@@ -93,6 +93,10 @@ export const REQUIRED_MONEY_MIGRATIONS = [
  *      missing entry + one unknown entry.
  */
 export const KNOWN_MONEY_MIGRATIONS = new Set([
+  // Stripe test-mode sink. Known so the filename firewall accepts it.
+  // Deliberately absent from REQUIRED_MONEY_MIGRATIONS: this PR does not
+  // apply it, and the production probe must not demand it.
+  "20261101180000_stripe_test_mode_subscription_sink.sql",
   // billing / paddle foundation
   "20260620234500_add_paddle_event_processing.sql",
   "20260621003000_paddle_event_processing_operator_audit.sql",

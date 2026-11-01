@@ -1,0 +1,86 @@
+/**
+ * Stripe webhook signature verification over the raw body.
+ * Stripe-Signature: t=<unix>,v1=<hex>[,v1=<hex>...]
+ * Signed payload is `${t}.${rawBody}` with HMAC-SHA256.
+ * Every v1 value is compared. The webhook secret must be a whsec_ value,
+ * never an API key.
+ */
+import { timingSafeEqualHex } from "@/lib/timingSafeCompareRules";
+
+export const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300;
+
+export async function computeStripeSignatureHex(
+  secret: string,
+  timestampSeconds: number,
+  rawBody: string,
+): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signed = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`${timestampSeconds}.${rawBody}`),
+  );
+  return [...new Uint8Array(signed)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export function assertStripeWebhookSecret(secret: string): boolean {
+  if (typeof secret !== "string" || !secret.startsWith("whsec_") || secret.length < 8) return false;
+  if (secret.includes("sk_live_") || secret.includes("sk_test_")) return false;
+  if (/\s/.test(secret)) return false;
+  return true;
+}
+
+export function parseStripeSignatureHeader(
+  header: string | null,
+): { timestamp: number; v1: string[] } | null {
+  if (typeof header !== "string" || header.length === 0) return null;
+  let timestamp: number | null = null;
+  const v1: string[] = [];
+  for (const part of header.split(",")) {
+    const trimmed = part.trim();
+    const separator = trimmed.indexOf("=");
+    if (separator <= 0) continue;
+    const key = trimmed.slice(0, separator);
+    const value = trimmed.slice(separator + 1);
+    if (key === "t" && /^[0-9]+$/.test(value)) timestamp = Number(value);
+    if (key === "v1" && value.length > 0) v1.push(value);
+  }
+  if (timestamp == null || v1.length === 0) return null;
+  return { timestamp, v1 };
+}
+
+export async function verifyStripeWebhookSignature(input: {
+  rawBody: string;
+  header: string | null;
+  secret: string;
+  nowMs: number;
+  toleranceSeconds?: number;
+}): Promise<{ ok: true; timestamp: number } | { ok: false; reason: "invalid_signature" }> {
+  const fail = { ok: false as const, reason: "invalid_signature" as const };
+  if (!assertStripeWebhookSecret(input.secret)) return fail;
+  const parsed = parseStripeSignatureHeader(input.header);
+  if (!parsed) return fail;
+  const tolerance = input.toleranceSeconds ?? STRIPE_WEBHOOK_TOLERANCE_SECONDS;
+  const nowSeconds = Math.floor(input.nowMs / 1000);
+  if (Math.abs(nowSeconds - parsed.timestamp) > tolerance) return fail;
+
+  let expected = "";
+  try {
+    expected = await computeStripeSignatureHex(input.secret, parsed.timestamp, input.rawBody);
+  } catch {
+    return fail;
+  }
+
+  let matched = false;
+  for (const candidate of parsed.v1) {
+    matched = timingSafeEqualHex(candidate, expected) || matched;
+  }
+  if (!matched) return fail;
+  return { ok: true, timestamp: parsed.timestamp };
+}

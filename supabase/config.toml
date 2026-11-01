@@ -16,6 +16,16 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # auth.getUser inside the function — defence in depth).
   [functions.get-paddle-price]
     verify_jwt = true
+  # create-checkout-session opens a Stripe Checkout Session in test mode only.
+  # The gateway requires a signed-in JWT. The handler re-verifies auth.getUser
+  # and refuses a live secret before any Stripe call.
+  [functions.create-checkout-session]
+    verify_jwt = true
+  # stripe-webhook accepts Stripe deliveries, which carry no Supabase JWT.
+  # Nothing is granted until the raw-body Stripe-Signature verifies. A
+  # livemode event is refused with no database write.
+  [functions.stripe-webhook]
+    verify_jwt = false
   # Webhook receivers accept Paddle requests, which carry no Supabase user
   # JWT. They grant NOTHING until the raw-body Paddle signature verifies
   # inside the function; platform JWT verification must be off or Paddle

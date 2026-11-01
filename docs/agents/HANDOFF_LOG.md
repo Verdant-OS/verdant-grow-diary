@@ -69,6 +69,43 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### STRIPE-TEST-MODE-2669
+
+```text
+TASK STRIPE-TEST-MODE-2669  priority: P2  status: OPEN
+goal: Stripe test-mode checkout and webhook for four subscriptions and two credit packs, with Founder Lifetime still retired.
+why: Issue #2669, Matthew's BUILD YES at 2026-11-01 09:51 CT, confirmed 11:34 CT. This pull request is slice 1 only (checkout session, webhook, additive schema, tests).
+branch: ultra/2669-stripe-test-mode
+base: verdant-grow-diary
+checkout: git fetch origin ultra/2669-stripe-test-mode verdant-grow-diary && git switch ultra/2669-stripe-test-mode && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: draft; read the URL from GitHub after push. Do not mark ready, approve, or merge.
+head_sha: the commit that adds this block; read git rev-parse HEAD after checkout. The READY FOR REVIEW comment names the full SHA.
+state: local until pushed; draft only
+current_step: slice 1 is in the working tree. Migration file is written and not applied.
+next_action: confirm the draft stays draft. An eligible reviewer who did not author this change reviews the exact head. Do not apply the migration, deploy, or use a live key.
+post_merge_check: NOT_MEASURED until a separately authorized deploy and migration apply. After that, a test-mode checkout must not succeed with an sk_live_ key, and founder_lifetime must still return 410 plan_retired.
+active_writer: verdant-ultra-bot (Grok session, Ultra Builder 1). Only that holder pushes.
+decisions: Hosted Checkout via fetch, no stripe npm package and no CSP change. Price ids come from env names only; catalog cents are checked against the Stripe Price before a session is created. Secret must start with sk_test_ and must not contain sk_live_. Webhook secret must start with whsec_. Signature is verified on the raw body (tolerance 300s) before any write. livemode true and founder_lifetime are refused with no writes. Subscription rows use provider stripe, environment sandbox, and paddle_subscription_id prefixed stripe:. past_due and canceled are UPDATE-only. Credit packs call grant_lovable_credit_pack with the checkout session id. The migration is listed in KNOWN_MONEY_MIGRATIONS only, not REQUIRED_MONEY_MIGRATIONS. New columns are not selected by the production entitlement lookup until the migration is applied. Return origin must be one of the four allowlisted origins.
+tried_and_rejected: apply_paddle_subscription_update (wrong RPC). A stripe npm dependency and Stripe.js (hosted Checkout does not need them). Selecting the new columns before the migration is applied. Putting the migration in REQUIRED_MONEY_MIGRATIONS (that list is probed as applied). Editing scripts/lib/scorerLockRules.mjs or any workflow. A Founder Lifetime Stripe product.
+commands: bunx vitest run src/test/stripe-founder-entitlement-preserved.test.ts src/test/stripe-test-mode-catalog.test.ts src/test/stripe-checkout-session-rules.test.ts src/test/stripe-webhook-rules.test.ts src/test/stripe-test-mode-migration.test.ts src/test/stripe-edge-security.test.ts --reporter=dot
+  Before, 2026-11-01 18:01:47 UTC, modules absent: Test Files 6 failed (6). Tests 6 failed | 1 passed (7).
+  After, 2026-11-01 18:08:44 UTC: Test Files 6 passed (6). Tests 27 passed (27).
+  NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck (exit 0). bun run lint (exit 0, 0 errors, 1130 pre-existing warnings).
+files_touched: src/lib/stripeTestModeCatalogRules.ts, src/lib/stripeCheckoutSessionRules.ts, src/lib/stripeCheckoutSessionOrchestrator.ts, src/lib/stripeWebhookSignatureRules.ts, src/lib/stripeWebhookEventRules.ts, src/lib/stripeWebhookOrchestrator.ts, src/lib/entitlements/lovablePaddleAdapter.ts, src/test/stripe-*.test.ts, supabase/functions/create-checkout-session/index.ts, supabase/functions/stripe-webhook/index.ts, supabase/functions/_shared/lib mirrors from sync-edge-shared, supabase/config.toml, supabase/migrations/20261101180000_stripe_test_mode_subscription_sink.sql, scripts/required-money-migrations.mjs, .env.example, docs/stripe-test-mode-setup.md, docs/agents/HANDOFF_LOG.md
+files_remaining: frontend Pricing, Upgrade, Checkout success/cancel, error copy, and the customer portal; Paddle removal; delete-dialog wording that still names Paddle. Those stay under the same yes and are not this pull request.
+blockers: migration apply, deploy, and live keys are not authorized. Independent exact-head review is not done. Payment and migration PRs stay out of the merge queue until a human approves that exact SHA.
+open_questions: none for slice 1. Real Checkout session ids and hosted screenshots are NOT_MEASURED (no live or test Stripe API calls from this session).
+gotchas: src/routeTree.gen.ts was already dirty on the base checkout; do not stage it. .claude/scorer-unlock.json is gitignored and must not be committed. The edge source must not contain the literal sk_test_ or sk_live_. past_due still grants access, so never INSERT a new past_due row. Do not call allocate_lovable_founder or write billing_subscriptions. Tax code txcd_10103100 is documentation only.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2669
+artifacts: docs/stripe-test-mode-setup.md. Migration file is not applied.
+reviewer_seat: empty
+reviewer_sha: empty
+session_state: Grok cloud agent bc-2c868d04-0235-582e-b0c6-5e4baa21c03d. No paused workflow.
+claimed_by: verdant-ultra-bot, 2026-11-01, by the Grok session that built slice 1
+owner: verdant-ultra-bot
+last_updated: 2026-11-01 13:15 CT, by Grok
+```
+
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text

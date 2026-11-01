@@ -44,6 +44,12 @@ export interface LovableSubscriptionRow {
   environment: string;
   created_at?: string;
   updated_at?: string;
+  /**
+   * Optional writer stamp. Absent rows stay the Lovable Paddle sink.
+   * `stripe` is the test-mode subscription written by apply_stripe_test_mode_event.
+   * Raw provider ids are still not copied onto the mapped row.
+   */
+  provider?: string | null;
 }
 
 export interface MapLovableOptions {
@@ -108,13 +114,14 @@ export function mapLovableSubscriptionRow(
     if (row.current_period_end == null) return null;
   }
 
+  const stripeTest = row.provider === "stripe";
   return {
-    // Synthetic normalized row — no raw Paddle IDs are exposed downstream.
-    id: `lovable_paddle:${planId}`,
+    // Synthetic normalized row — no raw provider ids are exposed downstream.
+    id: stripeTest ? `stripe_test:${planId}` : `lovable_paddle:${planId}`,
     user_id: row.user_id,
     plan_id: planId,
     status: row.status,
-    provider: "paddle",
+    provider: stripeTest ? "stripe" : "paddle",
     provider_customer_id: null,
     provider_subscription_id: null,
     current_period_end: row.current_period_end,

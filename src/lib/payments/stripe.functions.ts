@@ -8,6 +8,7 @@ import { stripeTokenEnvironment } from "@/lib/stripeCheckoutRules";
 import { resolveUnionEntitlements, pickEntitlingLovableRow } from "@/lib/entitlements";
 import { creditPackPurchaseEligible } from "@/lib/creditPackEligibility";
 import { stripeConfirmedPlanMatches } from "./stripeConfirmationRules";
+import type { SubscriptionLookup } from "./stripePortalSession.server";
 const environmentSchema = z.literal("sandbox"); // Owner approved test checkout only.
 async function resolveOrCreateCustomer(
   stripe: ReturnType<typeof createStripeClient>,
@@ -139,9 +140,7 @@ export const createStripePortalSession = createServerFn({ method: "POST" })
     const { isAllowedCheckoutReturnOrigin } = await import("./checkoutReturnOriginRules");
     if (!isAllowedCheckoutReturnOrigin(data.origin, requestOrigin))
       return { error: "Invalid return origin" };
-    const { createStripePortalSessionForUser, type SubscriptionLookup } = await import(
-      "./stripePortalSession.server"
-    );
+    const { createStripePortalSessionForUser } = await import("./stripePortalSession.server");
     return createStripePortalSessionForUser({
       // Structural cast: the full typed SupabaseClient against the minimal
       // lookup interface trips TS2589 (excessively deep instantiation).

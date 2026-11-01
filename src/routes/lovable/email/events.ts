@@ -1,5 +1,4 @@
 import { createEmailWebhookHandler } from '@lovable.dev/email-js'
-import { recordEmailEvent } from '@/lib/email/recordEmailEvent.server'
 import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute("/lovable/email/events")({
@@ -17,12 +16,15 @@ export const Route = createFileRoute("/lovable/email/events")({
             // Placeholder handlers — replace each log with the feature's reaction.
             // Throw on failure so the delivery is retried.
             'email.bounced': async (event) => {
+              const { recordEmailEvent } = await import('@/lib/email/recordEmailEvent.server')
               await recordEmailEvent(event)
             },
             'email.complaint': async (event) => {
+              const { recordEmailEvent } = await import('@/lib/email/recordEmailEvent.server')
               await recordEmailEvent(event)
             },
             'email.unsubscribed': async (event) => {
+              const { recordEmailEvent } = await import('@/lib/email/recordEmailEvent.server')
               await recordEmailEvent(event)
             },
           },

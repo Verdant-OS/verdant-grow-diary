@@ -1,5 +1,7 @@
 # Current tasks
 
+- [ ] Email update: convert existing sends, preserve email data and branding, replace outcome handlers, remove retired scaffold files, test and verify build; no publish.
+
 - [x] Lead capture, plan-interest and contact submissions now save through a validated server action and queue owner emails to matt@verdantgrowdiary.com. Contact and lead tests each produced a sent email receipt; only test submissions removed. 55 tests passed; ESLint 0 errors/1 warning; automatic build OK. Feedback excluded.
 - [ ] Automatic hosted delivery for owner submission alerts awaits owner publishing the new email handlers; no publish performed. Test emails were verified by explicitly processing the queue, not by claiming the undeployed scheduled endpoint worked.
 

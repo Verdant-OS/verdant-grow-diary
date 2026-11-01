@@ -1,3 +1,4 @@
+import '@tanstack/react-start/server-only'
 import * as React from 'react'
 import { render } from '@react-email/render'
 import { EmailAPIError, sendLovableEmail } from '@lovable.dev/email-js'
@@ -19,7 +20,7 @@ export type SendTemplateEmailResult =
   | { sent: false; reason: 'recipient_suppressed' }
 
 export interface SendTemplateEmailOptions {
-  templateData?: Record<string, any>
+  templateData?: Record<string, unknown>
   /** Dedupes retries of the same logical send; defaults to a random UUID (no dedupe). */
   idempotencyKey?: string
   replyTo?: string

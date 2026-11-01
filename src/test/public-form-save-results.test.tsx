@@ -80,7 +80,8 @@ describe.each(cases)("$name save result", (form) => {
     expect(view.container.querySelector("form")).toBeInTheDocument();
     if (!finish) throw new Error("Missing pending insert");
     finish({ error: null });
-    expect(await screen.findByRole("status")).toBeInTheDocument();
+    await waitFor(() => expect(view.container.querySelector("form")).toBeNull());
+    expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
   });
   it("settles a rejected save without claiming success or losing the form", async () => {
     mocks.insert.mockRejectedValue(new Error("private transport detail"));

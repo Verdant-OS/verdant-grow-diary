@@ -1,0 +1,2 @@
+Use the managed email scaffold for authentication handlers and templates; it preserves Cloud signature and callback contracts.
+Keep shared email-safe styling in styles.ts; email canvases remain white for client compatibility.

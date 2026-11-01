@@ -112,6 +112,7 @@ import { resolveQuickLogConfirmedScope } from "@/lib/quickLogConfirmedScopeRules
 import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
+import { activeDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
 import { useAuth } from "@/store/auth";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
@@ -2011,6 +2012,17 @@ function QuickLogV2SheetForOwner({
       setLocalError("Choose a plant or tent before saving.");
       return;
     }
+    const archiveGuard = activeDailyCheckPlantArchiveSaveGuard();
+    if (archiveGuard && resolved.plantId) {
+      const archiveDecision = await archiveGuard(resolved.plantId);
+      if (archiveDecision.block) {
+        // An unresolved earlier save still owns this form: keep it locked so
+        // the next retry replays that record, not edits made after the block.
+        if (pendingSubmission) keepSubmissionLockedRef.current = true;
+        setLocalError(archiveDecision.message);
+        return;
+      }
+    }
     const archivedSaveBlock = quickLogArchivedGrowActionBlock({
       growId: resolved.growId,
       action: pendingWateringSubmission
@@ -2023,6 +2035,7 @@ function QuickLogV2SheetForOwner({
       archivedGrowIds,
     });
     if (archivedSaveBlock) {
+      if (pendingSubmission) keepSubmissionLockedRef.current = true;
       setLocalError(archivedSaveBlock);
       return;
     }

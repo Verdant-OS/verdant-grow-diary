@@ -35,6 +35,7 @@ import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { isArchivedGrowNoteActivity } from "@/lib/archivedGrowQuickLogRules";
 import { supabase } from "@/integrations/supabase/client";
+import { activeDailyCheckPlantArchiveSaveGuard } from "@/lib/dailyCheckPlantArchiveSaveGuard";
 import {
   createQuickLogPhotoDiaryEntry,
   hasConfirmedQuickLogPhotoDiaryEntryForOwner,
@@ -1028,6 +1029,14 @@ export default function QuickLogAllActivitiesSection({
     if (!acquired) return;
     localSaveInFlightRef.current = true;
     try {
+      const archiveGuard = activeDailyCheckPlantArchiveSaveGuard();
+      const archiveDecision =
+        archiveGuard && record.input.plantId ? await archiveGuard(record.input.plantId) : null;
+      if (archiveDecision?.block) {
+        setErrorReason(archiveDecision.message);
+        setErrorForActivity(record.input.activityId);
+        return;
+      }
       const result = await save(record.input);
       const stillCurrent =
         liveOwnerIdRef.current === record.ownerId &&
@@ -1238,6 +1247,14 @@ export default function QuickLogAllActivitiesSection({
     localSaveInFlightRef.current = true;
 
     try {
+      const archiveGuard = activeDailyCheckPlantArchiveSaveGuard();
+      const archiveDecision =
+        archiveGuard && capturedTarget.plantId ? await archiveGuard(capturedTarget.plantId) : null;
+      if (archiveDecision?.block) {
+        setErrorReason(archiveDecision.message);
+        setErrorForActivity(selected.id);
+        return;
+      }
       const activityInput = {
         activityId: selected.id,
         growId: capturedTarget.growId,
@@ -1736,6 +1753,7 @@ export default function QuickLogAllActivitiesSection({
                     pendingPersistenceGate?.allowed === false)
                 }
                 data-testid={`${testIdPrefix}-retry-original`}
+                data-daily-check-save-plant={activePendingActivity.input.plantId ?? ""}
               >
                 {saving || checkingMovedReceipt
                   ? "Checking…"
@@ -2194,6 +2212,7 @@ export default function QuickLogAllActivitiesSection({
                         !guidedSymptomStageConfirmed))
                   }
                   data-testid={`${testIdPrefix}-save`}
+                  data-daily-check-save-plant={plantId ?? ""}
                 >
                   {saving ? "Saving…" : "Save"}
                 </Button>

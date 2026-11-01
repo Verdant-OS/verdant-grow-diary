@@ -161,3 +161,98 @@ export function defaultDailyCheckPlantId(input: {
  */
 export const DAILY_CHECK_WHAT_COUNTS_HINT =
   "A Daily Grow Check can be a quick plant note or a current-tent manual sensor snapshot.";
+
+/** Shown when submit re-reads the selected plant and it is archived. */
+export const DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE =
+  "This plant was archived. Pick another plant.";
+
+/** Shown when the archive re-read fails, is empty, or is not a boolean flag. */
+export const DAILY_CHECK_PLANT_ARCHIVE_RETRY_MESSAGE =
+  "Couldn't check whether this plant is archived. Try again.";
+
+/**
+ * Plant-list cache key. Equal to `PLANTS_QUERY_KEY` in `use-plants`.
+ * Daily Check imports it from here so a hook mock cannot drop the key.
+ */
+export const DAILY_CHECK_PLANTS_LIST_QUERY_KEY = ["plants"] as const;
+
+/**
+ * Save controls Daily Check renders. The page re-reads `plants.is_archived`
+ * before these run. The manual sensor snapshot controls are not listed: a
+ * snapshot is a tent-level reading with no plant_id, so an archived page
+ * plant must not block it.
+ */
+export const DAILY_CHECK_SUBMIT_SAVE_TEST_IDS = [
+  "quick-log-save",
+  "daily-check-all-activities-save",
+] as const;
+
+export type DailyCheckSubmitSaveTestId = (typeof DAILY_CHECK_SUBMIT_SAVE_TEST_IDS)[number];
+
+export function isDailyCheckSubmitSaveTestId(
+  testId: string | null | undefined,
+): testId is DailyCheckSubmitSaveTestId {
+  if (!testId) return false;
+  return (DAILY_CHECK_SUBMIT_SAVE_TEST_IDS as readonly string[]).includes(testId);
+}
+
+/**
+ * The plant named on the save control wins, including an explicit empty hint:
+ * that is a tent-only save with no plant to re-check. Only a control with no
+ * hint attribute at all falls back to Daily Check's selection.
+ */
+export function dailyCheckSavePlantId(input: {
+  readonly hintedPlantId: string | null | undefined;
+  readonly selectedPlantId: string;
+}): string {
+  if (input.hintedPlantId == null) return input.selectedPlantId;
+  return input.hintedPlantId.trim();
+}
+
+/** A read is stale when the plant that would be saved changed while it was in flight. */
+export function dailyCheckArchiveCheckIsStale(
+  checkedPlantId: string,
+  currentPlantId: string,
+): boolean {
+  return checkedPlantId !== currentPlantId;
+}
+
+export type DailyCheckPlantArchiveRead =
+  | { readonly status: "active" }
+  | { readonly status: "archived" }
+  | { readonly status: "unreadable" };
+
+/** Map one plant-row read. Only a boolean flag is archive proof. */
+export function classifyDailyCheckPlantArchiveRead(input: {
+  readonly error: boolean;
+  readonly isArchived: unknown;
+}): DailyCheckPlantArchiveRead {
+  if (input.error || typeof input.isArchived !== "boolean") return { status: "unreadable" };
+  return input.isArchived ? { status: "archived" } : { status: "active" };
+}
+
+export type DailyCheckPlantArchiveDecision =
+  | { readonly block: false }
+  | {
+      readonly block: true;
+      readonly message:
+        | typeof DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE
+        | typeof DAILY_CHECK_PLANT_ARCHIVE_RETRY_MESSAGE;
+    };
+
+export function dailyCheckSubmitBlockForPlantArchive(
+  read: DailyCheckPlantArchiveRead,
+): DailyCheckPlantArchiveDecision {
+  switch (read.status) {
+    case "active":
+      return { block: false };
+    case "unreadable":
+      return { block: true, message: DAILY_CHECK_PLANT_ARCHIVE_RETRY_MESSAGE };
+    case "archived":
+      return { block: true, message: DAILY_CHECK_ARCHIVED_PLANT_SUBMIT_MESSAGE };
+    default: {
+      const neverRead: never = read;
+      return neverRead;
+    }
+  }
+}

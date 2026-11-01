@@ -166,7 +166,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
       if (stripeTokenEnvironment(import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN)) {
         setBlockedReasonCode(null);
         setBlockedScope("checkout");
-        setBlockedReason(STRIPE_FULFILLMENT_PENDING_MESSAGE);
+        navigate(`/pricing?plan=${encodeURIComponent(options.priceId)}`);
         return;
       }
 

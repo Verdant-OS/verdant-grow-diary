@@ -47,7 +47,7 @@ export const createStripeCheckout = createServerFn({ method: 'POST' })
       if (rowsError) throw new Error('Paid access could not be verified');
       const now = new Date();
       const entitlement = resolveUnionEntitlements({ byoRow: null, lovableRow: pickEntitlingLovableRow(rows ?? [], data.environment, now), expectedBillingEnvironment: data.environment, now });
-      if (offer.kind === 'subscription' && entitlement.isActive) throw new Error('A paid plan already exists. Manage your subscription before starting another.');
+      if (offer.kind === 'subscription' && entitlement.isActive && entitlement.effectivePlanId !== 'free') throw new Error('A paid plan already exists. Manage your subscription before starting another.');
       if (offer.kind === 'payment' && !creditPackPurchaseEligible(entitlement)) throw new Error('A verified paid plan is required for credit packs.');
       const prices = await stripe.prices.list({ lookup_keys: [offer.id], active: true });
       const price = prices.data[0];

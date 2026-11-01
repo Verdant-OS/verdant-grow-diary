@@ -12,7 +12,9 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 vi.mock("@/pages/support/spamGuard", () => ({
   HONEYPOT_FIELD: "website_url",
-  checkSpam: () => ({ ok: true }), fingerprint: () => "test", recordSubmission: vi.fn(),
+  checkSpam: () => ({ ok: true }),
+  fingerprint: () => "test",
+  recordSubmission: vi.fn(),
 }));
 vi.mock("@/lib/pricingAnalytics", () => ({ trackPricingEvent: vi.fn() }));
 
@@ -22,26 +24,51 @@ beforeEach(() => {
 });
 
 const cases = [
-  { name: "contact", table: "contact_messages", render: () => <Contact />, fill: () => {
-    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "Test Grower" } });
-    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "test@example.com" } });
-    fireEvent.change(screen.getByLabelText(/^Message/), { target: { value: "Test message" } });
-  } },
-  { name: "feedback", table: "customer_feedback", render: () => <Feedback />, fill: () => {
-    fireEvent.click(screen.getAllByRole("radio", { name: /4 out of 5/ })[0]);
-  } },
-  { name: "lead", table: "leads", render: () => <LeadCaptureForm />, fill: () => {
-    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "test@example.com" } });
-  } },
-  { name: "plan interest", table: "leads", render: () => <SubscriberInterestForm planId="pro_monthly" />, fill: () => {
-    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "test@example.com" } });
-  } },
+  {
+    name: "contact",
+    table: "contact_messages",
+    render: () => <Contact />,
+    fill: () => {
+      fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "Test Grower" } });
+      fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "test@example.com" } });
+      fireEvent.change(screen.getByLabelText(/^Message/), { target: { value: "Test message" } });
+    },
+  },
+  {
+    name: "feedback",
+    table: "customer_feedback",
+    render: () => <Feedback />,
+    fill: () => {
+      fireEvent.click(screen.getAllByRole("radio", { name: /4 out of 5/ })[0]);
+    },
+  },
+  {
+    name: "lead",
+    table: "leads",
+    render: () => <LeadCaptureForm />,
+    fill: () => {
+      fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "test@example.com" } });
+    },
+  },
+  {
+    name: "plan interest",
+    table: "leads",
+    render: () => <SubscriberInterestForm planId="pro_monthly" />,
+    fill: () => {
+      fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: "test@example.com" } });
+    },
+  },
 ];
 
 describe.each(cases)("$name save result", (form) => {
   it("waits for a saved row before announcing success", async () => {
     let finish: ((result: { error: null }) => void) | undefined;
-    mocks.insert.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    mocks.insert.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
     const view = render(<MemoryRouter>{form.render()}</MemoryRouter>);
     form.fill();
     const element = view.container.querySelector("form");

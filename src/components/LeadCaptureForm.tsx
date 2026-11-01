@@ -72,15 +72,15 @@ export default function LeadCaptureForm({
     }
     setSubmitting(true);
     try {
-    const { error } = await supabase.from("leads").insert({
-      name: parsed.data.name || null,
-      email: parsed.data.email,
-      company: parsed.data.company || null,
-      lead_type: parsed.data.lead_type,
-      message: parsed.data.message || null,
-      source: "landing",
-    });
-    if (error) throw new Error("Lead save failed");
+      const { error } = await supabase.from("leads").insert({
+        name: parsed.data.name || null,
+        email: parsed.data.email,
+        company: parsed.data.company || null,
+        lead_type: parsed.data.lead_type,
+        message: parsed.data.message || null,
+        source: "landing",
+      });
+      if (error) throw new Error("Lead save failed");
     } catch {
       setSaveError("We couldn't save your request. Your text is still here. Please try again.");
       return;
@@ -93,7 +93,11 @@ export default function LeadCaptureForm({
 
   if (done) {
     return (
-      <div role="status" aria-live="polite" className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6 text-center">
+      <div
+        role="status"
+        aria-live="polite"
+        className="rounded-xl border border-border/50 bg-card/40 backdrop-blur p-6 text-center"
+      >
         <h3 className="font-display text-lg font-semibold">You're on the list</h3>
         <p className="mt-2 text-sm text-muted-foreground">
           Your request has been saved for the Verdant team. Thank you for reaching out.
@@ -167,7 +171,11 @@ export default function LeadCaptureForm({
           placeholder="Tell us about your grow or hardware integration."
         />
       </div>
-      {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+      {saveError && (
+        <p role="alert" className="text-sm text-destructive">
+          {saveError}
+        </p>
+      )}
       <Button type="submit" disabled={submitting} size="lg" className="w-full md:w-auto">
         {submitting ? "Submitting…" : "Submit"}
       </Button>

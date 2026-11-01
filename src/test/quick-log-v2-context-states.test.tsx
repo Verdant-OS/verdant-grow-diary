@@ -8,7 +8,7 @@
  *  - offers a clear next action (Retry or Add plant/tent).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { act, render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const rpcMock = vi.fn();
@@ -41,6 +41,8 @@ vi.mock("sonner", () => ({
 }));
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import { publishTentQuickLogTargetEvidence } from "@/context/TentQuickLogTargetContext";
+import { QUICK_LOG_V2_EMPTY_CONTENT_HELPER } from "@/lib/quickLogV2Rules";
 
 function renderSheet(defaultTargetKey?: string | null) {
   const client = new QueryClient({
@@ -129,17 +131,32 @@ describe("QuickLogV2Sheet — Save requires an explicit plant or tent target", (
   });
 
   it("keeps helper copy and disables Save when targets exist but none is selected", () => {
-    renderSheet();
-    expect(screen.queryByTestId("qlv2-context-loading")).toBeNull();
-    expect(screen.queryByTestId("qlv2-context-error")).toBeNull();
-    expect(screen.queryByTestId("qlv2-context-empty")).toBeNull();
-    expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
-      "Choose a plant or tent before saving.",
-    );
-    const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
-    expect(save.disabled).toBe(true);
-    fireEvent.click(save);
-    expect(rpcMock).not.toHaveBeenCalled();
+    plantsState.data = [
+      { id: "plant-1", name: "Plant 1", tent_id: "tent-1", grow_id: "grow-1" },
+      { id: "plant-2", name: "Plant 2", tent_id: "tent-1", grow_id: "grow-1" },
+    ];
+    act(() => {
+      publishTentQuickLogTargetEvidence({ tentId: "tent-1", soleActivePlantId: null });
+    });
+    try {
+      renderSheet();
+      expect(screen.queryByTestId("qlv2-context-loading")).toBeNull();
+      expect(screen.queryByTestId("qlv2-context-error")).toBeNull();
+      expect(screen.queryByTestId("qlv2-context-empty")).toBeNull();
+      expect(screen.getByTestId("qlv2-target-panel")).toHaveAttribute("data-scope", "tent");
+      expect(screen.getByTestId("qlv2-target-panel-tent-value")).toHaveTextContent("Tent 1");
+      expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
+        QUICK_LOG_V2_EMPTY_CONTENT_HELPER,
+      );
+      const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
+      expect(save.disabled).toBe(true);
+      fireEvent.click(save);
+      expect(rpcMock).not.toHaveBeenCalled();
+    } finally {
+      act(() => {
+        publishTentQuickLogTargetEvidence(null);
+      });
+    }
   });
 
   it("LIVE MISS #1310: note text without a plant/tent target keeps Save disabled (no toast/RPC)", () => {

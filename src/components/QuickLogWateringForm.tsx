@@ -60,6 +60,8 @@ interface Props {
    */
   entryTemperatureUnit?: TemperatureUnitPreference;
   volumeError?: string | null;
+  /** Inline water-temperature band message. Null when the typed value is acceptable. */
+  waterTemperatureError?: string | null;
   /** Set after the grower confirms this exact entered amount. */
   confirmedLargeWaterKey?: string | null;
   onConfirmLargeWater?: (confirmationKey: string) => void;
@@ -77,6 +79,7 @@ export default function QuickLogWateringForm({
   disabled,
   entryTemperatureUnit,
   volumeError,
+  waterTemperatureError = null,
   confirmedLargeWaterKey = null,
   onConfirmLargeWater,
 }: Props) {
@@ -337,8 +340,20 @@ export default function QuickLogWateringForm({
               inputMode="decimal"
               value={value.waterTempC}
               disabled={disabled}
+              aria-invalid={Boolean(waterTemperatureError) || undefined}
+              aria-describedby={waterTemperatureError ? "qlv2-water-temp-error" : undefined}
               onChange={(event) => setField("waterTempC", event.target.value)}
             />
+            {waterTemperatureError ? (
+              <p
+                id="qlv2-water-temp-error"
+                data-testid="qlv2-water-temp-error"
+                className="mt-1 text-sm text-destructive"
+                role="alert"
+              >
+                {waterTemperatureError}
+              </p>
+            ) : null}
           </div>
         </div>
       </details>

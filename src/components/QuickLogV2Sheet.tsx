@@ -176,6 +176,7 @@ import { writeFeedingTypedEvent, type FeedingTypedEventInput } from "@/lib/write
 import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
 import QuickLogWateringForm from "@/components/QuickLogWateringForm";
 import { assessQuickLogWaterSaveGate } from "@/lib/quickLogWaterSaveGateRules";
+import { assessQuickLogWaterTemperatureInput } from "@/lib/quickLogWaterTemperatureGateRules";
 import { assessQuickLogSensorSnapshotGate } from "@/lib/quickLogSensorSnapshotGateRules";
 import {
   assessLargeWaterAmount,
@@ -689,9 +690,7 @@ function QuickLogV2SheetForOwner({
   // can slip a second save through. This ref locks the entry point
   // during the same tick.
   const saveInFlightRef = useRef(false);
-  const submitGuardRef = useRef<QuickLogSubmitGuardState>(
-    createQuickLogSubmitGuardState(),
-  );
+  const submitGuardRef = useRef<QuickLogSubmitGuardState>(createQuickLogSubmitGuardState());
   const observationDraftSuppressedRef = useRef(false);
   // True once this open restored or wrote the stored draft, so emptying the
   // form may forget it. Opening for another target never clears its draft.
@@ -1078,14 +1077,38 @@ function QuickLogV2SheetForOwner({
     [form.action, form.temperatureC, form.humidityPct, form.vpdKpa, manualEntryUnit],
   );
   const sensorFieldErrors = waterSaveGate?.fields ?? snapshotGate?.fields ?? {};
+  const wateringWaterTemperatureGate =
+    form.action === "water"
+      ? assessQuickLogWaterTemperatureInput({
+          waterTemperatureInput: wateringForm.waterTempC,
+          temperatureUnit: waterEntryUnit,
+        })
+      : null;
+  const feedingEntryUnit = feedingTempEntryUnitRef.current ?? temperatureUnit;
+  const feedingWaterTemperatureGate =
+    form.action === "feed"
+      ? assessQuickLogWaterTemperatureInput({
+          waterTemperatureInput: feedingForm.waterTempC,
+          temperatureUnit: feedingEntryUnit,
+        })
+      : null;
+  const waterTemperatureMessage = retryPending
+    ? null
+    : (wateringWaterTemperatureGate?.message ?? null);
+  const feedWaterTemperatureMessage = retryPending
+    ? null
+    : (feedingWaterTemperatureGate?.message ?? null);
   const waterFieldMessage = retryPending
     ? null
-    : (waterSaveGate?.footerMessage ?? snapshotGate?.footerMessage ?? null);
+    : (waterSaveGate?.footerMessage ??
+      waterTemperatureMessage ??
+      snapshotGate?.footerMessage ??
+      null);
   // #2159: a negative feeding EC is named under its field and blocks Save
   // while typed, not only when the save is attempted.
   const feedingEcGate =
     form.action === "feed" && !retryPending ? assessFeedingEcFields(feedingForm) : null;
-  const feedingFieldMessage = feedingEcGate?.footerMessage ?? null;
+  const feedingFieldMessage = feedingEcGate?.footerMessage ?? feedWaterTemperatureMessage;
   const largeWaterAssessment =
     form.action === "water" && !retryPending
       ? assessLargeWaterAmount({
@@ -2024,6 +2047,16 @@ function QuickLogV2SheetForOwner({
         setLocalError(feedingFormReasonToHelper("grow_id:missing"));
         return;
       }
+      if (!pendingFeedingSubmission) {
+        const waterTemperatureGate = assessQuickLogWaterTemperatureInput({
+          waterTemperatureInput: feedingForm.waterTempC,
+          temperatureUnit: feedingTempEntryUnitRef.current ?? temperatureUnit,
+        });
+        if (waterTemperatureGate.message) {
+          setLocalError(waterTemperatureGate.message);
+          return;
+        }
+      }
       const mapped = pendingFeedingSubmission
         ? { ok: true as const, payload: pendingFeedingSubmission.payload }
         : buildFeedingFormPayload({
@@ -2234,6 +2267,15 @@ function QuickLogV2SheetForOwner({
     if (pendingWateringSubmission) {
       wateringPayload = pendingWateringSubmission.payload;
     } else if (form.action === "water") {
+      const waterTemperatureGate = assessQuickLogWaterTemperatureInput({
+        waterTemperatureInput: wateringForm.waterTempC,
+        temperatureUnit: wateringTempEntryUnitRef.current ?? temperatureUnit,
+      });
+      if (waterTemperatureGate.message) {
+        setLocalError(waterTemperatureGate.message);
+        setSaveStatus("");
+        return;
+      }
       const mapped = buildWateringFormPayload({
         growId: resolved.growId,
         tentId: resolved.tentId ?? null,
@@ -3606,6 +3648,7 @@ function QuickLogV2SheetForOwner({
                 defaultsApplied={feedingDefaultsApplied}
                 entryTemperatureUnit={feedingTempEntryUnitRef.current ?? temperatureUnit}
                 ecFieldErrors={feedingEcGate?.fields}
+                waterTemperatureError={feedWaterTemperatureMessage}
               />
             </div>
           )}
@@ -3643,6 +3686,7 @@ function QuickLogV2SheetForOwner({
                 }}
                 entryTemperatureUnit={wateringTempEntryUnitRef.current ?? temperatureUnit}
                 volumeError={retryPending ? null : (waterSaveGate?.fields.volume ?? null)}
+                waterTemperatureError={waterTemperatureMessage}
                 confirmedLargeWaterKey={largeWaterConfirmedKey}
                 onConfirmLargeWater={(confirmationKey) => {
                   const next = confirmLargeWaterAmount(
@@ -4269,11 +4313,7 @@ function QuickLogV2SheetForOwner({
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"
                   >
-                    {saveBusy
-                      ? "Saving…"
-                      : retryPending
-                        ? "Retry exact record"
-                        : "Save"}
+                    {saveBusy ? "Saving…" : retryPending ? "Retry exact record" : "Save"}
                   </Button>
                 </div>
               </>

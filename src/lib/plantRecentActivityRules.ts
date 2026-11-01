@@ -8,7 +8,9 @@
  * Read-only. Not used for alerts, actions, AI Doctor, or device control.
  */
 import { normalizeDiaryEntries, type NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
-import { isStale } from "@/lib/sensorSnapshot";
+import { isHumidityValid, isTemperatureValid } from "@/lib/sensorReadingNormalizationRules";
+import { STALE_THRESHOLD_MS, isStale } from "@/lib/sensorSnapshot";
+import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
 import { shouldShowPhotoNonDiagnosticLabel } from "@/lib/photoEventNonDiagnosticLabelRules";
 import { resolveQuickLogEventIdentity } from "@/lib/quickLogEventIdentityRules";
@@ -79,10 +81,56 @@ function previewNote(note: string): string {
   return trimmed.slice(0, NOTE_PREVIEW_MAX - 1).trimEnd() + "…";
 }
 
+const MANUAL_SNAPSHOT_READING_KEYS = ["temp_f", "humidity_percent", "ph", "ec"] as const;
+
+/**
+ * Temperature and humidity use the same bands as
+ * snapshotFromManualSensorSnapshot. pH and EC have no band there.
+ * Strings and non-finite numbers are not readings.
+ */
+function isAcceptedManualReading(
+  key: (typeof MANUAL_SNAPSHOT_READING_KEYS)[number],
+  value: unknown,
+): boolean {
+  if (typeof value !== "number" || !Number.isFinite(value)) return false;
+  switch (key) {
+    case "temp_f":
+      return isTemperatureValid(fahrenheitToCelsius(value));
+    case "humidity_percent":
+      return isHumidityValid(value);
+    case "ph":
+    case "ec":
+      return true;
+    default: {
+      const unexpected: never = key;
+      return unexpected;
+    }
+  }
+}
+
+/**
+ * Quick Log stores the reading on details.manual_sensor_snapshot, which
+ * collectExtras keeps. temp_f is not copied onto sensorSnapshot.temp.
+ * Temperature and humidity must fall inside the bands
+ * snapshotFromManualSensorSnapshot already uses.
+ */
+function hasManualSensorSnapshot(entry: NormalizedDiaryEntry): boolean {
+  const raw = entry.details.extras?.manual_sensor_snapshot;
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return false;
+  const snap = raw as Record<string, unknown>;
+  if (snap.source !== "manual") return false;
+  return MANUAL_SNAPSHOT_READING_KEYS.some((key) => isAcceptedManualReading(key, snap[key]));
+}
+
 function toRow(entry: NormalizedDiaryEntry, now: number): PlantRecentActivityRow {
   const snap = entry.details.sensorSnapshot;
-  const snapshotAt = snap?.at ?? null;
-  const hasSnapshot = !!snap;
+  const manualPresent = hasManualSensorSnapshot(entry);
+  // A manual Quick Log snapshot has no `at`. Use the diary entry time.
+  // Pass source "manual" so isStale uses the 24-hour window, not the
+  // 15-minute live default. temp_f stays off sensorSnapshot.temp.
+  const manualClock = manualPresent && !snap?.at;
+  const snapshotAt = snap?.at ?? (manualClock ? entry.createdAt : null);
+  const hasSnapshot = !!snap || manualPresent;
   const split = splitHardwareReadingsFromNote(entry.note);
   const identity = resolveQuickLogEventIdentity(entry);
   return {
@@ -100,7 +148,12 @@ function toRow(entry: NormalizedDiaryEntry, now: number): PlantRecentActivityRow
     hasPhoto: !!entry.photoUrl,
     hasSnapshot,
     snapshotAt,
-    snapshotStale: hasSnapshot && snapshotAt ? isStale(snapshotAt, now) : false,
+    snapshotStale:
+      hasSnapshot && snapshotAt
+        ? manualClock
+          ? isStale(snapshotAt, now, STALE_THRESHOLD_MS, "manual")
+          : isStale(snapshotAt, now)
+        : false,
     // QuickLog does not currently persist a source label on the snapshot.
     // We never invent one — leave null unless future writers store it.
     snapshotSourceLabel: null,

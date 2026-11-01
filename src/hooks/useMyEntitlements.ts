@@ -32,6 +32,7 @@ import {
   type LovableSubscriptionRow,
   type ResolvedEntitlement,
 } from "@/lib/entitlements";
+import { stripeTokenEnvironment } from "@/lib/stripeCheckoutRules";
 import { getPaddleEnvironment } from "@/lib/paddle";
 
 export interface UseMyEntitlementsResult {
@@ -166,7 +167,7 @@ export function useMyEntitlements(
   const [lookupFailed, setLookupFailed] = useState(false);
   const [entitlement, setEntitlement] = useState<ResolvedEntitlement>(() => FREE_NOW());
 
-  const expectedBillingEnvironment = useMemo(() => getPaddleEnvironment(), []);
+  const expectedBillingEnvironment = useMemo(() => stripeTokenEnvironment(import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN) ?? getPaddleEnvironment(), []);
 
   // The subscription reads race unmount (route change, test teardown):
   // never setState after unmount.

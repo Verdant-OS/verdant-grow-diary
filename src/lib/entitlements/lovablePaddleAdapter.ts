@@ -33,8 +33,11 @@ export type LovableBillingEnvironment = "sandbox" | "live";
  */
 export interface LovableSubscriptionRow {
   user_id: string;
-  paddle_subscription_id: string;
-  paddle_customer_id: string;
+  paddle_subscription_id: string | null;
+  paddle_customer_id: string | null;
+  billing_provider?: string;
+  stripe_subscription_id?: string | null;
+  stripe_customer_id?: string | null;
   product_id: string;
   price_id: string;
   status: string;
@@ -89,6 +92,7 @@ export function mapLovableSubscriptionRow(
     return null;
   }
   if (row.environment !== opts.expectedBillingEnvironment) return null;
+  if (row.billing_provider === "stripe" && (!row.stripe_subscription_id?.startsWith("sub_") || !row.stripe_customer_id?.startsWith("cus_"))) return null;
 
   const planId = KNOWN_PRICE_TO_PLAN[row.price_id];
   if (planId == null) return null;
@@ -114,7 +118,7 @@ export function mapLovableSubscriptionRow(
     user_id: row.user_id,
     plan_id: planId,
     status: row.status,
-    provider: "paddle",
+    provider: row.billing_provider === "stripe" ? "stripe" : "paddle",
     provider_customer_id: null,
     provider_subscription_id: null,
     current_period_end: row.current_period_end,

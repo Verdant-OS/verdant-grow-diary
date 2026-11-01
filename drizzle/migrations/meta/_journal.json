@@ -22,6 +22,13 @@
       "when": 1793509310587,
       "tag": "0002_stripe_test_credit_spend_isolation",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793510149238,
+      "tag": "0003_secure_public_support_forms",
+      "breakpoints": true
     }
   ]
 }

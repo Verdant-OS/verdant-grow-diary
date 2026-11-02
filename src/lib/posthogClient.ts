@@ -7,9 +7,13 @@
  * import runs for a missing key, a non-production host, a denied decision,
  * or the grow-help toolkit route.
  *
- * Withdrawal stops replay, resets the SDK, then opts out. `reset()` returns
- * the SDK to its default opted-in state, so opt-out has to follow it.
- * Sign-out resets the distinct id and leaves capture on while consent remains.
+ * Withdrawal stops replay, resets the device id, opts out, then deletes
+ * `ph_<token>_` cookie and web storage. The `__ph_opt_in_out_<token>` flag
+ * stays, so a reload remains opted out. `reset()` returns the SDK to its
+ * default opted-in state, so opt-out has to follow it. A granted init calls
+ * `opt_in_capturing` with no `$opt_in` event, including after a new session
+ * where the SDK reloaded a persisted opt-out. Sign-out resets the distinct
+ * id without clearing the device id and leaves capture on while consent remains.
  */
 
 import type { PostHogConfig } from "posthog-js";
@@ -20,6 +24,7 @@ import {
   buildPostHogInitOptions,
   decidePostHogStartup,
   mapFunnelEventToPostHog,
+  planPostHogPersistenceRemoval,
   posthogDistinctId,
   posthogPageviewProperties,
   posthogPersonProperties,
@@ -35,11 +40,13 @@ type PostHogSdk = {
   init: (token: string, config?: Partial<PostHogConfig>) => unknown;
   capture: (event: string, properties?: Record<string, unknown>) => unknown;
   identify: (distinctId: string, properties?: Record<string, unknown>) => unknown;
-  opt_in_capturing: () => void;
+  opt_in_capturing: (options?: { captureEventName?: false | null | string }) => void;
   opt_out_capturing: () => void;
   stopSessionRecording: () => void;
-  reset: () => void;
+  reset: (resetDeviceId?: boolean) => void;
 };
+
+const OPT_IN_WITHOUT_EVENT = { captureEventName: false } as const;
 
 export type PostHogClientDeps = {
   loadSdk?: () => Promise<PostHogSdk>;
@@ -54,6 +61,7 @@ type Status = "idle" | "loading" | "ready" | "stopped" | "failed";
 let status: Status = "idle";
 let generation = 0;
 let sdk: PostHogSdk | null = null;
+let projectKey: string | null = null;
 let capturing = false;
 let identifiedId: string | null = null;
 let lastPagePath: string | null = null;
@@ -72,6 +80,7 @@ export function __resetPostHogClientForTests(): void {
   status = "idle";
   generation = 0;
   sdk = null;
+  projectKey = null;
   capturing = false;
   identifiedId = null;
   lastPagePath = null;
@@ -118,13 +127,19 @@ function defaultReadEnv(): { key?: string; host?: string } {
 function beginLoad(key: string, apiHost: string, deps: PostHogClientDeps): void {
   const gen = ++generation;
   status = "loading";
+  projectKey = key;
   const load = deps.loadSdk ?? defaultLoadSdk;
   void load()
     .then((loaded) => {
       if (gen !== generation) return;
       safe(() => loaded.init(key, buildPostHogInitOptions(apiHost)));
       if (gen !== generation) {
-        withdraw(loaded);
+        withdraw(loaded, key);
+        return;
+      }
+      safe(() => loaded.opt_in_capturing(OPT_IN_WITHOUT_EVENT));
+      if (gen !== generation) {
+        withdraw(loaded, key);
         return;
       }
       sdk = loaded;
@@ -145,7 +160,7 @@ async function defaultLoadSdk(): Promise<PostHogSdk> {
 
 function resume(loaded: PostHogSdk): void {
   if (!capturing) {
-    safe(() => loaded.opt_in_capturing());
+    safe(() => loaded.opt_in_capturing(OPT_IN_WITHOUT_EVENT));
     capturing = true;
     status = "ready";
     attachSideEffects(loaded, generation, clientDeps);
@@ -158,15 +173,43 @@ function stopCollection(): void {
   detachSideEffects();
   lastPagePath = null;
   identifiedId = null;
-  if (sdk && capturing) withdraw(sdk);
+  const loaded = sdk;
+  const key = projectKey;
+  if (loaded && capturing) withdraw(loaded, key);
   capturing = false;
   status = sdk ? "stopped" : "idle";
 }
 
-function withdraw(loaded: PostHogSdk): void {
+function withdraw(loaded: PostHogSdk, key: string | null): void {
   safe(() => loaded.stopSessionRecording());
-  safe(() => loaded.reset());
+  safe(() => loaded.reset(true));
   safe(() => loaded.opt_out_capturing());
+  clearPersistedPostHogState(key);
+}
+
+function clearPersistedPostHogState(key: string | null): void {
+  if (!key || typeof window === "undefined") return;
+  const plan = planPostHogPersistenceRemoval({
+    token: key,
+    localKeys: storageKeys(window.localStorage),
+    sessionKeys: storageKeys(window.sessionStorage),
+    cookie: document.cookie,
+  });
+  if (!plan) return;
+  for (const name of plan.localKeys) window.localStorage.removeItem(name);
+  for (const name of plan.sessionKeys) window.sessionStorage.removeItem(name);
+  for (const name of plan.cookieNames) {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; path=/`;
+  }
+}
+
+function storageKeys(storage: Storage): string[] {
+  const keys: string[] = [];
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (key) keys.push(key);
+  }
+  return keys;
 }
 
 function emitPageview(loaded: PostHogSdk): void {

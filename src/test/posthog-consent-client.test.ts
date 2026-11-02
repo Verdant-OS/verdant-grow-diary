@@ -184,6 +184,8 @@ describe("PostHog consent client", () => {
         autocapture: false,
         rageclick: true,
         mask_all_text: true,
+        disable_session_recording: true,
+        opt_out_persistence_by_default: true,
         session_recording: expect.objectContaining({
           maskAllInputs: true,
           recordHeaders: false,
@@ -192,6 +194,8 @@ describe("PostHog consent client", () => {
         }),
       }),
     );
+    expect(sdk.opt_in_capturing).toHaveBeenCalledTimes(1);
+    expect(sdk.opt_in_capturing).toHaveBeenCalledWith({ captureEventName: false });
     expect(sdk.capture).toHaveBeenCalledTimes(1);
     expect(sdk.capture).toHaveBeenCalledWith("$pageview", {
       $pathname: "/",
@@ -229,17 +233,31 @@ describe("PostHog consent client", () => {
     await vi.waitFor(() => expect(sdk.capture).toHaveBeenCalledTimes(1));
     sdk.capture.mockClear();
 
+    const persistenceKey = `ph_${FIXTURE_KEY}_posthog`;
+    window.localStorage.setItem(persistenceKey, JSON.stringify({ $device_id: "device-kept" }));
+    window.localStorage.setItem(`${persistenceKey}__flags`, "{}");
+    window.sessionStorage.setItem(persistenceKey, "{}");
+    document.cookie = `${persistenceKey}=device-kept; path=/`;
+    window.localStorage.setItem(`__ph_opt_in_out_${FIXTURE_KEY}`, "0");
+
     syncPostHogWithConsent(
       "denied",
       { pathname: "/app", search: "", hash: "" },
       { loadSdk, readEnv: prodEnv },
     );
+
     expect(sdk.stopSessionRecording.mock.invocationCallOrder[0]).toBeLessThan(
       sdk.reset.mock.invocationCallOrder[0],
     );
+    expect(sdk.reset).toHaveBeenCalledWith(true);
     expect(sdk.reset.mock.invocationCallOrder[0]).toBeLessThan(
       sdk.opt_out_capturing.mock.invocationCallOrder[0],
     );
+    expect(window.localStorage.getItem(persistenceKey)).toBeNull();
+    expect(window.localStorage.getItem(`${persistenceKey}__flags`)).toBeNull();
+    expect(window.sessionStorage.getItem(persistenceKey)).toBeNull();
+    expect(document.cookie).not.toContain(persistenceKey);
+    expect(window.localStorage.getItem(`__ph_opt_in_out_${FIXTURE_KEY}`)).toBe("0");
 
     window.dispatchEvent(
       new CustomEvent(PRICING_ANALYTICS_EVENT, { detail: { name: "signup", props: {} } }),
@@ -393,8 +411,52 @@ describe("PostHog consent client", () => {
     syncPostHogWithConsent("granted", home, { loadSdk, readEnv: prodEnv });
     expect(loadSdk).toHaveBeenCalledTimes(1);
     expect(sdk.init).toHaveBeenCalledTimes(1);
-    expect(sdk.opt_in_capturing).toHaveBeenCalledTimes(1);
+    expect(sdk.opt_in_capturing).toHaveBeenCalledTimes(2);
+    expect(sdk.opt_in_capturing).toHaveBeenCalledWith({ captureEventName: false });
     expect(sdk.capture).toHaveBeenCalledTimes(1);
     expect(sdk.capture).toHaveBeenCalledWith("$pageview", expect.any(Object));
+  });
+
+  it("opts in after init when a new session grants consent after a persisted opt-out", async () => {
+    let optedOut = false;
+    const captures: string[] = [];
+    const sessionSdk = {
+      init: vi.fn(),
+      capture: vi.fn((event: string) => {
+        if (!optedOut) captures.push(event);
+      }),
+      identify: vi.fn(),
+      opt_in_capturing: vi.fn(() => {
+        optedOut = false;
+      }),
+      opt_out_capturing: vi.fn(() => {
+        optedOut = true;
+      }),
+      has_opted_out_capturing: vi.fn(() => optedOut),
+      stopSessionRecording: vi.fn(),
+      reset: vi.fn(),
+    };
+    const loadSdk = vi.fn(async () => sessionSdk);
+    setLocation("verdantgrowdiary.com");
+    const home = { pathname: "/", search: "", hash: "" };
+
+    syncPostHogWithConsent("granted", home, { loadSdk, readEnv: prodEnv });
+    await vi.waitFor(() => expect(sessionSdk.init).toHaveBeenCalledTimes(1));
+    expect(captures).toContain("$pageview");
+
+    syncPostHogWithConsent("denied", home, { loadSdk, readEnv: prodEnv });
+    expect(optedOut).toBe(true);
+    expect(sessionSdk.reset).toHaveBeenCalledWith(true);
+
+    __resetPostHogClientForTests();
+    captures.length = 0;
+    syncPostHogWithConsent("granted", home, { loadSdk, readEnv: prodEnv });
+    await vi.waitFor(() => expect(sessionSdk.init).toHaveBeenCalledTimes(2));
+    expect(sessionSdk.opt_in_capturing.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      sessionSdk.init.mock.invocationCallOrder.at(-1) ?? 0,
+    );
+    expect(optedOut).toBe(false);
+    expect(captures).toContain("$pageview");
+    expect(loadSdk).toHaveBeenCalledTimes(2);
   });
 });

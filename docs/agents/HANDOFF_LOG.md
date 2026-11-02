@@ -79,11 +79,11 @@ branch: ultra/2717-ecowitt-live-ingest
 base: verdant-grow-diary
 checkout: git fetch origin ultra/2717-ecowitt-live-ingest verdant-grow-diary && git switch ultra/2717-ecowitt-live-ingest
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2732
-head_sha: read git rev-parse HEAD after the Reviewer D follow-up; previous remote head acb3db1db0b706dc9e143b9484f2e5dce0aaee01
+head_sha: read git rev-parse HEAD after the channel-router follow-up; previous remote head ba05540f07fa26f511b05ba65ad5fac0eb95d9b6
 state: pushed draft
-current_step: Reviewer D P2-1, P2-2, and P3-3 were already fixed at acb3db1d. This follow-up truncates the stored passkey fingerprint, hides unknown_claim and passkey_mismatch behind rejected, and binds only while passkey_sha256 is null.
+current_step: Custom-upload air and soil use routeEcoWittPayloadToTents for channels 1-8. Indoor tempinf/humidityin are not tent air. Insert failure on both ingest paths returns 500/503 and is logged. bump_bridge_token_usage errors on the passkey path return 500.
 next_action: keep the PR draft. Required full-suite and lint jobs stay skipped until a non-author marks the PR ready. Do not apply the migration or deploy the edge function.
-post_merge_check: after a separate authorized apply and Publish, a GW1206 customized-upload POST to /ew/<token> writes source live indoor temp and humidity. NOT_MEASURED until then.
+post_merge_check: after a separate authorized apply and Publish, a GW1200B POST stores the tent's configured air channel, not the gateway indoor sensor. NOT_MEASURED until then.
 active_writer: Grok cloud session assigned 2026-11-02 to push this branch
 decisions: empty maybeSingle (data null, error null) is no open claim. A present row still goes through readOpenClaim, and a non-object still fails closed as malformed_response. No new migration. Do not edit config.toml, do not deploy, do not mark ready.
 tried_and_rejected: rewriting the claim service into a static class. The file already uses injected-client functions and the bug is one unreachable guard.
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: no production writes; PR stays draft
 claimed_by: Grok, 2026-11-02
 owner: Grok (takeover from Team Ultra by explicit assignment)
-last_updated: 2026-11-02 17:30 CT, by Grok
+last_updated: 2026-11-02 18:25 CT, by Grok
 ```
 
 ### CREATE-DIALOG-DISABLED-REASON

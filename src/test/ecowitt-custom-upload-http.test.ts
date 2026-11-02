@@ -30,14 +30,20 @@ function claim(passkeySha256: string | null): EcowittCustomUploadClaim {
 function formBody(): string {
   const body = new URLSearchParams({
     PASSKEY,
-    stationtype: "GW1200-fixture",
+    stationtype: "GW1200B",
     dateutc: "2026-11-02 18:00:00",
-    tempinf: "72",
-    humidityin: "55",
-    soilmoisture1: "40",
+    tempinf: "70",
+    humidityin: "40",
+    temp2f: "72",
+    humidity2: "55",
+    soilmoisture2: "40",
     co2: "800",
   });
   return body.toString();
+}
+
+function channels() {
+  return async () => ({ ok: true as const, airChannels: [2], soilChannels: [2, 3, 4] });
 }
 
 describe("EcoWitt customized-upload HTTP handler", () => {
@@ -68,6 +74,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         inserted = rows;
         return { ok: true };
       },
+      tentChannels: channels(),
     };
     const response = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
@@ -86,6 +93,8 @@ describe("EcoWitt customized-upload HTTP handler", () => {
     expect(payload).toEqual({ accepted: true, stored: 4, reason: "stored" });
     expect(JSON.stringify(payload)).not.toContain(PASSKEY);
     expect(inserted[0]?.source).toBe("live");
+    expect(inserted.map((row) => row.rawPayload.rawKey)).not.toContain("tempinf");
+    expect(inserted.map((row) => row.rawPayload.rawKey)).toContain("temp2f");
     expect(inserted[0]?.capturedAt).toBe("2026-11-02T18:00:00Z");
     expect(events[0]).toBe(`lookup:${await sha256Hex(TOKEN)}`);
     expect(events[1]?.startsWith("entitlement:")).toBe(true);
@@ -115,6 +124,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         events.push("insert");
         return { ok: true };
       },
+      tentChannels: channels(),
     };
     const limited = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
@@ -178,6 +188,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         inserts += 1;
         return { ok: true };
       },
+      tentChannels: channels(),
     };
     const mismatch = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
@@ -216,5 +227,41 @@ describe("EcoWitt customized-upload HTTP handler", () => {
     expect(oversized.status).toBe(200);
     expect(await oversized.json()).toMatchObject({ accepted: false, reason: "payload_too_large" });
     expect(inserts).toBe(0);
+  });
+
+  it("returns 503 when the reading insert fails", async () => {
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args.map(String).join(" "));
+    };
+    try {
+      const response = await handleEcowittCustomUploadRequest(
+        new Request(`https://example.test/ew/${TOKEN}`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: formBody(),
+        }),
+        {
+          now: () => NOW,
+          sha256Hex,
+          lookupClaim: async () => claim(null),
+          entitlement: async () => "allowed",
+          bindClaim: async () => ({ ok: true }),
+          touchClaim: async () => ({ ok: true }),
+          insertReadings: async () => ({ ok: false }),
+          tentChannels: channels(),
+        },
+      );
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({
+        accepted: false,
+        reason: "store_failed",
+        stored: 0,
+      });
+      expect(errors.some((line) => line.includes("insert_failed"))).toBe(true);
+    } finally {
+      console.error = original;
+    }
   });
 });

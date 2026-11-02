@@ -390,15 +390,30 @@ export async function handleEcoWittIngestRequest(
       auth_kind: auth.kind,
       rows: rows.length,
     });
-    return json({ ok: false, accepted: false, inserted: 0, error: "insert_failed" }, 200);
+    return json({ ok: false, accepted: false, inserted: 0, error: "insert_failed" }, 500);
   }
 
   const inserted = upserted?.length ?? 0;
   if (inserted > 0) {
-    await admin.rpc("bump_bridge_token_usage", {
+    const bumpResult = (await admin.rpc("bump_bridge_token_usage", {
       p_id: auth.tokenId,
       p_inserted: inserted,
-    });
+    })) as { error?: unknown } | null;
+    const bumpErr = bumpResult?.error ?? null;
+    if (bumpErr) {
+      console.error("[ecowitt-ingest] bump_bridge_token_usage_failed", {
+        auth_kind: auth.kind,
+      });
+      return json(
+        {
+          ok: false,
+          accepted: true,
+          inserted,
+          error: "bump_bridge_token_usage_failed",
+        },
+        500,
+      );
+    }
   }
 
   return json(

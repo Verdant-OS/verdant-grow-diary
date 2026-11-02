@@ -4,13 +4,17 @@
  * Pure: no React, no Supabase, no fetch, no clock except the injected `now`.
  * Date and percent handling follow `tools/ecowitt-testbench/ecowitt_listener.py`
  * (strict `YYYY-MM-DD HH:MM:SS` UTC, reject clocks more than five minutes
- * ahead, drop stuck 0/100 percent readings, ignore unknown keys). This path
- * stores indoor `tempinf` / `humidityin`, soil channel 1, and `co2` only.
- * It does not treat a missing metric as a healthy zero.
+ * ahead, drop stuck 0/100 percent readings, ignore unknown keys). Air and
+ * soil come from channels 1–8 through `routeEcoWittPayloadToTents` and the
+ * tent's `air_channels` / `soil_channels`. Indoor `tempinf` / `humidityin`
+ * are never tent air. Unmapped channels are dropped. `co2` stays on the
+ * claim tent. A missing metric is not stored as a healthy zero.
  *
  * The claim token and PASSKEY never appear in stored rows or in the plan's
  * public fields. Callers hash them before planning.
  */
+
+import { routeEcoWittPayloadToTents } from "./ecowittChannelTentRouter.ts";
 
 export const ECOWITT_CUSTOM_UPLOAD_MAX_BODY_BYTES = 64 * 1024;
 export const ECOWITT_CUSTOM_UPLOAD_FUTURE_SKEW_MS = 5 * 60 * 1000;
@@ -35,7 +39,7 @@ const GATEWAY_MARKER_SET = new Set<string>(ECOWITT_CUSTOM_UPLOAD_GATEWAY_MARKERS
 export type EcowittCustomUploadMetric =
   "temperature_c" | "humidity_pct" | "soil_moisture_pct" | "co2_ppm";
 
-export type EcowittCustomUploadChannel = "indoor" | "soil1" | "co2";
+export type EcowittCustomUploadChannel = `air${number}` | `soil${number}` | "co2";
 
 export interface EcowittCustomUploadClaim {
   readonly id: string;
@@ -110,10 +114,12 @@ export interface EcowittCustomUploadPlanInput {
   readonly now: Date;
   /** SHA-256 hex of the lowercased PASSKEY, or null when it is not 32 hex chars. */
   readonly passkeySha256: string | null;
+  /** Tent EcoWitt air channels, 1–8. Empty means no channel is tent air. */
+  readonly airChannels: readonly number[];
+  /** Tent EcoWitt soil channels, 1–8. Empty means no soil channel is stored. */
+  readonly soilChannels: readonly number[];
 }
 
-const AIR_TEMP_C_MIN = -10;
-const AIR_TEMP_C_MAX = 50;
 const CO2_PPM_MIN = 200;
 const CO2_PPM_MAX = 10000;
 
@@ -267,40 +273,51 @@ interface MetricDraft {
   readonly rawValue: string;
 }
 
-function metricDrafts(fields: Map<string, string | null>): readonly MetricDraft[] {
+function channelsInRange(channels: readonly number[]): number[] {
+  return channels.filter((channel) => channel >= 1 && channel <= 8);
+}
+
+function metricDrafts(
+  fields: Map<string, string | null>,
+  airChannels: readonly number[],
+  soilChannels: readonly number[],
+  passkeyFingerprint: string,
+): readonly MetricDraft[] {
+  const payload: Record<string, unknown> = {};
+  for (const [key, value] of fields) payload[key] = value;
+  const routed = routeEcoWittPayloadToTents({
+    payload,
+    payloadPasskeyFingerprint: passkeyFingerprint,
+    eligibleTents: [
+      {
+        tent_id: "claim",
+        passkey_fingerprint: passkeyFingerprint,
+        air_channels: channelsInRange(airChannels),
+        soil_channels: channelsInRange(soilChannels),
+      },
+    ],
+  });
   const drafts: MetricDraft[] = [];
-  const indoorF = coerceFinite(fields.get("tempinf") ?? null);
-  if (indoorF !== null) {
-    const celsius = customUploadFahrenheitToCelsius(indoorF);
-    if (celsius >= AIR_TEMP_C_MIN && celsius <= AIR_TEMP_C_MAX) {
+  for (const group of routed.groups) {
+    for (const reading of group.readings) {
+      if (
+        (reading.metric === "humidity_pct" || reading.metric === "soil_moisture_pct") &&
+        (reading.value <= 0 || reading.value >= 100)
+      ) {
+        continue;
+      }
+      const raw = fields.get(reading.source_channel_key);
       drafts.push({
-        metric: "temperature_c",
-        channel: "indoor",
-        rawKey: "tempinf",
-        value: celsius,
-        rawValue: (fields.get("tempinf") ?? "").trim(),
+        metric: reading.metric,
+        channel:
+          reading.metric === "soil_moisture_pct"
+            ? `soil${reading.channel}`
+            : `air${reading.channel}`,
+        rawKey: reading.source_channel_key,
+        value: reading.value,
+        rawValue: (raw ?? "").trim(),
       });
     }
-  }
-  const humidity = coerceFinite(fields.get("humidityin") ?? null);
-  if (humidity !== null && humidity > 0 && humidity < 100) {
-    drafts.push({
-      metric: "humidity_pct",
-      channel: "indoor",
-      rawKey: "humidityin",
-      value: humidity,
-      rawValue: (fields.get("humidityin") ?? "").trim(),
-    });
-  }
-  const soil = coerceFinite(fields.get("soilmoisture1") ?? null);
-  if (soil !== null && soil > 0 && soil < 100) {
-    drafts.push({
-      metric: "soil_moisture_pct",
-      channel: "soil1",
-      rawKey: "soilmoisture1",
-      value: soil,
-      rawValue: (fields.get("soilmoisture1") ?? "").trim(),
-    });
   }
   const co2 = coerceFinite(fields.get("co2") ?? null);
   if (co2 !== null && co2 >= CO2_PPM_MIN && co2 <= CO2_PPM_MAX) {
@@ -393,7 +410,12 @@ export function planEcowittCustomUploadIngest(
   if (capturedAt === null) return reject("dateutc_invalid");
   if (duplicateCapturedAt(claim, capturedAt)) return reject("duplicate_captured_at");
 
-  const drafts = metricDrafts(fields);
+  const drafts = metricDrafts(
+    fields,
+    input.airChannels,
+    input.soilChannels,
+    passkeySha256.slice(0, 16),
+  );
   if (drafts.length === 0) return reject("no_storable_metrics");
 
   const receivedAt = input.now.toISOString();

@@ -1,9 +1,10 @@
 /**
  * HTTP adapter for EcoWitt customized-upload ingest.
  *
- * Always answers 200 so a gateway does not retry-storm. The body is never
- * logged. PASSKEY and the claim token are hashed and then dropped.
- * Persistence and the entitlement lookup are injected ports.
+ * Logical rejects stay HTTP 200 so a gateway does not retry-storm. An insert
+ * failure or a tent-channel lookup failure is HTTP 503 and is logged. The
+ * body is never logged. PASSKEY and the claim token are hashed and then dropped.
+ * Persistence, tent channel config, and the entitlement lookup are injected ports.
  */
 import {
   ECOWITT_CUSTOM_UPLOAD_MAX_BODY_BYTES,
@@ -39,6 +40,11 @@ export interface EcowittCustomUploadPorts {
   insertReadings(
     rows: readonly EcowittCustomUploadStoredReading[],
   ): Promise<{ ok: true } | { ok: false }>;
+  tentChannels(
+    tentId: string,
+  ): Promise<
+    { ok: true; airChannels: readonly number[]; soilChannels: readonly number[] } | { ok: false }
+  >;
 }
 
 export async function sha256Hex(value: string): Promise<string> {
@@ -54,6 +60,7 @@ function publicIngestReason(reason: string): string {
 function jsonResponse(
   plan: Pick<EcowittCustomUploadIngestPlan, "accepted" | "reason">,
   stored: number,
+  status = 200,
 ): Response {
   return new Response(
     JSON.stringify({
@@ -62,7 +69,7 @@ function jsonResponse(
       stored,
     }),
     {
-      status: 200,
+      status,
       headers: {
         "content-type": "application/json; charset=utf-8",
         "cache-control": "no-store",
@@ -93,6 +100,8 @@ export async function handleEcowittCustomUploadRequest(
       entitlement: "allowed",
       now,
       passkeySha256: null,
+      airChannels: [],
+      soilChannels: [],
     });
     return jsonResponse(plan, 0);
   }
@@ -113,6 +122,8 @@ export async function handleEcowittCustomUploadRequest(
       entitlement: "allowed",
       now,
       passkeySha256: null,
+      airChannels: [],
+      soilChannels: [],
     });
     return jsonResponse(plan, 0);
   }
@@ -128,6 +139,8 @@ export async function handleEcowittCustomUploadRequest(
       entitlement: "allowed",
       now,
       passkeySha256: null,
+      airChannels: [],
+      soilChannels: [],
     });
     return jsonResponse(plan, 0);
   }
@@ -143,6 +156,8 @@ export async function handleEcowittCustomUploadRequest(
       entitlement: "allowed",
       now,
       passkeySha256: null,
+      airChannels: [],
+      soilChannels: [],
     });
     return jsonResponse(plan, 0);
   }
@@ -156,6 +171,18 @@ export async function handleEcowittCustomUploadRequest(
       : null;
   const claim = token === null ? null : await ports.lookupClaim(await ports.sha256Hex(token));
   const entitlement = claim === null ? "allowed" : await ports.entitlement(claim.userId, now);
+  const channels =
+    claim === null
+      ? {
+          ok: true as const,
+          airChannels: [] as readonly number[],
+          soilChannels: [] as readonly number[],
+        }
+      : await ports.tentChannels(claim.tentId);
+  if (!channels.ok) {
+    console.error("[ecowitt-custom-upload] tent_channel_lookup_failed");
+    return jsonResponse({ accepted: false, reason: "store_failed" }, 0, 503);
+  }
 
   const plan = planEcowittCustomUploadIngest({
     method,
@@ -166,6 +193,8 @@ export async function handleEcowittCustomUploadRequest(
     entitlement,
     now,
     passkeySha256,
+    airChannels: channels.airChannels,
+    soilChannels: channels.soilChannels,
   });
 
   if (!plan.accepted || claim === null) return jsonResponse(plan, 0);
@@ -190,7 +219,10 @@ export async function handleEcowittCustomUploadRequest(
   }
 
   const inserted = await ports.insertReadings(plan.rows);
-  if (!inserted.ok) return jsonResponse({ accepted: false, reason: "store_failed" }, 0);
+  if (!inserted.ok) {
+    console.error("[ecowitt-custom-upload] insert_failed", { rows: plan.rows.length });
+    return jsonResponse({ accepted: false, reason: "store_failed" }, 0, 503);
+  }
   return jsonResponse(plan, plan.rows.length);
 }
 

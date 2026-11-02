@@ -88,6 +88,11 @@ export interface EcowittCustomUploadServiceRole {
   insertReadings(
     rows: readonly EcowittCustomUploadStoredReading[],
   ): Promise<{ ok: true } | { ok: false }>;
+  tentChannels(
+    tentId: string,
+  ): Promise<
+    { ok: true; airChannels: readonly number[]; soilChannels: readonly number[] } | { ok: false }
+  >;
 }
 
 export async function handleEcowittCustomUploadWithEntitlement(
@@ -133,6 +138,7 @@ export async function handleEcowittCustomUploadWithEntitlement(
         capturedAt,
       ),
     insertReadings: (rows) => deps.serviceRole.insertReadings(rows),
+    tentChannels: (tentId) => deps.serviceRole.tentChannels(tentId),
   };
   return handleEcowittCustomUploadRequest(request, ports);
 }

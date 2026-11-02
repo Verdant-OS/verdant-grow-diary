@@ -61,6 +61,8 @@ function input(
     entitlement: "allowed",
     now: NOW,
     passkeySha256: PASSKEY_HASH,
+    airChannels: [],
+    soilChannels: [],
     ...overrides,
   };
 }
@@ -102,25 +104,60 @@ describe("EcoWitt customized-upload ingest rules", () => {
     expect(exactAge.accepted).toBe(true);
   });
 
-  it("stores indoor live rows in Celsius and drops secrets", () => {
-    const plan = planEcowittCustomUploadIngest(input());
+  it("stores channel 2 as tent air on a GW1200B packet and drops secrets", () => {
+    const plan = planEcowittCustomUploadIngest(
+      input({
+        airChannels: [2],
+        soilChannels: [2, 3, 4],
+        fields: fields({
+          stationtype: "GW1200B",
+          tempinf: "70.0",
+          humidityin: "40",
+          temp1f: "60.0",
+          humidity1: "30",
+          temp2f: "72.0",
+          humidity2: "55",
+          temp3f: "80.0",
+          humidity3: "60",
+          temp4f: "81.0",
+          humidity4: "61",
+          temp5f: "82.0",
+          humidity5: "62",
+          soilmoisture1: "10",
+          soilmoisture2: "40",
+          soilmoisture3: "41",
+          soilmoisture4: "42",
+        }),
+      }),
+    );
     expect(plan.httpStatus).toBe(200);
     expect(plan.accepted).toBe(true);
-    expect(plan.rows.map((row) => row.metric)).toEqual([
-      "temperature_c",
-      "humidity_pct",
-      "soil_moisture_pct",
-      "co2_ppm",
+    const air = plan.rows.find((row) => row.metric === "temperature_c");
+    const rh = plan.rows.find((row) => row.metric === "humidity_pct");
+    expect(air?.rawPayload.rawKey).toBe("temp2f");
+    expect(air?.rawPayload.channel).toBe("air2");
+    expect(air?.value).toBeCloseTo(customUploadFahrenheitToCelsius(72), 2);
+    expect(rh?.rawPayload.rawKey).toBe("humidity2");
+    expect(rh?.value).toBe(55);
+    expect(plan.rows.map((row) => row.rawPayload.rawKey)).not.toContain("tempinf");
+    expect(plan.rows.map((row) => row.rawPayload.rawKey)).not.toContain("humidityin");
+    expect(plan.rows.map((row) => row.rawPayload.rawKey)).not.toContain("temp1f");
+    expect(plan.rows.map((row) => row.rawPayload.rawKey).sort()).toEqual([
+      "co2",
+      "humidity2",
+      "soilmoisture2",
+      "soilmoisture3",
+      "soilmoisture4",
+      "temp2f",
     ]);
     expect(plan.rows.every((row) => row.source === "live" && row.quality === "ok")).toBe(true);
-    expect(plan.rows[0]?.value).toBeCloseTo(customUploadFahrenheitToCelsius(72), 5);
     expect(plan.rows[0]?.capturedAt).toBe("2026-11-02T18:00:00Z");
     expect(plan.rows[0]?.receivedAt).toBe(NOW.toISOString());
     expect(plan.rows.every((row) => row.userId === OWNER && row.tentId === TENT)).toBe(true);
     const serialized = JSON.stringify(plan);
     expect(serialized).not.toContain(PASSKEY);
     expect(serialized).not.toContain(TOKEN);
-    expect(plan.bind).toEqual({ passkeySha256: PASSKEY_HASH, stationtype: "GW1200-fixture" });
+    expect(plan.bind).toEqual({ passkeySha256: PASSKEY_HASH, stationtype: "GW1200B" });
   });
 
   it("ignores a body user id and does not bind a second PASSKEY", () => {
@@ -152,15 +189,35 @@ describe("EcoWitt customized-upload ingest rules", () => {
   it("drops stuck percent readings and does not invent the missing ones", () => {
     const plan = planEcowittCustomUploadIngest(
       input({
-        fields: fields({ humidityin: "100", soilmoisture1: "0", co2: "12" }),
+        airChannels: [2],
+        soilChannels: [2],
+        fields: fields({
+          temp2f: "72.0",
+          humidity2: "100",
+          soilmoisture2: "0",
+          co2: "12",
+        }),
       }),
     );
     expect(plan.accepted).toBe(true);
     expect(plan.rows.map((row) => row.metric)).toEqual(["temperature_c"]);
+    expect(plan.rows[0]?.rawPayload.rawKey).toBe("temp2f");
     const empty = planEcowittCustomUploadIngest(
-      input({ fields: fields({ tempinf: "", humidityin: "0", soilmoisture1: "100", co2: "" }) }),
+      input({
+        airChannels: [2],
+        soilChannels: [2],
+        fields: fields({
+          tempinf: "72.0",
+          humidityin: "55",
+          temp2f: "",
+          humidity2: "0",
+          soilmoisture2: "100",
+          co2: "",
+        }),
+      }),
     );
     expect(empty.reason).toBe("no_storable_metrics");
+    expect(empty.rows.map((row) => row.rawPayload.rawKey)).not.toContain("tempinf");
     expect(empty.bind).toBeNull();
   });
 

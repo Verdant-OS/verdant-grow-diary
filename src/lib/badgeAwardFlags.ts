@@ -7,7 +7,7 @@
  *
  * Petal must approve `badgeAwardCopy` before this flag is ever turned on.
  * Turning this flag on does not award a badge and does not render a
- * profile. Signed-in members can read active awards. Logged-out visitors
+ * profile. Award SELECT is the owning account only. Logged-out visitors
  * see no awards. Evidence photos stay private to the owning account.
  */
 export const ownerBadgeShelfEnabled = false as const;

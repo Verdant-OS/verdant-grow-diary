@@ -6,8 +6,8 @@
  * one. Note text is not required. These lines do not claim skill, rank,
  * yield, safety, or that a badge was verified. They do not shame a
  * text-only entry. This shelf is the owner view. A later slice shows
- * badges on the grower's profile. Signed-in members can read active
- * awards. Logged-out visitors see no awards. Evidence photos stay
+ * badges on the grower's profile. Award SELECT is the owning account
+ * only. Logged-out visitors see no awards. Evidence photos stay
  * private to the owning account.
  * Petal must approve this copy before ownerBadgeShelfEnabled is turned on.
  */

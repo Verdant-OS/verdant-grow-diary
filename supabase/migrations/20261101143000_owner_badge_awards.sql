@@ -427,10 +427,11 @@ BEGIN
   END IF;
 
   -- Recheck after the advisory lock and immediately before any award or
-  -- evidence write, so a committed enabled = false is a write barrier.
-  -- A plain read is enough: the disable commits before this statement.
-  -- FOR UPDATE on this singleton would be held by reconcile across later
-  -- owners and would deadlock a concurrent evaluate.
+  -- evidence write. A disable already committed is visible here and stops
+  -- the write. A disable that commits after this read and before this
+  -- function commits can still land one award or evidence write. That
+  -- window is accepted. FOR UPDATE on this singleton would be held by
+  -- reconcile across later owners and would deadlock a concurrent evaluate.
   SELECT runtime.enabled
     INTO runtime_enabled
   FROM public.badge_award_runtime AS runtime

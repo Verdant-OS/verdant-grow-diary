@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { confirmStripeCheckout } from "@/lib/payments/stripe.functions";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { useAuth } from "@/store/auth";
@@ -46,6 +47,7 @@ function StripeReturn() {
   const [retry, setRetry] = useState(0);
   const [checking, setChecking] = useState(false);
   const confirmCheckout = useServerFn(confirmStripeCheckout);
+  const trackedSessionRef = useRef<string | null>(null);
   useEffect(() => {
     setConfirmed(false);
     setVerifiedPlan(null);
@@ -78,6 +80,20 @@ function StripeReturn() {
         }
         setConfirmed(result.state === "confirmed");
         setVerifiedPlan("planId" in result ? result.planId : null);
+        // Purchase event only after the server confirmed this exact session's plan,
+        // once per checkout session (Check again must not double-count).
+        if (
+          result.state === "confirmed" &&
+          "planId" in result &&
+          typeof result.planId === "string" &&
+          trackedSessionRef.current !== session_id
+        ) {
+          trackedSessionRef.current = session_id;
+          trackFunnelEvent("subscription_activated", {
+            plan: result.planId,
+            surface: "stripe_checkout",
+          });
+        }
         setMessage(
           result.state === "confirmed"
             ? "credits" in result

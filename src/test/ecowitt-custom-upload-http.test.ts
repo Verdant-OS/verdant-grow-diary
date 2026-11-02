@@ -80,10 +80,11 @@ describe("EcoWitt customized-upload HTTP handler", () => {
     const payload = (await response.json()) as {
       accepted: boolean;
       stored: number;
-      reason: string;
+      reason?: string;
     };
     expect(response.status).toBe(200);
-    expect(payload).toEqual({ accepted: true, stored: 4, reason: "stored" });
+    expect(payload).toEqual({ accepted: true, stored: 4 });
+    expect(payload.reason).toBeUndefined();
     expect(JSON.stringify(payload)).not.toContain(PASSKEY);
     expect(inserted[0]?.source).toBe("live");
     expect(inserted[0]?.capturedAt).toBe("2026-11-02T18:00:00Z");
@@ -124,11 +125,8 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       }),
       ports,
     );
-    expect(await limited.json()).toMatchObject({
-      accepted: false,
-      reason: "rate_limited",
-      stored: 0,
-    });
+    expect(limited.status).toBe(200);
+    expect(await limited.json()).toEqual({ accepted: false, stored: 0 });
     const duplicate = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
         method: "POST",
@@ -140,11 +138,8 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         touchClaim: async () => ({ ok: false, reason: "duplicate_captured_at" }),
       },
     );
-    expect(await duplicate.json()).toMatchObject({
-      accepted: false,
-      reason: "duplicate_captured_at",
-      stored: 0,
-    });
+    expect(duplicate.status).toBe(200);
+    expect(await duplicate.json()).toEqual({ accepted: false, stored: 0 });
     const missing = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
         method: "POST",
@@ -156,11 +151,8 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         touchClaim: async () => ({ ok: false, reason: "claim_not_found" }),
       },
     );
-    expect(await missing.json()).toMatchObject({
-      accepted: false,
-      reason: "store_failed",
-      stored: 0,
-    });
+    expect(missing.status).toBe(200);
+    expect(await missing.json()).toEqual({ accepted: false, stored: 0 });
     expect(events).toEqual([]);
   });
 
@@ -192,11 +184,8 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       }),
       ports,
     );
-    expect(await mismatch.json()).toMatchObject({
-      accepted: false,
-      reason: "passkey_mismatch",
-      stored: 0,
-    });
+    expect(mismatch.status).toBe(200);
+    expect(await mismatch.json()).toEqual({ accepted: false, stored: 0 });
     const oversized = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
         method: "POST",
@@ -214,7 +203,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       },
     );
     expect(oversized.status).toBe(200);
-    expect(await oversized.json()).toMatchObject({ accepted: false, reason: "payload_too_large" });
+    expect(await oversized.json()).toEqual({ accepted: false, stored: 0 });
     expect(inserts).toBe(0);
   });
 });

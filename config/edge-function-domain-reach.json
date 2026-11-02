@@ -41,6 +41,7 @@
     "email_unsubscribe_tokens": "email",
     "suppressed_emails": "email",
     "sensor_readings": "ingest",
+    "ecowitt_custom_upload_claims": "ingest",
     "bridge_tokens": "ingest",
     "sensor_ingest_audit_log": "ingest",
     "diary_entries": "grower",
@@ -91,6 +92,12 @@
       "tables": ["billing_subscriptions", "paddle_customers", "subscriptions"],
       "rpcs": [],
       "justification": "Account erasure legitimately spans domains. Named in the spec §5.5 as the case a restricted role cannot improve — a role for it would be service_role with extra steps. Exempt from the cross-domain report by design."
+    },
+    "ecowitt-custom-upload": {
+      "domain": "ingest",
+      "tables": ["ecowitt_custom_upload_claims", "sensor_readings"],
+      "rpcs": ["reserve_ecowitt_custom_upload_receipt"],
+      "justification": "Service role binds one claim and writes that tent's live readings. The claim token is the auth. No client-supplied user id."
     },
     "ecowitt-ingest": {
       "domain": "ingest",

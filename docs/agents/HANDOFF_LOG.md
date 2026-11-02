@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### ECOWITT-CUSTOM-UPLOAD-EDGE-2746
+
+```text
+TASK ECOWITT-CUSTOM-UPLOAD-EDGE-2746  priority: P1  status: OPEN
+goal: register the ecowitt-custom-upload Edge function on top of slice 1 and keep every gateway response at HTTP 200.
+why: Issue #2746. Stacked on #2732. The gateway must not see rejection reasons or retry-storm on non-200.
+branch: cursor/ecowitt-custom-upload-edge-6bc1
+base: ultra/2717-ecowitt-live-ingest
+checkout: git fetch origin cursor/ecowitt-custom-upload-edge-6bc1 && git switch cursor/ecowitt-custom-upload-edge-6bc1
+pr: draft; read the URL after push
+head_sha: read git rev-parse HEAD after the commit
+state: local until pushed; draft only
+current_step: handler, config.toml, domain-reach row, and Deno handler e2e
+next_action: keep the PR draft. Do not retarget until #2732 merges. Cheeko's yes is required on config.toml and the edge workflow at the exact head. Do not deploy.
+post_merge_check: after an authorized deploy, a GW1200 form POST to the function returns 200. NOT_MEASURED until then.
+active_writer: Grok cloud session for issue 2746
+decisions: missing interval_seconds fails closed. Slice-1 default interval stays 16 seconds. No 60 second fallback.
+tried_and_rejected: returning the plan reason in the JSON body. The gateway log carries the fixed reason code instead.
+commands: /tmp/deno/bin/deno test --no-lock --allow-env supabase/functions/ecowitt-custom-upload/handler_e2e_test.ts
+files_touched: supabase/functions/ecowitt-custom-upload/; supabase/functions/_shared/ecowittCustomUploadHttp.ts; supabase/config.toml; config/edge-function-domain-reach.json; .github/workflows/sensor-ingest-webhook-edge-tests.yml
+files_remaining: none in this slice
+blockers: Cheeko yes on gated files; founder deploy
+open_questions: none
+gotchas: do not push ultra/2717-ecowitt-live-ingest. Draft CI skips the full suite until a non-author marks the parent ready.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2746
+artifacts: local deno and vitest
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; PR stays draft
+claimed_by: Grok, 2026-11-02
+owner: Grok
+last_updated: 2026-11-02
+```
+
 ### ECOWITT-CLAIM-TOKEN-LIVE-INGEST-2717
 
 ```text

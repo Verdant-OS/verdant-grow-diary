@@ -1,9 +1,8 @@
 /**
  * Service-role wiring for customized-upload ingest.
  *
- * Not registered in supabase/config.toml and not deployed. #2702 merged at
- * 2:40 PM CT on 2026-11-02; registration still needs config.toml, which this
- * change does not edit. `requireLiveSensorEntitlement` runs before any claim
+ * Registered by supabase/functions/ecowitt-custom-upload. Not deployed here.
+ * `requireLiveSensorEntitlement` runs before any claim
  * bind or reading insert. touchClaim calls reserve_ecowitt_custom_upload_receipt
  * before insert. bindClaim must not write last_received_at or last_captured_at.
  * This module does not read a client-supplied user id from the gateway body.

@@ -46,17 +46,57 @@ export async function sha256Hex(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+const GATEWAY_LOG_REASONS = new Set<string>([
+  "stored",
+  "method_not_allowed",
+  "missing_claim_token",
+  "payload_too_large",
+  "unsupported_body",
+  "unknown_claim",
+  "claim_revoked",
+  "upgrade_required",
+  "entitlement_lookup_failed",
+  "passkey_malformed",
+  "passkey_mismatch",
+  "stationtype_missing",
+  "not_a_gateway_packet",
+  "rate_limited",
+  "duplicate_captured_at",
+  "no_storable_metrics",
+  "dateutc_invalid",
+  "dateutc_in_future",
+  "dateutc_too_old",
+  "store_failed",
+  "server_misconfigured",
+]);
+
+/**
+ * Gateway answers are always HTTP 200. The decision reason is logged as a
+ * fixed code and is not copied into the response body.
+ */
+export class EcowittCustomUploadGatewayResponse {
+  static log(reason: string, stored: number): void {
+    const safe = GATEWAY_LOG_REASONS.has(reason) ? reason : "unlisted";
+    console.info(JSON.stringify({ event: "ecowitt_custom_upload", reason: safe, stored }));
+  }
+
+  static json(plan: { accepted: boolean; reason: string }, stored: number): Response {
+    EcowittCustomUploadGatewayResponse.log(plan.reason, stored);
+    return new Response(JSON.stringify({ accepted: plan.accepted, stored }), {
+      status: 200,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    });
+  }
+}
+
 function jsonResponse(
   plan: Pick<EcowittCustomUploadIngestPlan, "accepted" | "reason">,
   stored: number,
 ): Response {
-  return new Response(JSON.stringify({ accepted: plan.accepted, reason: plan.reason, stored }), {
-    status: 200,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-    },
-  });
+  return EcowittCustomUploadGatewayResponse.json(plan, stored);
 }
 
 function contentTypeIsForm(contentType: string | null): boolean {

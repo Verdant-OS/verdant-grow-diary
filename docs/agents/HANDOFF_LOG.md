@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### ECOWITT-S3-HARDENING-2747
+
+```text
+TASK ECOWITT-S3-HARDENING-2747  priority: P1  status: OPEN
+goal: close the slice-1 hardening follow-ups in a forward migration and keep every gateway response at HTTP 200.
+why: Issue #2747. Stacked on #2732. Real gateway data must not see an unbound race, a hash in an owner read, or a retry storm.
+branch: cursor/ecowitt-s3-hardening-56a9
+base: ultra/2717-ecowitt-live-ingest
+checkout: git fetch origin cursor/ecowitt-s3-hardening-56a9 ultra/2717-ecowitt-live-ingest && git switch cursor/ecowitt-s3-hardening-56a9
+pr: draft stacked on #2732; read the URL from GitHub after push
+head_sha: the commit that adds this block; read git rev-parse HEAD after checkout
+state: local until pushed; draft only
+current_step: migration 20261102233000, generic outward reason, 64 KiB missing-length cap, pgTAP and vitest
+next_action: keep the PR draft. Do not retarget, mark ready, request review, enqueue, or merge. Do not push ultra/2717-ecowitt-live-ingest.
+post_merge_check: after #2732 merges, retarget this PR to verdant-grow-diary, then after a separate authorized apply a revoked token POST writes no sensor row. NOT_MEASURED until then.
+active_writer: Grok cloud session on cursor/ecowitt-s3-hardening-56a9
+decisions: new forward migration only. 20261102150000 is untouched. unknown_claim and passkey_mismatch share outward reason rejected. The planner reason stays in recordRejection. bind_ecowitt_custom_upload_claim updates only when passkey_sha256 IS NULL. Revoke nulls the token hash. Rotate nulls the passkey binding. Authenticated column grants and ecowitt_custom_upload_claims_owner omit both hashes. The cloudflare route file is a byteTwin in the edge sync manifest.
+tried_and_rejected: editing the slice-1 pgTAP file. It is a locked scorer. The new assertions live in supabase/tests/ecowitt_custom_upload_claim_hardening_pgtap.sql. A concurrent bind inside the same uncommitted transaction was invisible to dblink, so the claim is committed before the race.
+commands: bunx vitest run src/test/ecowitt-custom-upload-http.test.ts src/test/ecowitt-custom-upload-ingest-rules.test.ts src/test/ecowitt-custom-upload-route-and-migration.test.ts --reporter=dot
+files_touched: supabase/migrations/20261102233000_ecowitt_custom_upload_claim_hardening.sql; supabase/functions/_shared/ecowittCustomUploadHttp.ts; supabase/functions/_shared/ecowittCustomUploadIngestRules.ts; supabase/functions/_shared/ecowittCustomUploadSupabasePorts.ts; src/lib/ecowittCustomUploadIngestRules.ts; src/test/ecowitt-custom-upload-http.test.ts; supabase/tests/ecowitt_custom_upload_claim_hardening_pgtap.sql; .github/workflows/ecowitt-custom-upload-claims-pgtap.yml; scripts/sync-edge-shared.mjs; supabase/functions/_shared/lib/.sync-manifest.json; docs/agents/HANDOFF_LOG.md
+files_remaining: none in this slice
+blockers: Cheeko's yes at the exact head before merge. Draft CI skips some required jobs until a non-author marks the PR ready. Do not mark it ready here.
+open_questions: salting the passkey fingerprint stays out of scope
+gotchas: another agent owns ultra/2717-ecowitt-live-ingest. A parallel S2 agent may edit ecowittCustomUploadHttp.ts. This slice's edits there are the missing-length cap, the outward reason, and the rejection log. Leave the data === null guard in ecowittCustomUploadClaimService.ts alone.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2747; https://github.com/Verdant-OS/verdant-grow-diary/pull/2732
+artifacts: local pgTAP 18 passed; local vitest 17 passed
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; PR stays draft
+claimed_by: Grok, 2026-11-02
+owner: Grok
+last_updated: 2026-11-02 17:50 CT, by Grok
+```
+
 ### ECOWITT-CLAIM-TOKEN-LIVE-INGEST-2717
 
 ```text

@@ -5,7 +5,9 @@
  * 2:40 PM CT on 2026-11-02; registration still needs config.toml, which this
  * change does not edit. `requireLiveSensorEntitlement` runs before any claim
  * bind or reading insert. touchClaim calls reserve_ecowitt_custom_upload_receipt
- * before insert. bindClaim must not write last_received_at or last_captured_at.
+ * before insert. bindClaim must call bind_ecowitt_custom_upload_claim,
+ * which updates only when passkey_sha256 IS NULL, and must not write
+ * last_received_at or last_captured_at.
  * This module does not read a client-supplied user id from the gateway body.
  */
 import { requireLiveSensorEntitlement } from "./liveSensorEntitlementGate.ts";
@@ -21,6 +23,33 @@ import type {
 } from "./ecowittCustomUploadIngestRules.ts";
 
 export const ECOWITT_CUSTOM_UPLOAD_RESERVE_RPC = "reserve_ecowitt_custom_upload_receipt" as const;
+
+export class EcowittCustomUploadClaimBind {
+  static readonly rpcName = "bind_ecowitt_custom_upload_claim";
+
+  static async execute(
+    rpc: (
+      fn: typeof EcowittCustomUploadClaimBind.rpcName,
+      args: {
+        readonly p_claim_id: string;
+        readonly p_passkey_sha256: string;
+        readonly p_stationtype: string;
+      },
+    ) => Promise<{ readonly data: unknown; readonly error: { readonly message: string } | null }>,
+    claimId: string,
+    passkeySha256: string,
+    stationtype: string,
+  ): Promise<{ ok: true } | { ok: false }> {
+    const { data, error } = await rpc(EcowittCustomUploadClaimBind.rpcName, {
+      p_claim_id: claimId,
+      p_passkey_sha256: passkeySha256,
+      p_stationtype: stationtype,
+    });
+    if (error) return { ok: false };
+    const value = Array.isArray(data) ? data[0] : data;
+    return value === true ? { ok: true } : { ok: false };
+  }
+}
 
 export type EcowittReserveReceipt =
   | { readonly ok: true }

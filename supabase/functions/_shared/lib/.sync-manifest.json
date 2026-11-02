@@ -109,5 +109,11 @@
     "src/lib/vpdDriftRules.ts": "c6323c0f6fd9d9700ded58103a0f20cb10a162e27834ff39552226e3723cf6c7",
     "src/lib/vpdRules.ts": "a0e403169a4afe081115459a9a05dc5e16fe4915e288a05d618cac1344f19754",
     "src/lib/vpdStageTargetRules.ts": "e937901b731807d9f0648668a9c3fac469d24d962699e5cf6bcd8019f5a35d7c"
+  },
+  "byteTwins": {
+    "cloudflare/ecowitt-plain-http-ingest.ts": {
+      "source": "src/lib/ecowittPlainHttpRouteRules.ts",
+      "sha256": "ce0cbddc37e166520545802ce54ff59178a863de3192a7daa6b86565659fd2f4"
+    }
   }
 }

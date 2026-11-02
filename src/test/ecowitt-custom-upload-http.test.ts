@@ -179,6 +179,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         return { ok: true };
       },
     };
+    const logged: string[] = [];
     const mismatch = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
         method: "POST",
@@ -190,13 +191,18 @@ describe("EcoWitt customized-upload HTTP handler", () => {
           tempinf: "70",
         }).toString(),
       }),
-      ports,
+      { ...ports, recordRejection: (reason) => logged.push(reason) },
     );
-    expect(await mismatch.json()).toMatchObject({
+    const mismatchBody = (await mismatch.json()) as { reason: string };
+    expect(mismatch.status).toBe(200);
+    expect(mismatchBody).toMatchObject({
       accepted: false,
-      reason: "passkey_mismatch",
+      reason: "rejected",
       stored: 0,
     });
+    expect(mismatchBody.reason).not.toBe("passkey_mismatch");
+    expect(logged).toEqual(["passkey_mismatch"]);
+    expect(JSON.stringify(mismatchBody)).not.toContain("cd".repeat(16));
     const oversized = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
         method: "POST",
@@ -215,6 +221,105 @@ describe("EcoWitt customized-upload HTTP handler", () => {
     );
     expect(oversized.status).toBe(200);
     expect(await oversized.json()).toMatchObject({ accepted: false, reason: "payload_too_large" });
+    expect(inserts).toBe(0);
+  });
+
+  it("uses one generic outward reason for an unknown claim and a passkey mismatch", async () => {
+    const logged: string[] = [];
+    const ports: EcowittCustomUploadPorts = {
+      now: () => NOW,
+      sha256Hex,
+      lookupClaim: async () => null,
+      entitlement: async () => "allowed",
+      bindClaim: async () => ({ ok: true }),
+      touchClaim: async () => ({ ok: true }),
+      insertReadings: async () => ({ ok: true }),
+      recordRejection: (reason) => logged.push(reason),
+    };
+    const unknown = await handleEcowittCustomUploadRequest(
+      new Request(`https://example.test/ew/${TOKEN}`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: formBody(),
+      }),
+      ports,
+    );
+    const unknownBody = (await unknown.json()) as { reason: string };
+    expect(unknown.status).toBe(200);
+    expect(unknownBody.reason).toBe("rejected");
+    expect(logged).toEqual(["unknown_claim"]);
+    expect(JSON.stringify(unknownBody)).not.toContain(PASSKEY);
+    expect(JSON.stringify(unknownBody)).not.toContain(TOKEN);
+  });
+
+  it("returns 200 and drops a chunked body over 64 KiB when Content-Length is missing", async () => {
+    const logged: string[] = [];
+    let inserts = 0;
+    const chunk = new Uint8Array(32 * 1024);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(chunk);
+        controller.enqueue(chunk);
+        controller.enqueue(new Uint8Array(1));
+        controller.close();
+      },
+    });
+    const request = new Request(`https://example.test/ew/${TOKEN}`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: stream,
+      duplex: "half",
+    } as RequestInit);
+    expect(request.headers.get("content-length")).toBeNull();
+    const response = await handleEcowittCustomUploadRequest(request, {
+      now: () => NOW,
+      sha256Hex,
+      lookupClaim: async () => {
+        throw new Error("lookup should not run for a capped body");
+      },
+      entitlement: async () => "allowed",
+      bindClaim: async () => ({ ok: true }),
+      touchClaim: async () => ({ ok: true }),
+      insertReadings: async () => {
+        inserts += 1;
+        return { ok: true };
+      },
+      recordRejection: (reason) => logged.push(reason),
+    });
+    const payload = (await response.json()) as {
+      accepted: boolean;
+      reason: string;
+      stored: number;
+    };
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ accepted: false, reason: "payload_too_large", stored: 0 });
+    expect(logged).toEqual(["payload_too_large"]);
+    expect(JSON.stringify(payload)).not.toContain(PASSKEY);
+    expect(inserts).toBe(0);
+  });
+
+  it("answers GET with 200 and writes no row", async () => {
+    let inserts = 0;
+    const logged: string[] = [];
+    const response = await handleEcowittCustomUploadRequest(
+      new Request(`https://example.test/ew/${TOKEN}`, { method: "GET" }),
+      {
+        now: () => NOW,
+        sha256Hex,
+        lookupClaim: async () => claim(null),
+        entitlement: async () => "allowed",
+        bindClaim: async () => ({ ok: true }),
+        touchClaim: async () => ({ ok: true }),
+        insertReadings: async () => {
+          inserts += 1;
+          return { ok: true };
+        },
+        recordRejection: (reason) => logged.push(reason),
+      },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ accepted: false, stored: 0 });
+    expect(logged).toEqual(["method_not_allowed"]);
     expect(inserts).toBe(0);
   });
 });

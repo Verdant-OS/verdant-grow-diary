@@ -7,7 +7,6 @@
  * response supply the truth. Reference pages never create alerts or actions.
  */
 
-import { ToadVenomCultivarProfile } from "@/constants/toadVenomCultivarProfile";
 import { CultivarVerifiedProfileRules } from "@/lib/cultivarVerifiedProfileRules";
 
 export const CULTIVAR_GUIDE_SECTION_KEYS = [
@@ -350,7 +349,6 @@ export const CULTIVAR_SOURCES: readonly CultivarSource[] = [
     "breeder",
     "Used for breeder-reported identity and timing context; copy is not reproduced.",
   ),
-  ...ToadVenomCultivarProfile.sources(),
 ];
 
 const SECTION_TITLES: Readonly<Record<CultivarGuideSectionKey, string>> = {
@@ -1006,7 +1004,6 @@ const PROFILE_SEEDS: readonly ProfileSeed[] = [
     ],
     sampleAromas: ["Sour fruit and grape direction", "Candy citrus direction"],
   },
-  ToadVenomCultivarProfile.seed(),
 ];
 
 /**

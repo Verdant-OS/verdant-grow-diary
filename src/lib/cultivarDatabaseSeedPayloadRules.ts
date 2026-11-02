@@ -126,7 +126,7 @@ export interface CultivarSeedPayloadCultivar {
   market_classification: string;
   lineage_text: string;
   description: string;
-  difficulty: string | null;
+  difficulty: string;
   height_category: string;
   chemotype: string;
   flowering_days_min: number | null;
@@ -151,12 +151,6 @@ export interface CultivarSeedPayloadCultivar {
     finish_note: string;
   }[];
   publication_status: string;
-  lineage_claims?: readonly unknown[];
-  same_name_lines?: readonly unknown[];
-  same_name_note?: string | null;
-  editorial_faq?: readonly { question: string; answer: string }[] | null;
-  dek?: string | null;
-  meta_description?: string | null;
   verification_status: string;
   data_origin: string;
   last_verified_at: string;
@@ -244,6 +238,17 @@ export function expectedAliasSourceKey(profile: VerdantCultivarProfile): string 
   return profile.sourceKeys[0] ?? null;
 }
 
+/** The ten sample profiles all carry a sourced difficulty. A null difficulty
+ * cannot enter the seed payload while the column is NOT NULL. */
+function requireDifficulty(
+  profile: VerdantCultivarProfile,
+): Exclude<VerdantCultivarProfile["difficulty"], null> {
+  if (profile.difficulty == null) {
+    throw new Error(`${profile.slug}: a seed profile needs a sourced difficulty`);
+  }
+  return profile.difficulty;
+}
+
 // ---------------------------------------------------------------------------
 // Bundled → payload
 // ---------------------------------------------------------------------------
@@ -260,7 +265,6 @@ export function buildCultivarDatabaseSeedPayload(
     source_type: source.sourceType,
     retrieved_at: source.retrievedAt,
     license_or_usage_notes: source.licenseNotes,
-    ...(source.linkPolicy ? { link_policy: source.linkPolicy } : {}),
   }));
 
   const breederNames = [
@@ -407,9 +411,7 @@ export function buildCultivarDatabaseSeedPayload(
       market_classification: profile.marketClassification,
       lineage_text: profile.lineage,
       description: profile.intro,
-      difficulty: profile.difficulty
-        ? CULTIVAR_DIFFICULTY_DATABASE_VALUES[profile.difficulty]
-        : null,
+      difficulty: CULTIVAR_DIFFICULTY_DATABASE_VALUES[requireDifficulty(profile)],
       height_category: profile.heightCategory,
       chemotype: profile.chemotype,
       flowering_days_min: profile.floweringDaysMin,
@@ -434,12 +436,6 @@ export function buildCultivarDatabaseSeedPayload(
         finish_note: pheno.finishNote,
       })),
       publication_status: profile.publicationStatus,
-      lineage_claims: profile.lineageClaims,
-      same_name_lines: profile.sameNameLines,
-      same_name_note: profile.sameNameNote,
-      editorial_faq: profile.editorialFaq,
-      dek: profile.dek,
-      meta_description: profile.metaDescription,
       verification_status: profile.verificationStatus,
       data_origin: CULTIVAR_DATA_ORIGIN_DATABASE_VALUES[profile.dataOrigin],
       last_verified_at: profile.lastVerifiedAt,

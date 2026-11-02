@@ -317,12 +317,6 @@
     community. Reviewed and verified profiles are the only slugs that belong
     here. The hub above stays advertised.
   -->
-  <url>
-    <loc>https://verdantgrowdiary.com/cultivars/toad-venom</loc>
-    <lastmod>2026-11-01</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
   <!--
     Added 2026-08-20. These routes were already live, HTTP 200, self-canonical
     and "index, follow", but absent from this sitemap — the long-standing

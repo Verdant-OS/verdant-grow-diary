@@ -49,8 +49,12 @@ describe("Strain Reference Library V1 detail", () => {
     expect(screen.getByText(/equipment commands/i)).toBeInTheDocument();
   });
 
-  it("redirects unknown slugs to the library", () => {
+  it("shows a noindex not-found page for unknown slugs", () => {
     renderPage("not-a-real-cultivar");
-    expect(screen.getByText("Index fallback")).toBeInTheDocument();
+    expect(screen.getByTestId("cultivar-not-found")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Cultivar not found" })).toBeInTheDocument();
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe(
+      "noindex, follow",
+    );
   });
 });

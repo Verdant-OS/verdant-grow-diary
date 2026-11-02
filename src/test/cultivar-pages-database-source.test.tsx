@@ -182,9 +182,9 @@ describe("cultivar pages — database source", () => {
     ).toBeInTheDocument();
   });
 
-  it("redirects an unknown slug deterministically in database mode", async () => {
+  it("shows a noindex not-found page for an unknown slug in database mode", async () => {
     renderDetail("not-a-real-cultivar");
-    await waitFor(() => expect(screen.getByText("Index fallback")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("cultivar-not-found")).toBeInTheDocument());
   });
 
   it("keeps index filtering, alias search, and punctuation normalization on database rows", async () => {

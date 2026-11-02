@@ -8,6 +8,13 @@
       "when": 1793662520046,
       "tag": "0000_owner_badge_awards",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793663222034,
+      "tag": "0001_pin_email_queue_function_search_path",
+      "breakpoints": true
     }
   ]
 }

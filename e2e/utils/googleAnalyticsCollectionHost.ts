@@ -1,53 +1,136 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, request as httpRequest } from "node:http";
 import { connect as netConnect } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "@playwright/test";
+import { webkit } from "playwright-core";
 
 /**
  * Point a GA spec's document host at verdantgrowdiary.com (#2693) while the
  * response bytes still come from this branch's dev server. Vite rejects that
  * Host, and the spec must not change an assertion to compensate.
+ *
+ * Chromium maps the name with --host-resolver-rules. WebKit has no such flag,
+ * so each run bind-mounts a private hosts file in a user namespace. The
+ * browser is the Playwright browserName fixture (the project's browserName, or
+ * its defaultBrowserType). process.argv does not carry --project in the worker,
+ * so it is not read.
+ * This file never writes the machine /etc/hosts.
  */
+const CHROMIUM_HOST_RESOLVER_RULES =
+  "--host-resolver-rules=MAP verdantgrowdiary.com 127.0.0.1,MAP www.verdantgrowdiary.com 127.0.0.1";
+
+const WEBKIT_RESOLVER_SCRIPT = `#!/bin/sh
+set -eu
+exec unshare --user --map-root-user --mount --propagation private sh -c 'mount --bind "$1" /etc/hosts && shift && exec "$@"' sh "$VERDANT_GA_HOSTS_FILE" "$VERDANT_WEBKIT_BIN" "$@"
+`;
+
+type CollectionBrowserName = "chromium" | "firefox" | "webkit";
+
+type CollectionLaunchOptions = {
+  args?: string[];
+  executablePath?: string;
+  env?: NodeJS.ProcessEnv;
+};
+
+let webkitCollectionHostSkip: string | undefined;
+
 export function pointSpecAtGoogleAnalyticsCollectionHost(
   proxyPort: number,
   appPort = 5173,
 ): string {
-  ensureCollectionHostLoopback();
   const origin = `http://verdantgrowdiary.com:${proxyPort}`;
   test.use({
     baseURL: origin,
-    ...(process.argv.some((arg) => arg.includes("webkit"))
-      ? {}
-      : {
-          launchOptions: {
-            args: [
-              "--host-resolver-rules=MAP verdantgrowdiary.com 127.0.0.1,MAP www.verdantgrowdiary.com 127.0.0.1",
-            ],
-          },
-        }),
+    launchOptions: async ({ browserName }, apply) => {
+      await apply(launchOptionsForCollectionHost(collectionBrowserName(browserName)));
+    },
   });
   // Listen in the worker only. Playwright also loads this file to collect tests,
-  // and a second bind on the same port fails.
+  // and a second bind on the same port fails. Resolving launchOptions here decides
+  // the WebKit skip before any later hook launches the browser.
+  test.beforeAll(({ browserName, launchOptions }) => {
+    void launchOptions;
+    if (browserName === "webkit" && webkitCollectionHostSkip)
+      test.skip(true, webkitCollectionHostSkip);
+  });
   test.beforeAll(async () => {
     await listenGaCollectionProxy(proxyPort, appPort);
   });
   return origin;
 }
 
-function ensureCollectionHostLoopback(): void {
-  const lines = [
+function collectionBrowserName(browserName: string): CollectionBrowserName {
+  if (browserName === "chromium" || browserName === "firefox" || browserName === "webkit")
+    return browserName;
+  throw new Error(
+    `GA collection host could not tell which browser this project launches (${browserName})`,
+  );
+}
+
+function launchOptionsForCollectionHost(
+  browserName: CollectionBrowserName,
+): CollectionLaunchOptions {
+  switch (browserName) {
+    case "chromium":
+      return { args: [CHROMIUM_HOST_RESOLVER_RULES] };
+    case "webkit":
+      return webKitCollectionHostLaunchOptions();
+    case "firefox":
+      return {};
+    default: {
+      const unexpected: never = browserName;
+      throw new Error(`Unexpected browser ${String(unexpected)}`);
+    }
+  }
+}
+
+function webKitSkipReason(detail: string): string {
+  return `WebKit per-run host resolver is unavailable (${detail}). --host-resolver-rules is Chromium-only, and this helper does not write /etc/hosts.`;
+}
+
+function webKitCollectionHostLaunchOptions(): CollectionLaunchOptions {
+  if (process.platform !== "linux") {
+    webkitCollectionHostSkip = webKitSkipReason("this process is not Linux");
+    return {};
+  }
+  try {
+    execFileSync(
+      "unshare",
+      ["--user", "--map-root-user", "--mount", "--propagation", "private", "true"],
+      { stdio: "ignore" },
+    );
+  } catch {
+    webkitCollectionHostSkip = webKitSkipReason(
+      "a private user-namespace hosts mount did not start",
+    );
+    return {};
+  }
+
+  const hostsPath = join(tmpdir(), `verdant-ga-hosts-${process.pid}`);
+  const scriptPath = join(tmpdir(), `verdant-ga-webkit-${process.pid}.sh`);
+  const existing = readFileSync("/etc/hosts", "utf8");
+  const mapping = [
     "127.0.0.1 verdantgrowdiary.com www.verdantgrowdiary.com",
     "::1 verdantgrowdiary.com www.verdantgrowdiary.com",
-  ];
-  try {
-    const current = readFileSync("/etc/hosts", "utf8");
-    const missing = lines.filter((line) => !current.includes(line));
-    if (missing.length === 0) return;
-    execFileSync("sudo", ["-n", "tee", "-a", "/etc/hosts"], { input: `${missing.join("\n")}\n` });
-  } catch {
-    // Chromium maps the host with --host-resolver-rules when sudo is unavailable.
-  }
+    "",
+  ].join("\n");
+  writeFileSync(
+    hostsPath,
+    existing.endsWith("\n") ? `${existing}${mapping}` : `${existing}\n${mapping}`,
+  );
+  writeFileSync(scriptPath, WEBKIT_RESOLVER_SCRIPT);
+  chmodSync(scriptPath, 0o755);
+  return {
+    executablePath: scriptPath,
+    env: {
+      ...process.env,
+      VERDANT_GA_HOSTS_FILE: hostsPath,
+      VERDANT_WEBKIT_BIN: webkit.executablePath(),
+    },
+  };
 }
 
 function listenGaCollectionProxy(proxyPort: number, appPort: number): Promise<void> {

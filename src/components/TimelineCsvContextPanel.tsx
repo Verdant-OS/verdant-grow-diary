@@ -15,9 +15,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { CsvTimelineEnvironmentChip } from "@/components/CsvTimelineEnvironmentChip";
 import { Button } from "@/components/ui/button";
 import {
-  buildCsvTimelineContext,
+  CsvTimelineSnapshotList,
   type CsvSensorReadingRow,
-  type CsvTimelineContextEntry,
+  type CsvTimelineSnapshot,
 } from "@/lib/environmentCsvTimelineContextViewModel";
 
 export interface TimelineDiaryLike {
@@ -111,36 +111,39 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
     };
   }, [growId, tentIdsKey, scopeKey, retryAttempt]);
 
-  const matchedByEntry = useMemo(() => {
-    const out = new Map<string, CsvTimelineContextEntry>();
-    if (!growId || entries.length === 0) return out;
-    // Run view-model per-tent (scope contract is per-tent).
+  const snapshots = useMemo(() => {
+    const cards: { id: string; snapshot: CsvTimelineSnapshot }[] = [];
+    if (!growId) return cards;
+    const seen = new Set<string>();
+    const usedEntryIds = new Set<string>();
     for (const tentId of tentIds) {
-      const tentEntries = entries
-        .filter((e) => e.tent_id === tentId)
-        .map((e) => ({
-          id: e.id,
-          grow_id: growId,
-          tent_id: e.tent_id,
-          occurred_at: e.entry_at,
-        }));
-      const ctx = buildCsvTimelineContext({
-        diaryEntries: tentEntries,
+      for (const snapshot of CsvTimelineSnapshotList.distinct({
         sensorReadings: rows,
         growId,
         tentId,
-      });
-      for (const c of ctx) {
-        if (c.snapshot) out.set(c.diaryEntryId, c);
+      })) {
+        const stamp = `${tentId}:${snapshot.capturedAt}`;
+        if (seen.has(stamp)) continue;
+        seen.add(stamp);
+        const near = entries.find((entry) => {
+          if (usedEntryIds.has(entry.id) || entry.tent_id !== tentId || !entry.entry_at) {
+            return false;
+          }
+          const delta = Math.abs(Date.parse(entry.entry_at) - Date.parse(snapshot.capturedAt));
+          return Number.isFinite(delta) && delta <= 45 * 60_000;
+        });
+        if (near) usedEntryIds.add(near.id);
+        cards.push({ id: near?.id ?? stamp, snapshot });
       }
     }
-    return out;
+    cards.sort((a, b) => Date.parse(b.snapshot.capturedAt) - Date.parse(a.snapshot.capturedAt));
+    return cards;
   }, [rows, entries, growId, tentIds]);
 
   if (!growId || tentIds.length === 0) return null;
-  if (readStatus === "success" && matchedByEntry.size === 0) return null;
+  if (readStatus === "success" && snapshots.length === 0) return null;
 
-  const hasCachedMatches = matchedByEntry.size > 0;
+  const hasCachedMatches = snapshots.length > 0;
 
   return (
     <section data-testid="timeline-csv-context-panel" className="mt-4 space-y-2">
@@ -179,12 +182,8 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
           </Button>
         </div>
       ) : null}
-      {[...matchedByEntry.values()].map((c) => (
-        <CsvTimelineEnvironmentChip
-          key={c.diaryEntryId}
-          diaryEntryId={c.diaryEntryId}
-          snapshot={c.snapshot}
-        />
+      {snapshots.map((c) => (
+        <CsvTimelineEnvironmentChip key={c.id} diaryEntryId={c.id} snapshot={c.snapshot} />
       ))}
     </section>
   );

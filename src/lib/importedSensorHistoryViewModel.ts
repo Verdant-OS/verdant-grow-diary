@@ -70,7 +70,6 @@ export interface ImportedSensorHistoryInputRow {
   value?: number | null;
   /** Optional validity flag used by historical-review eligibility. */
   quality?: string | null;
-  // NOTE: raw_payload is intentionally NOT in this input shape.
 }
 
 export interface ImportedSensorHistoryDisplayRow {
@@ -131,12 +130,21 @@ function normalizeSelected(
   return selected;
 }
 
+const IMPORTED_METRIC_LABELS: Record<string, string> = {
+  humidity_pct: "Humidity",
+  vpd_kpa: "VPD",
+  co2_ppm: "CO₂",
+  ppfd: "PPFD",
+  soil_moisture_pct: "Soil moisture",
+  ec: "EC",
+};
+
 function formatMetricLabel(metric: string, temperatureUnit: TemperatureUnitPreference): string {
   if (metric === "temperature_c")
     return `Temperature (${getTemperatureUnitSymbol(temperatureUnit)})`;
   if (metric === "soil_temp_c")
     return `Soil temperature (${getTemperatureUnitSymbol(temperatureUnit)})`;
-  return metric;
+  return IMPORTED_METRIC_LABELS[metric] ?? metric.replace(/_/g, " ");
 }
 
 function formatImportedValue(

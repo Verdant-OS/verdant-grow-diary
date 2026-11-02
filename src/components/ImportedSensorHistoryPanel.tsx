@@ -30,6 +30,7 @@ import {
   type ImportedHistoryAiDoctorHandoffPlant,
   type ImportedHistoryAiDoctorHandoffReadStatus,
 } from "@/lib/importedSensorHistoryAiDoctorHandoffRules";
+import { CsvImportVendorIdentity } from "@/lib/csvImportVendorIdentity";
 import {
   IMPORTED_SENSOR_HISTORY_ALL_METRICS,
   IMPORTED_SENSOR_HISTORY_ANCHOR_ID,
@@ -150,7 +151,7 @@ export default function ImportedSensorHistoryPanel({
       <header className="flex flex-wrap items-center gap-2">
         <h2 className="text-base font-semibold">Imported sensor history</h2>
         <Badge variant="secondary" data-testid="imported-history-source-badge">
-          Source: CSV
+          Source: {CsvImportVendorIdentity.badgeForRows(readings)}
         </Badge>
         <Badge variant="outline" data-testid="imported-history-not-live-badge">
           {IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY}

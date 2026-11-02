@@ -69,6 +69,41 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CSV-IMPORT-DISPLAY-2736-2739
+
+```text
+TASK CSV-IMPORT-DISPLAY-2736-2739  priority: P2  status: OPEN
+goal: timeline CSV context shows distinct current readings; tent imported history shows the vendor and friendly metric labels; the import preview uses the file temperature unit; the confirmation states metric readings and sensor rows when those counts differ.
+why: Issues 2736, 2737, 2738, and 2739. Four diary entries near one snapshot repeated the same card and hid newer imports. The history badge was hardcoded to CSV. Preview printed canonical Celsius. Metric labels returned raw keys. The count of 9 is metric inserts, not a wrong write.
+branch: cursor/csv-import-display-6fff
+base: verdant-grow-diary
+checkout: git fetch origin cursor/csv-import-display-6fff verdant-grow-diary && git switch cursor/csv-import-display-6fff
+pr: ready for review; no auto-merge
+head_sha: read git rev-parse HEAD after the commit that adds this block
+state: local until pushed
+current_step: display fixes and regression tests are in the working tree
+next_action: push and open the PR. Do not merge. Do not enable auto-merge.
+post_merge_check: after Publish, import an AC Infinity Fahrenheit CSV on the fixture account and confirm the timeline cards are distinct, the history badge names the vendor, labels say Humidity and VPD, the preview shows °F, and the confirmation names both counts. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Grok cloud agent on this branch
+decisions: distinct snapshots come from CsvTimelineSnapshotList, newest first, cap 12, still scoped to csv plus tent and grow. A nearby diary id is reused once so existing chip ids stay stable. Vendor is presentation-only via source_app and import_file_name; the stored source stays csv. Preview prints raw_temperature with the file unit. Friendly labels live in the history view model. The done message adds the sensor-row count only when it differs from insertedCount.
+tried_and_rejected: reading raw_payload inside the history view model. A source scan forbids that string there and in the panel. Vendor lookup stays in CsvImportVendorIdentity.
+commands: bunx vitest run src/test/csv-import-display-2736-2739.test.tsx src/test/imported-sensor-history-panel.test.tsx src/test/imported-sensor-history-view-model.test.ts src/test/environment-csv-timeline-mounted-context.test.tsx src/test/environment-csv-preview-copy-rules.test.ts src/test/csv-history-window-presentation.test.tsx src/test/environment-csv-import-persistence.test.ts src/test/csv-parser.test.ts --reporter=dot
+files_touched: src/lib/csvImportVendorIdentity.ts; src/lib/environmentCsvTimelineContextViewModel.ts; src/components/TimelineCsvContextPanel.tsx; src/lib/csvParser.ts; src/lib/environmentCsvImportPersistence.ts; src/lib/environmentCsvPreviewCopyRules.ts; src/lib/environmentCsvImportViewModel.ts; src/components/EnvironmentCsvImportModal.tsx; src/lib/importedSensorHistoryViewModel.ts; src/components/ImportedSensorHistoryPanel.tsx; src/test/csv-import-display-2736-2739.test.tsx; src/test/imported-sensor-history-panel.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work
+open_questions: none
+gotchas: src/test/imported-sensor-history-panel.test.tsx was scorer-locked. The pins asserted the raw metric keys, so the unlock was declared and the three label assertions were renegotiated. Filter test ids stay the metric keys. Already-imported rows without source_app or a brand in the stored file name stay labeled CSV.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2736
+artifacts: before and after screenshots live with the agent run, not in this repo
+reviewer_seat: not requested yet
+reviewer_sha: NOT_MEASURED
+session_state: no paused workflows; no production writes
+claimed_by: Grok, 2026-11-02
+owner: Grok
+last_updated: 2026-11-02, by Grok
+resume here
+```
+
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text

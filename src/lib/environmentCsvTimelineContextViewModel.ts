@@ -47,9 +47,7 @@ export interface CsvTimelineSnapshot {
   sourceLabel: typeof CSV_SOURCE_LABEL;
   title: typeof CSV_SNAPSHOT_TITLE;
   derivedVpdLabel:
-    | typeof CSV_DERIVED_VPD_LABEL
-    | typeof CSV_SUPPLIED_VPD_LABEL
-    | typeof CSV_UNKNOWN_VPD_LABEL;
+    typeof CSV_DERIVED_VPD_LABEL | typeof CSV_SUPPLIED_VPD_LABEL | typeof CSV_UNKNOWN_VPD_LABEL;
 }
 
 export interface CsvTimelineContextEntry {
@@ -98,6 +96,54 @@ function entryMs(e: DiaryEntryLike): number | null {
   if (!raw) return null;
   const t = Date.parse(raw);
   return Number.isFinite(t) ? t : null;
+}
+
+/** One card per distinct CSV observation, newest first, including readings no diary entry is near. */
+export class CsvTimelineSnapshotList {
+  static distinct(
+    input: Omit<CsvTimelineContextInput, "diaryEntries"> & { limit?: number },
+  ): CsvTimelineSnapshot[] {
+    const rowsAll = Array.isArray(input.sensorReadings) ? input.sensorReadings : [];
+    const { growId, tentId } = input;
+    if (!tentId) return [];
+    const rows = rowsAll.filter((r) => {
+      if (!isCsvRow(r)) return false;
+      if ((r.tent_id ?? null) !== tentId) return false;
+      const rg = rowGrowId(r);
+      if (growId && rg && rg !== growId) return false;
+      return true;
+    });
+    const byTs = new Map<number, CsvSensorReadingRow[]>();
+    for (const r of rows) {
+      const t = rowMs(r);
+      if (t == null) continue;
+      const list = byTs.get(t) ?? [];
+      list.push(r);
+      byTs.set(t, list);
+    }
+    const limit = Math.max(1, input.limit ?? 12);
+    return [...byTs.keys()]
+      .sort((a, b) => b - a)
+      .slice(0, limit)
+      .map((ts) => snapshotFromGroup(byTs.get(ts) ?? [], ts));
+  }
+}
+
+function snapshotFromGroup(group: CsvSensorReadingRow[], bestTs: number): CsvTimelineSnapshot {
+  const findVal = (metric: string): number | null => {
+    const m = group.find((r) => (r.metric ?? "") === metric);
+    const v = m?.value;
+    return typeof v === "number" && Number.isFinite(v) ? v : null;
+  };
+  return {
+    capturedAt: new Date(bestTs).toISOString(),
+    temperatureC: findVal("temperature_c"),
+    humidityPct: findVal("humidity_pct"),
+    derivedVpdKpa: findVal("vpd_kpa"),
+    sourceLabel: CSV_SOURCE_LABEL,
+    title: CSV_SNAPSHOT_TITLE,
+    derivedVpdLabel: rowVpdLabel(group.find((r) => (r.metric ?? "") === "vpd_kpa")),
+  };
 }
 
 export function buildCsvTimelineContext(input: CsvTimelineContextInput): CsvTimelineContextEntry[] {
@@ -157,21 +203,7 @@ export function buildCsvTimelineContext(input: CsvTimelineContextInput): CsvTime
       out.push({ diaryEntryId: entry.id, snapshot: null, matchAgeMinutes: null });
       continue;
     }
-    const group = byTs.get(bestTs) ?? [];
-    const findVal = (metric: string): number | null => {
-      const m = group.find((r) => (r.metric ?? "") === metric);
-      const v = m?.value;
-      return typeof v === "number" && Number.isFinite(v) ? v : null;
-    };
-    const snap: CsvTimelineSnapshot = {
-      capturedAt: new Date(bestTs).toISOString(),
-      temperatureC: findVal("temperature_c"),
-      humidityPct: findVal("humidity_pct"),
-      derivedVpdKpa: findVal("vpd_kpa"),
-      sourceLabel: CSV_SOURCE_LABEL,
-      title: CSV_SNAPSHOT_TITLE,
-      derivedVpdLabel: rowVpdLabel(group.find((r) => (r.metric ?? "") === "vpd_kpa")),
-    };
+    const snap = snapshotFromGroup(byTs.get(bestTs) ?? [], bestTs);
     out.push({
       diaryEntryId: entry.id,
       snapshot: snap,

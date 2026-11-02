@@ -323,7 +323,11 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
         {state.phase === "done" ? (
           <div data-testid="csv-import-done" className="space-y-2">
             <p className="text-sm">
-              {buildCsvImportDoneMessage(state.insertedCount, state.duplicateCount)}
+              {buildCsvImportDoneMessage(
+                state.insertedCount,
+                state.duplicateCount,
+                state.parsed?.validRows.length,
+              )}
             </p>
             <p className="text-xs text-muted-foreground" data-testid="csv-import-historical-note">
               {CSV_IMPORT_HISTORICAL_CONTEXT_NOTE}

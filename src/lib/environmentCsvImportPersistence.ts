@@ -55,6 +55,8 @@ export interface SensorReadingInsert {
     raw_temp_unit: ParsedEnvironmentRow["raw_temp_unit"];
     raw_row: Record<string, string>;
     vpd_source?: "derived" | "csv";
+    source_app?: "ac_infinity" | "spider_farmer" | "vivosun" | null;
+    import_file_name?: string | null;
   };
 }
 
@@ -76,6 +78,8 @@ export function buildSensorReadingInserts(
       raw_temperature: r.raw_temperature,
       raw_temp_unit: r.raw_temp_unit,
       raw_row: r.raw_payload,
+      ...(r.source_app ? { source_app: r.source_app } : {}),
+      ...(r.import_file_name ? { import_file_name: r.import_file_name } : {}),
     } as const;
 
     function pushMetric(

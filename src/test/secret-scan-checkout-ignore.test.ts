@@ -41,7 +41,7 @@ describe("secret scan checkout ignore file", () => {
     const marker = join(dir, "stub-saw.txt");
     writeFileSync(
       join(bin, "gitleaks"),
-      `#!/bin/sh\nif [ -e .gitleaksignore ]; then echo present > '${marker}'; else echo absent > '${marker}'; fi\nexit 0\n`,
+      `#!/bin/sh\nif [ -e .gitleaksignore ]; then echo present > '${marker}'; else echo absent > '${marker}'; fi\nn=$(git rev-list --count $RANGE)\necho "$n commits scanned."\nexit 0\n`,
       { mode: 0o755 },
     );
 

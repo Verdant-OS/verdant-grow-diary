@@ -1,5 +1,5 @@
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { load } from "js-yaml";
@@ -301,6 +301,8 @@ describe("secret-scan workflow", () => {
         "# shellcheck disable=SC2086",
         `git log -p -U0 --no-color --format= $logopts > '${patchOut}'`,
         `if [ -e .gitattributes ]; then echo present > '${attrOut}'; else echo absent > '${attrOut}'; fi`,
+        "n=$(git rev-list --count $RANGE)",
+        'echo "$n commits scanned."',
         "exit 0",
         "",
       ].join("\n"),
@@ -318,6 +320,116 @@ describe("secret-scan workflow", () => {
     expect(readFileSync(attrOut, "utf8").trim()).toBe("absent");
     expect(readFileSync(patchOut, "utf8")).toContain(fakeKey);
     expect(step("Scan commits").run).toContain("git log -p --text ");
+  });
+
+  it("removes a symlinked .gitattributes so the scan can see the secret (Reviewer B P1-1 at e17a3f23)", () => {
+    const dir = fixture();
+    const base = git(dir, "rev-parse", "HEAD");
+    const fakeKey = ["AKIA", "0TESTKEY01234567"].join("");
+    writeFileSync(join(dir, "creds.txt"), `aws_key=${fakeKey}\n`);
+    writeFileSync(join(dir, "attrs"), "creds.txt -diff\n");
+    symlinkSync("attrs", join(dir, ".gitattributes"));
+    git(dir, "add", ".");
+    git(dir, "commit", "-qm", "hidden");
+    const hazard = spawnSync("git", ["log", "-p", "--text", "--format=", `${base}..HEAD`], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    expect(hazard.status).toBe(0);
+    expect(hazard.stderr).toContain("unable to access '.gitattributes'");
+    expect(step("Scan commits").run).not.toContain("-name .gitattributes -type f");
+
+    const patchOut = join(dir, "scanner-patch.txt");
+    const attrOut = join(dir, "attr-state.txt");
+    const bin = mkdtempSync(join(tmpdir(), "stub-gitleaks-link-"));
+    dirs.push(bin);
+    writeFileSync(
+      join(bin, "gitleaks"),
+      [
+        "#!/bin/sh",
+        "logopts=",
+        'for a in "$@"; do',
+        '  case "$a" in',
+        '    --log-opts=*) logopts="${a#--log-opts=}" ;;',
+        "  esac",
+        "done",
+        "# shellcheck disable=SC2086",
+        `git log -p -U0 --no-color --format= $logopts > '${patchOut}'`,
+        `if [ -e .gitattributes ] || [ -L .gitattributes ]; then echo present > '${attrOut}'; else echo absent > '${attrOut}'; fi`,
+        "n=$(git rev-list --count $RANGE)",
+        'echo "$n commits scanned."',
+        "exit 0",
+        "",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+    execFileSync("bash", ["-c", step("Scan commits").run], {
+      cwd: dir,
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH ?? ""}`,
+        RANGE: `${base}..HEAD`,
+        POLICY_DIR: bin,
+      },
+    });
+    expect(readFileSync(attrOut, "utf8").trim()).toBe("absent");
+    expect(readFileSync(patchOut, "utf8")).toContain(fakeKey);
+  });
+
+  it("fails closed when git log writes to stderr (Reviewer B P1-1 at e17a3f23)", () => {
+    const dir = fixture();
+    const base = git(dir, "rev-parse", "HEAD");
+    writeFileSync(join(dir, "note.txt"), "hello\n");
+    git(dir, "add", ".");
+    git(dir, "commit", "-qm", "note");
+    // A self-symlink attributes file makes git log warn and still exit 0.
+    // gitleaks v8.30.1 then scans 0 commits and exits 0. The name is not
+    // .gitattributes, so the cleanup above does not remove it.
+    const loop = join(dir, "loop-attrs");
+    symlinkSync("loop-attrs", loop);
+    git(dir, "config", "core.attributesFile", loop);
+    const bin = mkdtempSync(join(tmpdir(), "stub-gitleaks-stderr-"));
+    dirs.push(bin);
+    writeFileSync(join(bin, "gitleaks"), "#!/bin/sh\necho '1 commits scanned.'\nexit 0\n", {
+      mode: 0o755,
+    });
+    expect(step("Scan commits").run).toContain("git log wrote to stderr");
+    expect(() =>
+      execFileSync("bash", ["-c", step("Scan commits").run], {
+        cwd: dir,
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH ?? ""}`,
+          RANGE: `${base}..HEAD`,
+          POLICY_DIR: bin,
+        },
+      }),
+    ).toThrow();
+  });
+
+  it("fails closed when gitleaks reports 0 commits for a non-empty range (Reviewer B P1-1 at e17a3f23)", () => {
+    const dir = fixture();
+    const base = git(dir, "rev-parse", "HEAD");
+    writeFileSync(join(dir, "note.txt"), "hello\n");
+    git(dir, "add", ".");
+    git(dir, "commit", "-qm", "note");
+    const bin = mkdtempSync(join(tmpdir(), "stub-gitleaks-zero-"));
+    dirs.push(bin);
+    writeFileSync(join(bin, "gitleaks"), "#!/bin/sh\necho '0 commits scanned.'\nexit 0\n", {
+      mode: 0o755,
+    });
+    expect(step("Scan commits").run).toContain("commits are in range");
+    expect(() =>
+      execFileSync("bash", ["-c", step("Scan commits").run], {
+        cwd: dir,
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH ?? ""}`,
+          RANGE: `${base}..HEAD`,
+          POLICY_DIR: bin,
+        },
+      }),
+    ).toThrow();
   });
 
   it("still rejects a malformed push sha (detection not weakened)", () => {
@@ -341,7 +453,11 @@ describe("secret-scan workflow", () => {
     const runGuard = (cwd: string, range: string) => {
       const bin = mkdtempSync(join(tmpdir(), "stub-gitleaks-"));
       dirs.push(bin);
-      writeFileSync(join(bin, "gitleaks"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+      writeFileSync(
+        join(bin, "gitleaks"),
+        '#!/bin/sh\nn=$(git rev-list --count $RANGE)\necho "$n commits scanned."\nexit 0\n',
+        { mode: 0o755 },
+      );
       return execFileSync("bash", ["-c", scan().run], {
         cwd,
         env: {

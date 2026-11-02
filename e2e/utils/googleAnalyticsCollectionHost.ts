@@ -1,11 +1,6 @@
-import { execFileSync } from "node:child_process";
-import { chmodSync, readFileSync, writeFileSync } from "node:fs";
-import { createServer, request as httpRequest } from "node:http";
-import { connect as netConnect } from "node:net";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { createServer, request as httpRequest, type IncomingMessage } from "node:http";
+import { connect as netConnect, type Socket } from "node:net";
 import { test } from "@playwright/test";
-import { webkit } from "playwright-core";
 
 /**
  * Point a GA spec's document host at verdantgrowdiary.com (#2693) while the
@@ -13,29 +8,32 @@ import { webkit } from "playwright-core";
  * Host, and the spec must not change an assertion to compensate.
  *
  * Chromium maps the name with --host-resolver-rules. WebKit has no such flag,
- * so each run bind-mounts a private hosts file in a user namespace. The
- * browser is the Playwright browserName fixture (the project's browserName, or
- * its defaultBrowserType). process.argv does not carry --project in the worker,
- * so it is not read.
- * This file never writes the machine /etc/hosts.
+ * and GitHub-hosted runners refuse the user namespace a private /etc/hosts
+ * mount needs. WebKit therefore uses this file's local forward proxy: the
+ * document URL stays on the diary host, and the proxy fetches the dev server.
+ * The browser is the Playwright browserName fixture (the project's browserName,
+ * or its defaultBrowserType). process.argv does not carry --project in the
+ * worker, so it is not read.
+ * This file never writes the machine /etc/hosts and never skips a spec.
  */
 const CHROMIUM_HOST_RESOLVER_RULES =
   "--host-resolver-rules=MAP verdantgrowdiary.com 127.0.0.1,MAP www.verdantgrowdiary.com 127.0.0.1";
 
-const WEBKIT_RESOLVER_SCRIPT = `#!/bin/sh
-set -eu
-exec unshare --user --map-root-user --mount --propagation private sh -c 'mount --bind "$1" /etc/hosts && shift && exec "$@"' sh "$VERDANT_GA_HOSTS_FILE" "$VERDANT_WEBKIT_BIN" "$@"
-`;
+const DIARY_HOSTS = new Set(["verdantgrowdiary.com", "www.verdantgrowdiary.com"]);
 
 type CollectionBrowserName = "chromium" | "firefox" | "webkit";
 
 type CollectionLaunchOptions = {
   args?: string[];
-  executablePath?: string;
-  env?: NodeJS.ProcessEnv;
+  proxy?: { server: string };
 };
 
-let webkitCollectionHostSkip: string | undefined;
+type ForwardTarget = {
+  hostname: string;
+  port: number;
+  path: string;
+  diary: boolean;
+};
 
 export function pointSpecAtGoogleAnalyticsCollectionHost(
   proxyPort: number,
@@ -45,17 +43,11 @@ export function pointSpecAtGoogleAnalyticsCollectionHost(
   test.use({
     baseURL: origin,
     launchOptions: async ({ browserName }, apply) => {
-      await apply(launchOptionsForCollectionHost(collectionBrowserName(browserName)));
+      await apply(launchOptionsForCollectionHost(collectionBrowserName(browserName), proxyPort));
     },
   });
   // Listen in the worker only. Playwright also loads this file to collect tests,
-  // and a second bind on the same port fails. Resolving launchOptions here decides
-  // the WebKit skip before any later hook launches the browser.
-  test.beforeAll(({ browserName, launchOptions }) => {
-    void launchOptions;
-    if (browserName === "webkit" && webkitCollectionHostSkip)
-      test.skip(true, webkitCollectionHostSkip);
-  });
+  // and a second bind on the same port fails. The browser launches after this hook.
   test.beforeAll(async () => {
     await listenGaCollectionProxy(proxyPort, appPort);
   });
@@ -72,12 +64,13 @@ function collectionBrowserName(browserName: string): CollectionBrowserName {
 
 function launchOptionsForCollectionHost(
   browserName: CollectionBrowserName,
+  proxyPort: number,
 ): CollectionLaunchOptions {
   switch (browserName) {
     case "chromium":
       return { args: [CHROMIUM_HOST_RESOLVER_RULES] };
     case "webkit":
-      return webKitCollectionHostLaunchOptions();
+      return { proxy: { server: `http://127.0.0.1:${proxyPort}` } };
     case "firefox":
       return {};
     default: {
@@ -87,65 +80,83 @@ function launchOptionsForCollectionHost(
   }
 }
 
-function webKitSkipReason(detail: string): string {
-  return `WebKit per-run host resolver is unavailable (${detail}). --host-resolver-rules is Chromium-only, and this helper does not write /etc/hosts.`;
+function isDiaryHost(hostname: string): boolean {
+  return DIARY_HOSTS.has(hostname.replace(/\.$/, "").toLowerCase());
 }
 
-function webKitCollectionHostLaunchOptions(): CollectionLaunchOptions {
-  if (process.platform !== "linux") {
-    webkitCollectionHostSkip = webKitSkipReason("this process is not Linux");
-    return {};
-  }
-  try {
-    execFileSync(
-      "unshare",
-      ["--user", "--map-root-user", "--mount", "--propagation", "private", "true"],
-      { stdio: "ignore" },
-    );
-  } catch {
-    webkitCollectionHostSkip = webKitSkipReason(
-      "a private user-namespace hosts mount did not start",
-    );
-    return {};
-  }
+function isOwnProxy(hostname: string, port: number, proxyPort: number): boolean {
+  const name = hostname.replace(/\.$/, "").toLowerCase();
+  return (name === "127.0.0.1" || name === "localhost") && port === proxyPort;
+}
 
-  const hostsPath = join(tmpdir(), `verdant-ga-hosts-${process.pid}`);
-  const scriptPath = join(tmpdir(), `verdant-ga-webkit-${process.pid}.sh`);
-  const existing = readFileSync("/etc/hosts", "utf8");
-  const mapping = [
-    "127.0.0.1 verdantgrowdiary.com www.verdantgrowdiary.com",
-    "::1 verdantgrowdiary.com www.verdantgrowdiary.com",
-    "",
-  ].join("\n");
-  writeFileSync(
-    hostsPath,
-    existing.endsWith("\n") ? `${existing}${mapping}` : `${existing}\n${mapping}`,
-  );
-  writeFileSync(scriptPath, WEBKIT_RESOLVER_SCRIPT);
-  chmodSync(scriptPath, 0o755);
-  return {
-    executablePath: scriptPath,
-    env: {
-      ...process.env,
-      VERDANT_GA_HOSTS_FILE: hostsPath,
-      VERDANT_WEBKIT_BIN: webkit.executablePath(),
-    },
-  };
+function forwardTarget(
+  rawUrl: string | undefined,
+  appPort: number,
+  proxyPort: number,
+): ForwardTarget | null {
+  const raw = rawUrl && rawUrl.length > 0 ? rawUrl : "/";
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
+    return { hostname: "127.0.0.1", port: appPort, path: raw, diary: true };
+  }
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  const port = url.port
+    ? Number(url.port)
+    : url.protocol === "https:" || url.protocol === "wss:"
+      ? 443
+      : 80;
+  const path = `${url.pathname}${url.search}`;
+  if (isDiaryHost(url.hostname) || isOwnProxy(url.hostname, port, proxyPort)) {
+    return { hostname: "127.0.0.1", port: appPort, path, diary: true };
+  }
+  return { hostname: url.hostname, port, path, diary: false };
+}
+
+function connectTarget(
+  raw: string | undefined,
+  proxyPort: number,
+): { hostname: string; port: number } | "loop" | null {
+  if (!raw) return null;
+  const colon = raw.lastIndexOf(":");
+  if (colon <= 0) return null;
+  const hostname = raw.slice(0, colon).trim();
+  const port = Number(raw.slice(colon + 1));
+  if (!hostname || !Number.isInteger(port) || port <= 0) return null;
+  if (isOwnProxy(hostname, port, proxyPort) || (isDiaryHost(hostname) && port === proxyPort))
+    return "loop";
+  return { hostname, port };
 }
 
 function listenGaCollectionProxy(proxyPort: number, appPort: number): Promise<void> {
   const origin = `http://verdantgrowdiary.com:${proxyPort}`;
   const server = createServer((req, res) => {
-    const headers = { ...req.headers, host: `127.0.0.1:${appPort}` };
+    const target = forwardTarget(req.url, appPort, proxyPort);
+    if (!target) {
+      res.writeHead(400);
+      res.end();
+      return;
+    }
+    const headers = { ...req.headers };
+    delete headers["proxy-connection"];
+    if (target.diary) headers.host = `127.0.0.1:${appPort}`;
     const proxyReq = httpRequest(
       {
-        hostname: "127.0.0.1",
-        port: appPort,
+        hostname: target.hostname,
+        port: target.port,
         method: req.method,
-        path: req.url,
+        path: target.path,
         headers,
       },
       (proxyRes) => {
+        if (!target.diary) {
+          res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+          proxyRes.pipe(res);
+          return;
+        }
         const chunks: Buffer[] = [];
         proxyRes.on("data", (chunk: Buffer) => {
           chunks.push(Buffer.from(chunk));
@@ -183,10 +194,35 @@ function listenGaCollectionProxy(proxyPort: number, appPort: number): Promise<vo
     });
     req.pipe(proxyReq);
   });
+  server.on("connect", (req: IncomingMessage, socket: Socket, head: Buffer) => {
+    const target = connectTarget(req.url, proxyPort);
+    if (target === "loop" || target === null) {
+      socket.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
+      return;
+    }
+    const upstream = netConnect(target.port, target.hostname, () => {
+      socket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+      if (head.length > 0) upstream.write(head);
+      upstream.pipe(socket);
+      socket.pipe(upstream);
+    });
+    const closeBoth = () => {
+      socket.destroy();
+      upstream.destroy();
+    };
+    upstream.on("error", closeBoth);
+    socket.on("error", closeBoth);
+  });
   server.on("upgrade", (req, socket, head) => {
-    const upstream = netConnect(appPort, "127.0.0.1", () => {
-      const headers = { ...req.headers, host: `127.0.0.1:${appPort}` };
-      let raw = `${req.method ?? "GET"} ${req.url ?? "/"} HTTP/1.1\r\n`;
+    const target = forwardTarget(req.url, appPort, proxyPort);
+    if (!target) {
+      socket.destroy();
+      return;
+    }
+    const upstream = netConnect(target.port, target.hostname, () => {
+      const headers = { ...req.headers, host: `${target.hostname}:${target.port}` };
+      if (target.diary) headers.host = `127.0.0.1:${appPort}`;
+      let raw = `${req.method ?? "GET"} ${target.path} HTTP/1.1\r\n`;
       for (const [key, value] of Object.entries(headers)) {
         if (value == null) continue;
         for (const item of Array.isArray(value) ? value : [value]) raw += `${key}: ${item}\r\n`;

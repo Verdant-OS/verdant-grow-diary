@@ -18,7 +18,8 @@ export type EcowittStationClaimState = "none" | "unbound" | "active" | "revoked"
 export interface EcowittStationReadingInput {
   readonly tentId: string;
   readonly metric: string;
-  readonly value: number;
+  /** PostgREST numeric columns arrive as strings. Both forms are live values. */
+  readonly value: number | string;
   readonly source: string;
   readonly quality: string;
   readonly capturedAt: string | null;
@@ -35,6 +36,8 @@ export interface EcowittStationCardInput {
   /** Raw token from the create call in this session. Never invented here. */
   readonly justCreatedToken: string | null;
   readonly createError?: string | null;
+  /** Pending means the open-claim read for this tent has not finished. */
+  readonly claimLookup?: "pending" | "ready";
 }
 
 export interface EcowittLoadedClaim {
@@ -154,6 +157,14 @@ function isLiveMetric(metric: string): metric is LiveMetric {
   return (LIVE_METRICS as readonly string[]).includes(metric);
 }
 
+function finiteReadingValue(value: number | string): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function latestLive(
   readings: readonly EcowittStationReadingInput[],
   tentId: string,
@@ -166,7 +177,7 @@ function latestLive(
     if (reading.source !== "live") continue;
     if (reading.quality !== "ok") continue;
     if (reading.metric !== metric || !isLiveMetric(reading.metric)) continue;
-    if (!Number.isFinite(reading.value)) continue;
+    if (finiteReadingValue(reading.value) === null) continue;
     if (reading.capturedAt === null) continue;
     const ms = Date.parse(reading.capturedAt);
     if (!Number.isFinite(ms)) continue;
@@ -220,7 +231,10 @@ export function buildEcowittCustomUploadStationCard(
     createLinkLabel: ECOWITT_CUSTOM_UPLOAD_COPY.createLink,
     createError: input.createError ?? null,
     canCreateLink:
-      input.tentId !== null && input.claimState !== "active" && input.claimState !== "unbound",
+      input.claimLookup !== "pending" &&
+      input.tentId !== null &&
+      input.claimState !== "active" &&
+      input.claimState !== "unbound",
     revoked: input.claimState === "revoked",
     claimId,
     canRevoke: openClaim,
@@ -297,10 +311,10 @@ export function buildEcowittCustomUploadStationCard(
     emptyMessage: null,
     freshness: stale ? "stale" : "live",
     freshnessLabel: stale ? ECOWITT_CUSTOM_UPLOAD_COPY.stale : ECOWITT_CUSTOM_UPLOAD_COPY.live,
-    indoorTempF: temp ? formatTempF(temp.value) : null,
-    indoorRh: humidity ? formatPercent(humidity.value) : null,
-    soil1: soil ? formatPercent(soil.value) : null,
-    co2: co2 ? formatCo2(co2.value) : null,
+    indoorTempF: temp ? formatTempF(finiteReadingValue(temp.value) ?? Number.NaN) : null,
+    indoorRh: humidity ? formatPercent(finiteReadingValue(humidity.value) ?? Number.NaN) : null,
+    soil1: soil ? formatPercent(finiteReadingValue(soil.value) ?? Number.NaN) : null,
+    co2: co2 ? formatCo2(finiteReadingValue(co2.value) ?? Number.NaN) : null,
     lastReadingLabel: `${ECOWITT_CUSTOM_UPLOAD_COPY.lastReading}: ${newest}`,
   };
 }

@@ -35,7 +35,10 @@ export interface EcowittCustomUploadPorts {
     capturedAt: string,
   ): Promise<
     | { ok: true }
-    | { ok: false; reason: "rate_limited" | "duplicate_captured_at" | "claim_not_found" }
+    | {
+        ok: false;
+        reason: "rate_limited" | "duplicate_captured_at" | "claim_not_found" | "store_failed";
+      }
   >;
   insertReadings(
     rows: readonly EcowittCustomUploadStoredReading[],
@@ -199,12 +202,23 @@ export async function handleEcowittCustomUploadRequest(
 
   if (!plan.accepted || claim === null) return jsonResponse(plan, 0);
 
+  const inserted = await ports.insertReadings(plan.rows);
+  if (!inserted.ok) {
+    console.error("[ecowitt-custom-upload] insert_failed", { rows: plan.rows.length });
+    return jsonResponse({ accepted: false, reason: "store_failed" }, 0, 503);
+  }
+
   const capturedAt = plan.rows[0]?.capturedAt ?? null;
   if (plan.touchReceivedAt !== null && capturedAt !== null) {
     const reserved = await ports.touchClaim(claim.id, plan.touchReceivedAt, capturedAt);
     if (!reserved.ok) {
-      const reason = reserved.reason === "claim_not_found" ? "store_failed" : reserved.reason;
-      return jsonResponse({ accepted: false, reason }, 0);
+      if (reserved.reason === "store_failed" || reserved.reason === "claim_not_found") {
+        console.error("[ecowitt-custom-upload] receipt_reserve_failed", {
+          reason: reserved.reason,
+        });
+        return jsonResponse({ accepted: false, reason: "store_failed" }, plan.rows.length, 503);
+      }
+      console.warn("[ecowitt-custom-upload] receipt_not_reserved", { reason: reserved.reason });
     }
   }
 
@@ -215,13 +229,10 @@ export async function handleEcowittCustomUploadRequest(
       plan.bind.stationtype,
       plan.touchReceivedAt ?? now.toISOString(),
     );
-    if (!bound.ok) return jsonResponse({ accepted: false, reason: "store_failed" }, 0);
-  }
-
-  const inserted = await ports.insertReadings(plan.rows);
-  if (!inserted.ok) {
-    console.error("[ecowitt-custom-upload] insert_failed", { rows: plan.rows.length });
-    return jsonResponse({ accepted: false, reason: "store_failed" }, 0, 503);
+    if (!bound.ok) {
+      console.error("[ecowitt-custom-upload] bind_failed");
+      return jsonResponse({ accepted: false, reason: "store_failed" }, plan.rows.length, 503);
+    }
   }
   return jsonResponse(plan, plan.rows.length);
 }

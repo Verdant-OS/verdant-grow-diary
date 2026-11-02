@@ -134,16 +134,6 @@ BEGIN
   IF uid IS NULL OR COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) THEN
     RAISE EXCEPTION 'not allowed';
   END IF;
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.ecowitt_custom_upload_claims
-    WHERE id = p_claim_id
-      AND user_id = uid
-      AND revoked_at IS NULL
-  ) THEN
-    RAISE EXCEPTION 'claim not found';
-  END IF;
-
   raw_token := encode(extensions.gen_random_bytes(24), 'hex');
   token_hash := encode(extensions.digest(convert_to(raw_token, 'utf8'), 'sha256'), 'hex');
   UPDATE public.ecowitt_custom_upload_claims
@@ -151,6 +141,11 @@ BEGIN
   WHERE id = p_claim_id
     AND user_id = uid
     AND revoked_at IS NULL;
+  -- A concurrent revoke or second rotate can make this match nothing.
+  -- Returning raw_token then would show a path the database never stored.
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'claim not found';
+  END IF;
   RETURN raw_token;
 END;
 $function$;

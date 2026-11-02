@@ -7,8 +7,15 @@
  * ahead, drop stuck 0/100 percent readings, ignore unknown keys). Air and
  * soil come from channels 1–8 through `routeEcoWittPayloadToTents` and the
  * tent's `air_channels` / `soil_channels`. Indoor `tempinf` / `humidityin`
- * are never tent air. Unmapped channels are dropped. `co2` stays on the
- * claim tent. A missing metric is not stored as a healthy zero.
+ * are never tent air. Unmapped channels are dropped. Air temperature outside
+ * −10..50 °C is dropped here even though the shared router allows 60 °C.
+ * `sensor_readings_dedupe_uidx` is unique on (user, tent, source, metric,
+ * captured_at), so this planner emits one row per metric: the mean of the
+ * valid channels. Each channel's number and raw value stay on
+ * `raw_payload.channels`. A humidity or soil reading at 0 or 100 is stored
+ * with quality `suspect` (clone domes and dried coco are real), and it still
+ * counts in the mean. `co2` stays on the claim tent. A missing metric is not
+ * stored as a healthy zero.
  *
  * The claim token and PASSKEY never appear in stored rows or in the plan's
  * public fields. Callers hash them before planning.
@@ -59,14 +66,19 @@ export interface EcowittCustomUploadStoredReading {
   readonly source: "live";
   readonly metric: EcowittCustomUploadMetric;
   readonly value: number;
-  readonly quality: "ok";
+  readonly quality: "ok" | "suspect";
   readonly capturedAt: string;
   readonly receivedAt: string;
   readonly rawPayload: {
     readonly vendor: "ecowitt";
-    readonly channel: EcowittCustomUploadChannel;
-    readonly rawKey: string;
-    readonly rawValue: string;
+    readonly aggregation: "mean";
+    readonly channels: readonly {
+      readonly channel: number;
+      readonly rawKey: string;
+      readonly rawValue: string;
+      readonly value: number;
+      readonly suspect: boolean;
+    }[];
     readonly passkeyFingerprint: string;
     readonly timestampSource: "ecowitt_dateutc";
   };
@@ -120,6 +132,8 @@ export interface EcowittCustomUploadPlanInput {
   readonly soilChannels: readonly number[];
 }
 
+const AIR_TEMP_C_MIN = -10;
+const AIR_TEMP_C_MAX = 50;
 const CO2_PPM_MIN = 200;
 const CO2_PPM_MAX = 10000;
 
@@ -187,7 +201,7 @@ export function isEcowittPasskey(value: string): boolean {
 /** Strict EcoWitt `dateutc`. Rollover dates such as Feb 31 fail closed. */
 export function parseEcowittCustomUploadDateutc(value: string): string | null {
   const raw = value.trim();
-  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(raw);
+  const match = /^(\d{4})-(\d{2})-(\d{2})[ +](\d{2}):(\d{2}):(\d{2})$/.exec(raw);
   if (!match) return null;
   const year = Number(match[1]);
   const month = Number(match[2]);
@@ -252,7 +266,7 @@ function coerceFinite(value: string | null): number | null {
   const trimmed = value.trim();
   if (trimmed === "" || trimmed === "true" || trimmed === "false") return null;
   const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed)) return null;
+  if (!Number.isFinite(parsed) || parsed === -9999) return null;
   return parsed;
 }
 
@@ -265,24 +279,31 @@ function stationTypeFrom(fields: Map<string, string | null>): string | null {
   return trimmed;
 }
 
-interface MetricDraft {
+interface ChannelSample {
   readonly metric: EcowittCustomUploadMetric;
-  readonly channel: EcowittCustomUploadChannel;
+  readonly channel: number;
   readonly rawKey: string;
   readonly value: number;
   readonly rawValue: string;
+  readonly suspect: boolean;
 }
 
 function channelsInRange(channels: readonly number[]): number[] {
   return channels.filter((channel) => channel >= 1 && channel <= 8);
 }
 
-function metricDrafts(
+function percentSuspect(metric: EcowittCustomUploadMetric, value: number): boolean {
+  return (
+    (metric === "humidity_pct" || metric === "soil_moisture_pct") && (value <= 0 || value >= 100)
+  );
+}
+
+function metricSamples(
   fields: Map<string, string | null>,
   airChannels: readonly number[],
   soilChannels: readonly number[],
   passkeyFingerprint: string,
-): readonly MetricDraft[] {
+): readonly ChannelSample[] {
   const payload: Record<string, unknown> = {};
   for (const [key, value] of fields) payload[key] = value;
   const routed = routeEcoWittPayloadToTents({
@@ -297,39 +318,52 @@ function metricDrafts(
       },
     ],
   });
-  const drafts: MetricDraft[] = [];
+  const samples: ChannelSample[] = [];
   for (const group of routed.groups) {
     for (const reading of group.readings) {
       if (
-        (reading.metric === "humidity_pct" || reading.metric === "soil_moisture_pct") &&
-        (reading.value <= 0 || reading.value >= 100)
+        reading.metric === "temperature_c" &&
+        (reading.value < AIR_TEMP_C_MIN || reading.value > AIR_TEMP_C_MAX)
       ) {
         continue;
       }
       const raw = fields.get(reading.source_channel_key);
-      drafts.push({
+      if ((raw ?? "").trim() === "-9999") continue;
+      samples.push({
         metric: reading.metric,
-        channel:
-          reading.metric === "soil_moisture_pct"
-            ? `soil${reading.channel}`
-            : `air${reading.channel}`,
+        channel: reading.channel,
         rawKey: reading.source_channel_key,
         value: reading.value,
         rawValue: (raw ?? "").trim(),
+        suspect: percentSuspect(reading.metric, reading.value),
       });
     }
   }
   const co2 = coerceFinite(fields.get("co2") ?? null);
   if (co2 !== null && co2 >= CO2_PPM_MIN && co2 <= CO2_PPM_MAX) {
-    drafts.push({
+    samples.push({
       metric: "co2_ppm",
-      channel: "co2",
+      channel: 0,
       rawKey: "co2",
       value: co2,
       rawValue: (fields.get("co2") ?? "").trim(),
+      suspect: false,
     });
   }
-  return drafts;
+  return samples;
+}
+
+/** One row per metric. Mean of the channels that survived routing and the −10..50 °C air bound. */
+function aggregateCustomUploadSamples(
+  samples: readonly ChannelSample[],
+): ReadonlyMap<EcowittCustomUploadMetric, readonly ChannelSample[]> {
+  const grouped = new Map<EcowittCustomUploadMetric, ChannelSample[]>();
+  for (const sample of samples) {
+    const list = grouped.get(sample.metric) ?? [];
+    list.push(sample);
+    grouped.set(sample.metric, list);
+  }
+  return grouped;
 }
 
 function dateutcFailure(
@@ -410,33 +444,46 @@ export function planEcowittCustomUploadIngest(
   if (capturedAt === null) return reject("dateutc_invalid");
   if (duplicateCapturedAt(claim, capturedAt)) return reject("duplicate_captured_at");
 
-  const drafts = metricDrafts(
+  const samples = metricSamples(
     fields,
     input.airChannels,
     input.soilChannels,
     passkeySha256.slice(0, 16),
   );
-  if (drafts.length === 0) return reject("no_storable_metrics");
+  const grouped = aggregateCustomUploadSamples(samples);
+  if (grouped.size === 0) return reject("no_storable_metrics");
 
   const receivedAt = input.now.toISOString();
-  const rows: EcowittCustomUploadStoredReading[] = drafts.map((draft) => ({
-    userId: claim.userId,
-    tentId: claim.tentId,
-    source: "live",
-    metric: draft.metric,
-    value: draft.value,
-    quality: "ok",
-    capturedAt,
-    receivedAt,
-    rawPayload: {
-      vendor: "ecowitt",
-      channel: draft.channel,
-      rawKey: draft.rawKey,
-      rawValue: draft.rawValue,
-      passkeyFingerprint: passkeySha256.slice(0, 16),
-      timestampSource: "ecowitt_dateutc",
-    },
-  }));
+  const rows: EcowittCustomUploadStoredReading[] = [...grouped.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([metric, channels]) => {
+      const mean = channels.reduce((sum, channel) => sum + channel.value, 0) / channels.length;
+      return {
+        userId: claim.userId,
+        tentId: claim.tentId,
+        source: "live" as const,
+        metric,
+        value: Math.round(mean * 100) / 100,
+        quality: channels.some((channel) => channel.suspect)
+          ? ("suspect" as const)
+          : ("ok" as const),
+        capturedAt,
+        receivedAt,
+        rawPayload: {
+          vendor: "ecowitt" as const,
+          aggregation: "mean" as const,
+          channels: channels.map((channel) => ({
+            channel: channel.channel,
+            rawKey: channel.rawKey,
+            rawValue: channel.rawValue,
+            value: channel.value,
+            suspect: channel.suspect,
+          })),
+          passkeyFingerprint: passkeySha256.slice(0, 16),
+          timestampSource: "ecowitt_dateutc" as const,
+        },
+      };
+    });
 
   return {
     httpStatus: 200,

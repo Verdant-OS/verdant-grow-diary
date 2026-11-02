@@ -67,6 +67,9 @@ describe("EcoWitt claim migration", () => {
     );
     expect(MIGRATION).toContain("public.revoke_ecowitt_custom_upload_claim");
     expect(MIGRATION).toContain("public.rotate_ecowitt_custom_upload_claim");
+    expect(MIGRATION).toMatch(
+      /rotate_ecowitt_custom_upload_claim[\s\S]*IF NOT FOUND THEN\s*RAISE EXCEPTION 'claim not found';/,
+    );
     expect(MIGRATION).not.toContain("PASSKEY");
   });
 });

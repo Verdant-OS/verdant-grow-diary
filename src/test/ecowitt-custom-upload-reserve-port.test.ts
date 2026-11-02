@@ -27,6 +27,6 @@ describe("EcoWitt receipt reserve port", () => {
       "2026-11-02T18:00:30.000Z",
       "2026-11-02T18:00:00.000Z",
     );
-    expect(missing).toEqual({ ok: false, reason: "claim_not_found" });
+    expect(missing).toEqual({ ok: false, reason: "store_failed" });
   });
 });

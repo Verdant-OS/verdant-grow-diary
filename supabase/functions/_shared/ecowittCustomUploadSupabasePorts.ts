@@ -28,7 +28,8 @@ export type EcowittReserveReceipt =
   | { readonly ok: true }
   | {
       readonly ok: false;
-      readonly reason: "rate_limited" | "duplicate_captured_at" | "claim_not_found";
+      readonly reason:
+        "rate_limited" | "duplicate_captured_at" | "claim_not_found" | "store_failed";
     };
 
 export function readEcowittReserveReceipt(data: unknown): EcowittReserveReceipt {
@@ -62,7 +63,7 @@ export async function reserveEcowittCustomUploadReceipt(
     p_received_at: receivedAt,
     p_captured_at: capturedAt,
   });
-  if (error) return { ok: false, reason: "claim_not_found" };
+  if (error) return { ok: false, reason: "store_failed" };
   return readEcowittReserveReceipt(data);
 }
 

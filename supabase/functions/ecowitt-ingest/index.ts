@@ -298,7 +298,7 @@ export async function handleEcoWittIngestRequest(
     console.error("[ecowitt-ingest] tent_lookup_failed", {
       auth_kind: auth.kind,
     });
-    return json({ ok: true, accepted: false, inserted: 0, reason: "tent_lookup_failed" }, 200);
+    return json({ ok: false, accepted: false, inserted: 0, reason: "tent_lookup_failed" }, 503);
   }
 
   const eligibleTents = parseEligibleTents((tentRows ?? []) as TentHardwareConfigRow[]);
@@ -357,6 +357,17 @@ export async function handleEcoWittIngestRequest(
     timestampSource,
   });
 
+  if (summary.dropped.length > 0) {
+    console.warn("[ecowitt-ingest] channels_dropped", {
+      auth_kind: auth.kind,
+      dropped: summary.dropped.map((drop) => ({
+        channel_key: drop.channel_key,
+        channel: drop.channel,
+        reason: drop.reason,
+      })),
+    });
+  }
+
   if (rows.length === 0) {
     // 200 OK with accepted:false covers: missing PASSKEY, unknown
     // fingerprint, no channel mapped to any owned tent, all values invalid.
@@ -395,24 +406,20 @@ export async function handleEcoWittIngestRequest(
 
   const inserted = upserted?.length ?? 0;
   if (inserted > 0) {
-    const bumpResult = (await admin.rpc("bump_bridge_token_usage", {
-      p_id: auth.tokenId,
-      p_inserted: inserted,
-    })) as { error?: unknown } | null;
-    const bumpErr = bumpResult?.error ?? null;
+    let bumpErr: unknown = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const bumpResult = (await admin.rpc("bump_bridge_token_usage", {
+        p_id: auth.tokenId,
+        p_inserted: inserted,
+      })) as { error?: unknown } | null;
+      bumpErr = bumpResult?.error ?? null;
+      if (!bumpErr) break;
+    }
     if (bumpErr) {
-      console.error("[ecowitt-ingest] bump_bridge_token_usage_failed", {
+      console.warn("[ecowitt-ingest] bump_bridge_token_usage_failed", {
         auth_kind: auth.kind,
+        inserted,
       });
-      return json(
-        {
-          ok: false,
-          accepted: true,
-          inserted,
-          error: "bump_bridge_token_usage_failed",
-        },
-        500,
-      );
     }
   }
 

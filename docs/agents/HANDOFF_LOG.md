@@ -79,9 +79,9 @@ branch: ultra/2717-ecowitt-live-ingest
 base: verdant-grow-diary
 checkout: git fetch origin ultra/2717-ecowitt-live-ingest verdant-grow-diary && git switch ultra/2717-ecowitt-live-ingest
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2732
-head_sha: read git rev-parse HEAD after the channel-router follow-up; previous remote head ba05540f07fa26f511b05ba65ad5fac0eb95d9b6
+head_sha: read git rev-parse HEAD after the Bugbot and protocol follow-up; previous remote head 3cd66995ee0728c176cddf91f15693d7c68352e7
 state: pushed draft
-current_step: Custom-upload air and soil use routeEcoWittPayloadToTents for channels 1-8. Indoor tempinf/humidityin are not tent air. Insert failure on both ingest paths returns 500/503 and is logged. bump_bridge_token_usage errors on the passkey path return 500.
+current_step: One row per tent and metric (mean, raw channels kept). Insert runs before receipt reserve. Rotate returns a token only when UPDATE finds a row. Tent switch clears the loaded claim immediately. Create stays hidden until the open-claim read finishes. Live card accepts numeric strings and labels tent air. dateutc accepts '+' or space. -9999 is missing. Gateway 5xx retry is NOT_MEASURED.
 next_action: keep the PR draft. Required full-suite and lint jobs stay skipped until a non-author marks the PR ready. Do not apply the migration or deploy the edge function.
 post_merge_check: after a separate authorized apply and Publish, a GW1200B POST stores the tent's configured air channel, not the gateway indoor sensor. NOT_MEASURED until then.
 active_writer: Grok cloud session assigned 2026-11-02 to push this branch
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: no production writes; PR stays draft
 claimed_by: Grok, 2026-11-02
 owner: Grok (takeover from Team Ultra by explicit assignment)
-last_updated: 2026-11-02 18:25 CT, by Grok
+last_updated: 2026-11-02 23:43 UTC, by Grok
 ```
 
 ### CREATE-DIALOG-DISABLED-REASON

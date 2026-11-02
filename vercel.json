@@ -18,7 +18,6 @@
     },
     { "source": "/strains", "destination": "/cultivars", "permanent": true },
     { "source": "/strains/:slug", "destination": "/cultivars/:slug", "permanent": true },
-    { "source": "/features", "destination": "/welcome", "permanent": true },
     { "source": "/demo", "destination": "/welcome", "permanent": true },
     { "source": "/refunds", "destination": "/refund", "permanent": true },
     { "source": "/refund-policy", "destination": "/refund", "permanent": true },

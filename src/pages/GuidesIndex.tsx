@@ -16,6 +16,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { VERDANT_GROWER_GUIDE_FAQ, VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
+import { PUBLIC_GROW_GUIDE_ARTICLES } from "@/lib/publicGrowGuideArticles";
 
 const PAGE_TITLE = "Grower Guides: Diary, Lighting & Sensor Truth | Verdant";
 const PAGE_DESCRIPTION =
@@ -186,6 +187,17 @@ export default function GuidesIndex() {
               </p>
             </Link>
           </li>
+          {PUBLIC_GROW_GUIDE_ARTICLES.map((g) => (
+            <li
+              key={g.slug}
+              className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors"
+            >
+              <Link to={g.path} className="block">
+                <h3 className="font-semibold text-lg">{g.h1}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{g.description}</p>
+              </Link>
+            </li>
+          ))}
         </ul>
       </section>
 

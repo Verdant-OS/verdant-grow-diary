@@ -33,6 +33,26 @@ const ROUTES = [
     canonical: `${ORIGIN}/tools/grow-help-toolkit`,
   },
   {
+    path: "/guides/isolate-male-cannabis-plant",
+    expectTitle: /Identify and Isolate a Male Cannabis Plant/,
+    canonical: `${ORIGIN}/guides/isolate-male-cannabis-plant`,
+  },
+  {
+    path: "/guides/cannabis-tissue-culture",
+    expectTitle: /Cannabis Tissue Culture/,
+    canonical: `${ORIGIN}/guides/cannabis-tissue-culture`,
+  },
+  {
+    path: "/guides/still-air-box-vs-flow-hood",
+    expectTitle: /Still Air Box vs Flow Hood/,
+    canonical: `${ORIGIN}/guides/still-air-box-vs-flow-hood`,
+  },
+  {
+    path: "/guides/steady-climate-multiple-grow-tents",
+    expectTitle: /Steady Climate Across Multiple Grow Tents/,
+    canonical: `${ORIGIN}/guides/steady-climate-multiple-grow-tents`,
+  },
+  {
     path: "/guides/athena-feed-chart-log",
     expectTitle: /Athena Feed Chart Log/,
     canonical: `${ORIGIN}/guides/athena-feed-chart-log`,

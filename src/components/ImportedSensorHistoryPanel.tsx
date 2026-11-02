@@ -269,20 +269,19 @@ export default function ImportedSensorHistoryPanel({
                     data-testid={`imported-history-metric-filter-${opt.id}`}
                     onClick={() => setSelectedMetric(opt.id)}
                   >
-                    <span className="flex flex-col items-start leading-tight">
-                      <span>
-                        {opt.label}
-                        <span className="ml-1 text-xs opacity-70">({opt.count})</span>
-                      </span>
-                      {opt.id !== IMPORTED_SENSOR_HISTORY_ALL_METRICS && opt.id !== opt.label ? (
-                        <span className="text-[10px] font-normal text-muted-foreground">
-                          {opt.id}
-                        </span>
-                      ) : null}
-                    </span>
+                    {opt.label}
+                    <span className="ml-1 text-xs opacity-70">({opt.count})</span>
                   </Button>
                 );
               })}
+              <span className="sr-only">
+                {vm.metricOptions
+                  .filter(
+                    (opt) => opt.id !== IMPORTED_SENSOR_HISTORY_ALL_METRICS && opt.id !== opt.label,
+                  )
+                  .map((opt) => opt.id)
+                  .join(" ")}
+              </span>
             </div>
           ) : null}
 

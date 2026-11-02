@@ -15,6 +15,7 @@ CREATE TABLE public.ecowitt_custom_upload_claims (
   revoked_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   last_received_at timestamptz,
+  last_captured_at timestamptz,
   CONSTRAINT ecowitt_custom_upload_claims_token_sha256_hex
     CHECK (token_sha256 ~ '^[0-9a-f]{64}$'),
   CONSTRAINT ecowitt_custom_upload_claims_passkey_sha256_hex
@@ -89,8 +90,8 @@ BEGIN
     RAISE EXCEPTION 'active claim exists';
   END IF;
 
-  raw_token := encode(gen_random_bytes(24), 'hex');
-  token_hash := encode(digest(convert_to(raw_token, 'utf8'), 'sha256'), 'hex');
+  raw_token := encode(extensions.gen_random_bytes(24), 'hex');
+  token_hash := encode(extensions.digest(convert_to(raw_token, 'utf8'), 'sha256'), 'hex');
   INSERT INTO public.ecowitt_custom_upload_claims (user_id, tent_id, token_sha256)
   VALUES (uid, p_tent_id, token_hash)
   RETURNING id INTO new_id;
@@ -143,8 +144,8 @@ BEGIN
     RAISE EXCEPTION 'claim not found';
   END IF;
 
-  raw_token := encode(gen_random_bytes(24), 'hex');
-  token_hash := encode(digest(convert_to(raw_token, 'utf8'), 'sha256'), 'hex');
+  raw_token := encode(extensions.gen_random_bytes(24), 'hex');
+  token_hash := encode(extensions.digest(convert_to(raw_token, 'utf8'), 'sha256'), 'hex');
   UPDATE public.ecowitt_custom_upload_claims
   SET token_sha256 = token_hash
   WHERE id = p_claim_id
@@ -153,6 +154,61 @@ BEGIN
   RETURN raw_token;
 END;
 $function$;
+
+-- Serializes receipt updates for one claim. Bind must not write these columns.
+CREATE OR REPLACE FUNCTION public.reserve_ecowitt_custom_upload_receipt(
+  p_claim_id uuid,
+  p_received_at timestamptz,
+  p_captured_at timestamptz
+)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_interval integer;
+  v_last_received timestamptz;
+  v_last_captured timestamptz;
+  v_revoked timestamptz;
+  v_gap_ms integer;
+BEGIN
+  IF p_claim_id IS NULL OR p_received_at IS NULL OR p_captured_at IS NULL THEN
+    RETURN 'claim_not_found';
+  END IF;
+
+  SELECT interval_seconds, last_received_at, last_captured_at, revoked_at
+  INTO v_interval, v_last_received, v_last_captured, v_revoked
+  FROM public.ecowitt_custom_upload_claims
+  WHERE id = p_claim_id
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_revoked IS NOT NULL THEN
+    RETURN 'claim_not_found';
+  END IF;
+
+  v_gap_ms := GREATEST(8000, v_interval * 500);
+  IF v_last_received IS NOT NULL
+     AND p_received_at < v_last_received + (v_gap_ms * INTERVAL '1 millisecond') THEN
+    RETURN 'rate_limited';
+  END IF;
+
+  IF v_last_captured IS NOT NULL AND v_last_captured = p_captured_at THEN
+    RETURN 'duplicate_captured_at';
+  END IF;
+
+  UPDATE public.ecowitt_custom_upload_claims
+  SET last_received_at = p_received_at,
+      last_captured_at = p_captured_at
+  WHERE id = p_claim_id
+    AND revoked_at IS NULL;
+  RETURN 'ok';
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.reserve_ecowitt_custom_upload_receipt(uuid, timestamptz, timestamptz)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.reserve_ecowitt_custom_upload_receipt(uuid, timestamptz, timestamptz) TO service_role;
 
 REVOKE ALL ON FUNCTION public.create_ecowitt_custom_upload_claim(uuid)
   FROM PUBLIC, anon, authenticated, service_role;

@@ -57,7 +57,14 @@ describe("EcoWitt claim migration", () => {
     expect(MIGRATION).toContain("SET search_path TO 'public', 'pg_temp'");
     expect(MIGRATION).not.toMatch(/GRANT\s+[^;]*\sTO\s+anon/i);
     expect(MIGRATION).not.toMatch(/CREATE\s+POLICY[\s\S]*FOR\s+INSERT/i);
-    expect(MIGRATION).toContain("encode(digest(convert_to(raw_token, 'utf8'), 'sha256'), 'hex')");
+    expect(MIGRATION).toContain("extensions.gen_random_bytes(24)");
+    expect(MIGRATION).toContain("extensions.digest(convert_to(raw_token, 'utf8'), 'sha256')");
+    expect(MIGRATION).not.toContain("encode(gen_random_bytes(");
+    expect(MIGRATION).not.toContain("encode(digest(");
+    expect(MIGRATION).toContain("last_captured_at timestamptz");
+    expect(MIGRATION).toContain(
+      "GRANT EXECUTE ON FUNCTION public.reserve_ecowitt_custom_upload_receipt(uuid, timestamptz, timestamptz) TO service_role",
+    );
     expect(MIGRATION).toContain("public.revoke_ecowitt_custom_upload_claim");
     expect(MIGRATION).toContain("public.rotate_ecowitt_custom_upload_claim");
     expect(MIGRATION).not.toContain("PASSKEY");

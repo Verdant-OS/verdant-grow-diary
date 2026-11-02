@@ -513,12 +513,12 @@ describe("CSV history -> AI Doctor full-chain regression", () => {
         return [cells[1].textContent, cells[2].textContent];
       });
     expect(visibleRows).toEqual([
-      ["humidity_pct", "58%"],
+      ["Humidity", "58%"],
       ["Temperature (°C)", "26 °C"],
-      ["vpd_kpa", "1.41 kPa"],
-      ["humidity_pct", "54%"],
+      ["VPD", "1.41 kPa"],
+      ["Humidity", "54%"],
       ["Temperature (°C)", "24 °C"],
-      ["vpd_kpa", "1.37 kPa"],
+      ["VPD", "1.37 kPa"],
     ]);
 
     const handoff = screen.getByTestId("imported-history-ai-doctor-handoff");

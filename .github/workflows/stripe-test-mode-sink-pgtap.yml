@@ -43,8 +43,10 @@ jobs:
         run: |
           set -euo pipefail
           PG_BIN="/usr/lib/postgresql/${PG_MAJOR}/bin"
-          PGDATA="${RUNNER_TEMP}/stripe-sink-pg"
-          SOCK="${RUNNER_TEMP}/stripe-sink-sock"
+          # /tmp is traversable by the postgres OS user. RUNNER_TEMP is mode 700
+          # and owned by the runner, so initdb there fails with permission denied.
+          PGDATA="/tmp/stripe-sink-pg"
+          SOCK="/tmp/stripe-sink-sock"
           PORT=54329
           cleanup() {
             if [ -d "$PGDATA" ]; then

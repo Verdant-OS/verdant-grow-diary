@@ -56,7 +56,7 @@ export function buildCultivarQaContext(cultivar: VerdantCultivarProfile): string
   lines.push(
     `Life cycle (reported): ${cultivar.lifeCycle === "autoflower" ? "autoflower" : "photoperiod"}`,
   );
-  lines.push(`Reported difficulty: ${cultivar.difficulty}`);
+  lines.push(`Reported difficulty: ${cultivar.difficulty ?? "not sourced"}`);
   lines.push(`Reported flower window: ${cultivar.flowerWeeks}`);
   lines.push(`Market classification (reported): ${cultivar.marketClassification}`);
   lines.push(`Evidence state: ${cultivar.verificationStatus}`);

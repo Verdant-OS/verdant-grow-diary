@@ -5,7 +5,7 @@
  * write rows, diagnose a plant, create alerts, or generate Action Queue items.
  */
 import { useEffect } from "react";
-import { Link, Navigate, useParams } from "@/lib/react-router-compat";
+import { Link, useParams } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import CultivarBlueprintCrossSell from "@/components/CultivarBlueprintCrossSell";
 import CultivarFollowButton from "@/components/CultivarFollowButton";
@@ -32,6 +32,7 @@ import {
   buildCultivarFaqItems,
   cultivarVerificationIsSearchIndexable,
 } from "@/lib/cultivarDetailSeo";
+import { CultivarVerifiedProfileRules } from "@/lib/cultivarVerifiedProfileRules";
 
 function sectionId(key: CultivarGuideSectionKey): string {
   return `guide-${key.replace(/_/g, "-")}`;
@@ -40,7 +41,7 @@ function sectionId(key: CultivarGuideSectionKey): string {
 function formatDate(value: string): string {
   const date = new Date(value);
   return Number.isFinite(date.getTime())
-    ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date)
+    ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(date)
     : "Not recorded";
 }
 
@@ -58,16 +59,18 @@ export default function CultivarPage() {
     ? buildCultivarSummaryRows(cultivar, formatDate(cultivar.lastVerifiedAt))
     : [];
   const faqItems = cultivar ? buildCultivarFaqItems(cultivar) : [];
+  const missingSlug = slug && !cultivar ? slug : undefined;
 
   usePageSeo({
     title: cultivar
       ? `${cultivar.name} Cultivar Grow Guide | Verdant`
-      : "Strain Reference Library | Verdant",
+      : "Cultivar not found | Verdant",
     description: cultivar
-      ? `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`
-      : "Source-backed cultivar references with reported tendencies, confidence, and missing information.",
-    path: cultivar ? `/cultivars/${cultivar.slug}` : "/cultivars",
-    noindex: cultivar ? !cultivarVerificationIsSearchIndexable(cultivar.verificationStatus) : false,
+      ? (cultivar.metaDescription ??
+        `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`)
+      : "This cultivar reference is not in the library.",
+    path: cultivar ? `/cultivars/${cultivar.slug}` : `/cultivars/${missingSlug ?? "not-found"}`,
+    noindex: cultivar ? !cultivarVerificationIsSearchIndexable(cultivar.verificationStatus) : true,
   });
 
   useEffect(() => {
@@ -82,7 +85,7 @@ export default function CultivarPage() {
         { name: "Lineage", value: cultivar.lineage },
         { name: "Life cycle", value: cultivar.lifeCycle },
         { name: "Reported flower window", value: cultivar.flowerWeeks },
-        { name: "Difficulty", value: cultivar.difficulty },
+        ...(cultivar.difficulty ? [{ name: "Difficulty", value: cultivar.difficulty }] : []),
         { name: "Evidence state", value: formatVerificationStatus(cultivar.verificationStatus) },
       ],
     });
@@ -122,7 +125,27 @@ export default function CultivarPage() {
     return () => scripts.forEach((script) => script.remove());
   }, [cultivar, faqItems]);
 
-  if (!cultivar) return <Navigate to="/cultivars" replace />;
+  if (!cultivar) {
+    return (
+      <main data-testid="cultivar-not-found" className="min-h-screen bg-background px-4 py-16">
+        <h1 className="font-display text-3xl font-bold">Cultivar not found</h1>
+        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
+          {slug
+            ? `"${slug}" is not in the strain reference library.`
+            : "No cultivar was requested."}{" "}
+          This page is not indexed.
+        </p>
+        <Link to="/cultivars" className="mt-6 inline-flex text-sm font-semibold text-primary">
+          Back to the strain reference library
+        </Link>
+      </main>
+    );
+  }
+
+  const diaryCta =
+    cultivar.verificationStatus === "verified"
+      ? CultivarVerifiedProfileRules.diaryCta(cultivar)
+      : null;
 
   return (
     <main
@@ -159,6 +182,9 @@ export default function CultivarPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             Aliases: {cultivar.aliases.length > 0 ? cultivar.aliases.join(", ") : "None recorded"}
           </p>
+          {cultivar.dek ? (
+            <p className="mt-3 max-w-3xl text-base text-muted-foreground">{cultivar.dek}</p>
+          ) : null}
 
           <div className="mt-4">
             <CultivarFollowButton cultivar={cultivar} />
@@ -316,7 +342,7 @@ export default function CultivarPage() {
                   <dt className="text-xs uppercase tracking-wide text-muted-foreground">
                     Difficulty
                   </dt>
-                  <dd className="mt-1">{cultivar.difficulty}</dd>
+                  <dd className="mt-1">{cultivar.difficulty ?? "Not sourced"}</dd>
                 </div>
                 <div>
                   <dt className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -339,22 +365,99 @@ export default function CultivarPage() {
               </dl>
             </section>
 
+            {cultivar.lineageClaims.length > 0 ? (
+              <section className="rounded-xl border border-border/60 p-4">
+                <h2 className="font-display text-lg font-semibold">Lineage claims</h2>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full min-w-[28rem] text-left text-sm">
+                    <thead>
+                      <tr className="text-xs uppercase tracking-wide text-muted-foreground">
+                        <th className="py-2 pr-3">Claim</th>
+                        <th className="py-2 pr-3">Source</th>
+                        <th className="py-2">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cultivar.lineageClaims.map((claim) => (
+                        <tr key={claim.claim} className="border-t border-border/50">
+                          <td className="py-2 pr-3">{claim.claim}</td>
+                          <td className="py-2 pr-3">{claim.source}</td>
+                          <td className="py-2">{claim.date}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ) : null}
+            {cultivar.sameNameLines.length > 0 ? (
+              <section className="rounded-xl border border-border/60 p-4">
+                <h2 className="font-display text-lg font-semibold">Same name, different plant</h2>
+                {cultivar.sameNameNote ? (
+                  <p className="mt-2 text-sm text-muted-foreground">{cultivar.sameNameNote}</p>
+                ) : null}
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full min-w-[36rem] text-left text-sm">
+                    <thead>
+                      <tr className="text-xs uppercase tracking-wide text-muted-foreground">
+                        <th className="py-2 pr-3">Line</th>
+                        <th className="py-2 pr-3">Seed type</th>
+                        <th className="py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cultivar.sameNameLines.map((line) => (
+                        <tr key={line.name} className="border-t border-border/50 align-top">
+                          <td className="py-2 pr-3">
+                            {line.name}
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              {line.lineage} · {line.source} · {line.date}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-3">{line.seedType}</td>
+                          <td className="py-2">{line.relation}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ) : null}
+
             <section id="sources" className="scroll-mt-32 rounded-xl border border-border/60 p-4">
-              <h2 className="font-display text-lg font-semibold">Sources</h2>
-              <p className="mt-2 text-xs text-muted-foreground">
-                References support individual claims. Verdant does not copy source marketing text.
-              </p>
+              <h2 className="font-display text-lg font-semibold">
+                {cultivar.verificationStatus === "verified"
+                  ? `Sources · last checked ${formatDate(cultivar.lastVerifiedAt)}`
+                  : "Sources"}
+              </h2>
+              {cultivar.verificationStatus === "verified" ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {CultivarVerifiedProfileRules.verifiedDefinition()}
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  References support individual claims. Verdant does not copy source marketing text.
+                </p>
+              )}
               <ul className="mt-4 space-y-3 text-sm">
                 {sources.map((source) => (
                   <li key={source.key} className="rounded-lg bg-muted/30 p-3">
-                    <a
-                      href={source.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium underline-offset-4 hover:underline"
-                    >
-                      {source.title}
-                    </a>
+                    {source.linkPolicy === "unlinked" ? (
+                      <p className="font-medium">{source.title}</p>
+                    ) : (
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel={
+                          source.linkPolicy === "nofollow"
+                            ? "nofollow noopener noreferrer"
+                            : "noopener noreferrer"
+                        }
+                        className="font-medium underline-offset-4 hover:underline"
+                      >
+                        {source.title}
+                      </a>
+                    )}
                     <p className="mt-1 text-xs text-muted-foreground">
                       {source.publisher} · {source.sourceType.replace(/_/g, " ")} · retrieved{" "}
                       {formatDate(source.retrievedAt)}
@@ -401,14 +504,33 @@ export default function CultivarPage() {
             actual logs and sensors in charge. Reference pages never create alerts, nutrient
             actions, irrigation actions, or equipment commands.
           </p>
+          {cultivar.verificationStatus === "verified" ? (
+            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+              The public record has no finished home harvest. If you are running this cut, your
+              diary is the data. {CultivarVerifiedProfileRules.phenoHuntNote()}{" "}
+              <Link to="/pricing" className="font-semibold text-primary">
+                Pricing
+              </Link>
+            </p>
+          ) : null}
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
-            <Link
-              to="/auth"
-              data-testid="cultivar-signup-cta"
-              className="inline-flex items-center rounded-md bg-primary px-4 py-2 font-semibold text-primary-foreground hover:opacity-90"
-            >
-              Start a free grow diary
-            </Link>
+            {diaryCta ? (
+              <a
+                href={diaryCta.href}
+                data-testid="cultivar-signup-cta"
+                className="inline-flex items-center rounded-md bg-primary px-4 py-2 font-semibold text-primary-foreground hover:opacity-90"
+              >
+                {diaryCta.label}
+              </a>
+            ) : (
+              <Link
+                to="/auth"
+                data-testid="cultivar-signup-cta"
+                className="inline-flex items-center rounded-md bg-primary px-4 py-2 font-semibold text-primary-foreground hover:opacity-90"
+              >
+                Start a free grow diary
+              </Link>
+            )}
             <Link
               to="/cultivars"
               className="inline-flex items-center rounded-md border border-border px-4 py-2 font-semibold hover:border-primary/40"

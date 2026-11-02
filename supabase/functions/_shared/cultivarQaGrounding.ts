@@ -167,6 +167,20 @@ export const SERVER_CULTIVAR_QA_CONTEXTS: Readonly<Record<string, string>> = Obj
     "Source keys: [sour-stomper-product-info], [watts-2021-terpene-genetics], [cannabinoid-method-context-2019], [cannabinoid-spatial-variability-2025], [chemotype-genomics-2021]",
     "Note: this is a sample/reference profile. Values are reported and not guaranteed for any specific plant.",
   ].join("\n"),
+  "toad-venom": [
+    "Cultivar: Toad Venom",
+    "Also searched as: Becky, Frog Poison, Frawg Poison",
+    "Reported lineage: Animal Face × Sin Mintz (reported; direction and Sin Mintz maker disputed)",
+    "Reported breeder/source: Ronin Seeds (cross); Green Dragon (selection). Credit is disputed, see Lineage.",
+    "Life cycle (reported): photoperiod",
+    "Reported difficulty: not sourced",
+    "Reported flower window: About 8.5–9.5 weeks (60–65 days, one nursery flower-out)",
+    "Market classification (reported): unknown",
+    "Evidence state: verified",
+    "Commonly reported terpene directions: beta-caryophyllene, limonene, linalool, beta-myrcene, alpha-humulene (reported, varies by phenotype and lab method)",
+    "Source keys: [toad-venom-greenstate], [toad-venom-leaf-magazines], [toad-venom-vice], [toad-venom-ny420], [toad-venom-alchimia], [toad-venom-tiwih], [toad-venom-roots], [toad-venom-leafly], [toad-venom-leafly-picks], [toad-venom-hightimes], [toad-venom-metrotimes], [toad-venom-billies], [toad-venom-flora-flame], [toad-venom-terp-warz], [toad-venom-1321], [toad-venom-howhigh], [toad-venom-kaycha], [toad-venom-icmag], [toad-venom-growdiaries], [toad-venom-seedfinder-ronin], [toad-venom-seedfinder-growers-choice], [toad-venom-seedfinder-philo], [toad-venom-seedfinder-zamnesia], [toad-venom-eleven-thirty], [toad-venom-soloud], [watts-2021-terpene-genetics], [cannabinoid-method-context-2019], [cannabinoid-spatial-variability-2025], [chemotype-genomics-2021]",
+    "Note: this is a sample/reference profile. Values are reported and not guaranteed for any specific plant.",
+  ].join("\n"),
 });
 
 type JsonBodySource = {

@@ -133,7 +133,7 @@ Deno.test("accepts a bounded answer and rejects empty or oversized output", () =
 });
 
 Deno.test("the server catalog contains only bounded non-empty contexts", () => {
-  assertEquals(Object.keys(SERVER_CULTIVAR_QA_CONTEXTS).length, 10);
+  assertEquals(Object.keys(SERVER_CULTIVAR_QA_CONTEXTS).length, 11);
   for (const [slug, context] of Object.entries(SERVER_CULTIVAR_QA_CONTEXTS)) {
     assert(slug.length > 0);
     assert(context.length > 0);

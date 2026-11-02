@@ -130,17 +130,19 @@ DECLARE
   uid uuid := auth.uid();
   raw_token text;
   token_hash text;
+  previous_hash text;
 BEGIN
   IF uid IS NULL OR COALESCE((auth.jwt() ->> 'is_anonymous')::boolean, false) THEN
     RAISE EXCEPTION 'not allowed';
   END IF;
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.ecowitt_custom_upload_claims
-    WHERE id = p_claim_id
-      AND user_id = uid
-      AND revoked_at IS NULL
-  ) THEN
+
+  SELECT claims.token_sha256
+  INTO previous_hash
+  FROM public.ecowitt_custom_upload_claims AS claims
+  WHERE claims.id = p_claim_id
+    AND claims.user_id = uid
+    AND claims.revoked_at IS NULL;
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'claim not found';
   END IF;
 
@@ -150,7 +152,11 @@ BEGIN
   SET token_sha256 = token_hash
   WHERE id = p_claim_id
     AND user_id = uid
-    AND revoked_at IS NULL;
+    AND revoked_at IS NULL
+    AND token_sha256 = previous_hash;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'claim not found';
+  END IF;
   RETURN raw_token;
 END;
 $function$;

@@ -35,35 +35,46 @@ export interface EcowittCustomUploadStationMountProps {
 export function EcowittCustomUploadStationMount(props: EcowittCustomUploadStationMountProps) {
   const { tentId, readings, now, claims = supabase as unknown as EcowittClaimMountClient } = props;
   const [loaded, setLoaded] = useState<EcowittOpenClaim | null>(null);
+  const [loadedTentId, setLoadedTentId] = useState<string | null>(null);
   const [session, setSession] = useState<EcowittStationSession | null>(null);
+  const [sessionTentId, setSessionTentId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const generation = useRef(0);
+  const loadedForTent = loadedTentId === tentId ? loaded : null;
+  const sessionForTent = sessionTentId === tentId ? session : null;
+  const lookupPending = tentId !== null && loadedTentId !== tentId;
 
   useEffect(() => {
     const ticket = ++generation.current;
+    const requestedTentId = tentId;
     setSession(null);
+    setSessionTentId(null);
     setActionError(null);
-    if (tentId === null) {
-      setLoaded(null);
-      return;
-    }
+    setLoaded(null);
+    setLoadedTentId(null);
+    if (requestedTentId === null) return;
     let cancelled = false;
-    void loadOpenEcowittCustomUploadClaim(claims, tentId).then((loadedClaim) => {
+    void loadOpenEcowittCustomUploadClaim(claims, requestedTentId).then((loadedClaim) => {
       if (cancelled || ticket !== generation.current) return;
       if (!loadedClaim.ok) {
         setLoaded(null);
+        setLoadedTentId(requestedTentId);
         setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.lookupFailed);
         return;
       }
       setLoaded(loadedClaim.claim);
+      setLoadedTentId(requestedTentId);
     });
     return () => {
       cancelled = true;
     };
   }, [tentId, claims]);
 
-  const resolved = resolveEcowittStationMountClaim({ loaded, session });
+  const resolved = resolveEcowittStationMountClaim({
+    loaded: loadedForTent,
+    session: sessionForTent,
+  });
   const model = useMemo(
     () =>
       buildEcowittCustomUploadStationCard({
@@ -76,61 +87,72 @@ export function EcowittCustomUploadStationMount(props: EcowittCustomUploadStatio
         claimId: resolved.claimId,
         justCreatedToken: resolved.justCreatedToken,
         createError: actionError,
+        claimLookupPending: lookupPending,
       }),
-    [tentId, readings, now, resolved, actionError],
+    [tentId, readings, now, resolved, actionError, lookupPending],
   );
 
   async function onCreateLink(): Promise<void> {
+    if (tentId === null || loadedTentId !== tentId) return;
+    const requestedTentId = tentId;
     const ticket = ++generation.current;
     setCreating(true);
     setActionError(null);
     try {
-      const created = await createEcowittCustomUploadClaim(claims, tentId);
+      const created = await createEcowittCustomUploadClaim(claims, requestedTentId);
       if (ticket !== generation.current) return;
       if (!created.ok) {
         setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.createFailed);
         return;
       }
       setSession({ kind: "created", claimId: created.claimId, token: created.uploadToken });
+      setSessionTentId(requestedTentId);
     } finally {
       if (ticket === generation.current) setCreating(false);
     }
   }
 
   async function onRevokeLink(): Promise<void> {
+    if (tentId === null || loadedTentId !== tentId) return;
+    const requestedTentId = tentId;
+    const claimId = resolved.claimId;
     const ticket = ++generation.current;
     setCreating(true);
     setActionError(null);
     try {
-      const revoked = await revokeEcowittCustomUploadClaim(claims, resolved.claimId);
+      const revoked = await revokeEcowittCustomUploadClaim(claims, claimId);
       if (ticket !== generation.current) return;
       if (!revoked.ok || !revoked.revoked) {
         setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.revokeFailed);
         return;
       }
       setSession({ kind: "revoked" });
+      setSessionTentId(requestedTentId);
     } finally {
       if (ticket === generation.current) setCreating(false);
     }
   }
 
   async function onRotateLink(): Promise<void> {
+    if (tentId === null || loadedTentId !== tentId) return;
+    const requestedTentId = tentId;
+    const claimId = resolved.claimId;
+    if (claimId === null) {
+      setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.rotateFailed);
+      return;
+    }
     const ticket = ++generation.current;
     setCreating(true);
     setActionError(null);
     try {
-      const rotated = await rotateEcowittCustomUploadClaim(claims, resolved.claimId);
+      const rotated = await rotateEcowittCustomUploadClaim(claims, claimId);
       if (ticket !== generation.current) return;
       if (!rotated.ok) {
         setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.rotateFailed);
         return;
       }
-      const claimId = resolved.claimId;
-      if (claimId === null) {
-        setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.rotateFailed);
-        return;
-      }
       setSession({ kind: "rotated", claimId, token: rotated.uploadToken });
+      setSessionTentId(requestedTentId);
     } finally {
       if (ticket === generation.current) setCreating(false);
     }

@@ -11,6 +11,7 @@ import {
   ECOWITT_CUSTOM_UPLOAD_DEFAULT_INTERVAL_SECONDS,
   isCustomUploadPacketStale,
 } from "@/lib/ecowittCustomUploadIngestRules";
+import { toFiniteMetricValue } from "@/lib/ecowittTentSnapshotV0Rules";
 import { celsiusToFahrenheit } from "@/lib/temperatureUnits";
 
 export type EcowittStationClaimState = "none" | "unbound" | "active" | "revoked";
@@ -18,7 +19,8 @@ export type EcowittStationClaimState = "none" | "unbound" | "active" | "revoked"
 export interface EcowittStationReadingInput {
   readonly tentId: string;
   readonly metric: string;
-  readonly value: number;
+  /** PostgREST `numeric` may arrive as a string. */
+  readonly value: number | string;
   readonly source: string;
   readonly quality: string;
   readonly capturedAt: string | null;
@@ -35,6 +37,8 @@ export interface EcowittStationCardInput {
   /** Raw token from the create call in this session. Never invented here. */
   readonly justCreatedToken: string | null;
   readonly createError?: string | null;
+  /** True until the open-claim read for this tent has settled. */
+  readonly claimLookupPending?: boolean;
 }
 
 export interface EcowittLoadedClaim {
@@ -150,6 +154,10 @@ export interface EcowittStationCardModel {
 const LIVE_METRICS = ["temperature_c", "humidity_pct", "soil_moisture_pct", "co2_ppm"] as const;
 type LiveMetric = (typeof LIVE_METRICS)[number];
 
+type NormalizedStationReading = Omit<EcowittStationReadingInput, "value"> & {
+  readonly value: number;
+};
+
 function isLiveMetric(metric: string): metric is LiveMetric {
   return (LIVE_METRICS as readonly string[]).includes(metric);
 }
@@ -158,20 +166,21 @@ function latestLive(
   readings: readonly EcowittStationReadingInput[],
   tentId: string,
   metric: LiveMetric,
-): EcowittStationReadingInput | null {
-  let best: EcowittStationReadingInput | null = null;
+): NormalizedStationReading | null {
+  let best: NormalizedStationReading | null = null;
   let bestMs = Number.NEGATIVE_INFINITY;
   for (const reading of readings) {
     if (reading.tentId !== tentId) continue;
     if (reading.source !== "live") continue;
     if (reading.quality !== "ok") continue;
     if (reading.metric !== metric || !isLiveMetric(reading.metric)) continue;
-    if (!Number.isFinite(reading.value)) continue;
+    const value = toFiniteMetricValue(reading.value);
+    if (value === null) continue;
     if (reading.capturedAt === null) continue;
     const ms = Date.parse(reading.capturedAt);
     if (!Number.isFinite(ms)) continue;
     if (ms >= bestMs) {
-      best = reading;
+      best = { ...reading, value };
       bestMs = ms;
     }
   }
@@ -200,8 +209,10 @@ export function buildEcowittCustomUploadStationCard(
 ): EcowittStationCardModel {
   const interval = input.intervalSeconds ?? ECOWITT_CUSTOM_UPLOAD_DEFAULT_INTERVAL_SECONDS;
   const claimId = input.claimId ?? null;
+  const lookupPending = input.claimLookupPending === true;
   const openClaim =
     input.tentId !== null &&
+    !lookupPending &&
     claimId !== null &&
     (input.claimState === "active" || input.claimState === "unbound");
   const settings: EcowittStationSetting[] = [
@@ -220,7 +231,10 @@ export function buildEcowittCustomUploadStationCard(
     createLinkLabel: ECOWITT_CUSTOM_UPLOAD_COPY.createLink,
     createError: input.createError ?? null,
     canCreateLink:
-      input.tentId !== null && input.claimState !== "active" && input.claimState !== "unbound",
+      input.tentId !== null &&
+      !lookupPending &&
+      input.claimState !== "active" &&
+      input.claimState !== "unbound",
     revoked: input.claimState === "revoked",
     claimId,
     canRevoke: openClaim,
@@ -249,7 +263,7 @@ export function buildEcowittCustomUploadStationCard(
   const soil = latestLive(input.readings, input.tentId, "soil_moisture_pct");
   const co2 = latestLive(input.readings, input.tentId, "co2_ppm");
   const present = [temp, humidity, soil, co2].filter(
-    (reading): reading is EcowittStationReadingInput => reading !== null,
+    (reading): reading is NormalizedStationReading => reading !== null,
   );
 
   if (present.length === 0) {

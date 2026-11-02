@@ -31,9 +31,91 @@ export interface EcowittStationCardInput {
   readonly intervalSeconds?: number;
   readonly lastReceivedAt: string | null;
   readonly claimState: EcowittStationClaimState;
+  readonly claimId?: string | null;
   /** Raw token from the create call in this session. Never invented here. */
   readonly justCreatedToken: string | null;
   readonly createError?: string | null;
+}
+
+export interface EcowittLoadedClaim {
+  readonly id: string;
+  readonly boundAt: string | null;
+  readonly revokedAt: string | null;
+  readonly lastReceivedAt: string | null;
+  readonly intervalSeconds: number;
+}
+
+export type EcowittStationSession =
+  | { readonly kind: "created" | "rotated"; readonly claimId: string; readonly token: string }
+  | { readonly kind: "revoked" };
+
+export function ecowittStationClaimState(
+  row: { readonly boundAt: string | null; readonly revokedAt: string | null } | null,
+): EcowittStationClaimState {
+  if (row === null) return "none";
+  if (row.revokedAt !== null) return "revoked";
+  if (row.boundAt === null) return "unbound";
+  return "active";
+}
+
+export function resolveEcowittStationMountClaim(input: {
+  readonly loaded: EcowittLoadedClaim | null;
+  readonly session: EcowittStationSession | null;
+}): {
+  readonly claimId: string | null;
+  readonly claimState: EcowittStationClaimState;
+  readonly justCreatedToken: string | null;
+  readonly lastReceivedAt: string | null;
+  readonly intervalSeconds: number | undefined;
+} {
+  if (input.session?.kind === "revoked") {
+    return {
+      claimId: null,
+      claimState: "revoked",
+      justCreatedToken: null,
+      lastReceivedAt: input.loaded?.lastReceivedAt ?? null,
+      intervalSeconds: input.loaded?.intervalSeconds,
+    };
+  }
+  if (input.session?.kind === "created") {
+    return {
+      claimId: input.session.claimId,
+      claimState: "unbound",
+      justCreatedToken: input.session.token,
+      lastReceivedAt: null,
+      intervalSeconds: undefined,
+    };
+  }
+  if (input.session?.kind === "rotated") {
+    const claimState = ecowittStationClaimState(
+      input.loaded === null
+        ? { boundAt: null, revokedAt: null }
+        : { boundAt: input.loaded.boundAt, revokedAt: null },
+    );
+    return {
+      claimId: input.session.claimId,
+      claimState: claimState === "none" ? "unbound" : claimState,
+      justCreatedToken: input.session.token,
+      lastReceivedAt: input.loaded?.lastReceivedAt ?? null,
+      intervalSeconds: input.loaded?.intervalSeconds,
+    };
+  }
+  if (input.loaded === null || input.loaded.revokedAt !== null) {
+    return {
+      claimId: null,
+      claimState: input.loaded === null ? "none" : "revoked",
+      justCreatedToken: null,
+      lastReceivedAt: input.loaded?.lastReceivedAt ?? null,
+      intervalSeconds: input.loaded?.intervalSeconds,
+    };
+  }
+  return {
+    claimId: input.loaded.id,
+    claimState: ecowittStationClaimState(input.loaded),
+    justCreatedToken: null,
+    lastReceivedAt: input.loaded.lastReceivedAt,
+    intervalSeconds: input.loaded.intervalSeconds,
+  };
 }
 
 export interface EcowittStationSetting {
@@ -58,6 +140,11 @@ export interface EcowittStationCardModel {
   readonly createError: string | null;
   readonly canCreateLink: boolean;
   readonly revoked: boolean;
+  readonly claimId: string | null;
+  readonly canRevoke: boolean;
+  readonly canRotate: boolean;
+  readonly revokeLinkLabel: string;
+  readonly rotateLinkLabel: string;
 }
 
 const LIVE_METRICS = ["temperature_c", "humidity_pct", "soil_moisture_pct", "co2_ppm"] as const;
@@ -112,6 +199,11 @@ export function buildEcowittCustomUploadStationCard(
   input: EcowittStationCardInput,
 ): EcowittStationCardModel {
   const interval = input.intervalSeconds ?? ECOWITT_CUSTOM_UPLOAD_DEFAULT_INTERVAL_SECONDS;
+  const claimId = input.claimId ?? null;
+  const openClaim =
+    input.tentId !== null &&
+    claimId !== null &&
+    (input.claimState === "active" || input.claimState === "unbound");
   const settings: EcowittStationSetting[] = [
     { label: "Upload", value: ECOWITT_CUSTOM_UPLOAD_COPY.uploadMode },
     { label: "Protocol", value: ECOWITT_CUSTOM_UPLOAD_COPY.protocol },
@@ -130,6 +222,11 @@ export function buildEcowittCustomUploadStationCard(
     canCreateLink:
       input.tentId !== null && input.claimState !== "active" && input.claimState !== "unbound",
     revoked: input.claimState === "revoked",
+    claimId,
+    canRevoke: openClaim,
+    canRotate: openClaim,
+    revokeLinkLabel: ECOWITT_CUSTOM_UPLOAD_COPY.revokeLink,
+    rotateLinkLabel: ECOWITT_CUSTOM_UPLOAD_COPY.rotateLink,
   };
 
   if (input.tentId === null) {

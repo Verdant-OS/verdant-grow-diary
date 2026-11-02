@@ -8,6 +8,8 @@ import type { EcowittStationCardModel } from "@/lib/ecowittCustomUploadStationCa
 export interface EcowittCustomUploadStationCardProps {
   readonly model: EcowittStationCardModel;
   readonly onCreateLink?: () => void;
+  readonly onRevokeLink?: () => void;
+  readonly onRotateLink?: () => void;
   readonly creating?: boolean;
 }
 
@@ -22,7 +24,7 @@ function Metric({ label, value, testId }: { label: string; value: string | null;
 }
 
 export function EcowittCustomUploadStationCard(props: EcowittCustomUploadStationCardProps) {
-  const { model, onCreateLink, creating = false } = props;
+  const { model, onCreateLink, onRevokeLink, onRotateLink, creating = false } = props;
   return (
     <section
       aria-label={model.sectionLabel}
@@ -106,6 +108,28 @@ export function EcowittCustomUploadStationCard(props: EcowittCustomUploadStation
           disabled={creating}
         >
           {model.createLinkLabel}
+        </button>
+      ) : null}
+      {model.canRevoke && onRevokeLink ? (
+        <button
+          type="button"
+          className="mt-3 rounded-md border border-border px-3 py-1.5 text-sm"
+          data-testid="ecowitt-custom-upload-revoke"
+          onClick={onRevokeLink}
+          disabled={creating}
+        >
+          {model.revokeLinkLabel}
+        </button>
+      ) : null}
+      {model.canRotate && onRotateLink ? (
+        <button
+          type="button"
+          className="mt-3 ml-2 rounded-md border border-border px-3 py-1.5 text-sm"
+          data-testid="ecowitt-custom-upload-rotate"
+          onClick={onRotateLink}
+          disabled={creating}
+        >
+          {model.rotateLinkLabel}
         </button>
       ) : null}
     </section>

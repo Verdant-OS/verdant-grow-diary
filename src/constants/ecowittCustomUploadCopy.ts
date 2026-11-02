@@ -22,4 +22,9 @@ export const ECOWITT_CUSTOM_UPLOAD_COPY = {
   tokenOnce: "The claim token is shown once, when you create the link.",
   createLink: "Create EcoWitt link",
   createFailed: "Couldn’t create the EcoWitt link.",
+  revokeLink: "Revoke EcoWitt link",
+  rotateLink: "Rotate EcoWitt link",
+  revokeFailed: "Couldn’t revoke the EcoWitt link.",
+  rotateFailed: "Couldn’t rotate the EcoWitt link.",
+  lookupFailed: "Couldn’t load the EcoWitt link.",
 } as const;

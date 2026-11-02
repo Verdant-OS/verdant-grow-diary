@@ -166,6 +166,7 @@ import {
   buildTonightTentMetrics,
   resolveTonightTentSelection,
 } from "@/lib/tonightTentHomeViewModel";
+import { tonightRowsFromQuickLogManualReadings } from "@/lib/tentManualEnvironmentSnapshotRules";
 import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
@@ -343,8 +344,14 @@ export default function Dashboard() {
     homeTent?.growId ?? null,
     homeTent ? [homeTent.id] : [],
   );
+  const homeSensorRows = homeTent ? (readingsByTent[homeTent.id] ?? []) : [];
+  const homeManualRows = tonightRowsFromQuickLogManualReadings(
+    homeTent ? quickLogManualsForTent(quickLogManualReadings, homeTent.id) : [],
+    homeTent?.id ?? null,
+    nowTick,
+  );
   const homeMetrics = buildTonightTentMetrics({
-    rows: homeTent ? (readingsByTent[homeTent.id] ?? []) : [],
+    rows: [...homeSensorRows, ...homeManualRows],
     // Same rule as the tent strip: a UUID tent with no reported status is still
     // loading; non-UUID ids are never queried, so their absence is established.
     rowsRead: {

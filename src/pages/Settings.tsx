@@ -28,6 +28,7 @@ import { createAccountDeletionContinuation } from "@/lib/accountDeletionContinua
 import { useAuth } from "@/store/auth";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { OwnerBadgeShelfMount } from "@/components/OwnerBadgeShelf";
 import RewardedReferralCard from "@/components/RewardedReferralCard";
 import FounderOwnerPrefsForm from "@/components/FounderOwnerPrefsForm";
 import { PRICING_TIERS } from "@/config/pricing";
@@ -705,6 +706,8 @@ export default function Settings() {
             Sign out
           </Button>
         </Tile>
+
+        <OwnerBadgeShelfMount />
 
         <Tile name="Preferences" state="available">
           <p className="text-sm text-muted-foreground mb-3">

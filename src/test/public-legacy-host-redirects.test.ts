@@ -3,8 +3,6 @@ import { APP_ROUTES } from "@/lib/appRouteManifest";
 import { resolveHostRouting } from "@/lib/cloudflareHostRoutingRules";
 
 const SAFE_PUBLIC_LEGACY_REDIRECTS = [
-  { source: "/welcome", destination: "/" },
-  { source: "/features", destination: "/" },
   { source: "/demo", destination: "/" },
   { source: "/refunds", destination: "/refund" },
   { source: "/refund-policy", destination: "/refund" },

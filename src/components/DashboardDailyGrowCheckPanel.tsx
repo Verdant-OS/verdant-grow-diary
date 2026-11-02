@@ -224,7 +224,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
             onValueChange={(v) => setFilter(v as DashboardDailyGrowCheckFilter)}
           >
             <SelectTrigger
-              className="h-8 w-[180px] text-xs"
+              className="h-auto min-h-8 w-full basis-full whitespace-normal py-1 text-left text-xs [&>span]:line-clamp-none! [&>span]:whitespace-normal! sm:w-[220px] sm:basis-auto"
               aria-label="Filter today's grow checks"
               data-testid="dashboard-daily-grow-check-panel-filter"
               data-filter={filter}
@@ -350,7 +350,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
               data-plant-id={row.plantId}
               data-checked-today={row.checkedToday ? "1" : "0"}
               data-today-method={row.todayMethod}
-              className="py-2 flex items-center justify-between gap-3 max-[389px]:flex-col max-[389px]:items-stretch"
+              className="py-2 flex items-center justify-between gap-3 max-[389px]:flex-col max-[389px]:items-stretch max-[430px]:flex-col max-[430px]:items-stretch"
             >
               <div className="flex items-start gap-2 min-w-0">
                 {row.checkedToday ? (
@@ -374,7 +374,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                     {row.plantName}
                   </Link>
                   <div
-                    className="text-xs text-muted-foreground truncate"
+                    className="min-w-0 text-xs text-muted-foreground whitespace-normal break-words"
                     data-testid="dashboard-daily-grow-check-panel-row-method"
                   >
                     {row.tentName ? `${row.tentName} · ` : ""}

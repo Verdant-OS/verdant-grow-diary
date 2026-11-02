@@ -110,6 +110,21 @@ export function mobileShellToastBottomOffset(): string {
  * The media queries keep `md+` and, by absence of the tag, public routes on
  * the library default toast position.
  */
+/**
+ * ID rule so the Quick Log clearance wins over any shorter `pb-*` utility
+ * on `#main-content`. An ID beats a single class.
+ */
+export function mainContentFabClearanceCss(): string {
+  const mobile = mobileQuickLogContentClearanceRem();
+  const desktop = desktopQuickLogContentClearanceRem();
+  return [
+    `#main-content{padding-bottom:calc(${mobile}rem + env(safe-area-inset-bottom))}`,
+    "@media (min-width:768px){",
+    `#main-content{padding-bottom:calc(${desktop}rem + env(safe-area-inset-bottom))}`,
+    "}",
+  ].join("");
+}
+
 export function mobileShellToastOffsetCss(): string {
   const offset = MOBILE_SHELL_TOAST_BOTTOM_OFFSET;
   return [

@@ -69,5 +69,8 @@ jobs:
               ;;
           esac
           sudo -u postgres psql -h 127.0.0.1 -p "$PORT" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE stripe_sink_pgtap;"
+          # finish(true) raises when an assert fails. ON_ERROR_STOP turns that
+          # into a non-zero exit so this job fails. The psql -f line stays a
+          # real command so the test-execution manifest still sees the SQL path.
           sudo -u postgres psql -h 127.0.0.1 -p "$PORT" -d stripe_sink_pgtap -v ON_ERROR_STOP=1 -f supabase/tests/stripe_test_mode_sink_pgtap.sql
           sudo -u postgres psql -h 127.0.0.1 -p "$PORT" -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE stripe_sink_pgtap;"

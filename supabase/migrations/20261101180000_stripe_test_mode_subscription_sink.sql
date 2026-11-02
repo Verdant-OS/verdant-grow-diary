@@ -86,8 +86,10 @@ GRANT ALL ON TABLE public.stripe_test_mode_canceled_subscriptions TO service_rol
 
 ALTER TABLE public.stripe_test_mode_canceled_subscriptions ENABLE ROW LEVEL SECURITY;
 
--- Newest Stripe event.created seen for a subscription. Older non-cancel
--- events do not move this mark backward. Cancel still applies when older.
+-- Newest Stripe event.created that wrote a subscription row or recorded a
+-- cancel. A no-op does not move this mark: no matching row, or a canceled
+-- subscription that stays canceled. Older non-cancel events do not rewind
+-- it. An older cancel still applies and does not move the mark backward.
 CREATE TABLE public.stripe_test_mode_subscription_clock (
   stripe_subscription_id text PRIMARY KEY,
   environment text NOT NULL DEFAULT 'sandbox' CHECK (environment = 'sandbox'),
@@ -372,8 +374,15 @@ BEGIN
       END IF;
     END IF;
 
+    -- Advance only when this call wrote a row or recorded a cancel.
+    -- no_matching_row and canceled_terminal leave the clock where it was,
+    -- so a later grant with an earlier event.created can still apply.
     IF p_event_created IS NOT NULL
-       AND (v_latest IS NULL OR p_event_created > v_latest) THEN
+       AND (v_latest IS NULL OR p_event_created > v_latest)
+       AND (
+         v_reason = 'cancel_recorded'
+         OR v_result_status IN ('created', 'updated')
+       ) THEN
       INSERT INTO public.stripe_test_mode_subscription_clock (
         stripe_subscription_id,
         environment,

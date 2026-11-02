@@ -16,9 +16,9 @@
  */
 import { captureRefIn, captureRefsKnown, rowCaptureRef } from "@/lib/sensorCaptureRefRules";
 import { format } from "date-fns";
+import { LatestVpdReadingSelection } from "@/lib/latestVpdReadingSelection";
 import { isStale, snapshotFromReadings, type SensorReadingLike } from "@/lib/sensorSnapshot";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
-import { LatestVpdReadingSelection } from "@/lib/latestVpdReadingSelection";
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
 import { resolveSensorSourceLabel } from "@/lib/sensorSourceLabelRules";
 import {
@@ -393,7 +393,13 @@ export function buildTentSnapshotView(
         : snap.vpd;
   // A rejected capture's VPD keeps its Invalid label but never its number,
   // matching Tonight and Tent Detail (Copilot on #2459 at de8c1b27).
+  // A current temperature/RH pair with no stored VPD is calculated here so the
+  // strip matches Tonight. A stale pair stays unknown: an old missing VPD is
+  // absence, not a backfill of an older stored value.
   const cohortAtMs = snap.ts ? Date.parse(snap.ts) : Number.NaN;
+  const cohortCurrent =
+    Number.isFinite(cohortAtMs) &&
+    !isStale(new Date(cohortAtMs).toISOString(), now, undefined, provenance);
   const cohortDerived = LatestVpdReadingSelection.choose({
     storedVpdKpa: typeof snap.vpd === "number" ? snap.vpd : null,
     storedCapturedAtMs: Number.isFinite(cohortAtMs) ? cohortAtMs : null,
@@ -407,7 +413,7 @@ export function buildTentSnapshotView(
       ? vpdKpa
       : canonical?.unavailable === true || canonical?.missing === true || canonicalRejected
         ? null
-        : cohortDerived.kind === "derived"
+        : cohortCurrent && cohortDerived.kind === "derived"
           ? cohortDerived.vpdKpa
           : null;
   const canonicalSource: SensorReadingSource | null =

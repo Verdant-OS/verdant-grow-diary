@@ -732,7 +732,7 @@ export default function Sensors() {
                 >
                   {unresolvedManualMetric || (isDerived && manualHistoryIncomplete)
                     ? manualHistoryMessage
-                    : isDerived
+                    : isDerived && state.tone !== "caution"
                       ? "No recorded VPD history to chart yet. The value below is calculated from temperature and humidity."
                       : state.message}
                 </p>

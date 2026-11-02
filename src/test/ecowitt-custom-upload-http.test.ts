@@ -23,6 +23,7 @@ function claim(passkeySha256: string | null): EcowittCustomUploadClaim {
     intervalSeconds: 16,
     revokedAt: null,
     lastReceivedAt: null,
+    lastCapturedAt: null,
   };
 }
 
@@ -58,8 +59,8 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         events.push(`bind:${passkeyHash}`);
         return { ok: true };
       },
-      touchClaim: async () => {
-        events.push("touch");
+      touchClaim: async (_id, _receivedAt, capturedAt) => {
+        events.push(`touch:${capturedAt}`);
         return { ok: true };
       },
       insertReadings: async (rows) => {
@@ -88,10 +89,79 @@ describe("EcoWitt customized-upload HTTP handler", () => {
     expect(inserted[0]?.capturedAt).toBe("2026-11-02T18:00:00Z");
     expect(events[0]).toBe(`lookup:${await sha256Hex(TOKEN)}`);
     expect(events[1]?.startsWith("entitlement:")).toBe(true);
-    expect(events.indexOf("insert")).toBeGreaterThan(
-      events.findIndex((event) => event.startsWith("entitlement:")),
+    const entitlementAt = events.findIndex((event) => event.startsWith("entitlement:"));
+    const touchAt = events.findIndex((event) => event.startsWith("touch:"));
+    const bindAt = events.findIndex((event) => event.startsWith("bind:"));
+    const insertAt = events.indexOf("insert");
+    expect(touchAt).toBeGreaterThan(entitlementAt);
+    expect(bindAt).toBeGreaterThan(touchAt);
+    expect(insertAt).toBeGreaterThan(bindAt);
+    expect(events.some((event) => event === "touch:2026-11-02T18:00:00Z")).toBe(true);
+  });
+
+  it("does not insert when the receipt reservation fails", async () => {
+    const events: string[] = [];
+    const ports: EcowittCustomUploadPorts = {
+      now: () => NOW,
+      sha256Hex,
+      lookupClaim: async () => claim(null),
+      entitlement: async () => "allowed",
+      bindClaim: async () => {
+        events.push("bind");
+        return { ok: true };
+      },
+      touchClaim: async () => ({ ok: false, reason: "rate_limited" }),
+      insertReadings: async () => {
+        events.push("insert");
+        return { ok: true };
+      },
+    };
+    const limited = await handleEcowittCustomUploadRequest(
+      new Request(`https://example.test/ew/${TOKEN}`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: formBody(),
+      }),
+      ports,
     );
-    expect(events.some((event) => event.startsWith("bind:"))).toBe(true);
+    expect(await limited.json()).toMatchObject({
+      accepted: false,
+      reason: "rate_limited",
+      stored: 0,
+    });
+    const duplicate = await handleEcowittCustomUploadRequest(
+      new Request(`https://example.test/ew/${TOKEN}`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: formBody(),
+      }),
+      {
+        ...ports,
+        touchClaim: async () => ({ ok: false, reason: "duplicate_captured_at" }),
+      },
+    );
+    expect(await duplicate.json()).toMatchObject({
+      accepted: false,
+      reason: "duplicate_captured_at",
+      stored: 0,
+    });
+    const missing = await handleEcowittCustomUploadRequest(
+      new Request(`https://example.test/ew/${TOKEN}`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: formBody(),
+      }),
+      {
+        ...ports,
+        touchClaim: async () => ({ ok: false, reason: "claim_not_found" }),
+      },
+    );
+    expect(await missing.json()).toMatchObject({
+      accepted: false,
+      reason: "store_failed",
+      stored: 0,
+    });
+    expect(events).toEqual([]);
   });
 
   it("does not insert when a second PASSKEY arrives or the body is too large", async () => {

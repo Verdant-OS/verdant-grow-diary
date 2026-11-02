@@ -14,6 +14,7 @@
 
 export const ECOWITT_CUSTOM_UPLOAD_MAX_BODY_BYTES = 64 * 1024;
 export const ECOWITT_CUSTOM_UPLOAD_FUTURE_SKEW_MS = 5 * 60 * 1000;
+export const ECOWITT_CUSTOM_UPLOAD_MAX_AGE_MS = ECOWITT_CUSTOM_UPLOAD_FUTURE_SKEW_MS;
 export const ECOWITT_CUSTOM_UPLOAD_DEFAULT_INTERVAL_SECONDS = 16;
 export const ECOWITT_CUSTOM_UPLOAD_MIN_INTERVAL_SECONDS = 16;
 export const ECOWITT_CUSTOM_UPLOAD_MAX_INTERVAL_SECONDS = 600;
@@ -45,6 +46,7 @@ export interface EcowittCustomUploadClaim {
   readonly intervalSeconds: number;
   readonly revokedAt: string | null;
   readonly lastReceivedAt: string | null;
+  readonly lastCapturedAt: string | null;
 }
 
 export interface EcowittCustomUploadStoredReading {
@@ -82,6 +84,8 @@ export type EcowittCustomUploadRejection =
   | "rate_limited"
   | "dateutc_invalid"
   | "dateutc_in_future"
+  | "dateutc_too_old"
+  | "duplicate_captured_at"
   | "no_storable_metrics"
   | "store_failed";
 
@@ -207,6 +211,7 @@ export function validateEcowittCustomUploadDateutc(value: string, now: Date): st
   const parsed = Date.parse(canonical);
   if (!Number.isFinite(parsed)) return null;
   if (parsed > now.getTime() + ECOWITT_CUSTOM_UPLOAD_FUTURE_SKEW_MS) return null;
+  if (parsed < now.getTime() - ECOWITT_CUSTOM_UPLOAD_MAX_AGE_MS) return null;
   return canonical;
 }
 
@@ -313,13 +318,22 @@ function metricDrafts(fields: Map<string, string | null>): readonly MetricDraft[
 function dateutcFailure(
   fields: Map<string, string | null>,
   now: Date,
-): "dateutc_invalid" | "dateutc_in_future" | null {
+): "dateutc_invalid" | "dateutc_in_future" | "dateutc_too_old" | null {
   const raw = fields.get("dateutc");
-  if (raw === null || raw === undefined || parseEcowittCustomUploadDateutc(raw) === null) {
-    return "dateutc_invalid";
-  }
-  if (validateEcowittCustomUploadDateutc(raw, now) === null) return "dateutc_in_future";
+  const canonical = raw === null || raw === undefined ? null : parseEcowittCustomUploadDateutc(raw);
+  if (canonical === null) return "dateutc_invalid";
+  const parsed = Date.parse(canonical);
+  if (!Number.isFinite(parsed)) return "dateutc_invalid";
+  if (parsed > now.getTime() + ECOWITT_CUSTOM_UPLOAD_FUTURE_SKEW_MS) return "dateutc_in_future";
+  if (parsed < now.getTime() - ECOWITT_CUSTOM_UPLOAD_MAX_AGE_MS) return "dateutc_too_old";
   return null;
+}
+
+function duplicateCapturedAt(claim: EcowittCustomUploadClaim, capturedAt: string): boolean {
+  if (claim.lastCapturedAt === null) return false;
+  const previous = Date.parse(claim.lastCapturedAt);
+  const next = Date.parse(capturedAt);
+  return Number.isFinite(previous) && Number.isFinite(next) && previous === next;
 }
 
 function rateLimited(claim: EcowittCustomUploadClaim, now: Date): boolean {
@@ -377,6 +391,7 @@ export function planEcowittCustomUploadIngest(
   if (dateProblem !== null) return reject(dateProblem);
   const capturedAt = validateEcowittCustomUploadDateutc(fields.get("dateutc") ?? "", input.now);
   if (capturedAt === null) return reject("dateutc_invalid");
+  if (duplicateCapturedAt(claim, capturedAt)) return reject("duplicate_captured_at");
 
   const drafts = metricDrafts(fields);
   if (drafts.length === 0) return reject("no_storable_metrics");

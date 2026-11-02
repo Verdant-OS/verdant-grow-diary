@@ -28,7 +28,14 @@ export interface EcowittCustomUploadPorts {
     stationtype: string,
     receivedAt: string,
   ): Promise<{ ok: true } | { ok: false }>;
-  touchClaim(claimId: string, receivedAt: string): Promise<{ ok: true } | { ok: false }>;
+  touchClaim(
+    claimId: string,
+    receivedAt: string,
+    capturedAt: string,
+  ): Promise<
+    | { ok: true }
+    | { ok: false; reason: "rate_limited" | "duplicate_captured_at" | "claim_not_found" }
+  >;
   insertReadings(
     rows: readonly EcowittCustomUploadStoredReading[],
   ): Promise<{ ok: true } | { ok: false }>;
@@ -151,6 +158,15 @@ export async function handleEcowittCustomUploadRequest(
 
   if (!plan.accepted || claim === null) return jsonResponse(plan, 0);
 
+  const capturedAt = plan.rows[0]?.capturedAt ?? null;
+  if (plan.touchReceivedAt !== null && capturedAt !== null) {
+    const reserved = await ports.touchClaim(claim.id, plan.touchReceivedAt, capturedAt);
+    if (!reserved.ok) {
+      const reason = reserved.reason === "claim_not_found" ? "store_failed" : reserved.reason;
+      return jsonResponse({ accepted: false, reason }, 0);
+    }
+  }
+
   if (plan.bind !== null) {
     const bound = await ports.bindClaim(
       claim.id,
@@ -163,10 +179,6 @@ export async function handleEcowittCustomUploadRequest(
 
   const inserted = await ports.insertReadings(plan.rows);
   if (!inserted.ok) return jsonResponse({ accepted: false, reason: "store_failed" }, 0);
-
-  if (plan.touchReceivedAt !== null) {
-    await ports.touchClaim(claim.id, plan.touchReceivedAt);
-  }
   return jsonResponse(plan, plan.rows.length);
 }
 

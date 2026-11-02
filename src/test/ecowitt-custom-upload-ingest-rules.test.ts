@@ -30,6 +30,7 @@ function claim(overrides: Partial<EcowittCustomUploadClaim> = {}): EcowittCustom
     intervalSeconds: 16,
     revokedAt: null,
     lastReceivedAt: null,
+    lastCapturedAt: null,
     ...overrides,
   };
 }
@@ -87,6 +88,18 @@ describe("EcoWitt customized-upload ingest rules", () => {
       }),
     );
     expect(exactSkew.accepted).toBe(true);
+    const tooOld = planEcowittCustomUploadIngest(
+      input({ fields: fields({ dateutc: "2026-11-02 17:50:00" }) }),
+    );
+    expect(tooOld.reason).toBe("dateutc_too_old");
+    expect(tooOld.rows).toEqual([]);
+    const exactAge = planEcowittCustomUploadIngest(
+      input({
+        now: new Date("2026-11-02T18:00:30.000Z"),
+        fields: fields({ dateutc: "2026-11-02 17:55:30" }),
+      }),
+    );
+    expect(exactAge.accepted).toBe(true);
   });
 
   it("stores indoor live rows in Celsius and drops secrets", () => {
@@ -159,6 +172,35 @@ describe("EcoWitt customized-upload ingest rules", () => {
     );
     expect(limited.reason).toBe("rate_limited");
     expect(limited.rows).toEqual([]);
+    const repeatedInsideGap = planEcowittCustomUploadIngest(
+      input({
+        claim: claim({
+          lastReceivedAt: "2026-11-02T18:00:25.000Z",
+          lastCapturedAt: "2026-11-02T18:00:00.000Z",
+        }),
+      }),
+    );
+    expect(repeatedInsideGap.reason).toBe("rate_limited");
+    const duplicate = planEcowittCustomUploadIngest(
+      input({
+        claim: claim({
+          lastReceivedAt: "2026-11-02T17:00:00.000Z",
+          lastCapturedAt: "2026-11-02T18:00:00.000Z",
+        }),
+      }),
+    );
+    expect(duplicate.reason).toBe("duplicate_captured_at");
+    expect(duplicate.rows).toEqual([]);
+    expect(duplicate.bind).toBeNull();
+    const sameInstant = planEcowittCustomUploadIngest(
+      input({
+        claim: claim({
+          lastReceivedAt: "2026-11-02T17:00:00.000Z",
+          lastCapturedAt: "2026-11-02T18:00:00Z",
+        }),
+      }),
+    );
+    expect(sameInstant.reason).toBe("duplicate_captured_at");
     const huge = planEcowittCustomUploadIngest(
       input({ bodyByteLength: ECOWITT_CUSTOM_UPLOAD_MAX_BODY_BYTES + 1, fields: null }),
     );

@@ -200,6 +200,8 @@ export function buildPostHogInitOptions(apiHost: string): Partial<PostHogConfig>
     mask_personal_data_properties: true,
     person_profiles: "identified_only",
     advanced_disable_feature_flags: true,
+    disable_session_recording: true,
+    opt_out_persistence_by_default: true,
     disable_surveys: true,
     enable_recording_console_log: false,
     capture_performance: false,
@@ -248,7 +250,81 @@ function allowProductProperties(
       if (typeof value === "string") out[key] = sanitizeLocationValue(value, key === "$pathname");
     }
   }
+  copySdkTransportProperties(source, out);
   return out;
+}
+
+/**
+ * Properties posthog-js requires to build a capture batch. `token` is also
+ * the ingestion key: the SDK drops the event when `before_send` removes it.
+ * Values that look like an email, a note, or an oversized string stay out.
+ */
+const SDK_TRANSPORT_PROPERTY_KEYS = [
+  "token",
+  "distinct_id",
+  "$session_id",
+  "$window_id",
+  "$device_id",
+  "$lib",
+  "$lib_version",
+] as const;
+
+const SDK_TRANSPORT_MAX_LENGTH = 200;
+
+function copySdkTransportProperties(
+  source: Record<string, unknown>,
+  out: Record<string, unknown>,
+): void {
+  for (const key of SDK_TRANSPORT_PROPERTY_KEYS) {
+    const value = source[key];
+    if (typeof value === "string") {
+      if (isSafeSdkTransportString(value)) out[key] = value;
+      continue;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
+  }
+}
+
+function isSafeSdkTransportString(value: string): boolean {
+  if (!value || value.length > SDK_TRANSPORT_MAX_LENGTH) return false;
+  if (value !== value.trim()) return false;
+  if (value.includes("@") || value.includes("\n") || value.includes("\r")) return false;
+  return true;
+}
+
+const POSTHOG_PERSISTENCE_TOKEN_RE = /^[\w-]+$/;
+
+export type PostHogPersistenceRemovalPlan = {
+  localKeys: string[];
+  sessionKeys: string[];
+  cookieNames: string[];
+};
+
+/**
+ * Names of PostHog identity storage to delete on consent withdrawal.
+ * Matches the SDK's sanitized persistence prefix (`ph_<token>_`) and leaves
+ * `__ph_opt_in_out_<token>` in place so the opt-out survives the reload.
+ * Returns null when the token could change a cookie header.
+ */
+export function planPostHogPersistenceRemoval(input: {
+  token: string;
+  localKeys: readonly string[];
+  sessionKeys: readonly string[];
+  cookie: string;
+}): PostHogPersistenceRemovalPlan | null {
+  const sanitized = input.token.replace(/\+/g, "PL").replace(/\//g, "SL").replace(/=/g, "EQ");
+  if (!POSTHOG_PERSISTENCE_TOKEN_RE.test(sanitized)) return null;
+  const prefix = `ph_${sanitized}_`;
+  const matches = (key: string) => key.startsWith(prefix);
+  const cookieNames = input.cookie
+    .split(";")
+    .map((part) => part.split("=")[0]?.trim() ?? "")
+    .filter((name) => name.length > 0 && matches(name));
+  return {
+    localKeys: input.localKeys.filter(matches),
+    sessionKeys: input.sessionKeys.filter(matches),
+    cookieNames: [...new Set(cookieNames)],
+  };
 }
 
 function scrubGenericProperties(

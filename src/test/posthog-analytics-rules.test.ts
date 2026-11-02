@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import posthog from "posthog-js";
+import type { CaptureResult } from "posthog-js";
 
 import { PRODUCTION_HOSTNAMES } from "@/lib/errorReportingRules";
 import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
@@ -8,6 +10,7 @@ import {
   decidePostHogStartup,
   isAnalyticsCollectionHost,
   mapFunnelEventToPostHog,
+  planPostHogPersistenceRemoval,
   posthogDistinctId,
   posthogPageviewProperties,
   posthogPersonProperties,
@@ -210,6 +213,8 @@ describe("PostHog init privacy", () => {
         mask_all_element_attributes: true,
         person_profiles: "identified_only",
         advanced_disable_feature_flags: true,
+        disable_session_recording: true,
+        opt_out_persistence_by_default: true,
         disable_surveys: true,
         enable_recording_console_log: false,
         capture_performance: false,
@@ -294,4 +299,123 @@ describe("PostHog init privacy", () => {
     expect(identifyText).not.toContain("Ada");
     expect(identify?.$set).toEqual({ signup_date: "2026-04-02", qa_synth: true });
   });
+
+  it("keeps SDK transport properties from a real posthog-js capture and still drops diary text", () => {
+    const options = buildPostHogInitOptions(POSTHOG_DEFAULT_API_HOST);
+    const beforeSend = options.before_send;
+    expect(typeof beforeSend).toBe("function");
+    if (typeof beforeSend !== "function") return;
+
+    const inputs: CaptureResult[] = [];
+    const outputs: Array<CaptureResult | null> = [];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    posthog.init(FIXTURE_KEY, {
+      ...options,
+      before_send: (capture) => {
+        inputs.push(capture);
+        const result = beforeSend(capture);
+        outputs.push(result);
+        return null;
+      },
+    });
+
+    posthog.capture("$pageview", {
+      $pathname: "/",
+      $current_url: "https://verdantgrowdiary.com/?email=a@b.com",
+      note: "diary note stays local",
+    });
+    posthog.capture("grow_created", {
+      note: "diary note stays local",
+      email: "grower@example.com",
+    });
+
+    const required = [
+      "token",
+      "distinct_id",
+      "$session_id",
+      "$window_id",
+      "$device_id",
+      "$lib",
+      "$lib_version",
+    ] as const;
+
+    for (const event of ["$pageview", "grow_created"] as const) {
+      const input = inputs.find((capture) => capture.event === event);
+      const output = outputs.find((capture) => capture?.event === event);
+      expect(input, event).toBeTruthy();
+      const source = input?.properties ?? {};
+      expect(source.token, `${event} input keys: ${Object.keys(source).join(",")}`).toBe(
+        FIXTURE_KEY,
+      );
+      expect(typeof source.distinct_id).toBe("string");
+      expect(output?.properties?.token).toBe(FIXTURE_KEY);
+      expect(output?.properties?.distinct_id).toBe(source.distinct_id);
+      for (const key of required) {
+        if (source[key] != null) expect(output?.properties?.[key]).toEqual(source[key]);
+      }
+      const text = JSON.stringify(output);
+      expect(text).not.toContain("diary note");
+      expect(text).not.toContain("grower@example.com");
+      expect(text).not.toContain("email=");
+    }
+
+    const pageview = outputs.find((capture) => capture?.event === "$pageview");
+    expect(pageview?.properties?.$pathname).toBe("/");
+    expect(pageview?.properties?.$current_url).toBe("https://verdantgrowdiary.com/");
+  });
+
+  it("plans removal of ph_<token>_ storage and keeps the opt-out flag", () => {
+    const token = FIXTURE_KEY;
+    const persistenceKey = `ph_${token}_posthog`;
+    const plan = planPostHogPersistenceRemoval({
+      token,
+      localKeys: [
+        persistenceKey,
+        `${persistenceKey}__flags`,
+        `ph_${token}_window_id`,
+        `__ph_opt_in_out_${token}`,
+        "unrelated",
+      ],
+      sessionKeys: [persistenceKey, `ph_${token}_primary_window_exists`, "other"],
+      cookie: `${persistenceKey}=device-kept; theme=dark`,
+    });
+    expect(plan).toEqual({
+      localKeys: [persistenceKey, `${persistenceKey}__flags`, `ph_${token}_window_id`],
+      sessionKeys: [persistenceKey, `ph_${token}_primary_window_exists`],
+      cookieNames: [persistenceKey],
+    });
+    expect(plan?.localKeys).not.toContain(`__ph_opt_in_out_${token}`);
+
+    expect(
+      planPostHogPersistenceRemoval({
+        token: "phc_bad; injected",
+        localKeys: ["ph_phc_bad; injected_posthog"],
+        sessionKeys: [],
+        cookie: "",
+      }),
+    ).toBeNull();
+
+    const encoded = planPostHogPersistenceRemoval({
+      token: "abc+def/ghi=",
+      localKeys: ["ph_abcPLdefSLghiEQ_posthog", "__ph_opt_in_out_abc+def/ghi="],
+      sessionKeys: [],
+      cookie: "ph_abcPLdefSLghiEQ_posthog=1",
+    });
+    expect(encoded).toEqual({
+      localKeys: ["ph_abcPLdefSLghiEQ_posthog"],
+      sessionKeys: [],
+      cookieNames: ["ph_abcPLdefSLghiEQ_posthog"],
+    });
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  try {
+    posthog.opt_out_capturing();
+  } catch {
+    // The SDK is only initialized by the real-capture test.
+  }
+  window.localStorage.clear();
+  window.sessionStorage.clear();
 });

@@ -5,7 +5,8 @@
  * 2:40 PM CT on 2026-11-02; registration still needs config.toml, which this
  * change does not edit. `requireLiveSensorEntitlement` runs before any claim
  * bind or reading insert. touchClaim calls reserve_ecowitt_custom_upload_receipt
- * before insert. bindClaim must not write last_received_at or last_captured_at.
+ * before insert. bindClaim calls bind_ecowitt_custom_upload_claim, which
+ * updates only while passkey_sha256 is null, and does not write receipt columns.
  * This module does not read a client-supplied user id from the gateway body.
  */
 import { requireLiveSensorEntitlement } from "./liveSensorEntitlementGate.ts";
@@ -21,6 +22,7 @@ import type {
 } from "./ecowittCustomUploadIngestRules.ts";
 
 export const ECOWITT_CUSTOM_UPLOAD_RESERVE_RPC = "reserve_ecowitt_custom_upload_receipt" as const;
+export const ECOWITT_CUSTOM_UPLOAD_BIND_RPC = "bind_ecowitt_custom_upload_claim" as const;
 
 export type EcowittReserveReceipt =
   | { readonly ok: true }
@@ -66,12 +68,15 @@ export async function reserveEcowittCustomUploadReceipt(
 
 export interface EcowittCustomUploadServiceRole {
   lookupClaim(tokenSha256: string): Promise<EcowittCustomUploadClaim | null>;
-  bindClaim(
-    claimId: string,
-    passkeySha256: string,
-    stationtype: string,
-    receivedAt: string,
-  ): Promise<{ ok: true } | { ok: false }>;
+  callBind(
+    fn: typeof ECOWITT_CUSTOM_UPLOAD_BIND_RPC,
+    args: {
+      readonly p_claim_id: string;
+      readonly p_passkey_sha256: string;
+      readonly p_stationtype: string;
+      readonly p_bound_at: string;
+    },
+  ): Promise<{ readonly data: unknown; readonly error: { readonly message: string } | null }>;
   callReserve(
     fn: typeof ECOWITT_CUSTOM_UPLOAD_RESERVE_RPC,
     args: {
@@ -109,8 +114,17 @@ export async function handleEcowittCustomUploadWithEntitlement(
       if (decision.reason === "upgrade_required") return "upgrade_required";
       return "lookup_failed";
     },
-    bindClaim: (claimId, passkeySha256, stationtype, receivedAt) =>
-      deps.serviceRole.bindClaim(claimId, passkeySha256, stationtype, receivedAt),
+    bindClaim: async (claimId, passkeySha256, stationtype, receivedAt) => {
+      const { data, error } = await deps.serviceRole.callBind(ECOWITT_CUSTOM_UPLOAD_BIND_RPC, {
+        p_claim_id: claimId,
+        p_passkey_sha256: passkeySha256,
+        p_stationtype: stationtype,
+        p_bound_at: receivedAt,
+      });
+      if (error) return { ok: false };
+      const bound = Array.isArray(data) ? data[0] : data;
+      return bound === true ? { ok: true } : { ok: false };
+    },
     touchClaim: (claimId, receivedAt, capturedAt) =>
       reserveEcowittCustomUploadReceipt(
         (fn, args) => deps.serviceRole.callReserve(fn, args),

@@ -411,7 +411,7 @@ export function planEcowittCustomUploadIngest(
       channel: draft.channel,
       rawKey: draft.rawKey,
       rawValue: draft.rawValue,
-      passkeyFingerprint: passkeySha256,
+      passkeyFingerprint: passkeySha256.slice(0, 16),
       timestampSource: "ecowitt_dateutc",
     },
   }));

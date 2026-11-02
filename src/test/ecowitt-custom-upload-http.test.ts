@@ -194,7 +194,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
     );
     expect(await mismatch.json()).toMatchObject({
       accepted: false,
-      reason: "passkey_mismatch",
+      reason: "rejected",
       stored: 0,
     });
     const oversized = await handleEcowittCustomUploadRequest(

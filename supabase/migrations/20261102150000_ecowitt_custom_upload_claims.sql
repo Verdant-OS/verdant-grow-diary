@@ -210,6 +210,46 @@ REVOKE ALL ON FUNCTION public.reserve_ecowitt_custom_upload_receipt(uuid, timest
   FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.reserve_ecowitt_custom_upload_receipt(uuid, timestamptz, timestamptz) TO service_role;
 
+-- First unbound packet wins. A second passkey does not replace it.
+CREATE OR REPLACE FUNCTION public.bind_ecowitt_custom_upload_claim(
+  p_claim_id uuid,
+  p_passkey_sha256 text,
+  p_stationtype text,
+  p_bound_at timestamptz
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF p_claim_id IS NULL OR p_bound_at IS NULL THEN
+    RETURN false;
+  END IF;
+  IF p_passkey_sha256 IS NULL OR p_passkey_sha256 !~ '^[0-9a-f]{64}$' THEN
+    RETURN false;
+  END IF;
+  IF p_stationtype IS NULL OR char_length(p_stationtype) < 1 OR char_length(p_stationtype) > 64 THEN
+    RETURN false;
+  END IF;
+
+  UPDATE public.ecowitt_custom_upload_claims
+  SET passkey_sha256 = p_passkey_sha256,
+      stationtype = p_stationtype,
+      bound_at = p_bound_at
+  WHERE id = p_claim_id
+    AND revoked_at IS NULL
+    AND passkey_sha256 IS NULL;
+
+  RETURN FOUND;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.bind_ecowitt_custom_upload_claim(uuid, text, text, timestamptz)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.bind_ecowitt_custom_upload_claim(uuid, text, text, timestamptz)
+  TO service_role;
+
 REVOKE ALL ON FUNCTION public.create_ecowitt_custom_upload_claim(uuid)
   FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.revoke_ecowitt_custom_upload_claim(uuid)

@@ -46,17 +46,29 @@ export async function sha256Hex(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function publicIngestReason(reason: string): string {
+  if (reason === "unknown_claim" || reason === "passkey_mismatch") return "rejected";
+  return reason;
+}
+
 function jsonResponse(
   plan: Pick<EcowittCustomUploadIngestPlan, "accepted" | "reason">,
   stored: number,
 ): Response {
-  return new Response(JSON.stringify({ accepted: plan.accepted, reason: plan.reason, stored }), {
-    status: 200,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
+  return new Response(
+    JSON.stringify({
+      accepted: plan.accepted,
+      reason: publicIngestReason(plan.reason),
+      stored,
+    }),
+    {
+      status: 200,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+      },
     },
-  });
+  );
 }
 
 function contentTypeIsForm(contentType: string | null): boolean {

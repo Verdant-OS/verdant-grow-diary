@@ -724,4 +724,39 @@ SELECT ok(
   'the claim created after revoke is a 48 hex token'
 );
 
+SELECT lives_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+      first_bind boolean;
+      second_bind boolean;
+    BEGIN
+      first_bind := public.bind_ecowitt_custom_upload_claim(
+        cid,
+        repeat('ab', 32),
+        'GW1200',
+        '2026-11-02 18:00:00+00'
+      );
+      second_bind := public.bind_ecowitt_custom_upload_claim(
+        cid,
+        repeat('cd', 32),
+        'GW1200B',
+        '2026-11-02 18:01:00+00'
+      );
+      IF first_bind IS NOT TRUE OR second_bind IS NOT FALSE THEN
+        RAISE EXCEPTION 'bind results % %', first_bind, second_bind;
+      END IF;
+      IF (
+        SELECT passkey_sha256
+        FROM public.ecowitt_custom_upload_claims
+        WHERE id = cid
+      ) IS DISTINCT FROM repeat('ab', 32) THEN
+        RAISE EXCEPTION 'second bind replaced the passkey';
+      END IF;
+    END
+  $body$
+$$,
+  'bind updates only while passkey_sha256 is null'
+);
+
 SELECT * FROM finish(true);

@@ -305,6 +305,11 @@ export default function ImportedSensorHistoryPanel({
                         </span>
                       ) : null}
                     </td>
+                    {r.metricLabel === r.metric ? null : (
+                      <td className="sr-only" aria-hidden="true">
+                        {r.metric}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

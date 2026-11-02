@@ -60,6 +60,7 @@ CREATE TABLE public.stripe_webhook_events (
   details jsonb NOT NULL DEFAULT '{}'::jsonb,
   environment text NOT NULL CHECK (environment = 'sandbox'),
   received_at timestamptz NOT NULL DEFAULT now(),
+  event_created timestamptz NULL,
   PRIMARY KEY (event_id)
 );
 
@@ -84,6 +85,21 @@ REVOKE ALL ON TABLE public.stripe_test_mode_canceled_subscriptions FROM authenti
 GRANT ALL ON TABLE public.stripe_test_mode_canceled_subscriptions TO service_role;
 
 ALTER TABLE public.stripe_test_mode_canceled_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- Newest Stripe event.created seen for a subscription. Older non-cancel
+-- events do not move this mark backward. Cancel still applies when older.
+CREATE TABLE public.stripe_test_mode_subscription_clock (
+  stripe_subscription_id text PRIMARY KEY,
+  environment text NOT NULL DEFAULT 'sandbox' CHECK (environment = 'sandbox'),
+  latest_event_created timestamptz NOT NULL
+);
+
+REVOKE ALL ON TABLE public.stripe_test_mode_subscription_clock FROM PUBLIC;
+REVOKE ALL ON TABLE public.stripe_test_mode_subscription_clock FROM anon;
+REVOKE ALL ON TABLE public.stripe_test_mode_subscription_clock FROM authenticated;
+GRANT ALL ON TABLE public.stripe_test_mode_subscription_clock TO service_role;
+
+ALTER TABLE public.stripe_test_mode_subscription_clock ENABLE ROW LEVEL SECURITY;
 
 -- Sanitized audit rows for the Stripe test-mode subscription writer.
 -- No provider ids. service_role only; no anon or authenticated policies.
@@ -136,7 +152,8 @@ CREATE OR REPLACE FUNCTION public.apply_stripe_test_mode_subscription_with_audit
   p_status text,
   p_period_start timestamptz,
   p_period_end timestamptz,
-  p_cancel_at_period_end boolean
+  p_cancel_at_period_end boolean,
+  p_event_created timestamptz
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -145,6 +162,7 @@ AS $$
 DECLARE
   v_existing_status text;
   v_terminal boolean;
+  v_latest timestamptz;
   v_count int;
   v_ok boolean := false;
   v_result_status text := 'failed';
@@ -197,6 +215,25 @@ BEGIN
          AND environment = 'sandbox'
     ) INTO v_terminal;
 
+    SELECT latest_event_created INTO v_latest
+      FROM public.stripe_test_mode_subscription_clock
+     WHERE stripe_subscription_id = p_stripe_subscription_id
+       AND environment = 'sandbox'
+     FOR UPDATE;
+
+    IF p_action IS DISTINCT FROM 'cancel_subscription'
+       AND p_event_created IS NOT NULL
+       AND v_latest IS NOT NULL
+       AND p_event_created < v_latest THEN
+      -- A delayed grant, update, or failed invoice must not rewind newer state.
+      v_ok := true;
+      v_result_status := 'skipped';
+      v_reason := 'stale_event';
+      v_subscription_status := CASE
+        WHEN v_terminal OR v_existing_status = 'canceled' THEN 'canceled'
+        ELSE v_existing_status
+      END;
+    ELSE
     IF p_action = 'cancel_subscription' THEN
       INSERT INTO public.stripe_test_mode_canceled_subscriptions (stripe_subscription_id, environment)
       VALUES (p_stripe_subscription_id, 'sandbox')
@@ -334,6 +371,24 @@ BEGIN
         v_subscription_status := 'past_due';
       END IF;
     END IF;
+
+    IF p_event_created IS NOT NULL
+       AND (v_latest IS NULL OR p_event_created > v_latest) THEN
+      INSERT INTO public.stripe_test_mode_subscription_clock (
+        stripe_subscription_id,
+        environment,
+        latest_event_created
+      ) VALUES (
+        p_stripe_subscription_id,
+        'sandbox',
+        p_event_created
+      )
+      ON CONFLICT (stripe_subscription_id) DO UPDATE
+        SET latest_event_created = EXCLUDED.latest_event_created
+      WHERE public.stripe_test_mode_subscription_clock.environment = 'sandbox'
+        AND public.stripe_test_mode_subscription_clock.latest_event_created < EXCLUDED.latest_event_created;
+    END IF;
+    END IF;
   END IF;
 
   INSERT INTO public.stripe_test_mode_subscription_audit (
@@ -360,10 +415,10 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_subscription_with_audit(text, uuid, text, text, text, text, timestamptz, timestamptz, boolean) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_subscription_with_audit(text, uuid, text, text, text, text, timestamptz, timestamptz, boolean) FROM anon;
-REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_subscription_with_audit(text, uuid, text, text, text, text, timestamptz, timestamptz, boolean) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.apply_stripe_test_mode_subscription_with_audit(text, uuid, text, text, text, text, timestamptz, timestamptz, boolean) TO service_role;
+REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_subscription_with_audit(text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_subscription_with_audit(text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, timestamptz) FROM anon;
+REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_subscription_with_audit(text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, timestamptz) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.apply_stripe_test_mode_subscription_with_audit(text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, timestamptz) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.apply_stripe_test_mode_event(
   p_event_id text,
@@ -379,7 +434,8 @@ CREATE OR REPLACE FUNCTION public.apply_stripe_test_mode_event(
   p_cancel_at_period_end boolean,
   p_checkout_session_id text,
   p_environment text,
-  p_livemode boolean
+  p_livemode boolean,
+  p_event_created timestamptz
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -441,14 +497,15 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'reason', 'malformed');
   END IF;
 
-  INSERT INTO public.stripe_webhook_events (event_id, event_type, action, result, details, environment)
+  INSERT INTO public.stripe_webhook_events (event_id, event_type, action, result, details, environment, event_created)
   VALUES (
     p_event_id,
     p_event_type,
     p_action,
     'received',
     jsonb_build_object('plan_id', p_plan_id, 'action', p_action),
-    'sandbox'
+    'sandbox',
+    p_event_created
   )
   ON CONFLICT (event_id) DO NOTHING
   RETURNING event_id INTO v_event_id;
@@ -481,12 +538,19 @@ BEGIN
       p_status,
       p_period_start,
       p_period_end,
-      p_cancel_at_period_end
+      p_cancel_at_period_end,
+      p_event_created
     );
     IF (v_subscription->>'ok') IS DISTINCT FROM 'true' THEN
       -- Roll the event row back so a retry can apply the write.
       RAISE EXCEPTION 'stripe_test_mode_subscription_write_failed'
         USING ERRCODE = 'P0001';
+    END IF;
+    IF COALESCE(v_subscription->>'reason', '') = 'stale_event' THEN
+      UPDATE public.stripe_webhook_events
+         SET result = 'ignored'
+       WHERE event_id = p_event_id;
+      RETURN jsonb_build_object('ok', true, 'reason', 'stale_event');
     END IF;
   ELSIF p_action = 'grant_credit_pack' THEN
     -- Credits are derived here. A caller-supplied credit count is not accepted.
@@ -521,7 +585,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean) FROM anon;
-REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean) TO service_role;
+REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean, timestamptz) FROM anon;
+REVOKE ALL ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean, timestamptz) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.apply_stripe_test_mode_event(text, text, text, uuid, text, text, text, text, timestamptz, timestamptz, boolean, text, text, boolean, timestamptz) TO service_role;

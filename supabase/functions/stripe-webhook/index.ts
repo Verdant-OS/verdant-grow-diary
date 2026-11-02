@@ -16,6 +16,23 @@ function json(status: number, body: Record<string, unknown>): Response {
   });
 }
 
+function stripeEventCreatedIso(rawBody: string, eventId: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch {
+    return null;
+  }
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const record = parsed as { id?: unknown; created?: unknown };
+  if (record.id !== eventId) return null;
+  if (typeof record.created !== "number" || !Number.isFinite(record.created)) return null;
+  if (record.created <= 0 || record.created >= 10_000_000_000) return null;
+  const created = new Date(record.created * 1000);
+  if (!Number.isFinite(created.getTime())) return null;
+  return created.toISOString();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
@@ -51,6 +68,7 @@ Deno.serve(async (req) => {
           p_checkout_session_id: payload.checkoutSessionId,
           p_environment: "sandbox",
           p_livemode: false,
+          p_event_created: stripeEventCreatedIso(rawBody, payload.eventId),
         });
         if (error || !data || (data as { ok?: boolean }).ok !== true) {
           const reason = (data as { reason?: string } | null)?.reason ?? "webhook_unavailable";

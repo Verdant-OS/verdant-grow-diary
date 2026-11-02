@@ -94,6 +94,30 @@ function subscriptionId(value: unknown): string | null {
   return nested && isStripeSubscriptionId(nested) ? nested : null;
 }
 
+/**
+ * Basil (2025-03-31) moved the billing period onto the subscription item.
+ * A top-level period is still accepted when an older payload includes one.
+ */
+function periodFromSubscription(record: Record<string, unknown> | null): {
+  periodStart: string | null;
+  periodEnd: string | null;
+} {
+  const items = asRecord(record?.items);
+  const data = items?.data;
+  const first = Array.isArray(data) ? asRecord(data[0]) : null;
+  return {
+    periodStart: unixToIso(first?.current_period_start) ?? unixToIso(record?.current_period_start),
+    periodEnd: unixToIso(first?.current_period_end) ?? unixToIso(record?.current_period_end),
+  };
+}
+
+/** Basil invoices put the subscription id on parent.subscription_details. */
+function invoiceSubscriptionId(object: Record<string, unknown>): string | null {
+  const parent = asRecord(object.parent);
+  const details = asRecord(parent?.subscription_details);
+  return subscriptionId(details?.subscription) ?? subscriptionId(object.subscription);
+}
+
 function planDecision(planId: string | null): StripeWebhookDecision | null {
   if (!planId) return null;
   const plan = classifyStripePlanId(planId);
@@ -140,11 +164,19 @@ function decideCheckout(eventId: string, object: Record<string, unknown>): Strip
 
   if (plan.kind !== "subscription") return { kind: "refuse", error: "malformed" };
   if (readString(object, "mode") !== "subscription") return { kind: "refuse", error: "malformed" };
-  const subscription = asRecord(object.subscription);
   const stripeSubscriptionId = subscriptionId(object.subscription);
-  const periodEnd = unixToIso(subscription?.current_period_end);
+  const subscription = asRecord(object.subscription);
+  if (!subscription) {
+    if (stripeSubscriptionId) return { kind: "ignore", reason: "subscription_unexpanded" };
+    return { kind: "ignore", reason: "period_not_present" };
+  }
+  const period = periodFromSubscription(subscription);
   const status = readString(subscription, "status");
-  if (!stripeSubscriptionId || !periodEnd || (status !== "active" && status !== "trialing")) {
+  if (
+    !stripeSubscriptionId ||
+    !period.periodEnd ||
+    (status !== "active" && status !== "trialing")
+  ) {
     return { kind: "ignore", reason: "period_not_present" };
   }
   return {
@@ -156,9 +188,9 @@ function decideCheckout(eventId: string, object: Record<string, unknown>): Strip
       stripeCustomerId: customerId(object.customer),
       stripeSubscriptionId,
       status,
-      periodStart: unixToIso(subscription?.current_period_start),
-      periodEnd,
-      cancelAtPeriodEnd: subscription?.cancel_at_period_end === true,
+      periodStart: period.periodStart,
+      periodEnd: period.periodEnd,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end === true,
       checkoutSessionId: sessionId,
     },
   };
@@ -216,10 +248,10 @@ function decideSubscription(
   }
 
   const plan = planId ? classifyStripePlanId(planId) : { kind: "unknown" as const };
-  const periodEnd = unixToIso(object.current_period_end);
+  const period = periodFromSubscription(object);
   if (
     plan.kind !== "subscription" ||
-    !periodEnd ||
+    !period.periodEnd ||
     (status !== "active" && status !== "trialing" && status !== "paused")
   ) {
     return { kind: "ignore", reason: "period_not_present" };
@@ -233,7 +265,8 @@ function decideSubscription(
         stripeSubscriptionId,
         planId: plan.planId,
         status,
-        periodEnd,
+        periodStart: period.periodStart,
+        periodEnd: period.periodEnd,
         cancelAtPeriodEnd: object.cancel_at_period_end === true,
       },
     };
@@ -247,8 +280,8 @@ function decideSubscription(
       stripeCustomerId: customerId(object.customer),
       stripeSubscriptionId,
       status,
-      periodStart: unixToIso(object.current_period_start),
-      periodEnd,
+      periodStart: period.periodStart,
+      periodEnd: period.periodEnd,
       cancelAtPeriodEnd: object.cancel_at_period_end === true,
     },
   };
@@ -271,12 +304,13 @@ export function decideStripeWebhookAction(event: unknown): StripeWebhookDecision
   switch (eventType) {
     case "checkout.session.completed":
       return decideCheckout(eventId, object);
+    case "customer.subscription.created":
     case "customer.subscription.updated":
       return decideSubscription(eventId, eventType, object, false);
     case "customer.subscription.deleted":
       return decideSubscription(eventId, eventType, object, true);
     case "invoice.payment_failed": {
-      const stripeSubscriptionId = subscriptionId(object.subscription);
+      const stripeSubscriptionId = invoiceSubscriptionId(object);
       if (!stripeSubscriptionId) return { kind: "ignore", reason: "no_subscription" };
       return {
         kind: "apply",

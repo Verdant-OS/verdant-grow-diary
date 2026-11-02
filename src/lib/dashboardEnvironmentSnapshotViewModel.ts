@@ -18,6 +18,7 @@ import { captureRefIn, captureRefsKnown, rowCaptureRef } from "@/lib/sensorCaptu
 import { format } from "date-fns";
 import { isStale, snapshotFromReadings, type SensorReadingLike } from "@/lib/sensorSnapshot";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
+import { LatestVpdReadingSelection } from "@/lib/latestVpdReadingSelection";
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
 import { resolveSensorSourceLabel } from "@/lib/sensorSourceLabelRules";
 import {
@@ -392,7 +393,23 @@ export function buildTentSnapshotView(
         : snap.vpd;
   // A rejected capture's VPD keeps its Invalid label but never its number,
   // matching Tonight and Tent Detail (Copilot on #2459 at de8c1b27).
-  const vpdShownKpa = cohortVpdRejected ? null : vpdKpa;
+  const cohortAtMs = snap.ts ? Date.parse(snap.ts) : Number.NaN;
+  const cohortDerived = LatestVpdReadingSelection.choose({
+    storedVpdKpa: typeof snap.vpd === "number" ? snap.vpd : null,
+    storedCapturedAtMs: Number.isFinite(cohortAtMs) ? cohortAtMs : null,
+    pairTempC: typeof snap.temp === "number" ? snap.temp : null,
+    pairRh: typeof snap.rh === "number" ? snap.rh : null,
+    pairCapturedAtMs: Number.isFinite(cohortAtMs) ? cohortAtMs : null,
+  });
+  const vpdShownKpa = cohortVpdRejected
+    ? null
+    : vpdKpa !== null
+      ? vpdKpa
+      : canonical?.unavailable === true || canonical?.missing === true || canonicalRejected
+        ? null
+        : cohortDerived.kind === "derived"
+          ? cohortDerived.vpdKpa
+          : null;
   const canonicalSource: SensorReadingSource | null =
     provenance === "live" || provenance === "manual" || provenance === "csv"
       ? provenance

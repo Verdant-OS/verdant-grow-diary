@@ -76,6 +76,7 @@ import {
   readSensorsTentRouteIntent,
   resolveSensorsTentRouteSelection,
 } from "@/lib/sensorRouteTentIntentRules";
+import { LatestVpdReadingSelection } from "@/lib/latestVpdReadingSelection";
 import {
   classifySensorReadingTrust,
   indexSensorReadingsByObservedMetric,
@@ -326,13 +327,24 @@ export default function Sensors() {
     // A failed refresh keeps the cached stages (React Query retains data).
     plants: plantsQuery.data ?? null,
   });
-  const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
   const [previousVpdInputs, setPreviousVpdInputs] = useState<LatestTrustedVpdInputs | null>(null);
   const latestTrustedVpdInputs = useMemo(
     () => selectSensorVpdDisplayEvidence(filtered, previousVpdInputs),
     [filtered, previousVpdInputs],
   );
+  const storedVpdReading = vpdStabilityReadings[0] ?? null;
+  const vpdChoice = LatestVpdReadingSelection.choose({
+    storedVpdKpa: readObservedSensorMetric(storedVpdReading, "vpd"),
+    storedCapturedAtMs: Date.parse(storedVpdReading?.capturedAt || storedVpdReading?.ts || ""),
+    pairTempC: latestTrustedVpdInputs?.temperatureC ?? null,
+    pairRh: latestTrustedVpdInputs?.humidityPct ?? null,
+    pairCapturedAtMs: latestTrustedVpdInputs
+      ? Date.parse(latestTrustedVpdInputs.reading.capturedAt || latestTrustedVpdInputs.reading.ts)
+      : null,
+  });
+  const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
   const derivedVpdKpa = useMemo(() => {
+    if (vpdChoice.kind === "derived") return vpdChoice.vpdKpa;
     if (latestObservedVpd !== null || !latestTrustedVpdInputs) return null;
     const derived = deriveVpd({
       temperature: latestTrustedVpdInputs.temperatureC,
@@ -340,7 +352,7 @@ export default function Sensors() {
       temperatureUnit: "C",
     });
     return derived.kind === "derived" ? derived.vpdKpa : null;
-  }, [latestObservedVpd, latestTrustedVpdInputs]);
+  }, [latestObservedVpd, latestTrustedVpdInputs, vpdChoice]);
   // Remember inputs only while their derived estimate is on screen; an
   // observed VPD must never seed a later stale derivation.
   useEffect(() => {
@@ -541,7 +553,8 @@ export default function Sensors() {
           // Resolve each metric from its own latest actual observation. A
           // newer sparse temperature snapshot must not erase or relabel an
           // older soil observation, and compatibility zeroes are never read.
-          const metricReadings = readingsByMetric[m.key];
+          const metricReadings =
+            m.key === "vpd" && vpdChoice.kind === "derived" ? [] : readingsByMetric[m.key];
           const latestMetricReading = metricReadings[0] ?? null;
           const rawValue = readObservedSensorMetric(latestMetricReading, m.key);
           const metricEvidenceReading =
@@ -579,7 +592,7 @@ export default function Sensors() {
             hasAnyReading: hasReadings,
             isStale: metricTrust.isStale || metricClassification.label === "Stale",
             isInvalid: metricTrust.isInvalid,
-            isDerived,
+            isDerived: isDerived && vpdChoice.kind !== "derived",
             recentValues,
           });
           const unresolvedManualMetric =
@@ -719,7 +732,7 @@ export default function Sensors() {
                 >
                   {unresolvedManualMetric || (isDerived && manualHistoryIncomplete)
                     ? manualHistoryMessage
-                    : isDerived && state.kind === "derived"
+                    : isDerived
                       ? "No recorded VPD history to chart yet. The value below is calculated from temperature and humidity."
                       : state.message}
                 </p>

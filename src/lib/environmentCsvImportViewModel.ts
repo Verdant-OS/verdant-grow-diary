@@ -86,7 +86,7 @@ export function buildCsvImportDoneMessage(
   }
   const stored =
     sensorRowCount != null && sensorRowCount > 0 && sensorRowCount !== insertedCount
-      ? `Imported ${insertedCount} CSV reading(s) from ${sensorRowCount} sensor row(s).`
+      ? `Imported ${insertedCount} CSV reading(s). From ${sensorRowCount} sensor row(s).`
       : `Imported ${insertedCount} CSV reading(s).`;
   if (duplicateCount > 0) {
     return `${stored} Skipped ${duplicateCount} duplicate reading(s) already in Verdant.`;

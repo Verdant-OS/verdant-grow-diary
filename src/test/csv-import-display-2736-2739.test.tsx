@@ -151,7 +151,7 @@ describe("CSV import display #2736–#2739", () => {
 
   it("counts stored readings and the sensor rows they came from", async () => {
     expect(buildCsvImportDoneMessage(9, 0, 3)).toBe(
-      "Imported 9 CSV reading(s) from 3 sensor row(s).",
+      "Imported 9 CSV reading(s). From 3 sensor row(s).",
     );
     const confirm = vi.fn().mockResolvedValue({ insertedCount: 9, error: null });
     render(
@@ -167,7 +167,7 @@ describe("CSV import display #2736–#2739", () => {
     expect(screen.getByTestId("csv-import-valid-count")).toHaveTextContent("1");
     fireEvent.click(screen.getByTestId("csv-import-confirm"));
     expect(await screen.findByTestId("csv-import-done")).toHaveTextContent(
-      "Imported 9 CSV reading(s) from 1 sensor row(s).",
+      "Imported 9 CSV reading(s). From 1 sensor row(s).",
     );
   });
 });

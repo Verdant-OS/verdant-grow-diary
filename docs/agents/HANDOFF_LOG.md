@@ -79,8 +79,8 @@ branch: cursor/csv-import-display-6fff
 base: verdant-grow-diary
 checkout: git fetch origin cursor/csv-import-display-6fff verdant-grow-diary && git switch cursor/csv-import-display-6fff
 pr: ready for review; no auto-merge
-head_sha: 16c521404e9ca75ac407f908397e5214714d00e8
-state: pushed after this note
+head_sha: tip of cursor/csv-import-display-6fff; confirmation sentence keeps the period after reading(s)
+state: pushed; PR 2744; no auto-merge
 current_step: display fixes and regression tests are in the working tree
 next_action: push and open the PR. Do not merge. Do not enable auto-merge.
 post_merge_check: after Publish, import an AC Infinity Fahrenheit CSV on the fixture account and confirm the timeline cards are distinct, the history badge names the vendor, labels say Humidity and VPD, the preview shows °F, and the confirmation names both counts. NOT_MEASURED until live /version.json reports the SHA.

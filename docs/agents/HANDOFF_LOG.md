@@ -79,9 +79,9 @@ branch: ultra/2717-ecowitt-live-ingest
 base: verdant-grow-diary
 checkout: git fetch origin ultra/2717-ecowitt-live-ingest verdant-grow-diary && git switch ultra/2717-ecowitt-live-ingest
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2732
-head_sha: read git rev-parse HEAD after the claim-parser commit; previous remote head 2307cb96c295c418726febe879072d9bb45b7370
+head_sha: read git rev-parse HEAD after the Reviewer D follow-up; previous remote head acb3db1db0b706dc9e143b9484f2e5dce0aaee01
 state: pushed draft
-current_step: pgcrypto call sites in the new migration and pgTAP already use extensions.digest and extensions.gen_random_bytes. readOpenClaim no longer has a null guard the only caller can never reach.
+current_step: Reviewer D P2-1, P2-2, and P3-3 were already fixed at acb3db1d. This follow-up truncates the stored passkey fingerprint, hides unknown_claim and passkey_mismatch behind rejected, and binds only while passkey_sha256 is null.
 next_action: keep the PR draft. Required full-suite and lint jobs stay skipped until a non-author marks the PR ready. Do not apply the migration or deploy the edge function.
 post_merge_check: after a separate authorized apply and Publish, a GW1206 customized-upload POST to /ew/<token> writes source live indoor temp and humidity. NOT_MEASURED until then.
 active_writer: Grok cloud session assigned 2026-11-02 to push this branch

@@ -36,7 +36,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends postgresql
           PG_MAJOR="$(psql --version | awk '{print $3}' | cut -d. -f1)"
-          sudo apt-get install -y --no-install-recommends "postgresql-${PG_MAJOR}-pgtap" "postgresql-${PG_MAJOR}-contrib"
+          sudo apt-get install -y --no-install-recommends "postgresql-${PG_MAJOR}-pgtap"
+          # Ubuntu names the contrib package postgresql-contrib-N. PGDG names it postgresql-N-contrib.
+          if apt-cache show "postgresql-${PG_MAJOR}-contrib" >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends "postgresql-${PG_MAJOR}-contrib"
+          else
+            sudo apt-get install -y --no-install-recommends "postgresql-contrib-${PG_MAJOR}"
+          fi
           echo "PG_MAJOR=${PG_MAJOR}" >> "$GITHUB_ENV"
 
       - name: Run ecowitt_custom_upload_claims_pgtap.sql on a fresh loopback database

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useOpenCustomerPortalState } from "@/lib/customerPortal";
+import { useOpenStripeCustomerPortalState } from "@/lib/payments/stripePortal";
 import { usePaddleCancelNotice } from "@/hooks/usePaddleCancelNotice";
 
 import {
@@ -27,7 +28,6 @@ import { createAccountDeletionContinuation } from "@/lib/accountDeletionContinua
 import { useAuth } from "@/store/auth";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
-import { OwnerBadgeShelfMount } from "@/components/OwnerBadgeShelf";
 import RewardedReferralCard from "@/components/RewardedReferralCard";
 import FounderOwnerPrefsForm from "@/components/FounderOwnerPrefsForm";
 import { PRICING_TIERS } from "@/config/pricing";
@@ -318,14 +318,31 @@ function TemperatureUnitTile() {
  * billing status directly.
  */
 function SubscriptionTile() {
-  const { loading, lookupFailed, entitlement, refetch } = useMyEntitlements();
+  const { loading, lookupFailed, entitlement, savedStripeTestSubscription, refetch } =
+    useMyEntitlements();
   const {
-    opening,
-    error: portalError,
-    open: openPortal,
-    clearError,
+    opening: paddleOpening,
+    error: paddlePortalError,
+    open: openPaddlePortal,
+    clearError: clearPaddleError,
   } = useOpenCustomerPortalState();
+  const {
+    opening: stripeOpening,
+    error: stripePortalError,
+    open: openStripePortal,
+    clearError: clearStripeError,
+  } = useOpenStripeCustomerPortalState();
   const cancelNotice = usePaddleCancelNotice();
+
+  // A saved Stripe test subscription is this account's purchase in the
+  // current billing environment — its Manage CTA and copy must point at the
+  // Stripe customer portal, not Paddle. Paddle stays the fallback for
+  // Paddle-era rows.
+  const useStripePortal = !loading && !lookupFailed && savedStripeTestSubscription != null;
+  const opening = useStripePortal ? stripeOpening : paddleOpening;
+  const portalError = useStripePortal ? stripePortalError : paddlePortalError;
+  const openPortal = useStripePortal ? openStripePortal : openPaddlePortal;
+  const clearError = useStripePortal ? clearStripeError : clearPaddleError;
 
   const planId = lookupFailed ? null : (entitlement?.displayPlanId ?? null);
 
@@ -365,6 +382,13 @@ function SubscriptionTile() {
               data-testid="settings-subscription-staff-note"
             >
               Internal staff — Pro capabilities, 10,000 AI credits/month.
+            </p>
+          )}
+          {!loading && !lookupFailed && (
+            <p className="text-xs text-muted-foreground mt-2" role="status">
+              {savedStripeTestSubscription
+                ? `Saved Stripe test subscription: ${savedStripeTestSubscription.displayPlanId.replaceAll("_", " ")} — ${savedStripeTestSubscription.status}. ${savedStripeTestSubscription.isActive ? "Test plan access active." : "Test plan access inactive."}`
+                : "No saved Stripe test subscription in this account’s current billing environment."}
             </p>
           )}
           {entitlement?.status === "past_due" && (
@@ -460,8 +484,9 @@ function SubscriptionTile() {
 
       {isPaid && !isLifetime ? (
         <p className="text-[11px] text-muted-foreground mt-2">
-          Cancel, change payment method, or download invoices in the Paddle customer portal. Opens
-          in a new tab.
+          {useStripePortal
+            ? "Cancel, change payment method, or download invoices in the Stripe customer portal. Opens in a new tab."
+            : "Cancel, change payment method, or download invoices in the Paddle customer portal. Opens in a new tab."}
         </p>
       ) : null}
     </Tile>
@@ -680,8 +705,6 @@ export default function Settings() {
             Sign out
           </Button>
         </Tile>
-
-        <OwnerBadgeShelfMount />
 
         <Tile name="Preferences" state="available">
           <p className="text-sm text-muted-foreground mb-3">

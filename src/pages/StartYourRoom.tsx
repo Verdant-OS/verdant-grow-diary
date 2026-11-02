@@ -41,7 +41,12 @@ import {
   type StartYourRoomResumePlant,
   type StartYourRoomStep,
 } from "@/lib/startYourRoomRules";
-import { setStartScreenChoice } from "@/lib/startScreenPreferences";
+import {
+  DEFAULT_START_SCREEN,
+  routeForStartScreen,
+  setStartScreenChoice,
+} from "@/lib/startScreenPreferences";
+import { OnboardingFlowControls } from "@/lib/onboardingFlowControls";
 import {
   evaluateVerifiedGrowCreationGate,
   evaluateVerifiedTentCreationGate,
@@ -152,6 +157,7 @@ export default function StartYourRoom() {
   const ownerId = user?.id ?? null;
   const mountedRef = useRef(true);
   const draftWriterRef = useRef(Symbol("start-room-draft"));
+  const abandonDraftRef = useRef(false);
   const ownerIdRef = useRef<string | null>(ownerId);
   // Written at commit, not during render: a discarded render must not leave an
   // owner the committed page is not showing.
@@ -254,6 +260,10 @@ export default function StartYourRoom() {
   useEffect(() => {
     if (!ownerId || draftHydratedFor.current !== ownerId || draftOwnerReady !== ownerId) return;
     if (startRoomDraftWriters.get(ownerId) !== draftWriterRef.current) return;
+    if (abandonDraftRef.current) {
+      clearBrowserSessionFormDraft(ownerId, START_YOUR_ROOM_DRAFT_FORM_ID);
+      return;
+    }
     if (step === "done") {
       clearBrowserSessionFormDraft(ownerId, START_YOUR_ROOM_DRAFT_FORM_ID);
       return;
@@ -706,13 +716,26 @@ export default function StartYourRoom() {
     nav(plantDetailQuickLogHref(shownIds.plantId), { replace: true });
   }
 
+  function restartFlow() {
+    if (!user) return;
+    abandonDraftRef.current = true;
+    OnboardingFlowControls.clearFlowAnswers(user.id);
+    nav(OnboardingFlowControls.restartHref());
+  }
+
+  function skipFlow() {
+    nav(routeForStartScreen(DEFAULT_START_SCREEN), { replace: true });
+  }
+
   function submitRoomFromForm(event: { preventDefault: () => void }) {
     event.preventDefault();
     void submitRoom();
   }
 
   return (
-    <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 py-8">
+    <div
+      className={`flex min-h-0 flex-col items-center px-4 py-8 ${OnboardingFlowControls.mobilePrimaryClearanceClass}`}
+    >
       <div
         className="w-full max-w-md glass rounded-2xl p-6 space-y-4"
         data-testid="start-your-room"
@@ -732,6 +755,27 @@ export default function StartYourRoom() {
           >
             {START_YOUR_ROOM_COPY.skipToStartScreen}
           </Link>
+        </div>
+        <div className="flex flex-wrap gap-2" data-testid="start-room-flow-controls">
+          <Button
+            type="button"
+            variant="outline"
+            data-testid="start-room-back"
+            onClick={() => nav(OnboardingFlowControls.backHref())}
+          >
+            {OnboardingFlowControls.backLabel}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            data-testid="start-room-restart"
+            onClick={restartFlow}
+          >
+            {OnboardingFlowControls.restartLabel}
+          </Button>
+          <Button type="button" variant="ghost" data-testid="start-room-skip" onClick={skipFlow}>
+            {OnboardingFlowControls.skipLabel}
+          </Button>
         </div>
 
         <h1
@@ -847,7 +891,7 @@ export default function StartYourRoom() {
               ) : null}
               <Button
                 type="submit"
-                className="w-full gradient-leaf text-primary-foreground"
+                className="w-[calc(100%-4.5rem)] gradient-leaf text-primary-foreground md:w-full"
                 disabled={
                   busy ||
                   createOutcomeUnknown ||
@@ -877,7 +921,7 @@ export default function StartYourRoom() {
             </ul>
             <Button
               type="button"
-              className="w-full gradient-leaf text-primary-foreground"
+              className="w-[calc(100%-4.5rem)] gradient-leaf text-primary-foreground md:w-full"
               disabled={!canFinish(shownIds)}
               onClick={finish}
               data-testid="start-room-finish"

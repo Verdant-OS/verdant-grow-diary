@@ -28,6 +28,7 @@ import {
 } from "@/lib/startScreenPreferences";
 import { shouldPreferStartYourRoom } from "@/lib/startYourRoomRules";
 import { Sprout } from "lucide-react";
+import { OnboardingFlowControls } from "@/lib/onboardingFlowControls";
 
 export const ONBOARDING_GROWS_LOADING_COPY = "Loading your grows…";
 import {
@@ -100,6 +101,11 @@ export default function Onboarding() {
     // keyboard users can tab directly into the radiogroup.
     headingRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setChoice(OnboardingFlowControls.readStartScreenChoice(user.id));
+  }, [user?.id]);
 
   if (loading) return null;
   if (growsLoading) {
@@ -246,7 +252,9 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
+    <div
+      className={`flex min-h-0 flex-col items-center px-6 py-10 ${OnboardingFlowControls.mobilePrimaryClearanceClass}`}
+    >
       <div className="w-full max-w-md glass rounded-2xl p-6">
         {preferRoom && !csvHistoryIntent ? (
           <div
@@ -314,7 +322,10 @@ export default function Onboarding() {
                 name="start-screen"
                 value={opt.key}
                 checked={choice === opt.key}
-                onChange={() => setChoice(opt.key)}
+                onChange={() => {
+                  setChoice(opt.key);
+                  if (user) OnboardingFlowControls.rememberStartScreenChoice(user.id, opt.key);
+                }}
                 className="mt-1"
                 aria-describedby={`start-screen-${opt.key}-desc`}
               />
@@ -339,8 +350,19 @@ export default function Onboarding() {
         </fieldset>
 
         <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            data-testid="onboarding-restart"
+            onClick={() => {
+              if (user) OnboardingFlowControls.clearFlowAnswers(user.id);
+              setChoice(DEFAULT_START_SCREEN);
+            }}
+          >
+            {OnboardingFlowControls.restartLabel}
+          </Button>
           <Button variant="ghost" onClick={() => go(DEFAULT_START_SCREEN, false)}>
-            Skip for now
+            {OnboardingFlowControls.skipLabel}
           </Button>
           <Button
             onClick={() => go(choice, true)}

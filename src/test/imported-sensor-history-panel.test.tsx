@@ -149,7 +149,7 @@ describe("ImportedSensorHistoryPanel", () => {
     );
     expect(screen.getByTestId("imported-history-total")).toHaveTextContent("2");
     const filters = screen.getByTestId("imported-history-metric-filters");
-    expect(filters).toHaveTextContent("Humidity");
+    expect(filters).toHaveTextContent("humidity_pct");
     expect(filters).toHaveTextContent("Temperature (°C)");
     // Live row never leaks into the metric filter list.
     expect(filters.textContent ?? "").not.toContain("co2_ppm");
@@ -177,8 +177,8 @@ describe("ImportedSensorHistoryPanel", () => {
     );
     expect(values).toEqual({
       "Temperature (°C)": "24.4 °C",
-      Humidity: "52%",
-      VPD: "1.11 kPa",
+      humidity_pct: "52%",
+      vpd_kpa: "1.11 kPa",
     });
   });
 
@@ -298,7 +298,7 @@ describe("ImportedSensorHistoryPanel", () => {
 
     const rows = screen.getByTestId("imported-history-recent-rows").querySelectorAll("tbody tr");
     expect(rows.length).toBe(1);
-    expect(rows[0].textContent ?? "").toContain("Humidity");
+    expect(rows[0].textContent ?? "").toContain("humidity_pct");
     expect(trackFunnelEvent).not.toHaveBeenCalled();
   });
 

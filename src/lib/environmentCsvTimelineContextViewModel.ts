@@ -98,35 +98,58 @@ function entryMs(e: DiaryEntryLike): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
-/** One card per distinct CSV observation, newest first, including readings no diary entry is near. */
+/** One card per distinct CSV observation. Diary-window matches are never dropped for a newest-N cap. */
 export class CsvTimelineSnapshotList {
   static distinct(
-    input: Omit<CsvTimelineContextInput, "diaryEntries"> & { limit?: number },
+    input: Omit<CsvTimelineContextInput, "diaryEntries"> & {
+      diaryEntries?: CsvTimelineContextInput["diaryEntries"];
+      windowMinutes?: number;
+    },
   ): CsvTimelineSnapshot[] {
-    const rowsAll = Array.isArray(input.sensorReadings) ? input.sensorReadings : [];
-    const { growId, tentId } = input;
-    if (!tentId) return [];
-    const rows = rowsAll.filter((r) => {
-      if (!isCsvRow(r)) return false;
-      if ((r.tent_id ?? null) !== tentId) return false;
-      const rg = rowGrowId(r);
-      if (growId && rg && rg !== growId) return false;
-      return true;
-    });
-    const byTs = new Map<number, CsvSensorReadingRow[]>();
-    for (const r of rows) {
-      const t = rowMs(r);
-      if (t == null) continue;
-      const list = byTs.get(t) ?? [];
-      list.push(r);
-      byTs.set(t, list);
+    const grouped = groupCsvSnapshots(input);
+    if (!grouped) return [];
+    const { byTs } = grouped;
+    const windowMs = Math.max(1, input.windowMinutes ?? DEFAULT_WINDOW_MIN) * 60_000;
+    const linked = new Set<number>();
+    for (const entry of input.diaryEntries ?? []) {
+      if (input.growId && entry.grow_id != null && entry.grow_id !== input.growId) continue;
+      if (entry.tent_id != null && entry.tent_id !== input.tentId) continue;
+      const eMs = entryMs(entry);
+      if (eMs == null) continue;
+      let bestTs: number | null = null;
+      let bestDelta = Number.POSITIVE_INFINITY;
+      for (const ts of byTs.keys()) {
+        const delta = Math.abs(ts - eMs);
+        if (delta > windowMs || delta >= bestDelta) continue;
+        bestDelta = delta;
+        bestTs = ts;
+      }
+      if (bestTs != null) linked.add(bestTs);
     }
-    const limit = Math.max(1, input.limit ?? 12);
-    return [...byTs.keys()]
-      .sort((a, b) => b - a)
-      .slice(0, limit)
-      .map((ts) => snapshotFromGroup(byTs.get(ts) ?? [], ts));
+    const chosen = new Set<number>([...linked, ...byTs.keys()]);
+    return [...chosen].sort((a, b) => b - a).map((ts) => snapshotFromGroup(byTs.get(ts) ?? [], ts));
   }
+}
+
+function groupCsvSnapshots(
+  input: Omit<CsvTimelineContextInput, "diaryEntries">,
+): { byTs: Map<number, CsvSensorReadingRow[]> } | null {
+  const rowsAll = Array.isArray(input.sensorReadings) ? input.sensorReadings : [];
+  const { growId, tentId } = input;
+  if (!tentId) return null;
+  const byTs = new Map<number, CsvSensorReadingRow[]>();
+  for (const row of rowsAll) {
+    if (!isCsvRow(row)) continue;
+    if ((row.tent_id ?? null) !== tentId) continue;
+    const rowGrow = rowGrowId(row);
+    if (growId && rowGrow && rowGrow !== growId) continue;
+    const ts = rowMs(row);
+    if (ts == null) continue;
+    const list = byTs.get(ts) ?? [];
+    list.push(row);
+    byTs.set(ts, list);
+  }
+  return { byTs };
 }
 
 function snapshotFromGroup(group: CsvSensorReadingRow[], bestTs: number): CsvTimelineSnapshot {

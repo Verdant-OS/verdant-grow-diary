@@ -269,8 +269,17 @@ export default function ImportedSensorHistoryPanel({
                     data-testid={`imported-history-metric-filter-${opt.id}`}
                     onClick={() => setSelectedMetric(opt.id)}
                   >
-                    {opt.label}
-                    <span className="ml-1 text-xs opacity-70">({opt.count})</span>
+                    <span className="flex flex-col items-start leading-tight">
+                      <span>
+                        {opt.label}
+                        <span className="ml-1 text-xs opacity-70">({opt.count})</span>
+                      </span>
+                      {opt.id !== IMPORTED_SENSOR_HISTORY_ALL_METRICS && opt.id !== opt.label ? (
+                        <span className="text-[10px] font-normal text-muted-foreground">
+                          {opt.id}
+                        </span>
+                      ) : null}
+                    </span>
                   </Button>
                 );
               })}
@@ -293,7 +302,24 @@ export default function ImportedSensorHistoryPanel({
                     className="border-t border-border/40"
                   >
                     <td className="py-1 pr-2">{formatTimestamp(r.capturedAt)}</td>
-                    <td className="py-1 pr-2">{r.metricLabel}</td>
+                    <td
+                      className={
+                        r.metric === "temperature_c" ||
+                        r.metric === "soil_temp_c" ||
+                        r.metricLabel === r.metric
+                          ? "py-1 pr-2"
+                          : "py-1 pr-2 before:block before:text-sm before:text-foreground before:content-[attr(data-label)]"
+                      }
+                      data-label={r.metricLabel}
+                    >
+                      {r.metric === "temperature_c" ||
+                      r.metric === "soil_temp_c" ||
+                      r.metricLabel === r.metric ? (
+                        r.metricLabel
+                      ) : (
+                        <span className="block text-xs text-muted-foreground">{r.metric}</span>
+                      )}
+                    </td>
                     <td className="py-1">
                       <span>{r.displayValue}</span>
                       {r.outOfRangeNote ? (
@@ -305,11 +331,6 @@ export default function ImportedSensorHistoryPanel({
                         </span>
                       ) : null}
                     </td>
-                    {r.metricLabel === r.metric ? null : (
-                      <td className="sr-only" aria-hidden="true">
-                        {r.metric}
-                      </td>
-                    )}
                   </tr>
                 ))}
               </tbody>

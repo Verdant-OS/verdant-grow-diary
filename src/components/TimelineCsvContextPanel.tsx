@@ -121,6 +121,14 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
         sensorReadings: rows,
         growId,
         tentId,
+        diaryEntries: entries
+          .filter((entry) => entry.tent_id === tentId)
+          .map((entry) => ({
+            id: entry.id,
+            grow_id: growId,
+            tent_id: entry.tent_id,
+            occurred_at: entry.entry_at,
+          })),
       })) {
         const stamp = `${tentId}:${snapshot.capturedAt}`;
         if (seen.has(stamp)) continue;

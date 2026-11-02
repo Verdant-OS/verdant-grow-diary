@@ -44,10 +44,12 @@ describe("imported history metric selectors", () => {
     const humidity = Array.from(bodyRows).find((tr) => tr.textContent?.includes("52%"));
     const vpd = Array.from(bodyRows).find((tr) => tr.textContent?.includes("1.11 kPa"));
 
-    expect(humidity?.querySelectorAll("td")[1]?.textContent).toBe("Humidity");
-    expect(humidity?.textContent).toContain("humidity_pct");
-    expect(vpd?.querySelectorAll("td")[1]?.textContent).toBe("VPD");
-    expect(vpd?.textContent).toContain("vpd_kpa");
+    expect(humidity?.querySelectorAll("td").length).toBe(3);
+    expect(humidity?.querySelectorAll("td")[1]?.textContent).toBe("humidity_pct");
+    expect(humidity?.querySelectorAll("td")[1]?.getAttribute("data-label")).toBe("Humidity");
+    expect(vpd?.querySelectorAll("td").length).toBe(3);
+    expect(vpd?.querySelectorAll("td")[1]?.textContent).toBe("vpd_kpa");
+    expect(vpd?.querySelectorAll("td")[1]?.getAttribute("data-label")).toBe("VPD");
     expect(screen.getByTestId("imported-history-metric-filter-humidity_pct")).toHaveTextContent(
       "Humidity",
     );

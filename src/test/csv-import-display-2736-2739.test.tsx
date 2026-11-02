@@ -77,8 +77,36 @@ describe("CSV import display #2736–#2739", () => {
         sensorReadings: rows,
         growId: "grow-1",
         tentId: "tent-1",
+        diaryEntries: entries.map((entry) => ({
+          id: entry.id,
+          grow_id: "grow-1",
+          tent_id: entry.tent_id,
+          occurred_at: entry.entry_at,
+        })),
       }),
     ).toHaveLength(4);
+  });
+
+  it("keeps an older diary entry's chip after a larger newer import", async () => {
+    const olderAt = "2026-09-01T12:00:00.000Z";
+    const newer = Array.from({ length: 13 }, (_, index) =>
+      metricRow(
+        new Date(Date.parse("2026-11-02T00:00:00.000Z") + index * 3_600_000).toISOString(),
+        "temperature_c",
+        (80 - 32) * (5 / 9),
+      ),
+    );
+    const rows = [metricRow(olderAt, "temperature_c", (70 - 32) * (5 / 9)), ...newer];
+    read.mockResolvedValue({ data: rows, error: null });
+    render(
+      <TimelineCsvContextPanel
+        growId="grow-1"
+        entries={[{ id: "older-entry", tent_id: "tent-1", entry_at: olderAt }]}
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId("csv-timeline-chip-older-entry")).toBeTruthy());
+    expect(screen.getByTestId("csv-timeline-chip-older-entry").textContent).toContain("70.0 °F");
+    expect(screen.getAllByText(/80\.0 °F/).length).toBe(13);
   });
 
   it("names the vendor on imported history and keeps the stored source csv", () => {

@@ -17,6 +17,7 @@ import {
 } from "@/lib/temperatureUnitPreference";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import { cn } from "@/lib/utils";
+import { EcowittCustomUploadStationMount } from "@/components/EcowittCustomUploadStationMount";
 
 export interface EcowittTentSnapshotV0CardProps {
   tentId: string | null | undefined;
@@ -225,6 +226,21 @@ export function EcowittTentSnapshotV0Card(props: EcowittTentSnapshotV0CardProps)
             );
           })}
         </div>
+      ) : null}
+
+      {!readingsQuery.isLoading && !readingsQuery.isError ? (
+        <EcowittCustomUploadStationMount
+          tentId={tentId ?? null}
+          now={now}
+          readings={(readingsQuery.data ?? []).map((row) => ({
+            tentId: row.tent_id,
+            metric: row.metric,
+            value: row.value,
+            source: row.source,
+            quality: row.quality,
+            capturedAt: row.captured_at,
+          }))}
+        />
       ) : null}
     </section>
   );

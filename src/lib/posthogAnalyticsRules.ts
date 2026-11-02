@@ -38,11 +38,15 @@ export type PostHogProductEvent = {
   properties: Record<string, string | number>;
 };
 
+/** Published Lovable web address. Exact match; previews stay excluded. */
+export const LOVABLE_PUBLISHED_ANALYTICS_HOST = "verdantgrowdiary.verdantgrowdiary.lovable.app";
+
 /** Exact production hosts only. One trailing dot is ignored. No suffix match. */
 export function isAnalyticsCollectionHost(hostname: string | null | undefined): boolean {
   if (typeof hostname !== "string") return false;
   const normalized = hostname.trim().toLowerCase().replace(/\.$/, "");
   if (!normalized) return false;
+  if (normalized === LOVABLE_PUBLISHED_ANALYTICS_HOST) return true;
   return (PRODUCTION_HOSTNAMES as readonly string[]).includes(normalized);
 }
 
@@ -364,6 +368,8 @@ export function posthogCrossSubdomainCookieDomain(
   hostname: string | null | undefined,
 ): string | null {
   if (!isAnalyticsCollectionHost(hostname)) return null;
+  const normalized = (hostname ?? "").trim().toLowerCase().replace(/\.$/, "");
+  if (normalized === LOVABLE_PUBLISHED_ANALYTICS_HOST) return null;
   return POSTHOG_PARENT_COOKIE_DOMAIN;
 }
 

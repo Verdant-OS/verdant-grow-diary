@@ -173,11 +173,13 @@ const EXEMPTIONS: Record<string, { class: string; reason: string }> = {
   },
   "e2e/owner-badge-shelf.spec.ts": {
     class: EXEMPTION_CLASS.AWAITING_DECISION,
-    reason: "NOT_MEASURED (not run)",
+    reason:
+      "Credential-free chromium-mocked spec: page.route stubs /auth/v1 and /rest/v1, and no workflow names this file. Required CI wiring for this spec is a separate proposal and is not built in this slice. Adding it to mocked-e2e-unwired-closure.yml is a scorer-locked workflow edit outside that decision, so the spec stays AWAITING_DECISION. NOT_MEASURED (not run).",
   },
   "e2e/owner-badge-kill-switch.spec.ts": {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
-    reason: "NOT_MEASURED (not run)",
+    reason:
+      "Playwright request spec. test.skip unless E2E_LOCAL_SUPABASE_URL and E2E_LOCAL_SUPABASE_ANON_KEY are set, and it throws unless the host is loopback and is not verdantgrowdiary.com. A mocked CI job would record a skip, so the class is NEEDS_LIVE_DATABASE. NOT_MEASURED (not run). The required-CI change for this lane is the separate proposal, not this slice.",
   },
 
   /* ---------------- pgTAP lane ---------------- */

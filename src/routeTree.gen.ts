@@ -1,4 +1,4 @@
- 
+/* eslint-disable */
 
 // @ts-nocheck
 
@@ -78,7 +78,11 @@ import { Route as DocsMcpApiRouteImport } from './routes/docs.mcp-api'
 import { Route as GuidesIndexRouteImport } from './routes/guides.index'
 import { Route as GuidesSlugRouteImport } from './routes/guides.$slug'
 import { Route as GuidesAthenaFeedChartLogRouteImport } from './routes/guides.athena-feed-chart-log'
+import { Route as GuidesCannabisTissueCultureRouteImport } from './routes/guides.cannabis-tissue-culture'
 import { Route as GuidesGrowStageCareGuideRouteImport } from './routes/guides.grow-stage-care-guide'
+import { Route as GuidesIsolateMaleCannabisPlantRouteImport } from './routes/guides.isolate-male-cannabis-plant'
+import { Route as GuidesSteadyClimateMultipleGrowTentsRouteImport } from './routes/guides.steady-climate-multiple-grow-tents'
+import { Route as GuidesStillAirBoxVsFlowHoodRouteImport } from './routes/guides.still-air-box-vs-flow-hood'
 import { Route as InternalContextualPhenoComparisonDemoRouteImport } from './routes/internal.contextual-pheno-comparison-demo'
 import { Route as InternalDemoProofWalkthroughRouteImport } from './routes/internal.demo-proof-walkthrough'
 import { Route as InternalPhenoHuntDemoRouteImport } from './routes/internal.pheno-hunt-demo'
@@ -503,10 +507,34 @@ const GuidesAthenaFeedChartLogRoute =
     path: '/guides/athena-feed-chart-log',
     getParentRoute: () => rootRouteImport,
   } as any)
+const GuidesCannabisTissueCultureRoute =
+  GuidesCannabisTissueCultureRouteImport.update({
+    id: '/guides/cannabis-tissue-culture',
+    path: '/guides/cannabis-tissue-culture',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const GuidesGrowStageCareGuideRoute =
   GuidesGrowStageCareGuideRouteImport.update({
     id: '/guides/grow-stage-care-guide',
     path: '/guides/grow-stage-care-guide',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const GuidesIsolateMaleCannabisPlantRoute =
+  GuidesIsolateMaleCannabisPlantRouteImport.update({
+    id: '/guides/isolate-male-cannabis-plant',
+    path: '/guides/isolate-male-cannabis-plant',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const GuidesSteadyClimateMultipleGrowTentsRoute =
+  GuidesSteadyClimateMultipleGrowTentsRouteImport.update({
+    id: '/guides/steady-climate-multiple-grow-tents',
+    path: '/guides/steady-climate-multiple-grow-tents',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const GuidesStillAirBoxVsFlowHoodRoute =
+  GuidesStillAirBoxVsFlowHoodRouteImport.update({
+    id: '/guides/still-air-box-vs-flow-hood',
+    path: '/guides/still-air-box-vs-flow-hood',
     getParentRoute: () => rootRouteImport,
   } as any)
 const InternalContextualPhenoComparisonDemoRoute =
@@ -1014,7 +1042,11 @@ export interface FileRoutesByFullPath {
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
+  '/guides/cannabis-tissue-culture': typeof GuidesCannabisTissueCultureRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
+  '/guides/isolate-male-cannabis-plant': typeof GuidesIsolateMaleCannabisPlantRoute
+  '/guides/steady-climate-multiple-grow-tents': typeof GuidesSteadyClimateMultipleGrowTentsRoute
+  '/guides/still-air-box-vs-flow-hood': typeof GuidesStillAirBoxVsFlowHoodRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1162,7 +1194,11 @@ export interface FileRoutesByTo {
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
+  '/guides/cannabis-tissue-culture': typeof GuidesCannabisTissueCultureRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
+  '/guides/isolate-male-cannabis-plant': typeof GuidesIsolateMaleCannabisPlantRoute
+  '/guides/steady-climate-multiple-grow-tents': typeof GuidesSteadyClimateMultipleGrowTentsRoute
+  '/guides/still-air-box-vs-flow-hood': typeof GuidesStillAirBoxVsFlowHoodRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1314,7 +1350,11 @@ export interface FileRoutesById {
   '/docs/mcp-api': typeof DocsMcpApiRoute
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/athena-feed-chart-log': typeof GuidesAthenaFeedChartLogRoute
+  '/guides/cannabis-tissue-culture': typeof GuidesCannabisTissueCultureRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
+  '/guides/isolate-male-cannabis-plant': typeof GuidesIsolateMaleCannabisPlantRoute
+  '/guides/steady-climate-multiple-grow-tents': typeof GuidesSteadyClimateMultipleGrowTentsRoute
+  '/guides/still-air-box-vs-flow-hood': typeof GuidesStillAirBoxVsFlowHoodRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1465,7 +1505,11 @@ export interface FileRouteTypes {
     | '/docs/mcp-api'
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
+    | '/guides/cannabis-tissue-culture'
     | '/guides/grow-stage-care-guide'
+    | '/guides/isolate-male-cannabis-plant'
+    | '/guides/steady-climate-multiple-grow-tents'
+    | '/guides/still-air-box-vs-flow-hood'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1613,7 +1657,11 @@ export interface FileRouteTypes {
     | '/docs/mcp-api'
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
+    | '/guides/cannabis-tissue-culture'
     | '/guides/grow-stage-care-guide'
+    | '/guides/isolate-male-cannabis-plant'
+    | '/guides/steady-climate-multiple-grow-tents'
+    | '/guides/still-air-box-vs-flow-hood'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1764,7 +1812,11 @@ export interface FileRouteTypes {
     | '/docs/mcp-api'
     | '/guides/$slug'
     | '/guides/athena-feed-chart-log'
+    | '/guides/cannabis-tissue-culture'
     | '/guides/grow-stage-care-guide'
+    | '/guides/isolate-male-cannabis-plant'
+    | '/guides/steady-climate-multiple-grow-tents'
+    | '/guides/still-air-box-vs-flow-hood'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1890,7 +1942,11 @@ export interface RootRouteChildren {
   DocsMcpApiRoute: typeof DocsMcpApiRoute
   GuidesSlugRoute: typeof GuidesSlugRoute
   GuidesAthenaFeedChartLogRoute: typeof GuidesAthenaFeedChartLogRoute
+  GuidesCannabisTissueCultureRoute: typeof GuidesCannabisTissueCultureRoute
   GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute
+  GuidesIsolateMaleCannabisPlantRoute: typeof GuidesIsolateMaleCannabisPlantRoute
+  GuidesSteadyClimateMultipleGrowTentsRoute: typeof GuidesSteadyClimateMultipleGrowTentsRoute
+  GuidesStillAirBoxVsFlowHoodRoute: typeof GuidesStillAirBoxVsFlowHoodRoute
   InternalContextualPhenoComparisonDemoRoute: typeof InternalContextualPhenoComparisonDemoRoute
   InternalDemoProofWalkthroughRoute: typeof InternalDemoProofWalkthroughRoute
   InternalPhenoHuntDemoRoute: typeof InternalPhenoHuntDemoRoute
@@ -2394,11 +2450,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuidesAthenaFeedChartLogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/guides/cannabis-tissue-culture': {
+      id: '/guides/cannabis-tissue-culture'
+      path: '/guides/cannabis-tissue-culture'
+      fullPath: '/guides/cannabis-tissue-culture'
+      preLoaderRoute: typeof GuidesCannabisTissueCultureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/guides/grow-stage-care-guide': {
       id: '/guides/grow-stage-care-guide'
       path: '/guides/grow-stage-care-guide'
       fullPath: '/guides/grow-stage-care-guide'
       preLoaderRoute: typeof GuidesGrowStageCareGuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/isolate-male-cannabis-plant': {
+      id: '/guides/isolate-male-cannabis-plant'
+      path: '/guides/isolate-male-cannabis-plant'
+      fullPath: '/guides/isolate-male-cannabis-plant'
+      preLoaderRoute: typeof GuidesIsolateMaleCannabisPlantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/steady-climate-multiple-grow-tents': {
+      id: '/guides/steady-climate-multiple-grow-tents'
+      path: '/guides/steady-climate-multiple-grow-tents'
+      fullPath: '/guides/steady-climate-multiple-grow-tents'
+      preLoaderRoute: typeof GuidesSteadyClimateMultipleGrowTentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guides/still-air-box-vs-flow-hood': {
+      id: '/guides/still-air-box-vs-flow-hood'
+      path: '/guides/still-air-box-vs-flow-hood'
+      fullPath: '/guides/still-air-box-vs-flow-hood'
+      preLoaderRoute: typeof GuidesStillAirBoxVsFlowHoodRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/internal/contextual-pheno-comparison-demo': {
@@ -3231,7 +3315,12 @@ const rootRouteChildren: RootRouteChildren = {
   DocsMcpApiRoute: DocsMcpApiRoute,
   GuidesSlugRoute: GuidesSlugRoute,
   GuidesAthenaFeedChartLogRoute: GuidesAthenaFeedChartLogRoute,
+  GuidesCannabisTissueCultureRoute: GuidesCannabisTissueCultureRoute,
   GuidesGrowStageCareGuideRoute: GuidesGrowStageCareGuideRoute,
+  GuidesIsolateMaleCannabisPlantRoute: GuidesIsolateMaleCannabisPlantRoute,
+  GuidesSteadyClimateMultipleGrowTentsRoute:
+    GuidesSteadyClimateMultipleGrowTentsRoute,
+  GuidesStillAirBoxVsFlowHoodRoute: GuidesStillAirBoxVsFlowHoodRoute,
   InternalContextualPhenoComparisonDemoRoute:
     InternalContextualPhenoComparisonDemoRoute,
   InternalDemoProofWalkthroughRoute: InternalDemoProofWalkthroughRoute,

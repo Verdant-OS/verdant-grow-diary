@@ -142,6 +142,12 @@ export type TonightSensorRow = DashboardSensorEvidenceRow & {
   id?: string;
   /** Capture identity when the row stands in for another record (a diary entry). */
   capture_ref?: string | null;
+  /**
+   * The row's source stays `manual` so the evidence filter admits it.
+   * Tonight then labels the metric stale. Set for a Quick Log manual past
+   * the 24h window.
+   */
+  labelStale?: boolean;
 };
 
 export type TonightRowsReadStatus = "loading" | "error" | "refresh_error" | "success";
@@ -540,9 +546,17 @@ export function buildTonightTentMetrics(input: {
       if (!when) continue;
       const ref = rowCaptureRef(row);
       const siblingRejected = captureHasRejectedSibling(rejectedSiblings, ref, when.epochMs);
+      const admitted = normalizeSensorSource(row.source);
+      // An aged manual stays admitted (source `manual`) and is labelled stale
+      // only after the evidence filter. The filter itself drops source `stale`.
+      const source = siblingRejected
+        ? "invalid"
+        : row.labelStale === true && admitted === "manual"
+          ? "stale"
+          : admitted;
       candidates.push({
         value: row.value,
-        source: siblingRejected ? "invalid" : normalizeSensorSource(row.source),
+        source,
         ...when,
         // A raw VPD from a rejected capture ranks with the rejection
         // placeholders, so an independent valid VPD at the same instant is

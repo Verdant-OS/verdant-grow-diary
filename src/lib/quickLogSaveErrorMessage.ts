@@ -126,7 +126,7 @@ export function quickLogReasonToOperatorMessage(reason: string | null | undefine
     case "volume_too_large":
       return QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE;
     case "temperature_out_of_range":
-      return "Temperature must be between -10 and 60°C.";
+      return "Temperature must be between 14 and 140°F (-10 to 60°C).";
     case "humidity_out_of_range":
       return "Humidity must be between 0 and 100.";
     case "vpd_out_of_range":

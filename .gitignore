@@ -85,3 +85,9 @@ public/version.json
 # keep both verbatim: the slash form matches the directory, the bare form a worktree symlink.
 .simple-workflow/
 .simple-workflow
+
+# REA evidence is local-only; vendor packages must never be committed.
+rea-out/
+*.apk
+*.apks
+*.xapk

@@ -70,6 +70,8 @@ interface Props {
   entryTemperatureUnit?: TemperatureUnitPreference;
   /** Live EC field errors (#2159), shown under each EC input. */
   ecFieldErrors?: Partial<Record<FeedingEcFieldKey, string>>;
+  /** Inline water-temperature band message. Null when the typed value is acceptable. */
+  waterTemperatureError?: string | null;
 }
 
 export default function QuickLogFeedingForm({
@@ -79,6 +81,7 @@ export default function QuickLogFeedingForm({
   defaultsApplied = false,
   entryTemperatureUnit,
   ecFieldErrors = {},
+  waterTemperatureError = null,
 }: Props) {
   const temperatureUnit = useTemperatureUnitPreference();
   // Display-side canonicalization only: the write seam converts from the
@@ -427,8 +430,20 @@ export default function QuickLogFeedingForm({
               inputMode="decimal"
               value={value.waterTempC}
               disabled={disabled}
+              aria-invalid={Boolean(waterTemperatureError) || undefined}
+              aria-describedby={waterTemperatureError ? "qlv2-feed-water-temp-error" : undefined}
               onChange={(e) => setField("waterTempC", e.target.value)}
             />
+            {waterTemperatureError ? (
+              <p
+                id="qlv2-feed-water-temp-error"
+                data-testid="qlv2-feed-water-temp-error"
+                className="mt-1 text-sm text-destructive"
+                role="alert"
+              >
+                {waterTemperatureError}
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="mt-3">

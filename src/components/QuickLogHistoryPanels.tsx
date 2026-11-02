@@ -24,6 +24,10 @@ import {
 } from "@/lib/quickLogHistoryRules";
 import { getEventType } from "@/lib/diary";
 import {
+  formatTimelineEntryTimestamp,
+  TIMELINE_ENTRY_UNKNOWN_TIME,
+} from "@/lib/timelineEntryTimestampFormat";
+import {
   exportGrowDiaryReportAsPdf,
   type BuildGrowDiaryReportInput,
 } from "@/lib/growDiaryPdfExport";
@@ -64,20 +68,11 @@ interface QuickLogHistorySectionProps {
 }
 
 function fmtDate(iso: string | null, fallback: string): string {
-  if (!iso) return fallback || "Unknown time";
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return fallback || "Unknown time";
-    return d.toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return fallback || "Unknown time";
-  }
+  if (!iso) return fallback || TIMELINE_ENTRY_UNKNOWN_TIME;
+  const formatted = formatTimelineEntryTimestamp(iso);
+  return formatted === TIMELINE_ENTRY_UNKNOWN_TIME
+    ? fallback || TIMELINE_ENTRY_UNKNOWN_TIME
+    : formatted;
 }
 
 function asObjectRecord(v: unknown): Record<string, unknown> | null {

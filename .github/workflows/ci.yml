@@ -229,6 +229,10 @@ jobs:
           KNOWLEDGE_HISTORY_REQUIRED: "true"
         run: bun run knowledge:validate
 
+      # REA evidence kit (#2667): its node:test cases have no other CI home.
+      - name: REA evidence kit tests
+        run: node --test scripts/rea/tests/*.test.mjs
+
       - name: Lint
         id: lint
         run: bun run lint

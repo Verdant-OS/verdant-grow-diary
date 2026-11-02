@@ -8,7 +8,7 @@ import {
   removeAhrefsAnalyticsScript,
 } from "@/lib/ahrefsAnalyticsLoader";
 import { loadGoogleAnalytics, setGoogleAnalyticsOptOut } from "@/lib/googleAnalyticsLoader";
-import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
+import { isExcludedAnalyticsPath } from "@/lib/posthogAnalyticsRules";
 import { syncPostHogWithConsent } from "@/lib/posthogClient";
 
 /**
@@ -19,7 +19,7 @@ export function applyAnalyticsConsentDecision(
   decision: AnalyticsConsentDecision,
   location: Pick<Location, "pathname" | "search" | "hash">,
 ): boolean {
-  if (isExcludedAnalyticsRoute(location.pathname)) {
+  if (isExcludedAnalyticsPath(location.pathname)) {
     syncPostHogWithConsent("denied", location);
     setGoogleAnalyticsOptOut(true);
     const tagWasPresent = isAhrefsAnalyticsLoaded();
@@ -46,10 +46,6 @@ export function applyAnalyticsConsentDecision(
   return mustReload;
 }
 
-function isExcludedAnalyticsRoute(pathname: string): boolean {
-  return pathname === GROW_HELP_TOOLKIT_PATH || pathname === `${GROW_HELP_TOOLKIT_PATH}/`;
-}
-
 /**
  * Toolkit routes unmount the analytics shell before it can see the new URL.
  * Apply the same provider gate once that route is current.
@@ -59,6 +55,6 @@ export function tearDownAnalyticsForExcludedRoute(
   decision: AnalyticsConsentDecision,
   location: Pick<Location, "pathname" | "search" | "hash">,
 ): boolean {
-  if (!isExcludedAnalyticsRoute(location.pathname)) return false;
+  if (!isExcludedAnalyticsPath(location.pathname)) return false;
   return applyAnalyticsConsentDecision(decision, location);
 }

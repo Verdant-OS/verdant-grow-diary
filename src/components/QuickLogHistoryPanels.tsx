@@ -23,6 +23,8 @@ import {
   type QuickLogHistoryRow,
 } from "@/lib/quickLogHistoryRules";
 import { getEventType } from "@/lib/diary";
+import { timelineEntryHasNoteText } from "@/lib/timelineChipCountRules";
+import { TimelineQuickLogEnvironmentSnapshotReadback } from "@/lib/timelineQuickLogEnvironmentSnapshotReadback";
 import {
   formatTimelineEntryTimestamp,
   TIMELINE_ENTRY_UNKNOWN_TIME,
@@ -161,6 +163,13 @@ function buildRecentDiaryPdfInput(
   const normalized = normalizeDiaryEntries({ rawEntries: lifted });
   const allRows = buildRecentQuickLogActivity(normalized, Number.MAX_SAFE_INTEGER);
   const recentRows = allRows.slice(0, Math.max(0, limit));
+  const detailsById = new Map<string, unknown>();
+  for (const raw of lifted) {
+    const id = typeof raw.id === "string" ? raw.id : "";
+    if (id) detailsById.set(id, raw.details);
+  }
+  const readingLine = (id: string) =>
+    TimelineQuickLogEnvironmentSnapshotReadback.pdfReadingLine(detailsById.get(id));
 
   return {
     grow: { name: "Diary Summary" },
@@ -169,11 +178,13 @@ function buildRecentDiaryPdfInput(
       watering: countRows(allRows, (row) => row.eventType === "watering"),
       feeding: countRows(allRows, (row) => row.eventType === "feeding"),
       photo: countRows(allRows, (row) => !!row.photoUrl),
+      sensorSnapshots: allRows.reduce((total, row) => total + (readingLine(row.id) ? 1 : 0), 0),
     },
     recent: recentRows.map((row) => {
       const et = getEventType(row.eventType);
       const details = [
-        row.noteBody,
+        timelineEntryHasNoteText(row.noteBody) ? row.noteBody : null,
+        readingLine(row.id),
         row.photoUrl ? "Photo attached" : null,
         row.manualHandheld ? "Manual handheld readings included" : null,
       ].filter((v): v is string => !!v && v.length > 0);

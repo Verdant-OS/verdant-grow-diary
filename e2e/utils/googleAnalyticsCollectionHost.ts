@@ -1,5 +1,6 @@
-import { createServer, request as httpRequest, type IncomingMessage } from "node:http";
+import { createServer, request as httpRequest, type IncomingMessage, type Server } from "node:http";
 import { connect as netConnect, type Socket } from "node:net";
+import type { Duplex } from "node:stream";
 import { test } from "@playwright/test";
 
 /**
@@ -11,15 +12,23 @@ import { test } from "@playwright/test";
  * and GitHub-hosted runners refuse the user namespace a private /etc/hosts
  * mount needs. WebKit therefore uses this file's local forward proxy: the
  * document URL stays on the diary host, and the proxy fetches the dev server.
- * The browser is the Playwright browserName fixture (the project's browserName,
- * or its defaultBrowserType). process.argv does not carry --project in the
- * worker, so it is not read.
+ * The proxy listens on 127.0.0.1 only. It rewrites the diary hosts to that dev
+ * server and refuses every other target, including localhost services, unless
+ * the host is named in GA_PROXY_EXTERNAL_ALLOWLIST. The browser is the
+ * Playwright browserName fixture (the project's browserName, or its
+ * defaultBrowserType). process.argv does not carry --project in the worker,
+ * so it is not read.
  * This file never writes the machine /etc/hosts and never skips a spec.
  */
 const CHROMIUM_HOST_RESOLVER_RULES =
   "--host-resolver-rules=MAP verdantgrowdiary.com 127.0.0.1,MAP www.verdantgrowdiary.com 127.0.0.1";
 
 const DIARY_HOSTS = new Set(["verdantgrowdiary.com", "www.verdantgrowdiary.com"]);
+
+/** Public hosts the proxy may tunnel. Diary documents are rewritten locally and are not listed here. */
+export const GA_PROXY_EXTERNAL_ALLOWLIST: readonly string[] = [];
+
+export const GA_COLLECTION_PROXY_BIND_HOST = "127.0.0.1";
 
 type CollectionBrowserName = "chromium" | "firefox" | "webkit";
 
@@ -80,20 +89,57 @@ function launchOptionsForCollectionHost(
   }
 }
 
+function normalizeHost(hostname: string): string {
+  return hostname
+    .replace(/\.$/, "")
+    .replace(/^\[|\]$/g, "")
+    .toLowerCase();
+}
+
 function isDiaryHost(hostname: string): boolean {
-  return DIARY_HOSTS.has(hostname.replace(/\.$/, "").toLowerCase());
+  return DIARY_HOSTS.has(normalizeHost(hostname));
 }
 
 function isOwnProxy(hostname: string, port: number, proxyPort: number): boolean {
-  const name = hostname.replace(/\.$/, "").toLowerCase();
+  const name = normalizeHost(hostname);
   return (name === "127.0.0.1" || name === "localhost") && port === proxyPort;
+}
+
+function isBlockedRelayHost(hostname: string): boolean {
+  const name = normalizeHost(hostname);
+  if (
+    name === "localhost" ||
+    name.endsWith(".localhost") ||
+    name === "127.0.0.1" ||
+    name === "::1" ||
+    name === "0.0.0.0"
+  ) {
+    return true;
+  }
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(name);
+  if (!ipv4) return false;
+  const parts = ipv4.slice(1).map((part) => Number(part));
+  if (parts.some((part) => part > 255)) return true;
+  const a = parts[0] ?? 0;
+  const b = parts[1] ?? 0;
+  if (a === 0 || a === 10 || a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
+
+function isAllowlistedExternal(hostname: string): boolean {
+  if (isBlockedRelayHost(hostname)) return false;
+  const name = normalizeHost(hostname);
+  return GA_PROXY_EXTERNAL_ALLOWLIST.some((host) => normalizeHost(host) === name);
 }
 
 function forwardTarget(
   rawUrl: string | undefined,
   appPort: number,
   proxyPort: number,
-): ForwardTarget | null {
+): ForwardTarget | "forbid" | null {
   const raw = rawUrl && rawUrl.length > 0 ? rawUrl : "/";
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
     return { hostname: "127.0.0.1", port: appPort, path: raw, diary: true };
@@ -109,35 +155,47 @@ function forwardTarget(
     : url.protocol === "https:" || url.protocol === "wss:"
       ? 443
       : 80;
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) return null;
   const path = `${url.pathname}${url.search}`;
   if (isDiaryHost(url.hostname) || isOwnProxy(url.hostname, port, proxyPort)) {
     return { hostname: "127.0.0.1", port: appPort, path, diary: true };
   }
-  return { hostname: url.hostname, port, path, diary: false };
+  if (isAllowlistedExternal(url.hostname)) {
+    return { hostname: url.hostname, port, path, diary: false };
+  }
+  return "forbid";
 }
 
 function connectTarget(
   raw: string | undefined,
   proxyPort: number,
-): { hostname: string; port: number } | "loop" | null {
-  if (!raw) return null;
+): { hostname: string; port: number } | "forbid" {
+  if (!raw) return "forbid";
   const colon = raw.lastIndexOf(":");
-  if (colon <= 0) return null;
+  if (colon <= 0) return "forbid";
   const hostname = raw.slice(0, colon).trim();
   const port = Number(raw.slice(colon + 1));
-  if (!hostname || !Number.isInteger(port) || port <= 0) return null;
-  if (isOwnProxy(hostname, port, proxyPort) || (isDiaryHost(hostname) && port === proxyPort))
-    return "loop";
+  if (!hostname || !Number.isInteger(port) || port <= 0 || port > 65535) return "forbid";
+  if (isOwnProxy(hostname, port, proxyPort) || (isDiaryHost(hostname) && port === proxyPort)) {
+    return "forbid";
+  }
+  if (!isAllowlistedExternal(hostname)) return "forbid";
   return { hostname, port };
 }
 
-function listenGaCollectionProxy(proxyPort: number, appPort: number): Promise<void> {
+function refuseUpgrade(socket: Duplex): void {
+  socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+}
+
+export function startGaCollectionProxy(proxyPort: number, appPort: number): Promise<Server> {
   const origin = `http://verdantgrowdiary.com:${proxyPort}`;
+  let boundPort = proxyPort;
   const server = createServer((req, res) => {
-    const target = forwardTarget(req.url, appPort, proxyPort);
-    if (!target) {
-      res.writeHead(400);
+    const target = forwardTarget(req.url, appPort, boundPort);
+    if (target === "forbid" || !target) {
+      res.writeHead(target === "forbid" ? 403 : 400);
       res.end();
+      req.destroy();
       return;
     }
     const headers = { ...req.headers };
@@ -195,9 +253,9 @@ function listenGaCollectionProxy(proxyPort: number, appPort: number): Promise<vo
     req.pipe(proxyReq);
   });
   server.on("connect", (req: IncomingMessage, socket: Socket, head: Buffer) => {
-    const target = connectTarget(req.url, proxyPort);
-    if (target === "loop" || target === null) {
-      socket.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
+    const target = connectTarget(req.url, boundPort);
+    if (target === "forbid") {
+      socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
       return;
     }
     const upstream = netConnect(target.port, target.hostname, () => {
@@ -214,9 +272,9 @@ function listenGaCollectionProxy(proxyPort: number, appPort: number): Promise<vo
     socket.on("error", closeBoth);
   });
   server.on("upgrade", (req, socket, head) => {
-    const target = forwardTarget(req.url, appPort, proxyPort);
-    if (!target) {
-      socket.destroy();
+    const target = forwardTarget(req.url, appPort, boundPort);
+    if (target === "forbid" || !target) {
+      refuseUpgrade(socket);
       return;
     }
     const upstream = netConnect(target.port, target.hostname, () => {
@@ -241,15 +299,31 @@ function listenGaCollectionProxy(proxyPort: number, appPort: number): Promise<vo
     const finish = () => {
       if (settled) return;
       settled = true;
+      const address = server.address();
+      if (address && typeof address === "object") boundPort = address.port;
       server.unref();
-      resolve();
+      resolve(server);
     };
     server.once("error", (error: NodeJS.ErrnoException) => {
-      if (error.code === "EADDRINUSE") finish();
-      else reject(error);
+      if (settled) return;
+      settled = true;
+      server.unref();
+      server.close(() => undefined);
+      reject(error);
     });
-    server.listen(proxyPort, () => {
+    server.listen(proxyPort, GA_COLLECTION_PROXY_BIND_HOST, () => {
       finish();
     });
   });
+}
+
+function listenGaCollectionProxy(proxyPort: number, appPort: number): Promise<void> {
+  return startGaCollectionProxy(proxyPort, appPort).then(
+    () => undefined,
+    (error: NodeJS.ErrnoException) => {
+      // A second Playwright worker binds the same port. The first listener is the proxy.
+      if (error.code === "EADDRINUSE") return;
+      throw error;
+    },
+  );
 }

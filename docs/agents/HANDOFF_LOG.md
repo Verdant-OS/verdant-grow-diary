@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### ECOWITT-CLAIM-TOKEN-LIVE-INGEST-2717
+
+```text
+TASK ECOWITT-CLAIM-TOKEN-LIVE-INGEST-2717  priority: P1  status: OPEN
+goal: slice 1 stores a valid EcoWitt custom-upload POST as a live tent reading. Migration apply, edge deploy, and the real GW1206 pass stay outside this branch.
+why: Issue #2717. Cheeko's live EcoWitt path. Draft PR #2732. Team Ultra ran out of usage; this session was assigned the existing branch.
+branch: ultra/2717-ecowitt-live-ingest
+base: verdant-grow-diary
+checkout: git fetch origin ultra/2717-ecowitt-live-ingest verdant-grow-diary && git switch ultra/2717-ecowitt-live-ingest
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2732
+head_sha: read git rev-parse HEAD after the claim-parser commit; previous remote head 2307cb96c295c418726febe879072d9bb45b7370
+state: pushed draft
+current_step: pgcrypto call sites in the new migration and pgTAP already use extensions.digest and extensions.gen_random_bytes. readOpenClaim no longer has a null guard the only caller can never reach.
+next_action: keep the PR draft. Required full-suite and lint jobs stay skipped until a non-author marks the PR ready. Do not apply the migration or deploy the edge function.
+post_merge_check: after a separate authorized apply and Publish, a GW1206 customized-upload POST to /ew/<token> writes source live indoor temp and humidity. NOT_MEASURED until then.
+active_writer: Grok cloud session assigned 2026-11-02 to push this branch
+decisions: empty maybeSingle (data null, error null) is no open claim. A present row still goes through readOpenClaim, and a non-object still fails closed as malformed_response. No new migration. Do not edit config.toml, do not deploy, do not mark ready.
+tried_and_rejected: rewriting the claim service into a static class. The file already uses injected-client functions and the bug is one unreachable guard.
+commands: bunx vitest run src/test/ecowitt-custom-upload-claim-actions.test.ts src/test/ecowitt-custom-upload-route-and-migration.test.ts --reporter=dot
+files_touched: src/lib/ecowittCustomUploadClaimService.ts; src/test/ecowitt-custom-upload-claim-actions.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none in slice 1 repository scope
+blockers: founder apply and deploy; draft CI skips Full test suite and Lint, typecheck, test, build
+open_questions: none for the parser
+gotchas: Supabase maybeSingle returns data null when no row exists. The loader returns before readOpenClaim in that case. pgcrypto on Supabase is extensions.digest, already qualified at 2307cb96.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2717; https://github.com/Verdant-OS/verdant-grow-diary/pull/2732#discussion_r4448230482
+artifacts: local vitest on the claim-actions file
+reviewer_seat: prior REQUEST_CHANGES at 85ec9a2af are stale for this head; a new independent review is not requested by this push
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; PR stays draft
+claimed_by: Grok, 2026-11-02
+owner: Grok (takeover from Team Ultra by explicit assignment)
+last_updated: 2026-11-02 17:30 CT, by Grok
+```
+
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text

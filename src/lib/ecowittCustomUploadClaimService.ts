@@ -125,7 +125,6 @@ export async function rotateEcowittCustomUploadClaim(
 }
 
 function readOpenClaim(data: unknown): EcowittOpenClaim | null {
-  if (data === null) return null;
   const row = Array.isArray(data) ? data[0] : data;
   if (row === null || typeof row !== "object") return null;
   const record = row as Record<string, unknown>;

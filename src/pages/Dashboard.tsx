@@ -980,23 +980,27 @@ export default function Dashboard() {
                           const sensorReadStatus = isUuid(tent.id)
                             ? (sensorStatusByTent[tent.id] ?? "loading")
                             : "success";
-                          const snapRows = tentRows as BuildTentSnapshotInput[];
-                          const snapView = buildTentSnapshotView(snapRows, envStage, nowTick, {
-                            temperatureUnit,
-                            // Same Tonight derivation the tent page and /tents list use,
-                            // so a newer manual temperature/RH pair replaces an older CSV VPD.
-                            canonicalVpd: tentsListCanonicalVpd(
-                              snapRows,
-                              tent.id,
-                              nowTick,
-                              { status: "idle", snapshot: null },
-                              sensorReadStatus === "loading" ||
-                                sensorReadStatus === "error" ||
-                                sensorReadStatus === "refresh_error"
-                                ? sensorReadStatus
-                                : "success",
-                            ),
-                          });
+                          const snapView = buildTentSnapshotView(
+                            tentRows as BuildTentSnapshotInput[],
+                            envStage,
+                            nowTick,
+                            {
+                              temperatureUnit,
+                              // Same Tonight derivation the tent page and /tents list use,
+                              // so a newer manual temperature/RH pair replaces an older CSV VPD.
+                              canonicalVpd: tentsListCanonicalVpd(
+                                tentRows as BuildTentSnapshotInput[],
+                                tent.id,
+                                nowTick,
+                                { status: "idle", snapshot: null },
+                                sensorReadStatus === "loading" ||
+                                  sensorReadStatus === "error" ||
+                                  sensorReadStatus === "refresh_error"
+                                  ? sensorReadStatus
+                                  : "success",
+                              ),
+                            },
+                          );
                           const sensorReadStatusLabel =
                             sensorReadStatus === "loading"
                               ? "sensor data loading"

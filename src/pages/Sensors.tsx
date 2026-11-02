@@ -592,7 +592,7 @@ export default function Sensors() {
             hasAnyReading: hasReadings,
             isStale: metricTrust.isStale || metricClassification.label === "Stale",
             isInvalid: metricTrust.isInvalid,
-            isDerived: isDerived && vpdChoice.kind !== "derived",
+            isDerived,
             recentValues,
           });
           const unresolvedManualMetric =

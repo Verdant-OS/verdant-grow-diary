@@ -179,7 +179,6 @@ describe("PostHog identity and product events", () => {
     for (const blocked of [
       "paywall_viewed",
       "checkout_started",
-      "subscription_activated",
       "credit_pack_cta_clicked",
       "ai_doctor_review_started",
       "onboarding_completed",

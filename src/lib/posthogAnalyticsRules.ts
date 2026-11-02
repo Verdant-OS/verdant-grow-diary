@@ -31,7 +31,10 @@ export type PostHogStartup =
   | { enabled: true; key: string; apiHost: string };
 
 export type PostHogProductEvent = {
-  name: "user_signed_up" | "grow_created" | "plant_created" | "log_created" | "sensor_csv_imported";
+  name:
+    | "user_signed_up"
+    | "purchase_completed"
+    | "grow_created" | "plant_created" | "log_created" | "sensor_csv_imported";
   properties: Record<string, string | number>;
 };
 
@@ -122,8 +125,9 @@ export function posthogPageviewProperties(
 
 /**
  * Maps the existing `verdant:analytics` funnel names onto the product events
- * this slice is allowed to send. Billing, paywall, checkout, subscription,
- * credit pack, and AI doctor events are dropped. Vendor and row text are
+ * this slice is allowed to send. A server-confirmed `subscription_activated`
+ * becomes `purchase_completed` with a slug-shaped plan id only. Paywall,
+ * checkout-intent, credit pack, and AI doctor events are dropped. Vendor and row text are
  * never copied. `rows` becomes `row_count` only as an integer in range.
  */
 export function mapFunnelEventToPostHog(
@@ -133,6 +137,8 @@ export function mapFunnelEventToPostHog(
   switch (name) {
     case "signup":
       return [{ name: "user_signed_up", properties: {} }];
+    case "subscription_activated":
+      return purchaseCompletedEvents(props);
     case "grow_created":
       return [{ name: "grow_created", properties: {} }];
     case "plant_created":
@@ -144,6 +150,24 @@ export function mapFunnelEventToPostHog(
     default:
       return [];
   }
+}
+
+const PLAN_SLUG_RE = /^[a-z][a-z0-9_]{0,39}$/;
+
+function purchaseCompletedEvents(
+  props: Record<string, unknown> | null | undefined,
+): PostHogProductEvent[] {
+  const plan = props?.plan;
+  if (typeof plan !== "string" || !PLAN_SLUG_RE.test(plan)) return [];
+  return [{ name: "purchase_completed", properties: { plan } }];
+}
+
+/** Connector region (`us`/`eu`) to its ingest origin; anything else is null. */
+export function posthogIngestHostForRegion(region: string | null | undefined): string | null {
+  const normalized = (region ?? "").trim().toLowerCase();
+  if (normalized === "us") return "https://us.i.posthog.com";
+  if (normalized === "eu" || normalized === "") return "https://eu.i.posthog.com";
+  return null;
 }
 
 function csvImportEvents(props: Record<string, unknown> | null | undefined): PostHogProductEvent[] {
@@ -160,6 +184,7 @@ function csvImportEvents(props: Record<string, unknown> | null | undefined): Pos
 const PRODUCT_PROPERTY_KEYS: Record<string, readonly string[]> = {
   $pageview: ["$pathname", "$current_url"],
   user_signed_up: [],
+  purchase_completed: ["plan"],
   grow_created: [],
   plant_created: [],
   log_created: ["source"],

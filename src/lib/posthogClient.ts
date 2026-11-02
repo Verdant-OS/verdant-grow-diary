@@ -29,6 +29,7 @@ import {
   planPostHogPersistenceRemoval,
   posthogCookieExpiryAssignments,
   posthogDistinctId,
+  posthogIngestHostForRegion,
   posthogPageviewProperties,
   posthogPersonProperties,
 } from "@/lib/posthogAnalyticsRules";
@@ -123,8 +124,19 @@ export function syncPostHogWithConsent(
 }
 
 function defaultReadEnv(): { key?: string; host?: string } {
-  const env = import.meta.env as { VITE_POSTHOG_KEY?: string; VITE_POSTHOG_HOST?: string };
-  return { key: env.VITE_POSTHOG_KEY, host: env.VITE_POSTHOG_HOST };
+  const env = import.meta.env as {
+    VITE_POSTHOG_KEY?: string;
+    VITE_POSTHOG_HOST?: string;
+    VITE_LOVABLE_CONNECTOR_POSTHOG_API_KEY?: string;
+    VITE_LOVABLE_CONNECTOR_POSTHOG_REGION?: string;
+  };
+  // The linked PostHog connector supplies the project token and region.
+  const key = env.VITE_LOVABLE_CONNECTOR_POSTHOG_API_KEY || env.VITE_POSTHOG_KEY;
+  const host =
+    env.VITE_POSTHOG_HOST ||
+    posthogIngestHostForRegion(env.VITE_LOVABLE_CONNECTOR_POSTHOG_REGION) ||
+    undefined;
+  return { key, host };
 }
 
 function beginLoad(key: string, apiHost: string, deps: PostHogClientDeps): void {

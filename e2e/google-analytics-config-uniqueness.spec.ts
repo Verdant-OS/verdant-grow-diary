@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 import { grantAnalyticsConsent, waitForAnalyticsClientReady } from "./utils/analyticsConsent";
+import { pointSpecAtGoogleAnalyticsCollectionHost } from "./utils/googleAnalyticsCollectionHost";
+
+pointSpecAtGoogleAnalyticsCollectionHost(5193);
 
 /**
  * Strict regression gate: a client-side page transition must NEVER produce an

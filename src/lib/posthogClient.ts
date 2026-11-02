@@ -8,7 +8,9 @@
  * or the grow-help toolkit route.
  *
  * Withdrawal stops replay, resets the device id, opts out, then deletes
- * `ph_<token>_` cookie and web storage. The `__ph_opt_in_out_<token>` flag
+ * `ph_<token>_` web storage and cookies. On a production host the cookie
+ * expiry also sets `Domain=.verdantgrowdiary.com`, because posthog-js
+ * defaults to a cross-subdomain cookie. The `__ph_opt_in_out_<token>` flag
  * stays, so a reload remains opted out. `reset()` returns the SDK to its
  * default opted-in state, so opt-out has to follow it. A granted init calls
  * `opt_in_capturing` with no `$opt_in` event, including after a new session
@@ -25,6 +27,7 @@ import {
   decidePostHogStartup,
   mapFunnelEventToPostHog,
   planPostHogPersistenceRemoval,
+  posthogCookieExpiryAssignments,
   posthogDistinctId,
   posthogPageviewProperties,
   posthogPersonProperties,
@@ -198,8 +201,11 @@ function clearPersistedPostHogState(key: string | null): void {
   if (!plan) return;
   for (const name of plan.localKeys) window.localStorage.removeItem(name);
   for (const name of plan.sessionKeys) window.sessionStorage.removeItem(name);
-  for (const name of plan.cookieNames) {
-    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; path=/`;
+  for (const assignment of posthogCookieExpiryAssignments({
+    cookieNames: plan.cookieNames,
+    hostname: window.location.hostname,
+  })) {
+    document.cookie = assignment;
   }
 }
 

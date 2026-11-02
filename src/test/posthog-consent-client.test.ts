@@ -270,6 +270,51 @@ describe("PostHog consent client", () => {
     expect(sdk.identify).not.toHaveBeenCalled();
   });
 
+  it("expires the parent-domain identity cookie on withdrawal", async () => {
+    const writes: string[] = [];
+    const jar = new Map<string, string>();
+    const persistenceKey = `ph_${FIXTURE_KEY}_posthog`;
+    Object.defineProperty(document, "cookie", {
+      configurable: true,
+      get: () => [...jar.entries()].map(([name, value]) => `${name}=${value}`).join("; "),
+      set: (raw: string) => {
+        writes.push(raw);
+        const pair = raw.split(";")[0] ?? "";
+        const eq = pair.indexOf("=");
+        const name = (eq === -1 ? pair : pair.slice(0, eq)).trim();
+        if (!name) return;
+        const expires = /expires=|Max-Age=0/i.test(raw);
+        if (expires) jar.delete(name);
+        else jar.set(name, pair.slice(eq + 1).trim());
+      },
+    });
+
+    try {
+      const loadSdk = vi.fn(async () => sdk);
+      setLocation("www.verdantgrowdiary.com");
+      syncPostHogWithConsent(
+        "granted",
+        { pathname: "/", search: "", hash: "" },
+        { loadSdk, readEnv: prodEnv },
+      );
+      await vi.waitFor(() => expect(sdk.capture).toHaveBeenCalledTimes(1));
+      document.cookie = `${persistenceKey}=device-kept; path=/`;
+
+      syncPostHogWithConsent(
+        "denied",
+        { pathname: "/", search: "", hash: "" },
+        { loadSdk, readEnv: prodEnv },
+      );
+
+      const hostOnly = `${persistenceKey}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; path=/`;
+      expect(writes).toContain(hostOnly);
+      expect(writes).toContain(`${hostOnly}; domain=.verdantgrowdiary.com`);
+      expect(jar.has(persistenceKey)).toBe(false);
+    } finally {
+      delete (document as { cookie?: string }).cookie;
+    }
+  });
+
   it("does not initialize when consent is withdrawn before the SDK import resolves", async () => {
     let release: (value: typeof sdk) => void = () => {};
     const loadSdk = vi.fn(

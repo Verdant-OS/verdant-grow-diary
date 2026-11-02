@@ -327,6 +327,37 @@ export function planPostHogPersistenceRemoval(input: {
   };
 }
 
+const POSTHOG_COOKIE_EXPIRED_AT = "Thu, 01 Jan 1970 00:00:00 GMT";
+const POSTHOG_PARENT_COOKIE_DOMAIN = ".verdantgrowdiary.com";
+const POSTHOG_COOKIE_NAME_RE = /^ph_[\w-]+$/;
+
+/**
+ * Parent domain posthog-js 1.444.0 uses for its default cross-subdomain cookie
+ * on the two production hosts. Other hostnames get no Domain attribute.
+ */
+export function posthogCrossSubdomainCookieDomain(
+  hostname: string | null | undefined,
+): string | null {
+  if (!isAnalyticsCollectionHost(hostname)) return null;
+  return POSTHOG_PARENT_COOKIE_DOMAIN;
+}
+
+/** Host-only expiry, plus the parent-domain expiry when the SDK may have set one. */
+export function posthogCookieExpiryAssignments(input: {
+  cookieNames: readonly string[];
+  hostname: string | null | undefined;
+}): string[] {
+  const domain = posthogCrossSubdomainCookieDomain(input.hostname);
+  const assignments: string[] = [];
+  for (const name of input.cookieNames) {
+    if (!POSTHOG_COOKIE_NAME_RE.test(name)) continue;
+    const hostOnly = `${name}=; expires=${POSTHOG_COOKIE_EXPIRED_AT}; Max-Age=0; path=/`;
+    assignments.push(hostOnly);
+    if (domain) assignments.push(`${hostOnly}; domain=${domain}`);
+  }
+  return assignments;
+}
+
 function scrubGenericProperties(
   properties: Record<string, unknown> | undefined,
 ): Record<string, unknown> {

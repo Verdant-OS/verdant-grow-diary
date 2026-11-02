@@ -12,6 +12,7 @@ import {
   isAnalyticsCollectionHost,
   mapFunnelEventToPostHog,
   planPostHogPersistenceRemoval,
+  posthogCookieExpiryAssignments,
   posthogDistinctId,
   posthogPageviewProperties,
   posthogPersonProperties,
@@ -407,6 +408,37 @@ describe("PostHog init privacy", () => {
       sessionKeys: [],
       cookieNames: ["ph_abcPLdefSLghiEQ_posthog"],
     });
+  });
+
+  it("expires a parent-domain PostHog cookie, not only the host cookie", () => {
+    const name = `ph_${FIXTURE_KEY}_posthog`;
+    const hostOnly = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; path=/`;
+    const parent = `${hostOnly}; domain=.verdantgrowdiary.com`;
+    for (const hostname of [
+      "verdantgrowdiary.com",
+      "www.verdantgrowdiary.com",
+      "WWW.VerdantGrowDiary.com.",
+    ]) {
+      expect(posthogCookieExpiryAssignments({ cookieNames: [name], hostname })).toEqual([
+        hostOnly,
+        parent,
+      ]);
+    }
+    expect(posthogCookieExpiryAssignments({ cookieNames: [name], hostname: "localhost" })).toEqual([
+      hostOnly,
+    ]);
+    expect(
+      posthogCookieExpiryAssignments({
+        cookieNames: [name],
+        hostname: "verdantgrowdiary.com.evil.test",
+      }),
+    ).toEqual([hostOnly]);
+    expect(
+      posthogCookieExpiryAssignments({
+        cookieNames: [`${name}; domain=evil.com`, "not-posthog"],
+        hostname: "verdantgrowdiary.com",
+      }),
+    ).toEqual([]);
   });
 });
 

@@ -10,7 +10,8 @@
  */
 import type { SensorReading, SensorReadingMetricKey } from "@/mock";
 import { isHumidityValid, isTemperatureValid } from "@/lib/sensorReadingNormalizationRules";
-import { isStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { isSnapshotStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { classifySnapshotTruth, type SensorTruthAssessment } from "@/lib/sensorTruthRules";
 import type { TonightSensorRow } from "@/lib/tonightTentHomeViewModel";
 
 const MANUAL_SOURCE = "manual" as const;
@@ -40,6 +41,11 @@ export interface DisplayedTentClimateSnapshot {
   manualMetrics: { temp: boolean; rh: boolean };
   /** Source-aware staleness of the displayed manual values. False when only the sensor shows. */
   stale: boolean;
+  /**
+   * Manual-window staleness of each climate metric that the manual value won.
+   * False when that metric still shows the sensor.
+   */
+  manualStale: { temp: boolean; rh: boolean };
 }
 
 function scopedTentId(tentId: string | null | undefined): string | null {
@@ -91,8 +97,9 @@ export function tonightRowsFromQuickLogManualReadings(
     if (!inTent(reading, scope)) continue;
     const at = captureIso(reading);
     if (!at) continue;
-    // Same manual window the tent page uses: an aged manual row is labelled stale.
-    const source = isStale(at, nowMs, undefined, MANUAL_SOURCE) ? "stale" : MANUAL_SOURCE;
+    // Source stays `manual` so the Dashboard evidence filter still admits the
+    // row. Past the 24h manual window, Tonight labels it stale after that filter.
+    const labelStale = isSnapshotStale({ ts: at, source: MANUAL_SOURCE }, nowMs);
     for (const metric of CLIMATE_METRICS) {
       const value = climateValue(reading, metric);
       if (value === null) continue;
@@ -101,11 +108,12 @@ export function tonightRowsFromQuickLogManualReadings(
         tent_id: scope,
         metric: metric.metric,
         value,
-        source,
+        source: MANUAL_SOURCE,
         quality: "ok",
         ts: at,
         captured_at: at,
         raw_payload: null,
+        ...(labelStale ? { labelStale: true as const } : {}),
       });
     }
   }
@@ -161,6 +169,7 @@ export function resolveDisplayedTentClimateSnapshot(input: {
     fromManual: false,
     manualMetrics: { temp: false, rh: false },
     stale: false,
+    manualStale: { temp: false, rh: false },
   };
   const scope = scopedTentId(input.tentId);
   if (!scope) return kept;
@@ -198,11 +207,18 @@ export function resolveDisplayedTentClimateSnapshot(input: {
         tent_id: scope,
         alert_persistence_eligible: false,
       };
+  const bothManual = tempWins && rhWins;
+  const manualStale = {
+    temp: tempWins && isSnapshotStale({ ts: latest.temp!.ts, source: MANUAL_SOURCE }, input.nowMs),
+    rh: rhWins && isSnapshotStale({ ts: latest.rh!.ts, source: MANUAL_SOURCE }, input.nowMs),
+  };
   const snapshot: SensorSnapshot = {
     ...base,
-    // Both climate chips manual: label the climate manual. Otherwise the
-    // sensor's own source stays (it still supplies at least one chip).
-    source: tempWins && rhWins ? MANUAL_SOURCE : base.source,
+    // Both climate chips manual: label the climate manual and clock it at the
+    // manual capture (the older of the two, so a split reading is not shown
+    // younger than it is). Otherwise the sensor's own source and time stay.
+    source: bothManual ? MANUAL_SOURCE : base.source,
+    ts: bothManual ? oldest.ts : base.ts,
     temp: tempWins ? latest.temp!.value : sensorTimed ? base.temp : null,
     rh: rhWins ? latest.rh!.value : sensorTimed ? base.rh : null,
   };
@@ -210,7 +226,67 @@ export function resolveDisplayedTentClimateSnapshot(input: {
     snapshot,
     fromManual: true,
     manualMetrics: { temp: tempWins, rh: rhWins },
-    // The oldest displayed manual value decides: one aged manual chip is stale.
-    stale: isStale(oldest.ts, input.nowMs, undefined, MANUAL_SOURCE),
+    // The oldest displayed manual value decides the combined flag.
+    stale: isSnapshotStale({ ts: oldest.ts, source: MANUAL_SOURCE }, input.nowMs),
+    manualStale,
+  };
+}
+
+/**
+ * Each climate chip's own staleness. A manual metric uses the 24h manual
+ * window; a metric still showing the sensor uses the sensor header's flag.
+ * One stale chip does not mark the other.
+ */
+export function tentClimateChipStale(input: {
+  manualMetrics: { temp: boolean; rh: boolean };
+  manualStale: { temp: boolean; rh: boolean };
+  sensorStale: boolean;
+}): { temp: boolean; rh: boolean } {
+  return {
+    temp: input.manualMetrics.temp ? input.manualStale.temp : input.sensorStale,
+    rh: input.manualMetrics.rh ? input.manualStale.rh : input.sensorStale,
+  };
+}
+
+/**
+ * Truth-strip input for the tent Environment block.
+ * When both climate metrics are the manual reading, the strip clocks that
+ * capture and ages it on the manual window. Sensor VPD, CO₂, and soil stay
+ * off that manual snapshot so they are not presented as part of the log.
+ * Any other mix keeps the sensor snapshot and its own truth.
+ */
+export function tentEnvironmentTruthStripInput(input: {
+  displayed: DisplayedTentClimateSnapshot;
+  sensorSnapshot: SensorSnapshot | null;
+  sensorTruth: SensorTruthAssessment | null;
+  nowMs: number;
+}): {
+  snapshot: SensorSnapshot | null;
+  truth?: SensorTruthAssessment | null;
+  now: number;
+} {
+  const climate = input.displayed.snapshot;
+  const bothManual =
+    input.displayed.manualMetrics.temp && input.displayed.manualMetrics.rh && climate != null;
+  if (!bothManual || climate == null) {
+    return {
+      snapshot: input.sensorSnapshot,
+      truth: input.sensorTruth,
+      now: input.nowMs,
+    };
+  }
+  const manualClimate: SensorSnapshot = {
+    ...climate,
+    vpd: null,
+    co2: null,
+    soil: null,
+    soil_ec: null,
+    soil_temp: null,
+    ppfd: null,
+  };
+  return {
+    snapshot: manualClimate,
+    truth: classifySnapshotTruth(manualClimate, input.nowMs),
+    now: input.nowMs,
   };
 }

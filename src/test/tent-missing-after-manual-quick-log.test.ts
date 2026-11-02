@@ -179,6 +179,59 @@ describe("tent Quick Log manual reading is invisible to the Tonight card until p
     });
   });
 
+  it("keeps an aged manual row on the Tonight card, labelled stale", () => {
+    const agedAt = "2026-10-29T13:00:00.000Z";
+    const reading = environmentReading(TENT, agedAt);
+    const rows = tonightRowsFromQuickLogManualReadings(
+      reading ? [reading] : [],
+      TENT,
+      NOW.getTime(),
+    );
+    expect(rows.length).toBe(2);
+    expect(rows.every((row) => row.source === "manual")).toBe(true);
+
+    const metrics = metricsFrom(rows);
+    const temp = metrics.find((metric) => metric.key === "temp")!;
+    const rh = metrics.find((metric) => metric.key === "rh")!;
+    const vpd = metrics.find((metric) => metric.key === "vpd")!;
+    const staleLabel = sensorSourceLabel("stale");
+    expect(temp).toMatchObject({
+      state: "value",
+      value: TEMP_C,
+      source: "stale",
+      sourceLabel: staleLabel,
+    });
+    expect(rh).toMatchObject({
+      state: "value",
+      value: 60,
+      source: "stale",
+      sourceLabel: staleLabel,
+    });
+    expect(vpd.state).toBe("value");
+    expect(vpd.value).not.toBeNull();
+    expect(vpd.source).toBe("stale");
+    expect(vpd.sourceLabel).toBe(staleLabel);
+    expect(metrics.map((metric) => metric.state)).not.toContain("missing");
+  });
+
+  it("keeps a manual row inside the 24h window labelled manual on the Tonight card", () => {
+    const withinWindow = "2026-10-31T17:16:00.000Z";
+    const reading = environmentReading(TENT, withinWindow);
+    const rows = tonightRowsFromQuickLogManualReadings(
+      reading ? [reading] : [],
+      TENT,
+      NOW.getTime(),
+    );
+    expect(rows.every((row) => row.source === "manual" && row.labelStale !== true)).toBe(true);
+    const temp = metricsFrom(rows).find((metric) => metric.key === "temp")!;
+    expect(temp).toMatchObject({
+      state: "value",
+      value: TEMP_C,
+      source: "manual",
+      sourceLabel: sensorSourceLabel("manual"),
+    });
+  });
+
   it("drops a null or foreign tent id", () => {
     const foreign = environmentReading(OTHER, LOGGED_AT);
     expect(

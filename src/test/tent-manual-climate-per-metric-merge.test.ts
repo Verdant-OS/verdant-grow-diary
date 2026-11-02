@@ -7,9 +7,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { sensorReadingFromQuickLogEnvironmentRow } from "@/lib/sensorsQuickLogManualSeriesRules";
 import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import { buildSensorSnapshotReadModel } from "@/lib/sensors/sensorSnapshotReadModel";
 import {
   latestQuickLogManualClimateByMetric,
   resolveDisplayedTentClimateSnapshot,
+  tentClimateChipStale,
+  tentEnvironmentTruthStripInput,
   tonightRowsFromQuickLogManualReadings,
 } from "@/lib/tentManualEnvironmentSnapshotRules";
 
@@ -77,10 +80,17 @@ function resolve(
 }
 
 describe("resolveDisplayedTentClimateSnapshot: per-metric merge", () => {
-  it("a newer temp+RH manual keeps the live CO₂ and VPD", () => {
+  it("a newer temp+RH manual keeps the live CO₂ and VPD and the manual capture time", () => {
     const shown = resolve(live(), [manual(AFTER, { temperature_c: 25, humidity_pct: 60 })]);
     expect(shown.manualMetrics).toEqual({ temp: true, rh: true });
-    expect(shown.snapshot).toMatchObject({ temp: 25, rh: 60, co2: 900, vpd: 1.2 });
+    expect(shown.snapshot).toMatchObject({
+      source: "manual",
+      ts: AFTER,
+      temp: 25,
+      rh: 60,
+      co2: 900,
+      vpd: 1.2,
+    });
   });
 
   it("a newer temp-only manual keeps live RH and CO₂", () => {
@@ -147,20 +157,100 @@ describe("resolveDisplayedTentClimateSnapshot: per-metric merge", () => {
 });
 
 describe("tonightRowsFromQuickLogManualReadings: stale labelling", () => {
-  it("labels rows past the manual window stale and keeps fresh ones manual", () => {
+  it("keeps an aged row admitted as manual and marks it for the stale label", () => {
     const old = tonightRowsFromQuickLogManualReadings(
       [manual(DAYS_AGO, { temperature_c: 25, humidity_pct: 60 })],
       TENT,
       NOW_MS,
     );
     expect(old.length).toBe(2);
-    expect(old.every((row) => row.source === "stale")).toBe(true);
+    expect(old.every((row) => row.source === "manual" && row.labelStale === true)).toBe(true);
+    const withinDay = tonightRowsFromQuickLogManualReadings(
+      [manual("2026-10-31T17:16:00.000Z", { temperature_c: 25, humidity_pct: 60 })],
+      TENT,
+      NOW_MS,
+    );
+    expect(withinDay.every((row) => row.source === "manual" && row.labelStale !== true)).toBe(true);
     const fresh = tonightRowsFromQuickLogManualReadings(
       [manual(AFTER, { temperature_c: 25, humidity_pct: 60 })],
       TENT,
       NOW_MS,
     );
-    expect(fresh.every((row) => row.source === "manual")).toBe(true);
+    expect(fresh.every((row) => row.source === "manual" && row.labelStale !== true)).toBe(true);
+  });
+});
+
+describe("tent climate chips and the truth strip", () => {
+  it("stales only the chip whose own manual reading is past the manual window", () => {
+    const freshTemp = resolve(live({ ts: DAYS_AGO }), [manual(AFTER, { temperature_c: 25 })]);
+    expect(freshTemp.manualMetrics).toEqual({ temp: true, rh: false });
+    expect(freshTemp.manualStale).toEqual({ temp: false, rh: false });
+    expect(freshTemp.snapshot?.ts).toBe(DAYS_AGO);
+    expect(
+      tentClimateChipStale({
+        manualMetrics: freshTemp.manualMetrics,
+        manualStale: freshTemp.manualStale,
+        sensorStale: true,
+      }),
+    ).toEqual({ temp: false, rh: true });
+
+    const split = resolve(live({ ts: "2026-10-28T13:00:00.000Z" }), [
+      manual(DAYS_AGO, { temperature_c: 25 }),
+      manual(AFTER, { humidity_pct: 60 }),
+    ]);
+    expect(split.manualMetrics).toEqual({ temp: true, rh: true });
+    expect(split.manualStale).toEqual({ temp: true, rh: false });
+    expect(split.snapshot?.ts).toBe(DAYS_AGO);
+    expect(
+      tentClimateChipStale({
+        manualMetrics: split.manualMetrics,
+        manualStale: split.manualStale,
+        sensorStale: true,
+      }),
+    ).toEqual({ temp: true, rh: false });
+  });
+
+  it("clocks the truth strip at the manual capture when both climate metrics are manual", () => {
+    const sensorAt = "2026-11-01T11:16:00.000Z";
+    const manualAt = "2026-11-01T12:56:00.000Z";
+    const shown = resolve(live({ ts: sensorAt }), [
+      manual(manualAt, { temperature_c: 25, humidity_pct: 60 }),
+    ]);
+    expect(shown.snapshot).toMatchObject({
+      source: "manual",
+      ts: manualAt,
+      co2: 900,
+      vpd: 1.2,
+    });
+    const recent = buildSensorSnapshotReadModel(
+      tentEnvironmentTruthStripInput({
+        displayed: shown,
+        sensorSnapshot: live({ ts: sensorAt }),
+        sensorTruth: null,
+        nowMs: NOW_MS,
+      }),
+    );
+    expect(recent.capturedAt).toBe(manualAt);
+    expect(recent.source).toBe("manual");
+    expect(recent.isStale).toBe(false);
+    expect(recent.isMissing).toBe(false);
+
+    const agedSensorAt = "2026-10-28T13:00:00.000Z";
+    const aged = resolve(live({ ts: agedSensorAt }), [
+      manual(DAYS_AGO, { temperature_c: 25, humidity_pct: 60 }),
+    ]);
+    expect(aged.snapshot).toMatchObject({ co2: 900, vpd: 1.2, ts: DAYS_AGO });
+    const strip = tentEnvironmentTruthStripInput({
+      displayed: aged,
+      sensorSnapshot: live({ ts: agedSensorAt }),
+      sensorTruth: null,
+      nowMs: NOW_MS,
+    });
+    expect(strip.snapshot).toMatchObject({ vpd: null, co2: null, ts: DAYS_AGO, source: "manual" });
+    const agedModel = buildSensorSnapshotReadModel(strip);
+    expect(agedModel.capturedAt).toBe(DAYS_AGO);
+    expect(agedModel.isStale).toBe(true);
+    expect(agedModel.isMissing).toBe(false);
   });
 });
 
@@ -168,10 +258,13 @@ describe("page wiring stays on the shared helpers", () => {
   const DETAIL = readFileSync("src/pages/TentDetail.tsx", "utf8");
   const DASHBOARD = readFileSync("src/pages/Dashboard.tsx", "utf8");
 
-  it("TentDetail chips read the merged snapshot and its staleness", () => {
+  it("TentDetail chips read the merged snapshot and each chip's own staleness", () => {
     expect(DETAIL).toMatch(/const displayedClimate = resolveDisplayedTentClimateSnapshot\(/);
     expect(DETAIL).toMatch(/const snap = displayedClimate\.snapshot;/);
-    expect(DETAIL).toMatch(/displayedClimate\.fromManual && displayedClimate\.stale/);
+    expect(DETAIL).toMatch(/tentClimateChipStale\(/);
+    expect(DETAIL).toMatch(/tentEnvironmentTruthStripInput\(/);
+    expect(DETAIL).toMatch(/temperatureChip\(\{ stale: climateChipStale\.temp \}\)/);
+    expect(DETAIL).toMatch(/humidityChip\(\{ stale: climateChipStale\.rh \}\)/);
     expect(DETAIL).not.toMatch(/stale:\s*false/);
   });
 

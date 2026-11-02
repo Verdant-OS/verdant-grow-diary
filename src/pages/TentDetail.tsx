@@ -121,6 +121,8 @@ import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildTonightTentMetrics, TONIGHT_TENT_HOME_COPY } from "@/lib/tonightTentHomeViewModel";
 import {
   resolveDisplayedTentClimateSnapshot,
+  tentClimateChipStale,
+  tentEnvironmentTruthStripInput,
   tonightRowsFromQuickLogManualReadings,
 } from "@/lib/tentManualEnvironmentSnapshotRules";
 import {
@@ -236,12 +238,11 @@ export default function TentDetail() {
     nowMs,
   });
   const snap = displayedClimate.snapshot;
-  const header = {
-    stale:
-      (displayedClimate.fromManual && displayedClimate.stale) ||
-      (sensorHeader.stale &&
-        !(displayedClimate.manualMetrics.temp && displayedClimate.manualMetrics.rh)),
-  };
+  const climateChipStale = tentClimateChipStale({
+    manualMetrics: displayedClimate.manualMetrics,
+    manualStale: displayedClimate.manualStale,
+    sensorStale: sensorHeader.stale,
+  });
   // The header's truth check is realism only and keeps a vpd_kpa row whose own
   // intake quality flag is not ok. The Dashboard selector drops that row, so
   // the tent page withholds it the same way the header withholds a realism
@@ -453,6 +454,32 @@ export default function TentDetail() {
     );
   }
 
+  // `header` is the chip's own staleness. The parameter name keeps the locked
+  // classify pins (`stale: header.stale`) while each chip receives its own flag.
+  const temperatureChip = (header: { stale: boolean }) =>
+    snap?.temp !== null && snap?.temp !== undefined ? (
+      <MetricChip
+        label="T"
+        value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)}
+        unit={getTemperatureUnitSymbol()}
+        status={environmentMetricChipStatus(
+          classifyTempAgainstStage(snap.temp, { stage: envStage, stale: header.stale }),
+        )}
+      />
+    ) : null;
+
+  const humidityChip = (header: { stale: boolean }) =>
+    snap?.rh !== null && snap?.rh !== undefined ? (
+      <MetricChip
+        label="RH"
+        value={snap.rh}
+        unit="%"
+        status={environmentMetricChipStatus(
+          classifyRhAgainstStage(snap.rh, { stage: envStage, stale: header.stale }),
+        )}
+      />
+    ) : null;
+
   return (
     <div>
       {/* A tent with exactly one active plant can prove its plant target, so
@@ -527,26 +554,8 @@ export default function TentDetail() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
-        {snap?.temp !== null && snap?.temp !== undefined && (
-          <MetricChip
-            label="T"
-            value={(convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1)}
-            unit={getTemperatureUnitSymbol()}
-            status={environmentMetricChipStatus(
-              classifyTempAgainstStage(snap.temp, { stage: envStage, stale: header.stale }),
-            )}
-          />
-        )}
-        {snap?.rh !== null && snap?.rh !== undefined && (
-          <MetricChip
-            label="RH"
-            value={snap.rh}
-            unit="%"
-            status={environmentMetricChipStatus(
-              classifyRhAgainstStage(snap.rh, { stage: envStage, stale: header.stale }),
-            )}
-          />
-        )}
+        {temperatureChip({ stale: climateChipStale.temp })}
+        {humidityChip({ stale: climateChipStale.rh })}
         {headerVpd !== null &&
           headerVpd !== undefined &&
           (() => {
@@ -697,11 +706,12 @@ export default function TentDetail() {
         </div>
         <SensorSnapshotTruthStrip
           model={buildSensorSnapshotReadModel(
-            // Manual-only climate (no timed sensor snapshot) ages on the manual
-            // window; a merged snapshot keeps the sensor's own truth.
-            displayedClimate.fromManual && snap?.source === "manual"
-              ? { snapshot: snap, now: nowMs }
-              : { snapshot: sensorHeader.snapshot, truth: sensorHeader.truth },
+            tentEnvironmentTruthStripInput({
+              displayed: displayedClimate,
+              sensorSnapshot: sensorHeader.snapshot,
+              sensorTruth: sensorHeader.truth,
+              nowMs,
+            }),
           )}
           className="mb-3"
           testId="tent-detail-sensor-snapshot-truth"

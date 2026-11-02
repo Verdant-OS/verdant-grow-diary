@@ -953,7 +953,12 @@ BEGIN
   -- non-anonymous owner after the same cursor still receives the award.
   -- Drop any leftover reconcile fixtures first: their ids sort above this pair.
   DELETE FROM auth.users WHERE email LIKE 'badge-reconcile-%@verdant.test';
-  SELECT max(id) INTO v_cursor_max FROM auth.users;
+  -- auth.users.id is uuid. PostgreSQL has no max(uuid) aggregate.
+  SELECT account.id
+    INTO v_cursor_max
+  FROM auth.users AS account
+  ORDER BY account.id DESC
+  LIMIT 1;
   v_anon_owner := 'ffffffff-ffff-ffff-ffff-ffffffff0001';
   v_real_owner := 'ffffffff-ffff-ffff-ffff-ffffffff0002';
   v_anon_grow := gen_random_uuid();

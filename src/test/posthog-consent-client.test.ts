@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
 import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
 import {
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
+import {
   __resetPostHogClientForTests,
   syncPostHogWithConsent,
   type PostHogIdentity,
@@ -234,11 +238,11 @@ describe("PostHog consent client", () => {
     sdk.capture.mockClear();
 
     const persistenceKey = `ph_${FIXTURE_KEY}_posthog`;
-    window.localStorage.setItem(persistenceKey, JSON.stringify({ $device_id: "device-kept" }));
-    window.localStorage.setItem(`${persistenceKey}__flags`, "{}");
+    setLocalStorageItemForTest(persistenceKey, JSON.stringify({ $device_id: "device-kept" }));
+    setLocalStorageItemForTest(`${persistenceKey}__flags`, "{}");
     window.sessionStorage.setItem(persistenceKey, "{}");
     document.cookie = `${persistenceKey}=device-kept; path=/`;
-    window.localStorage.setItem(`__ph_opt_in_out_${FIXTURE_KEY}`, "0");
+    setLocalStorageItemForTest(`__ph_opt_in_out_${FIXTURE_KEY}`, "0");
 
     syncPostHogWithConsent(
       "denied",
@@ -253,11 +257,11 @@ describe("PostHog consent client", () => {
     expect(sdk.reset.mock.invocationCallOrder[0]).toBeLessThan(
       sdk.opt_out_capturing.mock.invocationCallOrder[0],
     );
-    expect(window.localStorage.getItem(persistenceKey)).toBeNull();
-    expect(window.localStorage.getItem(`${persistenceKey}__flags`)).toBeNull();
+    expect(getLocalStorageItemForTest(persistenceKey)).toBeNull();
+    expect(getLocalStorageItemForTest(`${persistenceKey}__flags`)).toBeNull();
     expect(window.sessionStorage.getItem(persistenceKey)).toBeNull();
     expect(document.cookie).not.toContain(persistenceKey);
-    expect(window.localStorage.getItem(`__ph_opt_in_out_${FIXTURE_KEY}`)).toBe("0");
+    expect(getLocalStorageItemForTest(`__ph_opt_in_out_${FIXTURE_KEY}`)).toBe("0");
 
     window.dispatchEvent(
       new CustomEvent(PRICING_ANALYTICS_EVENT, { detail: { name: "signup", props: {} } }),

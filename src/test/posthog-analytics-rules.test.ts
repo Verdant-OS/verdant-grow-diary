@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import posthog from "posthog-js";
 import type { CaptureResult } from "posthog-js";
 
+import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
 import { PRODUCTION_HOSTNAMES } from "@/lib/errorReportingRules";
 import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
 import {
@@ -416,6 +417,6 @@ afterEach(() => {
   } catch {
     // The SDK is only initialized by the real-capture test.
   }
-  window.localStorage.clear();
+  clearLocalStorageForTest();
   window.sessionStorage.clear();
 });

@@ -34,6 +34,8 @@ interface PlantDetailPhotoStripProps {
    * strip remains read-only and never writes a diary record itself.
    */
   onReviewPhoto?: (target: PlantDetailPhotoReviewTarget) => void;
+  /** Opens the shared timeline photo viewer on this diary photo. */
+  onOpenPhoto?: (entryId: string) => void;
   /**
    * The parent's photo lookup for this plant. When given, the strip renders it
    * and keeps its own lookup disabled, so one page mounts one diary/photo read.
@@ -55,6 +57,7 @@ export default function PlantDetailPhotoStrip({
   onUploadPhoto,
   onReviewPhoto,
   photoStrip,
+  onOpenPhoto,
 }: PlantDetailPhotoStripProps) {
   const ownLookup = usePlantDetailPhotoStripItems(plantId, { enabled: !photoStrip });
   const { diary, display, items, hasPlantContext } = photoStrip ?? ownLookup;
@@ -200,7 +203,22 @@ export default function PlantDetailPhotoStrip({
               className="shrink-0 w-24 sm:w-28 snap-start rounded-lg overflow-hidden border border-border/40 bg-card/40"
             >
               <div className="relative aspect-square bg-secondary/30">
-                {item.thumbnailUrl ? (
+                {item.thumbnailUrl && onOpenPhoto ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenPhoto(item.sourcePhotoId)}
+                    aria-label={`Open photo: ${item.altText}`}
+                    data-testid="plant-detail-photo-strip-open"
+                    className="absolute inset-0 focus:outline-hidden focus:ring-2 focus:ring-primary/60"
+                  >
+                    <img
+                      src={item.thumbnailUrl}
+                      alt={item.altText}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ) : item.thumbnailUrl ? (
                   <img
                     src={item.thumbnailUrl}
                     alt={item.altText}

@@ -279,13 +279,21 @@ export function snapshotFromReadings(rows: SensorReadingLike[]): SensorSnapshot 
       (item): item is { row: SensorReadingLike; observedAt: string } => item.observedAt !== null,
     );
   if (observedRows.length === 0) return null;
-  const latestTs = observedRows.reduce(
-    (latest, item) => (item.observedAt > latest ? item.observedAt : latest),
-    observedRows[0].observedAt,
+  // Group and rank by the instant, not the timestamp string, so
+  // `...000Z` and `+00:00` for one moment stay one capture and an older
+  // offset cannot outrank a newer one by lexical order.
+  const timed = observedRows.flatMap((item) => {
+    const epochMs = Date.parse(item.observedAt);
+    return Number.isFinite(epochMs) ? [{ ...item, epochMs }] : [];
+  });
+  if (timed.length === 0) return null;
+  const latestEpoch = timed.reduce(
+    (latest, item) => (item.epochMs > latest ? item.epochMs : latest),
+    timed[0].epochMs,
   );
-  const latest = observedRows
-    .filter((item) => item.observedAt === latestTs)
-    .map((item) => item.row);
+  const latestTimed = timed.filter((item) => item.epochMs === latestEpoch);
+  const latestTs = latestTimed[0].observedAt;
+  const latest = latestTimed.map((item) => item.row);
   const get = (metric: string): number | null => {
     const r = latest.find((x) => x.metric === metric);
     return r ? toFiniteNumber(r.value) : null;

@@ -76,11 +76,11 @@ TASK CSV-METRIC-IDENTITY-S1  priority: P1  status: OPEN
 goal: The CSV importer never reads soil columns as air temperature or air humidity, and column order never changes what a file means.
 why: CSV QA handoff 2026-11-03 finding F2. On deploy cd0fe0cd, a Spider Farmer soil export with temperature_soil(°C) first was accepted with soil temperature as air temperature_c (reproduced on a real 773-row export); in the original order the same file was rejected.
 branch: claude/csv-metric-identity-s1
-base: verdant-grow-diary @ cd0fe0cd4353c0145eae9d1855b54427240c1f3a
+base: verdant-grow-diary (branched at cd0fe0cd4353c0145eae9d1855b54427240c1f3a; base ac10d68ef281b2b9e01d77dea17da63869a0a6a1 merged in 2026-11-03 13:25 CT)
 checkout: git fetch origin claude/csv-metric-identity-s1 verdant-grow-diary && git switch claude/csv-metric-identity-s1
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2808 (draft)
-head_sha: read the PR head (git ls-remote origin claude/csv-metric-identity-s1). Code commit is 43975b85a06c53f7fc4c289a022694b92e23f579; this block is the only later change.
-state: pushed draft; required CI running
+head_sha: read the PR head (git ls-remote origin claude/csv-metric-identity-s1). Code commit is 43975b85a06c53f7fc4c289a022694b92e23f579; later commits are this block and a base merge only.
+state: pushed draft; at f48043f0 all 63 check runs completed with 0 failures (4 cancelled runs superseded by passing reruns); base merged for a HANDOFF_LOG conflict, CI re-running
 current_step: required CI at the current head
 next_action: when required CI is green at the head, obtain a complete-scope exact-head review from Codex (eligible: did not author or repair). Stay draft until merge gate.
 post_merge_check: on the disposable QA fixture tent at https://verdantgrowdiary.com, with /version.json showing the merged commit, PREVIEW ONLY (cancel, never commit) the QA handoff soil template in original order and with temperature_soil(°C) first; both must show the soil-only message and zero rows. A device export preview must still show air temperature/RH/VPD/CO2/PPFD. NOT_MEASURED until deploy.
@@ -100,7 +100,41 @@ reviewer_sha: NOT_MEASURED
 session_state: no production writes; draft; auto-merge off
 claimed_by: Claude, 2026-11-03 12:35 CT
 owner: Claude (Matthew-assigned)
-last_updated: 2026-11-03 12:35 CT, by Claude
+last_updated: 2026-11-03 13:25 CT, by Claude
+```
+
+### PHOTO-VIEWER-CAPTION-TILES
+
+```text
+TASK PHOTO-VIEWER-CAPTION-TILES  priority: P1  status: OPEN
+goal: Timeline photo viewer caption shows the entry note, or the timeline local-time formatter when the note is blank, and plant Recent Photos, the plant hero, and Timeline Photo history open that viewer.
+why: Issue #2804. The caption joined stage and the raw UTC ISO and ignored the note. Those three tiles were not controls.
+branch: cursor/photo-viewer-caption-tiles-1ba3
+base: verdant-grow-diary
+checkout: git fetch origin cursor/photo-viewer-caption-tiles-1ba3 verdant-grow-diary && git switch cursor/photo-viewer-caption-tiles-1ba3
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2805
+head_sha: 71024e9d10201391d3143617911b3644b280916c
+state: pushed; required CI re-running after the null-safe plant photo wiring
+current_step: caption class, tile buttons, plant lightbox, and null-safe hero open
+next_action: confirm required CI at the pushed head. Do not merge, enqueue, or request review.
+post_merge_check: after Publish, open a photo from a plant Recent Photos tile and confirm the viewer caption is the note or a local time, never a raw ISO. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Grok cloud agent on this branch
+decisions: TimelinePhotoLightboxCaption.fromItem is the only caption path. Tiles are buttons. Focus returns to the opener when the viewer unmounts. Alt text still includes the raw entry instant because src/test/timeline-photo-lightbox-rules.test.ts is scorer-locked and pins that string.
+tried_and_rejected: rewriting the locked alt assertion. The scorer lock refused the edit.
+commands: bunx vitest run src/test/timeline-photo-caption-and-open.test.tsx src/test/timeline-photo-lightbox-component.test.tsx src/test/timeline-photo-lightbox-rules.test.ts --reporter=dot
+files_touched: src/lib/timelinePhotoLightboxRules.ts; src/components/TimelinePhotoLightbox.tsx; src/components/PhotoHistoryPanel.tsx; src/components/PlantDetailPhotoStrip.tsx; src/components/PlantPhoto.tsx; src/components/PlantPhotoView.tsx; src/pages/PlantDetail.tsx; src/pages/Timeline.tsx; src/test/timeline-photo-caption-and-open.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work
+open_questions: none
+gotchas: do not edit the locked alt-text test. Upload size warning is out of scope.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2804
+artifacts: local screenshots, not committed
+reviewer_seat: not requested; Moonbow routes review
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; auto-merge off
+claimed_by: Grok, 2026-11-03
+owner: Grok
+last_updated: 2026-11-02 23:20 CT, by Grok
 ```
 
 ### POSTHOG-PUBLIC-CLIENT-KEY

@@ -663,15 +663,15 @@ export default function Dashboard() {
             data-testid="dashboard-environment-snapshot"
             className="mb-6"
           >
-            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-              <div>
+            <div className="mb-2 flex min-w-0 flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
                 <h2
                   id="dashboard-environment-snapshot-heading"
                   className="font-display font-semibold text-base"
                 >
                   Environment Snapshot
                 </h2>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground break-words">
                   Latest reading per tent with honest source labels.
                 </p>
               </div>

@@ -224,7 +224,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
             onValueChange={(v) => setFilter(v as DashboardDailyGrowCheckFilter)}
           >
             <SelectTrigger
-              className="h-8 w-[180px] text-xs"
+              className="h-auto min-h-11 w-full basis-full whitespace-normal py-1 text-left text-xs [&>span]:line-clamp-none! [&>span]:whitespace-normal! sm:w-[220px] sm:basis-auto"
               aria-label="Filter today's grow checks"
               data-testid="dashboard-daily-grow-check-panel-filter"
               data-filter={filter}
@@ -350,7 +350,10 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
               data-plant-id={row.plantId}
               data-checked-today={row.checkedToday ? "1" : "0"}
               data-today-method={row.todayMethod}
-              className="py-2 flex items-center justify-between gap-3 max-[389px]:flex-col max-[389px]:items-stretch"
+              // max-[389px] stays because src/test/dashboard-mobile-layout-safety.test.ts
+              // pins that exact class string. That test is scorer-locked. Tailwind 4
+              // max-[Npx] is width < N, so max-[431px] includes the 430px phone width.
+              className="py-2 flex items-center justify-between gap-3 max-[389px]:flex-col max-[389px]:items-stretch max-[431px]:flex-col max-[431px]:items-stretch"
             >
               <div className="flex items-start gap-2 min-w-0">
                 {row.checkedToday ? (
@@ -374,7 +377,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                     {row.plantName}
                   </Link>
                   <div
-                    className="text-xs text-muted-foreground truncate"
+                    className="min-w-0 text-xs text-muted-foreground whitespace-normal break-words"
                     data-testid="dashboard-daily-grow-check-panel-row-method"
                   >
                     {row.tentName ? `${row.tentName} · ` : ""}
@@ -402,7 +405,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                     asChild
                     size="sm"
                     variant="outline"
-                    className="h-8 px-2 text-xs"
+                    className="h-11 min-h-11 px-2 text-xs"
                     data-testid="dashboard-daily-grow-check-panel-row-action-note"
                     data-method="note"
                   >
@@ -422,7 +425,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                     asChild
                     size="sm"
                     variant="outline"
-                    className="h-8 px-2 text-xs"
+                    className="h-11 min-h-11 px-2 text-xs"
                     data-testid="dashboard-daily-grow-check-panel-row-action-sensor"
                     data-method="sensor"
                   >

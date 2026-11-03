@@ -185,7 +185,7 @@ export function isForbiddenSensorTruthSourceToken(source: unknown): boolean {
 
 /** User-facing badge copy — constitution tags only; never vendor/transport. */
 export function constitutionSensorTruthBadgeLabel(
-  truth: EcowittTentSnapshotV0TruthSource | "none",
+  truth: EcowittTentSnapshotV0TruthSource | "mixed" | "none",
 ): string {
   switch (truth) {
     case "live":
@@ -200,6 +200,8 @@ export function constitutionSensorTruthBadgeLabel(
       return "Stale";
     case "invalid":
       return "Invalid";
+    case "mixed":
+      return "Mixed";
     case "none":
       return "No live data";
   }

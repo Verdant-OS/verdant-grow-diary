@@ -7,9 +7,9 @@ import {
 } from "@tanstack/react-query";
 import {
   effectiveSensorReadingsQuery,
-  requireEffectiveSensorReadings,
   EFFECTIVE_SENSOR_QUERY_VERSION,
 } from "@/lib/effectiveSensorReadings";
+import { TimelineBoundedRead } from "@/lib/timelineBoundedRead";
 import type { SensorReadingRow } from "@/lib/db";
 import { buildPrivateSensorQueryKey } from "@/lib/growDataQueryKeyRules";
 import { isUuid } from "@/lib/isUuid";
@@ -70,7 +70,9 @@ async function fetchTentSensorWindow(
   perTentLimit: number,
   sources: readonly string[],
 ): Promise<SensorReadingRow[]> {
-  let query = effectiveSensorReadingsQuery().select("*").eq("tent_id", tentId);
+  let query = effectiveSensorReadingsQuery()
+    .select(TimelineBoundedRead.sensorListSelect)
+    .eq("tent_id", tentId);
   // Apply source scope before ordering/limiting. This prevents a busy
   // live stream from crowding older imported history out of a bounded
   // CSV-only read window.
@@ -87,7 +89,7 @@ async function fetchTentSensorWindow(
     .order("id", { ascending: false })
     .limit(perTentLimit);
   if (error) throw error;
-  return requireEffectiveSensorReadings(data);
+  return TimelineBoundedRead.acceptSensorList(data);
 }
 
 /**
@@ -190,7 +192,7 @@ export function useSensorReadings(
     queryFn: async () => {
       if (!enabled) return [];
       let q = effectiveSensorReadingsQuery()
-        .select("*")
+        .select(TimelineBoundedRead.sensorListSelect)
         // Actual observation time takes precedence. CSV rows retain historical
         // `captured_at` while `ts` can be one shared import time.
         .order("captured_at", { ascending: false, nullsFirst: false })
@@ -203,7 +205,7 @@ export function useSensorReadings(
       if (tentId) q = q.eq("tent_id", tentId);
       const { data, error } = await q;
       if (error) throw error;
-      return requireEffectiveSensorReadings(data);
+      return TimelineBoundedRead.acceptSensorList(data);
     },
   });
   return tentScope ? tentScoped : single;

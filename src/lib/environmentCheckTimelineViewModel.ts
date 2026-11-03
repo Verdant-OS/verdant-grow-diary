@@ -122,7 +122,12 @@ export function resolveEffectiveQuickLogCareType(
 
   // A new note carries the note marker. Its unstamped mirror still says
   // event_type "quick_log", so the marker is read before that wrapper type.
-  if (!hasEnvironmentEnvelope && hasQuickLogNoteMarker(details)) return "note";
+  // Timeline attaches the environment sibling onto this display row. A note
+  // that then carries a reading is a Measurement. The persisted companion
+  // does not copy that sibling.
+  if (!hasEnvironmentEnvelope && hasQuickLogNoteMarker(details)) {
+    return snapshotDetailsHaveReading(details) ? "measurement" : "note";
+  }
 
   if (detailKind && detailKind !== "observation" && detailKind !== "note") {
     return ENV_KIND_ALIASES.has(detailKind) ? "environment" : detailKind;
@@ -136,6 +141,15 @@ export function resolveEffectiveQuickLogCareType(
   if (directKind) return directKind;
   if (detailKind) return detailKind;
   return null;
+}
+
+function snapshotDetailsHaveReading(details: Record<string, unknown> | null): boolean {
+  const sensor = details?.sensor_snapshot;
+  if (!sensor || typeof sensor !== "object" || Array.isArray(sensor)) return false;
+  const record = sensor as Record<string, unknown>;
+  return [record.temp, record.temp_c, record.rh, record.humidity_pct, record.vpd].some(
+    (value) => typeof value === "number" && Number.isFinite(value),
+  );
 }
 
 function asFiniteNumber(v: unknown): number | null {

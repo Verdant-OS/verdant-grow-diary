@@ -163,7 +163,9 @@ export default function DashboardDataSourceDisclosure({
       >
         {BADGE_TEXT[label]}
       </Badge>
-      <span className="text-xs text-muted-foreground">{DESCRIPTION[label]}</span>
+      <span className="min-w-0 basis-full text-xs text-muted-foreground break-words sm:basis-auto">
+        {DESCRIPTION[label]}
+      </span>
       {isSimulated && (
         <>
           <Badge

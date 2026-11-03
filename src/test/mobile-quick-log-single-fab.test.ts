@@ -57,13 +57,14 @@ describe("mobile Quick Log — single FAB", () => {
     // Header and FAB share openGrowerQuickLog — same QuickLogV2Sheet entry.
     const openHandler =
       APP_SHELL.match(
-        /const openGrowerQuickLog = useCallback\(\(\) => \{([\s\S]*?)\}, \[location\.pathname, mobileQuickLogTarget\]\);/,
+        /const openGrowerQuickLog = useCallback\(\(\) => \{([\s\S]*?)\}, \[location\.pathname, mobileQuickLogTarget, user\?\.id\]\);/,
       )?.[1] ?? "";
     expect(openHandler).not.toBe("");
     expect(APP_SHELL).toMatch(
       /onClick=\{openGrowerQuickLog\}[\s\S]{0,200}data-testid="mobile-quick-log-fab"/,
     );
     expect(openHandler).toContain("resolvePlantQuickLogRouteTarget(location.pathname)");
+    expect(openHandler).toContain("QuickLogLaunchTarget.resolve");
     expect(openHandler).toMatch(
       /mobileQuickLogTarget \?\? \(routePlantId \? `plant:\$\{routePlantId\}` : null\)/,
     );
@@ -87,13 +88,11 @@ describe("manual sensor save — UUID guard regression", () => {
 });
 
 describe("Tent Detail Quick Log — one fixed entry point", () => {
-  it("keeps one V2 Quick Log entry point, plant-scoped only when the tent proves a sole plant", () => {
-    // Renegotiated with Tranche B+ slice D7: a tent with exactly one active
-    // plant opens the sheet plant-scoped so Better/Same/Worse is reachable
-    // without reselection. Several plants keep the tent scope — the pin holds
-    // the exact new shape rather than loosening to allow any target key.
+  it("keeps one V2 Quick Log entry point that opens the tent, never the sole plant", () => {
+    // A tent page opens Whole tent. The sole plant stays selectable and is
+    // not the launch target.
     expect(TENT_DETAIL).toMatch(
-      /<QuickLogV2Fab\s+defaultTargetKey=\{\s*tent\?\.id\s*\?\s*\(safePlantId\s*\?\s*`plant:\$\{safePlantId\}`\s*:\s*`tent:\$\{tent\.id\}`\)\s*:\s*null\s*\}/,
+      /<QuickLogV2Fab\s+defaultTargetKey=\{tent\?\.id \? `tent:\$\{tent\.id\}` : null\}/,
     );
     // safePlantId is null unless exactly one active plant exists AND the
     // roster query has settled, so no default plant can be invented for a

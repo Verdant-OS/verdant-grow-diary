@@ -230,8 +230,23 @@ export const QUICK_LOG_V2_EMPTY_CONTENT_HELPER =
 /** Show type-to-filter inside Target Select when the list is this long or longer. */
 export const QUICK_LOG_V2_TARGET_FILTER_THRESHOLD = 8;
 
-export function formatQuickLogV2TargetOptionLabel(option: QuickLogV2TargetOption): string {
-  return `${option.type === "tent" ? "Tent" : "Plant"} · ${option.label}`;
+function tentNameForOption(
+  option: QuickLogV2TargetOption,
+  tentNameById?: ReadonlyMap<string, string> | null,
+): string | null {
+  if (!option.tentId || !tentNameById) return null;
+  const name = tentNameById.get(option.tentId);
+  return typeof name === "string" && name.trim().length > 0 ? name.trim() : null;
+}
+
+/** "<Tent> · Whole tent" or "<Plant> (<Tent>)". */
+export function formatQuickLogV2TargetOptionLabel(
+  option: QuickLogV2TargetOption,
+  tentNameById?: ReadonlyMap<string, string> | null,
+): string {
+  if (option.type === "tent") return `${option.label} · Whole tent`;
+  const tentName = tentNameForOption(option, tentNameById);
+  return tentName ? `${option.label} (${tentName})` : option.label;
 }
 
 /**
@@ -339,15 +354,10 @@ function selectableTentTargetKey(
 }
 
 /**
- * When tent context is active and selectedKey is still empty/unset:
- * 1) prefer a recent plant that belongs to the tent
- * 2) else auto-select when exactly one plant is in that tent
- * 3) else default to the selected tent itself when that tent is selectable
- *
- * Fence: never rewrite an explicit `tent:<id>` (or plant:/any non-empty key).
- * Tent open intent may still supply tentContextId via defaultTargetKey while
- * the draft target stays a tent the grower (or test) chose. A missing,
- * archived, or otherwise invalid tent does not become a target.
+ * A tent-context open with an empty key stays on that tent.
+ * A recent plant and a sole plant are selectable options. They are never
+ * written in as the target. An explicit tent or plant key is left alone.
+ * A missing, archived, or otherwise invalid tent does not become a target.
  */
 export function resolveTentScopedQuickLogPlantSelection(
   input: ResolveTentScopedQuickLogPlantSelectionInput,
@@ -357,27 +367,23 @@ export function resolveTentScopedQuickLogPlantSelection(
   if (!tentId) return null;
 
   const selected = typeof input.selectedKey === "string" ? input.selectedKey.trim() : "";
-  // Explicit tent/plant (or any other) selection must not be rewritten.
   if (selected.length > 0) return null;
 
-  const options = input.options ?? [];
-  const plantsInTent = options.filter(
-    (option) => option?.type === "plant" && option.tentId === tentId,
-  );
-  const tentKey = selectableTentTargetKey(tentId, options);
-  if (plantsInTent.length === 0) return tentKey;
+  return selectableTentTargetKey(tentId, input.options ?? []);
+}
 
-  const recentPlantId =
-    typeof input.recentPlantId === "string" && input.recentPlantId.length > 0
-      ? input.recentPlantId
-      : null;
-  if (recentPlantId && plantsInTent.some((plant) => plant.id === recentPlantId)) {
-    return `plant:${recentPlantId}`;
+/**
+ * Launch target: the current route, else the last-used target, else none.
+ * A tent route is never rewritten to a plant.
+ */
+export class QuickLogLaunchTarget {
+  static resolve(input: {
+    contextKey?: string | null;
+    lastUsedKey?: string | null;
+  }): string | null {
+    const context = typeof input.contextKey === "string" ? input.contextKey.trim() : "";
+    if (context.length > 0) return context;
+    const lastUsed = typeof input.lastUsedKey === "string" ? input.lastUsedKey.trim() : "";
+    return lastUsed.length > 0 ? lastUsed : null;
   }
-
-  if (plantsInTent.length === 1) {
-    return `plant:${plantsInTent[0].id}`;
-  }
-
-  return tentKey;
 }

@@ -17,6 +17,12 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PencilLine, Undo2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { convertTypedTemperatureToCelsius } from "@/lib/quickLogTypedTemperatureRules";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+} from "@/lib/temperatureUnitPreference";
 
 import {
   AlertDialog,
@@ -236,9 +242,13 @@ function RevisionControls({
       ? String(correctionValues.doseAmount)
       : "",
   );
-  const [temperatureDraft, setTemperatureDraft] = useState<string>(
-    draftSensor(correctionValues, "temperature_c"),
-  );
+  const temperatureUnit = useTemperatureUnitPreference();
+  const [temperatureDraft, setTemperatureDraft] = useState<string>(() => {
+    const stored = draftSensor(correctionValues, "temperature_c");
+    if (stored === "") return "";
+    const shown = convertCelsiusForDisplay(Number(stored), temperatureUnit);
+    return shown === null ? stored : String(Math.round(shown * 100) / 100);
+  });
   const [humidityDraft, setHumidityDraft] = useState<string>(
     draftSensor(correctionValues, "humidity_pct"),
   );
@@ -292,7 +302,12 @@ function RevisionControls({
         ? String(correctionValues.doseAmount)
         : "",
     );
-    setTemperatureDraft(draftSensor(correctionValues, "temperature_c"));
+    setTemperatureDraft(() => {
+      const stored = draftSensor(correctionValues, "temperature_c");
+      if (stored === "") return "";
+      const shown = convertCelsiusForDisplay(Number(stored), temperatureUnit);
+      return shown === null ? stored : String(Math.round(shown * 100) / 100);
+    });
     setHumidityDraft(draftSensor(correctionValues, "humidity_pct"));
     setVpdDraft(draftSensor(correctionValues, "vpd_kpa"));
     setTimeDraft(toDatetimeLocalValue(currentOccurredAt));
@@ -344,7 +359,12 @@ function RevisionControls({
     if (editsSensor && correctionValues) {
       const sensor: QuickLogCorrectionSensorValues = {};
       const original = correctionValues.sensor ?? {};
-      const temperature = temperatureDraft.trim() === "" ? undefined : Number(temperatureDraft);
+      const convertedTemperature = convertTypedTemperatureToCelsius(
+        temperatureDraft,
+        temperatureUnit,
+      );
+      const temperature =
+        convertedTemperature.kind === "celsius" ? convertedTemperature.value : undefined;
       const humidity = humidityDraft.trim() === "" ? undefined : Number(humidityDraft);
       const vpd = vpdDraft.trim() === "" ? undefined : Number(vpdDraft);
       if (temperature !== undefined && temperature !== original.temperature_c) {
@@ -497,7 +517,7 @@ function RevisionControls({
             {editsSensor && (
               <div className="space-y-2">
                 <label className="block text-xs text-muted-foreground">
-                  Temperature (°C)
+                  Temperature ({getTemperatureUnitSymbol(temperatureUnit)})
                   <input
                     type="number"
                     step="any"

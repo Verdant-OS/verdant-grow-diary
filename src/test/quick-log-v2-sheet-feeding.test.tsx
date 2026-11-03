@@ -196,7 +196,10 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     fillRequiredFeedingFields();
     clickSave();
     await waitFor(() =>
-      expect(toastSuccess).toHaveBeenCalledWith("Feeding logged.", expect.anything()),
+      expect(toastSuccess).toHaveBeenCalledWith(
+        "Feeding logged. · Plant 1 (Tent 1)",
+        expect.anything(),
+      ),
     );
     expect(writeFeedingMock).toHaveBeenCalledTimes(1);
     const payload = writeFeedingMock.mock.calls[0][0];
@@ -207,10 +210,8 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     expect(payload.volume_ml).toBe(750);
     expect(payload.idempotency_key).toMatch(/^quicklog-/);
     expect(payload.products).toEqual([{ name: "Base A", amount: 2, unit: "ml_per_l" }]);
-    // Post-save hardening: sheet stays open on success so the grower can
-    // review, log another, or close explicitly.
     expect(await screen.findByTestId("qlv2-post-save")).toBeInTheDocument();
-    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(rpcMock).not.toHaveBeenCalled();
     expect(tableMethods.insert).not.toHaveBeenCalled();
     expect(createdEvents).toEqual([

@@ -428,7 +428,7 @@ describe("AppShell mobile Quick Log routing", () => {
     expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
-  it("opens V2 with plant: target when Tent Detail proves one active plant", () => {
+  it("opens V2 on the tent when Tent Detail proves one active plant", () => {
     tentTargetEvidenceMock.mockReturnValue({
       tentId: TENT_ID,
       soleActivePlantId: PLANT_ID,
@@ -439,7 +439,7 @@ describe("AppShell mobile Quick Log routing", () => {
 
     expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
       "data-target-key",
-      `plant:${PLANT_ID}`,
+      `tent:${TENT_ID}`,
     );
     expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });

@@ -156,11 +156,11 @@ describe("TentDetail plant card link", () => {
 });
 
 describe("TentDetail Quick Log target evidence", () => {
-  it("passes the sole active plant to both the desktop opener and mobile shell", () => {
+  it("opens Whole tent on the desktop control and still registers the sole plant", () => {
     renderTentDetail();
     expect(screen.getByTestId("desktop-quick-log-target")).toHaveAttribute(
       "data-target-key",
-      "plant:plant-aaa",
+      "tent:tent-77",
     );
     expect(targetRegistrationMock).toHaveBeenLastCalledWith({
       clear: false,

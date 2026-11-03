@@ -66,14 +66,11 @@ export function resolveMobileQuickLogTarget(
   const tentId = resolveDetailRouteId(pathname, TENT_DETAIL_PATH);
   if (!tentId) return null;
 
-  // Tent Detail owns the active-plant query and publishes the same
-  // sole-active-plant derivation used by its desktop FAB. Match the route
-  // tent and validate both ids before becoming more specific. Missing,
-  // loading, stale, multi-plant, or malformed evidence stays tent-scoped.
-  const solePlantId = evidence?.tentId === tentId ? evidence.soleActivePlantId : null;
-  return typeof solePlantId === "string" && isUuid(solePlantId)
-    ? `plant:${solePlantId}`
-    : `tent:${tentId}`;
+  // A tent page opens Whole tent. The sole plant stays in the list.
+  // Evidence is ignored for the launch key so a one-plant tent cannot
+  // silently become a plant log.
+  void evidence;
+  return `tent:${tentId}`;
 }
 
 /**

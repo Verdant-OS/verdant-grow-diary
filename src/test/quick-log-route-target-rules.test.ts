@@ -44,13 +44,13 @@ describe("resolveMobileQuickLogTarget", () => {
     expect(resolveMobileQuickLogTarget(`/tents/${TENT_ID}/`)).toBe(`tent:${TENT_ID}`);
   });
 
-  it("uses matching sole-active-plant evidence", () => {
+  it("stays on the tent when sole-active-plant evidence is present", () => {
     expect(
       resolveMobileQuickLogTarget(`/tents/${TENT_ID}`, {
         tentId: TENT_ID,
         soleActivePlantId: PLANT_ID,
       }),
-    ).toBe(`plant:${PLANT_ID}`);
+    ).toBe(`tent:${TENT_ID}`);
   });
 
   it("never guesses a plant when the current tent has zero or several", () => {

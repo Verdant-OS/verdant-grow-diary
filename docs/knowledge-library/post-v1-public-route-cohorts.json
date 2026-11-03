@@ -13,6 +13,12 @@
         "/guides/cannabis-leaf-symptoms",
         "/guides/cannabis-leaves-turning-yellow"
       ]
+    },
+    {
+      "id": "PV1-CONTROLLER-CSV-IMPORT-GUIDE",
+      "sourcePullRequest": 2775,
+      "rationale": "This public guide explains how a shipped CSV import reads controller history, and it sits outside the immutable v1 roadmap allocation.",
+      "paths": ["/guides/import-grow-sensor-csv"]
     }
   ]
 }

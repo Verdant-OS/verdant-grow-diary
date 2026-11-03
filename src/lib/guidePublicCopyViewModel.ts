@@ -40,6 +40,22 @@ export function splitAroundAnchor(text: string, anchor: GuideAnchor | undefined)
   };
 }
 
+/** In-app paths, Verdant signup links, and the cited Spider Farmer FAQ. */
+export function isGuideCitationHref(value: string): boolean {
+  if (isPublicGuideHref(value)) return true;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.hostname === "www.spider-farmer.com" &&
+      url.username === "" &&
+      url.password === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** In-app paths and Verdant signup links only. */
 export function isPublicGuideHref(value: string): boolean {
   if (value.startsWith("/") && !value.startsWith("//") && !/[\s\\]/.test(value)) {

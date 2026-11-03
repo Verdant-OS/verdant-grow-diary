@@ -8,7 +8,7 @@
  * Results expectations for the @types Verdant actually ships:
  *
  *   FAQPage, Article, BreadcrumbList, SoftwareApplication,
- *   Organization, WebSite, CollectionPage.
+ *   Organization, WebSite, CollectionPage, HowTo.
  *
  * Errors (fail build):
  *   - malformed JSON
@@ -45,6 +45,7 @@ const KNOWN_TYPES = new Set([
   "WebSite",
   "CollectionPage",
   "WebPage",
+  "HowTo",
   "Thing",
 ]);
 
@@ -249,6 +250,32 @@ const validators = {
   },
   WebPage(obj, ctx, issues) {
     requireField(obj, "name", ctx, issues);
+    if (obj.dateModified !== undefined && !ISO_DATE.test(String(obj.dateModified))) {
+      pushIssue(
+        issues,
+        { ...ctx, path: `${ctx.path}.dateModified` },
+        "WebPage.dateModified must be ISO-8601 when present",
+      );
+    }
+  },
+  HowTo(obj, ctx, issues) {
+    requireField(obj, "name", ctx, issues);
+    if (!Array.isArray(obj.step) || obj.step.length === 0) {
+      pushIssue(
+        issues,
+        { ...ctx, path: `${ctx.path}.step` },
+        "HowTo.step must be a non-empty array",
+      );
+      return;
+    }
+    obj.step.forEach((step, i) => {
+      const stepCtx = { ...ctx, path: `${ctx.path}.step[${i}]` };
+      if (step?.["@type"] !== "HowToStep") {
+        pushIssue(issues, stepCtx, `step[${i}].@type must be "HowToStep"`);
+      }
+      requireField(step, "name", stepCtx, issues);
+      requireField(step, "text", stepCtx, issues);
+    });
   },
   Thing() {},
 };

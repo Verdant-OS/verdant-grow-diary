@@ -20,7 +20,7 @@ import {
 import { formatAgeLabel } from "@/lib/sensorSnapshotFreshnessRules";
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { calculateVpdKpa } from "@/lib/greenhouseClimateRules";
-import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import { snapshotFromReadings, type SensorSnapshot } from "@/lib/sensorSnapshot";
 import type {
   SensorSnapshotCaptureEvidence,
   SensorSnapshotRejectedQualityRow,
@@ -44,6 +44,12 @@ export const TONIGHT_TENT_HOME_COPY = {
   // Not "Loading…": that exact text is the app shell's global loading screen.
   loading: "Checking…",
   invalidValue: "—",
+  /** Visible mark when VPD was not computed from the latest capture. */
+  vpdNotComputed: "—",
+  /** Accessible name for that mark. The visible mark stays the dash. */
+  vpdNotComputedLabel: "VPD not computed: humidity is from an older reading",
+  /** Cue when RH (or another metric) is older than the temperature on the card. */
+  olderReading: "older reading",
   lastLogPrefix: "Last log in this grow:",
   noLogToday: "No log today",
   lastLogUnavailable: "Last log: not available",
@@ -170,7 +176,8 @@ export interface TonightSnapshotInput {
   } | null;
 }
 
-export type TonightMetricState = "value" | "invalid" | "missing" | "loading" | "unavailable";
+export type TonightMetricState =
+  "value" | "invalid" | "missing" | "loading" | "unavailable" | "not_computed";
 
 export interface TonightMetricView {
   key: TonightMetricKey;
@@ -622,9 +629,75 @@ export function buildTonightTentMetrics(input: {
 
   const vpdCandidates = byKey.get("vpd")!;
   let vpdUnderivable = false;
+  let vpdNotComputed = false;
   const derived = calculatedVpdCandidate(byKey.get("temp")!, byKey.get("rh")!, nowMs);
+  const displayedTemps = byKey.get("temp")!;
+  const displayedRhs = byKey.get("rh")!;
+  const displayedPair =
+    derived.kind === "derived" &&
+    derived.paired &&
+    isDisplayedCandidate(derived.inputs.temp, displayedTemps[0], nowMs) &&
+    isDisplayedCandidate(derived.inputs.rh, displayedRhs[0], nowMs);
+  // Same cohort rule as the Environment Snapshot: `snapshotFromReadings`
+  // keeps only the latest climate timestamp. VPD is computed there only when
+  // that capture has both temperature and RH. An older pair, calculated or
+  // stored, is not shown beside a newer temperature that did not bring RH.
+  const cohortInput: {
+    ts: string;
+    metric: string;
+    value: number;
+    source?: string | null;
+  }[] = evidenceRows
+    .filter((row) => isClimateMetric(row.metric) && typeof row.value === "number")
+    .map((row) => ({
+      ts: row.captured_at ?? row.ts,
+      metric: row.metric,
+      value: row.value as number,
+      source: row.source,
+    }));
+  if (snap?.ts) {
+    const snapSource = snap.source;
+    if (typeof snap.temp === "number") {
+      cohortInput.push({
+        ts: snap.ts,
+        metric: "temperature_c",
+        value: snap.temp,
+        source: snapSource,
+      });
+    }
+    if (typeof snap.rh === "number") {
+      cohortInput.push({
+        ts: snap.ts,
+        metric: "humidity_pct",
+        value: snap.rh,
+        source: snapSource,
+      });
+    }
+    if (typeof snap.vpd === "number") {
+      cohortInput.push({
+        ts: snap.ts,
+        metric: "vpd_kpa",
+        value: snap.vpd,
+        source: snapSource,
+      });
+    }
+  }
+  const climateCohort = snapshotFromReadings(cohortInput);
+  const cohortHasPair =
+    climateCohort != null &&
+    typeof climateCohort.temp === "number" &&
+    typeof climateCohort.rh === "number";
+  const cohortHasVpd = climateCohort != null && typeof climateCohort.vpd === "number";
+  const bothDisplayed = displayedTemps.length > 0 && displayedRhs.length > 0;
   if (vpdCandidates.length === 0) {
-    if (derived.kind === "derived") vpdCandidates.push(derived.candidate);
+    if (displayedPair && cohortHasPair) vpdCandidates.push(derived.candidate);
+    else if (cohortHasPair && !displayedPair) vpdUnderivable = true;
+    vpdUnderivable = vpdUnderivable || derived.kind === "underivable";
+    vpdNotComputed =
+      !vpdUnderivable && !cohortHasPair && !cohortHasVpd && !displayedPair && bothDisplayed;
+  } else if (!cohortHasVpd && !cohortHasPair && bothDisplayed) {
+    vpdCandidates.length = 0;
+    vpdNotComputed = derived.kind !== "underivable";
     vpdUnderivable = derived.kind === "underivable";
   } else if (
     derived.kind === "derived" &&
@@ -661,11 +734,14 @@ export function buildTonightTentMetrics(input: {
       const failed = rowsFailed(input.rowsRead.status) || input.snapshot.status === "unavailable";
       // Temperature and RH exist but cannot honestly be combined: unavailable, not missing.
       const underivable = key === "vpd" && vpdUnderivable;
+      const notComputed = key === "vpd" && vpdNotComputed && !underivable;
       const state: TonightMetricState = loading
         ? "loading"
         : failed || underivable
           ? "unavailable"
-          : "missing";
+          : notComputed
+            ? "not_computed"
+            : "missing";
       return {
         key,
         label,

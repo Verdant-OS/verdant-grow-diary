@@ -213,25 +213,28 @@ describe("an invalid newer VPD never reveals an older stored one (P1 at 3e689090
   });
 });
 
-describe("a calculated VPD is checked against the pair it came from (P2 at 3e689090)", () => {
+describe("a newer temperature-only capture does not keep an older pair (#2800)", () => {
   // A valid same-capture pair ten minutes ago, then a newer out-of-range
-  // temperature with no RH: Tonight calculates from the older pair.
+  // temperature with no RH. The latest climate cohort has no pair, so neither
+  // Tonight nor the list shows the older calculated VPD.
   const rows = [
     row("temperature_c", 80, at(1), "manual"),
     row("temperature_c", 24, at(10), "manual"),
     row("humidity_pct", 60, at(10), "manual"),
   ];
 
-  it("Tonight carries the pair it used", () => {
+  it("Tonight does not carry the older pair", () => {
     const vpd = tonightVpd({ rows, status: "success", snapshot: null });
-    expect(vpd.calculated).toBe(true);
-    expect(vpd.inputs).toEqual({ temp: 24, rh: 60 });
+    expect(vpd.calculated).toBe(false);
+    expect(vpd.state).toBe("unavailable");
+    expect(vpd.value).toBeNull();
+    expect(vpd.inputs).toBeUndefined();
   });
 
-  it("the list does not reject it for the newer displayed temperature", () => {
+  it("the list does not show or reject the older calculated VPD", () => {
     const canonical = tentsListCanonicalVpd(rows, TENT, NOW);
     expect(canonical?.rejected).toBeUndefined();
-    expect(canonical?.kpa).toBeCloseTo(1.19, 2);
+    expect(canonical?.kpa).toBeNull();
   });
 });
 

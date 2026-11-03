@@ -69,43 +69,107 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### IMPORT-GROW-SENSOR-CSV-GUIDE
+### PHOTO-VIEWER-CAPTION-TILES
 
 ```text
-TASK IMPORT-GROW-SENSOR-CSV-GUIDE  priority: other  status: OPEN
-goal: Public guide /guides/import-grow-sensor-csv, brand-neutral importer reference, with two-way links to the AC Infinity and Spider Farmer export guides.
-why: Search-to-first-value page for how the CSV importer reads columns, units, VPD, the 25 MB limit, and skipped rows.
-branch: cursor/import-grow-sensor-csv-guide-40fe
+TASK PHOTO-VIEWER-CAPTION-TILES  priority: P1  status: OPEN
+goal: Timeline photo viewer caption shows the entry note, or the timeline local-time formatter when the note is blank, and plant Recent Photos, the plant hero, and Timeline Photo history open that viewer.
+why: Issue #2804. The caption joined stage and the raw UTC ISO and ignored the note. Those three tiles were not controls.
+branch: cursor/photo-viewer-caption-tiles-1ba3
 base: verdant-grow-diary
-checkout: git fetch origin cursor/import-grow-sensor-csv-guide-40fe verdant-grow-diary && git switch cursor/import-grow-sensor-csv-guide-40fe
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2775
-head_sha: read git rev-parse HEAD after the unit-copy commit
-state: ready, auto-merge off
-current_step: wrong-unit advice, blank cells, and rows with no usable reading
-next_action: confirm required CI at the new head; do not auto-merge or enqueue
-post_merge_check: after Publish, GET https://verdantgrowdiary.com/guides/import-grow-sensor-csv and confirm HTTP 200, the self-canonical, and the three import steps. NOT_MEASURED until live /version.json reports the SHA.
-active_writer: Grok cloud agent
-decisions: Check the unit in the import preview before saving. A wrong-unit import cannot be corrected in the app. A wrong choice stores the wrong temperatures, and a wrong calculated VPD only when the file has no VPD column. A 24°C reading imported as °F is stored as about -4.4°C. A blank temperature or humidity cell does not skip the row. A row with a time and no usable reading is skipped. The five previously renegotiated locked files stay untouched.
-tried_and_rejected: renaming symptomGuidePaths. That assertion compares the whole post-v1 registry, so a rename edits more of the locked test.
-commands: bunx vitest run src/test/guide-import-grow-sensor-csv.test.tsx src/test/import-grow-sensor-csv-parser-copy.test.ts src/test/route-indexation-matrix.test.ts --reporter=dot
-files_touched: src/constants/verdantSeoContent.ts; src/pages/GuidePage.tsx; src/lib/seoStructuredData.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/guidePublicCopyViewModel.ts; public/sitemap.xml; scripts/validate-jsonld-rich-results.mjs; src/test/guide-import-grow-sensor-csv.test.tsx; src/test/import-grow-sensor-csv-parser-copy.test.ts; src/test/import-grow-sensor-csv-unit-copy.test.ts; src/test/verdant-seo-guides.test.ts; src/test/verdant-seo-sitemap-robots.test.ts; src/test/verdant-guides-glossary-head-invariants.test.ts; docs/knowledge-library/post-v1-public-route-cohorts.json; docs/seo/route-indexation-matrix.md; scripts/knowledge/validate-roadmap.test.mjs
+checkout: git fetch origin cursor/photo-viewer-caption-tiles-1ba3 verdant-grow-diary && git switch cursor/photo-viewer-caption-tiles-1ba3
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2805
+head_sha: 71024e9d10201391d3143617911b3644b280916c
+state: pushed; required CI re-running after the null-safe plant photo wiring
+current_step: caption class, tile buttons, plant lightbox, and null-safe hero open
+next_action: confirm required CI at the pushed head. Do not merge, enqueue, or request review.
+post_merge_check: after Publish, open a photo from a plant Recent Photos tile and confirm the viewer caption is the note or a local time, never a raw ISO. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Grok cloud agent on this branch
+decisions: TimelinePhotoLightboxCaption.fromItem is the only caption path. Tiles are buttons. Focus returns to the opener when the viewer unmounts. Alt text still includes the raw entry instant because src/test/timeline-photo-lightbox-rules.test.ts is scorer-locked and pins that string.
+tried_and_rejected: rewriting the locked alt assertion. The scorer lock refused the edit.
+commands: bunx vitest run src/test/timeline-photo-caption-and-open.test.tsx src/test/timeline-photo-lightbox-component.test.tsx src/test/timeline-photo-lightbox-rules.test.ts --reporter=dot
+files_touched: src/lib/timelinePhotoLightboxRules.ts; src/components/TimelinePhotoLightbox.tsx; src/components/PhotoHistoryPanel.tsx; src/components/PlantDetailPhotoStrip.tsx; src/components/PlantPhoto.tsx; src/components/PlantPhotoView.tsx; src/pages/PlantDetail.tsx; src/pages/Timeline.tsx; src/test/timeline-photo-caption-and-open.test.tsx; docs/agents/HANDOFF_LOG.md
 files_remaining: none
-blockers: gated. Needs Cheeko's own-words yes at the final head. 5 locked files were renegotiated.
+blockers: none for repository work
 open_questions: none
-gotchas: Do not enqueue. roadmap-500.json stays untouched.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2775
-artifacts: screenshots live on the PR, not in the branch
-reviewer_seat: A, C, and D reviewed f504015f; a new head needs a new verdict
-reviewer_sha: f504015f1bf025a6f6ab70071016cd54da8fe474
-session_state: no production writes
+gotchas: do not edit the locked alt-text test. Upload size warning is out of scope.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2804
+artifacts: local screenshots, not committed
+reviewer_seat: not requested; Moonbow routes review
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; auto-merge off
 claimed_by: Grok, 2026-11-03
 owner: Grok
-last_updated: 2026-11-02 21:32 CT, by Grok. Preview-before-saving replaces the impossible delete-and-reimport remedy.
+last_updated: 2026-11-02 23:20 CT, by Grok
+```
+
+### POSTHOG-PUBLIC-CLIENT-KEY
+
+```text
+TASK POSTHOG-PUBLIC-CLIENT-KEY  priority: other  status: OPEN
+goal: Lovable production builds initialise PostHog from the committed public phc_ client key after analytics consent.
+why: The live bundle reads VITE_POSTHOG_KEY and VITE_POSTHOG_HOST, and Lovable builds from the committed .env. Neither variable was set, so PostHog never initialised. Cheeko chose committing the public client key.
+branch: cursor/posthog-public-client-key-f411
+base: verdant-grow-diary
+checkout: git fetch origin cursor/posthog-public-client-key-f411 verdant-grow-diary && git switch cursor/posthog-public-client-key-f411
+pr: read the URL from GitHub after push
+head_sha: read git rev-parse HEAD after the push
+state: implementation in this commit; merge waits on Cheeko's own-words yes at the exact head SHA
+current_step: consent test waits on vi.dynamicImportSettled; committed env presence and per-directive CSP assertions added. Secret scan stays red until a separate base allowlist lands.
+next_action: confirm required CI is green at the head, then wait for Cheeko's yes at that SHA. Do not merge, enqueue, or publish.
+post_merge_check: after Publish, load https://verdantgrowdiary.com while signed out, grant analytics consent, and confirm a request to https://us.i.posthog.com. Before consent, that request must be absent. NOT_MEASURED until live /version.json reports this SHA.
+active_writer: Grok cloud agent on this branch
+decisions: Commit only the public phc_ key and https://us.i.posthog.com in .env. CSP adds that host plus https://us-assets.i.posthog.com because posthog-js 1.444.0 RequestRouter loads /static from the region assets host when api_host is the US ingestion host and asset_host is unset. script-src lists the assets host; connect-src lists both. .env.example stays empty and says phx_ keys must never be committed.
+tried_and_rejected: none
+commands: bunx vitest run src/test/posthog-env-consent-startup.test.ts src/test/security-headers-rules.test.ts src/test/posthog-consent-client.test.ts --reporter=dot
+files_touched: .env; .env.example; src/lib/securityHeadersRules.ts; src/test/posthog-env-consent-startup.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: env/config gate — Cheeko's own-words yes at the exact head SHA before merge
+open_questions: none
+gotchas: do not commit a phx_ key. Do not edit workflows, wrangler, package.json, lockfiles, migrations, or auth. Existing posthog-consent-client.test.ts stays untouched; it stubs an empty key and injects a fixture reader.
+links: none yet
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; auto-merge off
+claimed_by: Grok, 2026-11-03
+owner: Cheeko
+last_updated: 2026-11-02 20:40 CT, by Grok
 ```
 
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text
+TASK QUICK-LOG-TARGET-SAVE  priority: P1  status: OPEN
+goal: One draft PR for Quick Log target selection, one save, optional reading time, one time-label class, and correction temperature units.
+why: Issues 2778, 2779, 2780, 2781, and part of 2706. A tent open was resolving to the sole or recent plant, and a successful save left the sheet open.
+branch: cursor/quick-log-target-save-1baf
+base: verdant-grow-diary
+checkout: git fetch origin cursor/quick-log-target-save-1baf verdant-grow-diary && git switch cursor/quick-log-target-save-1baf
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2793 ready
+head_sha: d6b9abb71 is the implementation; 504ecc08c stamps this block; the pin-fix commit is the child of 504ecc08c. Read origin/cursor/quick-log-target-save-1baf for the exact head. This line cannot name that child.
+state: ready PR 2793, no auto-merge
+current_step: three CI pins updated after measured tap counts; required CI recheck follows the pin-fix push
+next_action: keep the PR draft until required checks are green at the exact head and Moonbow routes review
+post_merge_check: bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx
+active_writer: Grok cloud agent on cursor/quick-log-target-save-1baf
+decisions: tent context is never rewritten to a plant; last-used target applies only when the route has no tent or plant; success closes the sheet and names the target in the toast; reading time is sheet state wired to occurredAt; GrowerTimeLabel is the shared formatter; correction temperature displays the grower unit and converts once to Celsius on save
+tried_and_rejected: leaving the sole-plant pins unchanged would keep the bug
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx src/test/quick-log-v2-rules.test.ts src/test/quick-log-route-target-rules.test.ts src/test/mobile-quick-log-single-fab.test.ts src/test/app-shell-mobile-quick-log-routing.test.tsx src/test/quick-log-v2-sheet-watering.test.tsx src/test/quick-log-v2-sheet-feeding.test.tsx src/test/quick-log-v2-refresh-sheet.test.tsx src/test/quick-log-timeline-cta-integration.test.tsx
+files_touched: src/components/AppShell.tsx src/components/QuickLogEntryIntegrityControls.tsx src/components/QuickLogV2Sheet.tsx src/pages/TentDetail.tsx src/lib/quickLogV2Rules.ts src/lib/quickLogRouteTargetRules.ts src/lib/growerTimeLabel.ts src/lib/quickLogReadingTime.ts src/lib/timelineEntryTimestampFormat.ts src/lib/quickLogGroupedTimelineFilterViewModel.ts src/lib/quickLogSnapshotStripAdapter.ts src/lib/wateringCadenceHistoryRules.ts src/lib/growDiaryPdfExport.ts and the renegotiated tests named in the PR
+files_remaining: none for this slice
+blockers: none for repository work. Moonbow routes review and merge. No production write.
+open_questions: none
+gotchas: scorer pins that encoded sole-plant launch and a stay-open sheet were renegotiated in the same change. .claude/scorer-unlock.json is local only.
+links: issues 2778 2779 2780 2781 2706
+artifacts: src/test/quick-log-target-save-reading-time.test.tsx
+reviewer_seat: not requested
+reviewer_sha: none
+session_state: Grok implementation session
+claimed_by: Grok 2026-11-02
+owner: Grok
+last_updated: 2026-11-02 21:36 CT, by Grok
+
 TASK CREATE-DIALOG-DISABLED-REASON  priority: P2  status: OPEN
 goal: disabled primary buttons in New grow, New tent, and New plant state their reason, and each name field has a visible label that is its accessible name.
 why: Issue 3 (FA-F01, FA-F02, FA-F05). Cheeko approved building only (2026-10-31). Create tent and Create plant were disabled with no description, and the name fields were announced as their placeholders.

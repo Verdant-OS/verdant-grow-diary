@@ -149,6 +149,7 @@ import {
   buildTentSnapshotView,
   type BuildTentSnapshotInput,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
+import { tentsListCanonicalVpd } from "@/lib/tentsListVpdRules";
 import { formatDistanceToNow } from "date-fns";
 import {
   buildDashboardStabilityReadings,
@@ -662,15 +663,15 @@ export default function Dashboard() {
             data-testid="dashboard-environment-snapshot"
             className="mb-6"
           >
-            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-              <div>
+            <div className="mb-2 flex min-w-0 flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
                 <h2
                   id="dashboard-environment-snapshot-heading"
                   className="font-display font-semibold text-base"
                 >
                   Environment Snapshot
                 </h2>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground break-words">
                   Latest reading per tent with honest source labels.
                 </p>
               </div>
@@ -972,12 +973,6 @@ export default function Dashboard() {
                       <div className="space-y-2.5">
                         {latestPerTent.map(({ tent, envStage, stability, tentRows }) => {
                           const stabilityView = formatStabilityChipView(stability);
-                          const snapView = buildTentSnapshotView(
-                            tentRows as BuildTentSnapshotInput[],
-                            envStage,
-                            nowTick,
-                            { temperatureUnit },
-                          );
                           // Pending/failed reads must not masquerade as established
                           // absence or as data. Non-UUID ids (mock-fallback tents)
                           // are never queried — a uuid column cannot hold them, so
@@ -985,6 +980,34 @@ export default function Dashboard() {
                           const sensorReadStatus = isUuid(tent.id)
                             ? (sensorStatusByTent[tent.id] ?? "loading")
                             : "success";
+                          const snapView = buildTentSnapshotView(
+                            tentRows as BuildTentSnapshotInput[],
+                            envStage,
+                            nowTick,
+                            {
+                              temperatureUnit,
+                              // Same Tonight derivation the tent page and /tents list use,
+                              // so a newer manual temperature/RH pair replaces an older CSV VPD.
+                              // The home tent reuses Tonight's diary snapshot. Other tents stay
+                              // idle here: Dashboard loads that diary snapshot for one tent.
+                              canonicalVpd: tentsListCanonicalVpd(
+                                tentRows as BuildTentSnapshotInput[],
+                                tent.id,
+                                nowTick,
+                                tent.id === homeTent?.id
+                                  ? {
+                                      status: homeSnapshotState.status,
+                                      snapshot: homeSnapshotState.snapshot,
+                                    }
+                                  : { status: "idle", snapshot: null },
+                                sensorReadStatus === "loading" ||
+                                  sensorReadStatus === "error" ||
+                                  sensorReadStatus === "refresh_error"
+                                  ? sensorReadStatus
+                                  : "success",
+                              ),
+                            },
+                          );
                           const sensorReadStatusLabel =
                             sensorReadStatus === "loading"
                               ? "sensor data loading"

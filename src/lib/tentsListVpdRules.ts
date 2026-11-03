@@ -120,7 +120,7 @@ export function tentsListCanonicalVpd(
   // from rows Tonight does not read (Copilot on #2442 at e50d6087).
   // Missing, or not yet read: either way the list shows no VPD of its own until
   // Tonight's evidence settles (Codex on #2451 at 6d0fa53c).
-  if (vpd?.state === "missing" || vpd?.state === "loading") {
+  if (vpd?.state === "missing" || vpd?.state === "loading" || vpd?.state === "not_computed") {
     return {
       kpa: null,
       capturedAt: null,

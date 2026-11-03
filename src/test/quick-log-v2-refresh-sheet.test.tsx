@@ -148,7 +148,10 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
     clickWater();
     clickSave();
     await waitFor(() =>
-      expect(toastSuccess).toHaveBeenCalledWith("Watering logged.", expect.anything()),
+      expect(toastSuccess).toHaveBeenCalledWith(
+        "Watering logged. · Plant 1 (Tent 1)",
+        expect.anything(),
+      ),
     );
     const keys = invalidatedKeys().map((k) => JSON.stringify(k));
     expect(keys).toContain(JSON.stringify(["quick_log_grouped_timeline"]));
@@ -156,10 +159,8 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
     expect(keys).toContain(
       JSON.stringify(["plant_recent_activity", "33333333-3333-4333-8333-333333333333"]),
     );
-    // Post-save hardening: successful save shows the post-save panel and
-    // keeps the sheet open until the grower explicitly closes it.
     expect(await screen.findByTestId("qlv2-post-save")).toBeInTheDocument();
-    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("tent-targeted save invalidates tent grouped timeline keys", async () => {
@@ -174,7 +175,12 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
     renderSheet("tent:55555555-5555-4555-8555-555555555555");
     clickNote();
     clickSave();
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Log saved", expect.anything()));
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith(
+        "Log saved · Tent 1 · Whole tent",
+        expect.anything(),
+      ),
+    );
     const keys = invalidatedKeys().map((k) => JSON.stringify(k));
     expect(keys).toContain(JSON.stringify(["quick_log_grouped_timeline"]));
     expect(keys).toContain(JSON.stringify(["timeline_memory"]));
@@ -194,7 +200,9 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
     renderSheet("plant:33333333-3333-4333-8333-333333333333");
     clickNote();
     clickSave();
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Log saved", expect.anything()));
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith("Log saved · Plant 1 (Tent 1)", expect.anything()),
+    );
     const keys = invalidatedKeys().map((k) => JSON.stringify(k));
     // Prefix-based invalidation covers both plant- and tent-scoped grouped reads.
     expect(keys).toContain(JSON.stringify(["quick_log_grouped_timeline"]));

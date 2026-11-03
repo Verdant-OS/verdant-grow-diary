@@ -11,6 +11,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import {
   buildTimelinePhotoAltText,
   resolveTimelinePhotoNavigation,
+  TimelinePhotoLightboxCaption,
   type TimelinePhotoLightboxItem,
 } from "@/lib/timelinePhotoLightboxRules";
 
@@ -58,12 +59,17 @@ export default function TimelinePhotoLightbox({
   }, [active, handlePrev, handleNext, onClose]);
 
   useEffect(() => {
-    if (active && closeRef.current) closeRef.current.focus();
-  }, [active]);
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
+    return () => {
+      queueMicrotask(() => opener?.focus());
+    };
+  }, []);
 
   if (!active) return null;
 
   const alt = buildTimelinePhotoAltText(active);
+  const caption = TimelinePhotoLightboxCaption.fromItem(active);
   const counter = `${nav.currentIndex + 1} of ${nav.total}`;
 
   return (
@@ -128,16 +134,12 @@ export default function TimelinePhotoLightbox({
           data-testid="timeline-photo-lightbox-image"
           className="max-h-[80vh] max-w-full rounded-lg object-contain shadow-xl"
         />
-        {(active.plantName || active.entryAt || active.stage) && (
-          <figcaption
-            className="rounded-full bg-black/60 px-3 py-1 text-xs text-white"
-            data-testid="timeline-photo-lightbox-caption"
-          >
-            {[active.plantName, active.stage, active.entryAt]
-              .filter((v): v is string => !!v)
-              .join(" · ")}
-          </figcaption>
-        )}
+        <figcaption
+          className="max-w-full rounded-full bg-black/60 px-3 py-1 text-center text-xs text-white"
+          data-testid="timeline-photo-lightbox-caption"
+        >
+          {caption}
+        </figcaption>
       </figure>
     </div>
   );

@@ -17,6 +17,7 @@ import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { normalizePersistedGrowTentId } from "@/lib/growTentSelectionRules";
 import { normalizePersistedPlantId } from "@/lib/sensorRoutePlantIntentRules";
 import { buildTimelineLocalDateRangeBounds } from "@/lib/timelineDateRangeRules";
+import { DeletedPlantDisplayRules } from "@/lib/plantLifecycleWriteRules";
 import {
   classifyTimelineSensorSource,
   type TimelineSensorSourceKind,
@@ -324,8 +325,9 @@ function trimmedLabel(value: unknown): string {
 /**
  * Plant and tent names for a Timeline card and its detail drawer.
  * A name already stored on the diary details wins. Otherwise the loaded
- * directory supplies the name for the row's plant_id / tent_id. Never
- * invents a name when both are missing.
+ * directory supplies the name for the row's plant_id / tent_id. A loaded
+ * directory that has no row for that plant id is labeled "Deleted plant".
+ * A directory that has not loaded yet stays blank.
  */
 export function resolveTimelineCardPlaceLabels(input: {
   plantId?: string | null;
@@ -342,8 +344,12 @@ export function resolveTimelineCardPlaceLabels(input: {
     plantId && input.plantNamesById ? trimmedLabel(input.plantNamesById.get(plantId)) : "";
   const directoryTent =
     tentId && input.tentNamesById ? trimmedLabel(input.tentNamesById.get(tentId)) : "";
+  const deletedPlant =
+    plantId && input.plantNamesById != null && !detailsPlant && !directoryPlant
+      ? DeletedPlantDisplayRules.LABEL
+      : null;
   return {
-    plantName: detailsPlant || directoryPlant || null,
+    plantName: detailsPlant || directoryPlant || deletedPlant,
     tentName: detailsTent || directoryTent || null,
   };
 }

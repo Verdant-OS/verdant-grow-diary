@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### NEW-GROW-FIELD-LABELS
+
+```text
+TASK NEW-GROW-FIELD-LABELS  priority: other  status: OPEN
+goal: Tie New Grow's Type, Stage and Notes labels to their controls so assistive tech announces them.
+why: Live audit 2026-11-03 finding 12: New Grow's Type, Stage and Notes controls were not exposed with clear labels in the captured accessibility tree. Source confirmed bare <Label> elements with no htmlFor in src/pages/Grows.tsx; Name was already labelled.
+branch: claude/new-grow-field-labels
+base: verdant-grow-diary
+checkout: git fetch origin claude/new-grow-field-labels verdant-grow-diary && git switch claude/new-grow-field-labels
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub
+state: implementation and test committed.
+current_step: draft PR open; reviewer and merge authority awaiting Matthew.
+next_action: Matthew names the reviewer and merge gate; then mark ready and route.
+post_merge_check: after Publish, open New grow on https://verdantgrowdiary.com and confirm a screen reader announces Type, Stage and Notes. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: Scope is the New Grow dialog the audit captured. Create Tent (3 bare labels) and Create Plant (6 bare labels) have the same pattern and are left for a follow-up slice. Contrast, keyboard flow and the rest of finding 12 still need a dedicated accessibility pass (NOT_MEASURED).
+tried_and_rejected: none
+commands: bunx vitest run src/test/new-grow-field-labels.test.tsx --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/pages/Grows.tsx; src/test/new-grow-field-labels.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: reviewer and merge authority for this PR.
+gotchas: commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify).
+links: none
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 17:00 CT, by Claude
+```
+
 ### AI-DOCTOR-READINESS-SUMMARY-IMPL
 
 ```text

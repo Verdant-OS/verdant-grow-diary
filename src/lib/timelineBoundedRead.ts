@@ -96,6 +96,12 @@ export class TimelineBoundedRead {
     return payload;
   }
 
+  /** Null when the select carried no fence fields. An empty object is not a payload. */
+  static fencePayloadOrNull(row: Record<string, unknown>): Record<string, unknown> | null {
+    const payload = TimelineBoundedRead.fencePayloadFromExtracts(row);
+    return Object.keys(payload).length > 0 ? payload : null;
+  }
+
   static importedHistoryPayload(row: Record<string, unknown>): Record<string, unknown> {
     const payload: Record<string, unknown> = {};
     if (typeof row.source_app === "string" && row.source_app.length > 0) {
@@ -116,6 +122,13 @@ export class TimelineBoundedRead {
     return payload;
   }
 
+  static importedHistoryPayloadOrNull(
+    row: Record<string, unknown>,
+  ): Record<string, unknown> | null {
+    const payload = TimelineBoundedRead.importedHistoryPayload(row);
+    return Object.keys(payload).length > 0 ? payload : null;
+  }
+
   /** Rebuild the fence object. The effective-row checker requires the key to exist. */
   static stampMissingRawPayload(data: unknown): void {
     if (!Array.isArray(data)) return;
@@ -123,7 +136,7 @@ export class TimelineBoundedRead {
       if (!value || typeof value !== "object" || Array.isArray(value)) continue;
       const row = value as Record<string, unknown>;
       if (row.raw_payload && typeof row.raw_payload === "object") continue;
-      row.raw_payload = TimelineBoundedRead.fencePayloadFromExtracts(row);
+      row.raw_payload = TimelineBoundedRead.fencePayloadOrNull(row);
     }
   }
 
@@ -160,7 +173,7 @@ export class TimelineBoundedRead {
       const payload =
         row.raw_payload && typeof row.raw_payload === "object"
           ? row.raw_payload
-          : TimelineBoundedRead.fencePayloadFromExtracts(row);
+          : TimelineBoundedRead.fencePayloadOrNull(row);
       rows.push({ ...row, raw_payload: payload } as SensorReadingRow);
     }
     return rows;

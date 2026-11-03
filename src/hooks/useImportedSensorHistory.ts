@@ -65,7 +65,7 @@ export async function fetchImportedSensorHistory(
     const payload =
       row.raw_payload && typeof row.raw_payload === "object"
         ? row.raw_payload
-        : TimelineBoundedRead.importedHistoryPayload(row);
+        : TimelineBoundedRead.importedHistoryPayloadOrNull(row);
     return { ...row, raw_payload: payload } as ImportedSensorHistoryRow;
   });
 }

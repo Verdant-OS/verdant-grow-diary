@@ -167,8 +167,39 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         touchClaim: async () => ({ ok: false, reason: "store_failed" }),
       },
     );
-    expect(rpc.status).toBe(503);
-    expect(await rpc.json()).toMatchObject({ accepted: false, reason: "store_failed" });
+    expect(rpc.status).toBe(200);
+    expect(await rpc.json()).toMatchObject({ accepted: true, reason: "stored", stored: 4 });
+  });
+
+  it("returns 200 after the readings are stored when the receipt or bind fails", async () => {
+    const ports: EcowittCustomUploadPorts = {
+      now: () => NOW,
+      sha256Hex,
+      lookupClaim: async () => claim(null),
+      entitlement: async () => "allowed",
+      bindClaim: async () => ({ ok: true }),
+      touchClaim: async () => ({ ok: true }),
+      insertReadings: async () => ({ ok: true }),
+      tentChannels: channels(),
+    };
+    const request = () =>
+      new Request(`https://example.test/ew/${TOKEN}`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: formBody(),
+      });
+    const missing = await handleEcowittCustomUploadRequest(request(), {
+      ...ports,
+      touchClaim: async () => ({ ok: false, reason: "claim_not_found" }),
+    });
+    expect(missing.status).toBe(200);
+    expect(await missing.json()).toMatchObject({ accepted: true, reason: "stored", stored: 4 });
+    const unbound = await handleEcowittCustomUploadRequest(request(), {
+      ...ports,
+      bindClaim: async () => ({ ok: false }),
+    });
+    expect(unbound.status).toBe(200);
+    expect(await unbound.json()).toMatchObject({ accepted: true, reason: "stored", stored: 4 });
   });
 
   it("returns 503 when the tent channel lookup fails", async () => {

@@ -2,8 +2,10 @@
  * HTTP adapter for EcoWitt customized-upload ingest.
  *
  * Logical rejects stay HTTP 200 so a gateway does not retry-storm. An insert
- * failure or a tent-channel lookup failure is HTTP 503 and is logged. The
- * body is never logged. PASSKEY and the claim token are hashed and then dropped.
+ * failure or a tent-channel lookup failure is HTTP 503 and is logged. Once
+ * the readings are stored, a receipt or bind failure stays HTTP 200: a 503
+ * would replay the same packet into sensor_readings_dedupe_uidx. The body
+ * is never logged. PASSKEY and the claim token are hashed and then dropped.
  * Persistence, tent channel config, and the entitlement lookup are injected ports.
  */
 import {
@@ -216,9 +218,9 @@ export async function handleEcowittCustomUploadRequest(
         console.error("[ecowitt-custom-upload] receipt_reserve_failed", {
           reason: reserved.reason,
         });
-        return jsonResponse({ accepted: false, reason: "store_failed" }, plan.rows.length, 503);
+      } else {
+        console.warn("[ecowitt-custom-upload] receipt_not_reserved", { reason: reserved.reason });
       }
-      console.warn("[ecowitt-custom-upload] receipt_not_reserved", { reason: reserved.reason });
     }
   }
 
@@ -231,7 +233,6 @@ export async function handleEcowittCustomUploadRequest(
     );
     if (!bound.ok) {
       console.error("[ecowitt-custom-upload] bind_failed");
-      return jsonResponse({ accepted: false, reason: "store_failed" }, plan.rows.length, 503);
     }
   }
   return jsonResponse(plan, plan.rows.length);

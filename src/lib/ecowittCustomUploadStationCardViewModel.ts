@@ -1,7 +1,9 @@
 /**
  * Station card for one tent's EcoWitt customized-upload readings.
  *
- * Pure. Shows only source `live` rows. Missing metrics stay blank.
+ * Pure. Shows source `live` rows whose quality is `ok` or `degraded`.
+ * Missing metrics stay blank. A stuck percent is stored `degraded` and
+ * still belongs on this card.
  * Temperature is stored Celsius and displayed Fahrenheit.
  * Stale means the last packet is older than three gateway intervals.
  */
@@ -175,7 +177,7 @@ function latestLive(
   for (const reading of readings) {
     if (reading.tentId !== tentId) continue;
     if (reading.source !== "live") continue;
-    if (reading.quality !== "ok") continue;
+    if (reading.quality !== "ok" && reading.quality !== "degraded") continue;
     if (reading.metric !== metric || !isLiveMetric(reading.metric)) continue;
     if (finiteReadingValue(reading.value) === null) continue;
     if (reading.capturedAt === null) continue;

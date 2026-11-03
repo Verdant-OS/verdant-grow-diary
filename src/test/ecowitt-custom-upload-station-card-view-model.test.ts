@@ -12,7 +12,9 @@ describe("EcoWitt customized-upload station card view model", () => {
       tentId: TENT,
       now: NOW,
       lastReceivedAt: null,
-      claimState: "unbound",
+      // #2732 P2-1: readings show only for a bound (active) claim.
+      claimState: "active",
+      claimId: "33333333-3333-4333-8333-333333333333",
       justCreatedToken: TOKEN,
       readings: [
         {

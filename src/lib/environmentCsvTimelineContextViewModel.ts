@@ -19,6 +19,8 @@ export const CSV_SNAPSHOT_TITLE = "CSV environment snapshot" as const;
 export const CSV_SOURCE_LABEL = "CSV" as const;
 
 const DEFAULT_WINDOW_MIN = 45;
+/** Unlinked CSV snapshots on the timeline. Diary-linked snapshots are never capped. */
+export const CSV_UNLINKED_TIMELINE_CAP = 12;
 
 export interface CsvSensorReadingRow {
   id?: string | null;
@@ -98,16 +100,22 @@ function entryMs(e: DiaryEntryLike): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
-/** One card per distinct CSV observation. Diary-window matches are never dropped for a newest-N cap. */
+export interface CsvTimelineWindow {
+  snapshots: CsvTimelineSnapshot[];
+  /** Unlinked observations past the newest-12 cap. Linked snapshots are all included. */
+  omittedUnlinked: number;
+}
+
+/** Diary-linked snapshots always stay. Unlinked snapshots keep only the newest 12. */
 export class CsvTimelineSnapshotList {
-  static distinct(
+  static window(
     input: Omit<CsvTimelineContextInput, "diaryEntries"> & {
       diaryEntries?: CsvTimelineContextInput["diaryEntries"];
       windowMinutes?: number;
     },
-  ): CsvTimelineSnapshot[] {
+  ): CsvTimelineWindow {
     const grouped = groupCsvSnapshots(input);
-    if (!grouped) return [];
+    if (!grouped) return { snapshots: [], omittedUnlinked: 0 };
     const { byTs } = grouped;
     const windowMs = Math.max(1, input.windowMinutes ?? DEFAULT_WINDOW_MIN) * 60_000;
     const linked = new Set<number>();
@@ -126,8 +134,22 @@ export class CsvTimelineSnapshotList {
       }
       if (bestTs != null) linked.add(bestTs);
     }
-    const chosen = new Set<number>([...linked, ...byTs.keys()]);
-    return [...chosen].sort((a, b) => b - a).map((ts) => snapshotFromGroup(byTs.get(ts) ?? [], ts));
+    const unlinked = [...byTs.keys()].filter((ts) => !linked.has(ts)).sort((a, b) => b - a);
+    const shownUnlinked = unlinked.slice(0, CSV_UNLINKED_TIMELINE_CAP);
+    const chosen = [...linked, ...shownUnlinked].sort((a, b) => b - a);
+    return {
+      snapshots: chosen.map((ts) => snapshotFromGroup(byTs.get(ts) ?? [], ts)),
+      omittedUnlinked: Math.max(0, unlinked.length - CSV_UNLINKED_TIMELINE_CAP),
+    };
+  }
+
+  static distinct(
+    input: Omit<CsvTimelineContextInput, "diaryEntries"> & {
+      diaryEntries?: CsvTimelineContextInput["diaryEntries"];
+      windowMinutes?: number;
+    },
+  ): CsvTimelineSnapshot[] {
+    return CsvTimelineSnapshotList.window(input).snapshots;
   }
 }
 

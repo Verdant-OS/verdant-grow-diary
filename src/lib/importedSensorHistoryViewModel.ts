@@ -9,7 +9,9 @@
  *
  * Safety contract:
  *   - Only rows with an explicitly permitted CSV source are surfaced.
- *   - `raw_payload` is NEVER read, returned, or referenced.
+ *   - This view model does not read `raw_payload`. The panel vendor badge
+ *     reads `source_app` (and legacy `import_file_name` / `raw_row` headers)
+ *     and does not render the payload.
  *   - No automation, no alerts, no Action Queue, no AI calls.
  *   - Deterministic ordering (captured_at desc, ties broken by metric asc).
  *   - Stable, null-safe output shape — usable from JSX without

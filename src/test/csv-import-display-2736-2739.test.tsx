@@ -8,7 +8,11 @@ import { CsvTimelineSnapshotList } from "@/lib/environmentCsvTimelineContextView
 import { buildImportedSensorHistoryViewModel } from "@/lib/importedSensorHistoryViewModel";
 import { formatCsvPreviewRow } from "@/lib/environmentCsvPreviewCopyRules";
 import { buildCsvImportDoneMessage } from "@/lib/environmentCsvImportViewModel";
-import { buildSensorReadingInserts } from "@/lib/environmentCsvImportPersistence";
+import {
+  buildSensorReadingInserts,
+  persistCsvEnvironmentRows,
+} from "@/lib/environmentCsvImportPersistence";
+import { dedupeKeyOf } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import { parseEnvironmentCSVText } from "@/lib/csvParser";
 import { CsvImportVendorIdentity } from "@/lib/csvImportVendorIdentity";
 
@@ -106,7 +110,32 @@ describe("CSV import display #2736–#2739", () => {
     );
     await waitFor(() => expect(screen.getByTestId("csv-timeline-chip-older-entry")).toBeTruthy());
     expect(screen.getByTestId("csv-timeline-chip-older-entry").textContent).toContain("70.0 °F");
-    expect(screen.getAllByText(/80\.0 °F/).length).toBe(13);
+    expect(screen.getAllByText(/80\.0 °F/).length).toBe(12);
+    expect(screen.getByTestId("timeline-csv-more-readings").textContent).toBe(
+      "1 more CSV readings in Sensors",
+    );
+  });
+
+  it("pins a diary chip to the nearest CSV reading inside 45 minutes", async () => {
+    const entryAt = "2026-11-02T12:00:00.000Z";
+    const farther = new Date(Date.parse(entryAt) + 40 * 60_000).toISOString();
+    const nearer = new Date(Date.parse(entryAt) + 5 * 60_000).toISOString();
+    read.mockResolvedValue({
+      data: [
+        metricRow(farther, "temperature_c", (80 - 32) * (5 / 9)),
+        metricRow(nearer, "temperature_c", (72 - 32) * (5 / 9)),
+      ],
+      error: null,
+    });
+    render(
+      <TimelineCsvContextPanel
+        growId="grow-1"
+        entries={[{ id: "near-entry", tent_id: "tent-1", entry_at: entryAt }]}
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId("csv-timeline-chip-near-entry")).toBeTruthy());
+    expect(screen.getByTestId("csv-timeline-chip-near-entry").textContent).toContain("72.0 °F");
+    expect(screen.getByTestId("csv-timeline-chip-near-entry").textContent).not.toContain("80.0 °F");
   });
 
   it("names the vendor on imported history and keeps the stored source csv", () => {
@@ -123,6 +152,9 @@ describe("CSV import display #2736–#2739", () => {
     });
     expect(inserts.every((row) => row.source === "csv")).toBe(true);
     expect(inserts[0].raw_payload.source_app).toBe("ac_infinity");
+    expect(inserts.every((row) => !("import_file_name" in row.raw_payload))).toBe(true);
+    expect(CsvImportVendorIdentity.detect("not-ac-infinity.csv", [])).toBeNull();
+    expect(CsvImportVendorIdentity.detect("AC Infinity.csv", [])).toBe("ac_infinity");
     render(
       <MemoryRouter>
         <ImportedSensorHistoryPanel
@@ -142,6 +174,31 @@ describe("CSV import display #2736–#2739", () => {
       "Source: CSV · AC Infinity",
     );
     expect(CsvImportVendorIdentity.badgeForRows(inserts)).toBe("CSV · AC Infinity");
+  });
+
+  it("does not count a fully duplicate sensor row in From N", async () => {
+    const parsed = parseEnvironmentCSVText(
+      "Timestamp,Temp(°F),RH\n2026-11-02T15:00:00Z,75.2,55\n2026-11-02T16:00:00Z,76.1,56\n",
+    );
+    const scope = { user_id: "u", grow_id: "g", tent_id: "t" };
+    const existing = new Set(
+      buildSensorReadingInserts([parsed.validRows[0]], scope)
+        .map((row) => dedupeKeyOf(row))
+        .filter((key): key is string => key != null),
+    );
+    const res = await persistCsvEnvironmentRows(parsed.validRows, scope, {
+      insertSensorReadings: async (batch) => ({ error: null, insertedCount: batch.length }),
+      fetchExistingSensorReadingKeys: async () => existing,
+    });
+    expect(res.contributedSensorRowCount).toBe(1);
+    expect(parsed.validRows).toHaveLength(2);
+    const message = buildCsvImportDoneMessage(
+      res.insertedCount,
+      res.duplicateCount,
+      res.contributedSensorRowCount,
+    );
+    expect(message).toContain("From 1 sensor row(s).");
+    expect(message).not.toContain("From 2");
   });
 
   it("previews a Fahrenheit file in °F", () => {
@@ -181,7 +238,11 @@ describe("CSV import display #2736–#2739", () => {
     expect(buildCsvImportDoneMessage(9, 0, 3)).toBe(
       "Imported 9 CSV reading(s). From 3 sensor row(s).",
     );
-    const confirm = vi.fn().mockResolvedValue({ insertedCount: 9, error: null });
+    const confirm = vi.fn().mockResolvedValue({
+      insertedCount: 9,
+      contributedSensorRowCount: 1,
+      error: null,
+    });
     render(
       <MemoryRouter>
         <EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={confirm} />

@@ -10,7 +10,8 @@
  * route changes. Logic lives in importedSensorHistoryViewModel.
  *
  * Safety:
- *   - Never reads or renders `raw_payload`.
+ *   - The vendor badge reads `raw_payload.source_app`, and for older rows
+ *     `import_file_name` or `raw_row` headers. It never renders the payload.
  *   - Never classifies imported readings as live.
  *   - No writes. No automation. No alerts. No Action Queue.
  */
@@ -274,14 +275,6 @@ export default function ImportedSensorHistoryPanel({
                   </Button>
                 );
               })}
-              <span className="sr-only">
-                {vm.metricOptions
-                  .filter(
-                    (opt) => opt.id !== IMPORTED_SENSOR_HISTORY_ALL_METRICS && opt.id !== opt.label,
-                  )
-                  .map((opt) => opt.id)
-                  .join(" ")}
-              </span>
             </div>
           ) : null}
 
@@ -301,23 +294,8 @@ export default function ImportedSensorHistoryPanel({
                     className="border-t border-border/40"
                   >
                     <td className="py-1 pr-2">{formatTimestamp(r.capturedAt)}</td>
-                    <td
-                      className={
-                        r.metric === "temperature_c" ||
-                        r.metric === "soil_temp_c" ||
-                        r.metricLabel === r.metric
-                          ? "py-1 pr-2"
-                          : "py-1 pr-2 before:block before:text-sm before:text-foreground before:content-[attr(data-label)]"
-                      }
-                      data-label={r.metricLabel}
-                    >
-                      {r.metric === "temperature_c" ||
-                      r.metric === "soil_temp_c" ||
-                      r.metricLabel === r.metric ? (
-                        r.metricLabel
-                      ) : (
-                        <span className="block text-xs text-muted-foreground">{r.metric}</span>
-                      )}
+                    <td className="py-1 pr-2" data-metric={r.metric}>
+                      {r.metricLabel}
                     </td>
                     <td className="py-1">
                       <span>{r.displayValue}</span>

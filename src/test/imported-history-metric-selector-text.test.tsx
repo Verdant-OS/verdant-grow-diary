@@ -28,7 +28,7 @@ describe("imported history metric selectors", () => {
     saveTemperatureUnitPreference("celsius");
   });
 
-  it("keeps humidity_pct and vpd_kpa in the row text while the metric cell shows the friendly label", () => {
+  it("shows Humidity and VPD in the metric cell with the raw key only as data-metric", () => {
     render(
       <MemoryRouter initialEntries={["/tents/tent-A"]}>
         <ImportedSensorHistoryPanel
@@ -45,11 +45,13 @@ describe("imported history metric selectors", () => {
     const vpd = Array.from(bodyRows).find((tr) => tr.textContent?.includes("1.11 kPa"));
 
     expect(humidity?.querySelectorAll("td").length).toBe(3);
-    expect(humidity?.querySelectorAll("td")[1]?.textContent).toBe("humidity_pct");
-    expect(humidity?.querySelectorAll("td")[1]?.getAttribute("data-label")).toBe("Humidity");
+    expect(humidity?.querySelectorAll("td")[1]?.textContent).toBe("Humidity");
+    expect(humidity?.querySelectorAll("td")[1]?.getAttribute("data-metric")).toBe("humidity_pct");
+    expect(humidity?.textContent).not.toContain("humidity_pct");
     expect(vpd?.querySelectorAll("td").length).toBe(3);
-    expect(vpd?.querySelectorAll("td")[1]?.textContent).toBe("vpd_kpa");
-    expect(vpd?.querySelectorAll("td")[1]?.getAttribute("data-label")).toBe("VPD");
+    expect(vpd?.querySelectorAll("td")[1]?.textContent).toBe("VPD");
+    expect(vpd?.querySelectorAll("td")[1]?.getAttribute("data-metric")).toBe("vpd_kpa");
+    expect(vpd?.textContent).not.toContain("vpd_kpa");
     expect(screen.getByTestId("imported-history-metric-filter-humidity_pct")).toHaveTextContent(
       "Humidity",
     );

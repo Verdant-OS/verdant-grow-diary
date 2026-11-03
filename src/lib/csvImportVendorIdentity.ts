@@ -16,7 +16,8 @@ export class CsvImportVendorIdentity {
     headers: readonly string[],
   ): CsvSourceApp | null {
     const haystack = `${fileName ?? ""}\n${headers.join("\n")}`.toLowerCase();
-    if (/ac[\s._-]*infinity/.test(haystack)) return "ac_infinity";
+    // A leading "not" is a negative fixture name, not the vendor.
+    if (/(?<!not[\s._-]*)(?<![a-z0-9])ac[\s._-]*infinity\b/.test(haystack)) return "ac_infinity";
     if (/spider[\s._-]*farmer/.test(haystack)) return "spider_farmer";
     if (/\bvivosun\b/.test(haystack)) return "vivosun";
     return null;

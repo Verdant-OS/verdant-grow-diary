@@ -79,20 +79,20 @@ branch: cursor/csv-import-display-6fff
 base: verdant-grow-diary
 checkout: git fetch origin cursor/csv-import-display-6fff verdant-grow-diary && git switch cursor/csv-import-display-6fff
 pr: ready for review; no auto-merge
-head_sha: pending this commit; diary-window snapshots are not capped at 12; metric cell keeps three columns
-state: ready to push; PR 2744; no auto-merge
-current_step: review fixes for the 12-cap and the phantom metric cell
-next_action: push and wait for CI. Do not merge. Do not enable auto-merge. Do not edit e2e-local/native-csv-import-reopen.spec.ts.
+head_sha: pending this commit
+state: pushing the gated pin change; PR 2744; auto-merge off
+current_step: friendly-only metric cell, linked snapshots plus newest 12 unlinked, nearest match, P3s
+next_action: one push, update the PR body with before/after pins and real-route proof, wait for required CI 35/35. Do not merge. Do not enable auto-merge.
 post_merge_check: after Publish, import an AC Infinity Fahrenheit CSV on the fixture account and confirm the timeline cards are distinct, the history badge names the vendor, labels say Humidity and VPD, the preview shows °F, and the confirmation names both counts. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Grok cloud agent on this branch
-decisions: distinct snapshots come from CsvTimelineSnapshotList, newest first, cap 12, still scoped to csv plus tent and grow. A nearby diary id is reused once so existing chip ids stay stable. Vendor is presentation-only via source_app and import_file_name; the stored source stays csv. Preview prints raw_temperature with the file unit. Friendly labels live in the history view model. The done message adds the sensor-row count only when it differs from insertedCount.
+decisions: diary-linked CSV snapshots always render. Unlinked snapshots keep the newest 12, then one line "N more CSV readings in Sensors" links to /tents/:id#imported-history. A diary chip uses the nearest reading inside 45 minutes. The history metric cell is only the friendly label; the raw key is data-metric. Filter chips are friendly text. Cheeko approved the four locked assertion swaps. Vendor detection rejects a leading "not". Stored payloads keep source_app and drop import_file_name. "From N sensor row(s)" counts rows that inserted a metric.
 tried_and_rejected: reading raw_payload inside the history view model. A source scan forbids that string there and in the panel. Vendor lookup stays in CsvImportVendorIdentity.
 commands: bunx vitest run src/test/csv-import-display-2736-2739.test.tsx src/test/imported-sensor-history-panel.test.tsx src/test/imported-sensor-history-view-model.test.ts src/test/environment-csv-timeline-mounted-context.test.tsx src/test/environment-csv-preview-copy-rules.test.ts src/test/csv-history-window-presentation.test.tsx src/test/environment-csv-import-persistence.test.ts src/test/csv-parser.test.ts --reporter=dot
 files_touched: src/lib/csvImportVendorIdentity.ts; src/lib/environmentCsvTimelineContextViewModel.ts; src/components/TimelineCsvContextPanel.tsx; src/lib/csvParser.ts; src/lib/environmentCsvImportPersistence.ts; src/lib/environmentCsvPreviewCopyRules.ts; src/lib/environmentCsvImportViewModel.ts; src/components/EnvironmentCsvImportModal.tsx; src/lib/importedSensorHistoryViewModel.ts; src/components/ImportedSensorHistoryPanel.tsx; src/test/csv-import-display-2736-2739.test.tsx; src/test/imported-sensor-history-panel.test.tsx; src/test/imported-history-metric-selector-text.test.tsx; docs/agents/HANDOFF_LOG.md
-files_remaining: e2e-local/native-csv-import-reopen.spec.ts stays locked and unedited
+files_remaining: none for this slice
 blockers: none for repository work
 open_questions: none
-gotchas: The base-tracked history panel and full-chain tests are restored. Their cell text is the raw metric key. The friendly name is the metric cell's data-label, painted above that key. Temperature stays the friendly label because those pins and the native spec match Temperature (°C). Already-imported rows without source_app or a brand in the stored file name stay labeled CSV.
+gotchas: sensors-truth-closure.spec.ts had no raw-key cell text to swap; temperature filter text stays Temperature (°F/°C)(4). Native reopen now matches Humidity and VPD instead of the raw keys. The metric cell stays three columns. Already-imported rows can still badge from a legacy import_file_name. New inserts do not store the file name.
 links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2736
 artifacts: before and after screenshots live with the agent run, not in this repo
 reviewer_seat: not requested yet

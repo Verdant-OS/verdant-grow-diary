@@ -18,6 +18,8 @@ export interface ImportState {
   phase: ImportPhase;
   parsed: ParseEnvironmentCsvResult | null;
   insertedCount: number;
+  /** Sensor rows that contributed an insert. Null until confirm returns. */
+  contributedSensorRowCount: number | null;
   /** Rows skipped as duplicates (same file or already imported for this tent). */
   duplicateCount: number;
   /** Earlier batches committed before a later batch failed. */
@@ -30,6 +32,7 @@ export const INITIAL_IMPORT_STATE: ImportState = {
   phase: "idle",
   parsed: null,
   insertedCount: 0,
+  contributedSensorRowCount: null,
   duplicateCount: 0,
   partialWrite: false,
   errorCode: null,

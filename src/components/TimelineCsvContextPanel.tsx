@@ -111,13 +111,14 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
     };
   }, [growId, tentIdsKey, scopeKey, retryAttempt]);
 
-  const snapshots = useMemo(() => {
+  const timeline = useMemo(() => {
     const cards: { id: string; snapshot: CsvTimelineSnapshot }[] = [];
-    if (!growId) return cards;
+    const omitted: { tentId: string; count: number }[] = [];
+    if (!growId) return { cards, omitted };
     const seen = new Set<string>();
-    const usedEntryIds = new Set<string>();
+    const windowMs = 45 * 60_000;
     for (const tentId of tentIds) {
-      for (const snapshot of CsvTimelineSnapshotList.distinct({
+      const windowed = CsvTimelineSnapshotList.window({
         sensorReadings: rows,
         growId,
         tentId,
@@ -129,24 +130,42 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
             tent_id: entry.tent_id,
             occurred_at: entry.entry_at,
           })),
-      })) {
+      });
+      if (windowed.omittedUnlinked > 0) {
+        omitted.push({ tentId, count: windowed.omittedUnlinked });
+      }
+      const tentCards: { id: string; snapshot: CsvTimelineSnapshot; stamp: string }[] = [];
+      for (const snapshot of windowed.snapshots) {
         const stamp = `${tentId}:${snapshot.capturedAt}`;
         if (seen.has(stamp)) continue;
         seen.add(stamp);
-        const near = entries.find((entry) => {
-          if (usedEntryIds.has(entry.id) || entry.tent_id !== tentId || !entry.entry_at) {
-            return false;
-          }
-          const delta = Math.abs(Date.parse(entry.entry_at) - Date.parse(snapshot.capturedAt));
-          return Number.isFinite(delta) && delta <= 45 * 60_000;
-        });
-        if (near) usedEntryIds.add(near.id);
-        cards.push({ id: near?.id ?? stamp, snapshot });
+        tentCards.push({ id: stamp, snapshot, stamp });
+      }
+      const owner = new Map<string, { id: string; delta: number }>();
+      for (const entry of entries) {
+        if (entry.tent_id !== tentId || !entry.entry_at) continue;
+        const entryAt = Date.parse(entry.entry_at);
+        if (!Number.isFinite(entryAt)) continue;
+        let best: { stamp: string; delta: number } | null = null;
+        for (const card of tentCards) {
+          const delta = Math.abs(entryAt - Date.parse(card.snapshot.capturedAt));
+          if (!Number.isFinite(delta) || delta > windowMs) continue;
+          if (best == null || delta < best.delta) best = { stamp: card.stamp, delta };
+        }
+        if (!best) continue;
+        const current = owner.get(best.stamp);
+        if (!current || best.delta < current.delta) {
+          owner.set(best.stamp, { id: entry.id, delta: best.delta });
+        }
+      }
+      for (const card of tentCards) {
+        cards.push({ id: owner.get(card.stamp)?.id ?? card.stamp, snapshot: card.snapshot });
       }
     }
     cards.sort((a, b) => Date.parse(b.snapshot.capturedAt) - Date.parse(a.snapshot.capturedAt));
-    return cards;
+    return { cards, omitted };
   }, [rows, entries, growId, tentIds]);
+  const snapshots = timeline.cards;
 
   if (!growId || tentIds.length === 0) return null;
   if (readStatus === "success" && snapshots.length === 0) return null;
@@ -192,6 +211,16 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
       ) : null}
       {snapshots.map((c) => (
         <CsvTimelineEnvironmentChip key={c.id} diaryEntryId={c.id} snapshot={c.snapshot} />
+      ))}
+      {timeline.omitted.map((item) => (
+        <p key={item.tentId} className="text-xs text-muted-foreground">
+          <a
+            href={`/tents/${item.tentId}#imported-history`}
+            data-testid="timeline-csv-more-readings"
+          >
+            {item.count} more CSV readings in Sensors
+          </a>
+        </p>
       ))}
     </section>
   );

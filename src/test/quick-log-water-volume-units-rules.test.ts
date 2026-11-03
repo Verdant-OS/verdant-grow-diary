@@ -93,6 +93,10 @@ describe("display helpers", () => {
     expect(mlToWaterEntryDisplay(1500, "L")).toBe("1.5");
     expect(mlToWaterEntryDisplay(1500, "ml")).toBe("1500");
     expect(mlToWaterEntryDisplay(Number.NaN, "gal")).toBe("");
+    // A positive amount never displays as 0.
+    expect(mlToWaterEntryDisplay(1, "gal")).toBe("0.00026");
+    expect(mlToWaterEntryDisplay(0.4, "L")).toBe("0.0004");
+    expect(mlToWaterEntryDisplay(0, "gal")).toBe("0");
   });
 
   it("shows typed text first, else the canonical ml in the unit", () => {

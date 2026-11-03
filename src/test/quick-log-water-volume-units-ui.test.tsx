@@ -152,6 +152,22 @@ describe("Quick Log Water volume units", () => {
     expect(payloadVolume(latest).volume_ml).toBe(2271);
   });
 
+  it("a prefill above the warning threshold still warns in another unit", () => {
+    window.localStorage.setItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
+    render(<Harness initial={{ ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "10001" }} />);
+    expect(volumeInput().value).toBe("2.64");
+    expect(screen.getByTestId("qlv2-large-water-warning")).toHaveTextContent("10,001 ml");
+    expect(payloadVolume(latest).volume_ml).toBe(10001);
+  });
+
+  it("a tiny prefill shows a nonzero amount and saves its ml", () => {
+    window.localStorage.setItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
+    render(<Harness initial={{ ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "1" }} />);
+    expect(volumeInput().value).toBe("0.00026");
+    expect(screen.getByTestId("qlv2-volume-saves-as")).toHaveTextContent("Saves as 1 ml.");
+    expect(payloadVolume(latest).volume_ml).toBe(1);
+  });
+
   it("12: a restored record shows its stored ml in the entry unit and saves it unchanged", () => {
     window.localStorage.setItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
     render(<Harness initial={{ ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "3785" }} />);

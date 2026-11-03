@@ -63,8 +63,10 @@ function trimZeros(fixed: string): string {
 export function mlToWaterEntryDisplay(ml: number, unit: WaterEntryUnit): string {
   if (!Number.isFinite(ml) || ml < 0) return "";
   if (unit === "ml") return String(ml);
-  if (unit === "L") return trimZeros((ml / 1000).toFixed(3));
-  return trimZeros((ml / ML_PER_GAL).toFixed(2));
+  const value = unit === "L" ? ml / 1000 : ml / ML_PER_GAL;
+  const shown = trimZeros(value.toFixed(unit === "L" ? 3 : 2));
+  // A positive amount never displays as 0: fall back to two significant figures.
+  return shown === "0" && ml > 0 ? String(Number(value.toPrecision(2))) : shown;
 }
 
 /** The text a field shows: the grower's typed text, else the canonical ml in `unit`. */

@@ -34,6 +34,11 @@ export const FUNNEL_EVENTS = [
   "grow_created",
   "tent_created",
   "plant_created",
+  // Onboarding navigation. These sit with setup, before either activation
+  // branch. surface is "onboarding" or "start_room" — never an id.
+  "onboarding_back",
+  "onboarding_restart",
+  "onboarding_skip",
   "quick_log_saved",
   "csv_history_onboarding_ready",
   "csv_import_started",

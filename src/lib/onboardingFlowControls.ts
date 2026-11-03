@@ -32,10 +32,42 @@ export class OnboardingFlowControls {
    * The page starts at the top instead of centering into that band.
    */
   static readonly mobilePrimaryClearanceClass =
-    "justify-start pb-[calc(8rem+env(safe-area-inset-bottom))] md:justify-center md:pb-10";
+    "min-h-[100dvh] justify-start pb-[calc(8rem+env(safe-area-inset-bottom))] md:justify-center md:pb-10";
 
-  static showsBack(step: OnboardingFlowStep): boolean {
-    return step !== "start-screen";
+  /**
+   * Width that keeps the primary action clear of the Quick Log FAB
+   * (`right-4` + `w-14`) at 393px. Desktop uses the full row.
+   */
+  static readonly mobilePrimaryButtonWidthClass = "w-[calc(100%-4.5rem)] md:w-full";
+
+  static readonly restartConfirmTitle = "Restart this setup?";
+  static readonly restartConfirmBody =
+    "This clears the answers on this device. Rooms already saved in your account stay there.";
+  static readonly restartConfirmAction = "Restart setup";
+
+  static showsBack(step: OnboardingFlowStep, savedRoom = false): boolean {
+    return step !== "start-screen" && !savedRoom;
+  }
+
+  /** A confirmed grow, tent, or plant. Back and Restart would drop the resume ids. */
+  static savedRoom(ids: {
+    growId?: string | null;
+    tentId?: string | null;
+    plantId?: string | null;
+  }): boolean {
+    return Boolean(ids.growId || ids.tentId || ids.plantId);
+  }
+
+  /**
+   * Restart is off once a room row exists, while a create is in flight,
+   * and while the last create's outcome is still unknown.
+   */
+  static restartEnabled(input: {
+    savedRoom: boolean;
+    busy: boolean;
+    createOutcomeUnknown: boolean;
+  }): boolean {
+    return !input.savedRoom && !input.busy && !input.createOutcomeUnknown;
   }
 
   static backHref(): "/onboarding" {

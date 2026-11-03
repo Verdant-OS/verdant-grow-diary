@@ -542,7 +542,11 @@ describe("Pricing manifest snapshot (narrow)", () => {
       },
       { path: "/hardware-integrations", access: "public" },
       { path: "/pricing", access: "public" },
-      { path: "/welcome", access: "redirect", description: "→ /" },
+      {
+        path: "/welcome",
+        access: "public",
+        description: "Public start-here guide; the marketing landing and sign-out exit.",
+      },
     ]);
   });
 });

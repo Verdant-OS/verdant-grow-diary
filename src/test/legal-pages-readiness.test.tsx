@@ -235,7 +235,7 @@ describe("sitemap + robots discoverability", () => {
   });
 
   it("sitemap keeps /pricing discoverable and includes the /welcome start-here page", () => {
-    expect(SITEMAP).not.toContain("<loc>https://verdantgrowdiary.com/welcome</loc>");
+    expect(SITEMAP).toContain("<loc>https://verdantgrowdiary.com/welcome</loc>");
     expect(SITEMAP).toContain("<loc>https://verdantgrowdiary.com/pricing</loc>");
   });
 

@@ -92,6 +92,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
 const PUBLIC_MOBILE_ROUTES: string[] = [
   "/",
   "/welcome",
+  "/features",
   "/pricing",
   "/hardware-integrations",
   "/guides",

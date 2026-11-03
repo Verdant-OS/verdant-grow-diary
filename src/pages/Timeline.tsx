@@ -112,7 +112,9 @@ import {
   buildDiaryRangeReportUrl,
   defaultDiaryRangeReportRange,
 } from "@/lib/diaryRangeReportNavigationRules";
-import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
+import { TimelineCsvContextGate } from "@/components/TimelineCsvContextGate";
+import { requireEffectiveSensorReadings } from "@/lib/effectiveSensorReadingRules";
+import { TimelineBoundedRead } from "@/lib/timelineBoundedRead";
 import PhenoHuntTimelineSection from "@/components/PhenoHuntTimelineSection";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
@@ -153,10 +155,7 @@ import {
   dropBlankQuickLogPlaceholderRows,
   projectTimelineDiaryPage,
 } from "@/lib/timelineQuickLogPlaceholderDedupeRules";
-import {
-  effectiveSensorReadingsQuery,
-  requireEffectiveSensorReadings,
-} from "@/lib/effectiveSensorReadings";
+import { effectiveSensorReadingsQuery } from "@/lib/effectiveSensorReadings";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
@@ -481,6 +480,7 @@ async function resolveMissingLinkedGrowEventParents(input: {
       .from("grow_events")
       .select(ROOT_ZONE_GROW_EVENT_SELECT)
       .eq("grow_id", input.growId)
+      .limit(TimelineBoundedRead.idLookupLimit(missingLinkedGrowEventIds))
       .in("id", missingLinkedGrowEventIds);
     if (!input.isCurrent()) return;
     if (linkedResult.error || !Array.isArray(linkedResult.data)) {
@@ -508,7 +508,8 @@ async function loadLinkedRootSensorSiblings(input: {
       .from("grow_events")
       .select(TIMELINE_LINKED_ROOT_SELECT)
       .eq("grow_id", input.growId)
-      .in("id", input.rootIds);
+      .in("id", input.rootIds)
+      .limit(TimelineBoundedRead.idLookupLimit(input.rootIds));
     if (!input.isCurrent()) return;
     if (hasTimelineRequiredReadError(rootResult) || !Array.isArray(rootResult.data)) {
       input.onPartial();
@@ -1194,7 +1195,7 @@ export default function Timeline() {
         // capture in the correct observation-date window, while sorting
         // null captured_at last can hide a newer legacy reading.
         let capturedQuery = effectiveSensorReadingsQuery()
-          .select("*")
+          .select(TimelineBoundedRead.sensorListSelect)
           .in("tent_id", tentIds)
           .eq("source", "manual")
           .not("captured_at", "is", null)
@@ -1202,7 +1203,7 @@ export default function Timeline() {
           .order("ts", { ascending: false })
           .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
         let legacyQuery = effectiveSensorReadingsQuery()
-          .select("*")
+          .select(TimelineBoundedRead.sensorListSelect)
           .in("tent_id", tentIds)
           .eq("source", "manual")
           .is("captured_at", null)
@@ -1231,6 +1232,8 @@ export default function Timeline() {
           setManualSensorHistoryLimited(false);
           return;
         }
+        TimelineBoundedRead.stampMissingRawPayload(capturedResult.data);
+        TimelineBoundedRead.stampMissingRawPayload(legacyResult.data);
         const manualPage = completeManualSensorTimelineRows([
           ...requireEffectiveSensorReadings(capturedResult.data),
           ...requireEffectiveSensorReadings(legacyResult.data),
@@ -2875,7 +2878,7 @@ export default function Timeline() {
         </Link>
       </div>
 
-      <TimelineCsvContextPanel
+      <TimelineCsvContextGate
         growId={activeGrowId}
         entries={entries.map((e) => ({ id: e.id, tent_id: e.tent_id, entry_at: e.entry_at }))}
       />

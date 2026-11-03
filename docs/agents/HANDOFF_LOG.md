@@ -85,12 +85,12 @@ current_step: wrong-unit advice, blank cells, and rows with no usable reading
 next_action: confirm required CI at the new head; do not auto-merge or enqueue
 post_merge_check: after Publish, GET https://verdantgrowdiary.com/guides/import-grow-sensor-csv and confirm HTTP 200, the self-canonical, and the three import steps. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Grok cloud agent
-decisions: A wrong unit does not skip rows. The prompt appears only when every sampled temperature is 0-45, and choosing the other unit stores the converted temperatures and a recalculated VPD. A blank temperature or humidity cell does not skip the row. A row with a time and no usable reading is skipped. The five previously renegotiated locked files stay untouched.
+decisions: Check the unit in the import preview before saving. A wrong-unit import cannot be corrected in the app. A wrong choice stores the wrong temperatures, and a wrong calculated VPD only when the file has no VPD column. A 24°C reading imported as °F is stored as about -4.4°C. A blank temperature or humidity cell does not skip the row. A row with a time and no usable reading is skipped. The five previously renegotiated locked files stay untouched.
 tried_and_rejected: renaming symptomGuidePaths. That assertion compares the whole post-v1 registry, so a rename edits more of the locked test.
 commands: bunx vitest run src/test/guide-import-grow-sensor-csv.test.tsx src/test/import-grow-sensor-csv-parser-copy.test.ts src/test/route-indexation-matrix.test.ts --reporter=dot
 files_touched: src/constants/verdantSeoContent.ts; src/pages/GuidePage.tsx; src/lib/seoStructuredData.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/guidePublicCopyViewModel.ts; public/sitemap.xml; scripts/validate-jsonld-rich-results.mjs; src/test/guide-import-grow-sensor-csv.test.tsx; src/test/import-grow-sensor-csv-parser-copy.test.ts; src/test/import-grow-sensor-csv-unit-copy.test.ts; src/test/verdant-seo-guides.test.ts; src/test/verdant-seo-sitemap-robots.test.ts; src/test/verdant-guides-glossary-head-invariants.test.ts; docs/knowledge-library/post-v1-public-route-cohorts.json; docs/seo/route-indexation-matrix.md; scripts/knowledge/validate-roadmap.test.mjs
 files_remaining: none
-blockers: gated. Needs Cheeko's own-words yes at the final head. Six locked files were renegotiated: the five additive pins plus the dateModified expectation this PR added.
+blockers: gated. Needs Cheeko's own-words yes at the final head. 5 locked files were renegotiated.
 open_questions: none
 gotchas: Do not enqueue. roadmap-500.json stays untouched.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2775
@@ -100,7 +100,7 @@ reviewer_sha: f504015f1bf025a6f6ab70071016cd54da8fe474
 session_state: no production writes
 claimed_by: Grok, 2026-11-03
 owner: Grok
-last_updated: 2026-11-02 21:05 CT, by Grok. Wrong-unit copy no longer claims skipped rows. Blank cells and no-metric rows are named.
+last_updated: 2026-11-02 21:32 CT, by Grok. Preview-before-saving replaces the impossible delete-and-reimport remedy.
 ```
 
 ### CREATE-DIALOG-DISABLED-REASON

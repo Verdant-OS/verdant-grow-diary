@@ -817,7 +817,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
               },
             ],
             closing:
-              "The preview shows what will be saved before anything is written. Choosing the wrong unit does not skip rows. The unit prompt only appears when every temperature is between 0 and 45, and a wrong choice stores the wrong temperatures and a wrong calculated VPD. If temperatures look off after import (for example 24 shown as 24°F), delete that import and re-import choosing the other unit.",
+              "Check the unit in the import preview before saving, because a wrong-unit import can't be corrected in the app yet. Choosing the wrong unit does not skip rows. The unit prompt only appears when every temperature is between 0 and 45. A wrong choice stores the wrong temperatures. When the file has no VPD column, it also stores a wrong calculated VPD; a VPD supplied in the file is kept. A 24°C reading imported as °F is stored as about -4.4°C.",
           },
         ],
       },

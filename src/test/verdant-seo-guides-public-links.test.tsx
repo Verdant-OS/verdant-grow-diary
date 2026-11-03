@@ -289,7 +289,7 @@ describe("/guides click-through stays on public content", () => {
   });
 
   it("preserves real public routes and only the scoped static Customer Mode route", () => {
-    expect(manifestEntryFor("/welcome")?.access).toBe("redirect");
+    expect(manifestEntryFor("/welcome")?.access).toBe("public");
     expect(manifestEntryFor("/pricing")?.access).toBe("public");
     expect(APP_ROUTES.filter((route) => route.path.startsWith("/customer/"))).toEqual([
       expect.objectContaining({

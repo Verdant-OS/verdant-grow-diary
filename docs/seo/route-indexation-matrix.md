@@ -2,7 +2,7 @@
 
 **Source of truth:** `src/lib/appRouteManifest.ts` in this commit, checked against the mounted route modules by `src/test/helpers/routeManifestSyncHarness.ts`.<br>
 **Live index status:** **NOT_MEASURED.** This file records repository metadata, `public/sitemap.xml`, and `public/robots.txt`. It is not a Search Console measurement and it does not claim what `https://verdantgrowdiary.com` returns.<br>
-**Coverage:** 150 of 150 manifest routes — 48 public, 46 authenticated, 32 operator, 6 internal, and 18 redirects.
+**Coverage:** 151 of 151 manifest routes — 49 public, 46 authenticated, 32 operator, 6 internal, and 18 redirects.
 
 ## Reading the matrix
 
@@ -145,9 +145,9 @@ These manifest paths are public and are not in `STATIC_PUBLIC_OUTPUT_DOCUMENTS`.
 
 Every public manifest path, with or without a static document. `/cultivars/:slug` and `/guides/:slug` are patterns; their concrete paths are inventory lines.
 
-Manifest paths (`access: "public"`, 48):
+Manifest paths (`access: "public"`, 49):
 
-`*`; `/`; `/.lovable/oauth/consent`; `/ai-doctor-readiness-check`; `/auth`; `/breeder-beta`; `/checkout/cancel`; `/checkout/success`; `/contact`; `/creator-beta`; `/cultivars`; `/cultivars/:slug`; `/customer/guide/oreoz-vs-gelonade-comparison`; `/docs/mcp-api`; `/features`; `/feedback`; `/glossary`; `/guides`; `/guides/:slug`; `/guides/athena-feed-chart-log`; `/guides/cannabis-tissue-culture`; `/guides/grow-stage-care-guide`; `/guides/isolate-male-cannabis-plant`; `/guides/steady-climate-multiple-grow-tents`; `/guides/still-air-box-vs-flow-hood`; `/hardware-integrations`; `/how-ai-doctor-works`; `/internal/contextual-pheno-comparison-demo`; `/internal/demo-proof-walkthrough`; `/internal/pheno-hunt-demo`; `/partners/csv-preview`; `/pheno-comparison`; `/pheno-expression-showcase`; `/pheno-hunts/:id/compare`; `/pheno-hunts/:id/showcase`; `/pricing`; `/privacy`; `/quick-log`; `/refund`; `/reset-password`; `/sensors/csv-preview`; `/terms`; `/tools/blueprint-targets`; `/tools/grow-help-toolkit`; `/tools/vpd-calculator`; `/unsubscribe`; `/vpd-chart`; `/welcome`.
+`*`; `/`; `/.lovable/oauth/consent`; `/ai-doctor-readiness-check`; `/auth`; `/breeder-beta`; `/checkout/cancel`; `/checkout/stripe`; `/checkout/success`; `/contact`; `/creator-beta`; `/cultivars`; `/cultivars/:slug`; `/customer/guide/oreoz-vs-gelonade-comparison`; `/docs/mcp-api`; `/features`; `/feedback`; `/glossary`; `/guides`; `/guides/:slug`; `/guides/athena-feed-chart-log`; `/guides/cannabis-tissue-culture`; `/guides/grow-stage-care-guide`; `/guides/isolate-male-cannabis-plant`; `/guides/steady-climate-multiple-grow-tents`; `/guides/still-air-box-vs-flow-hood`; `/hardware-integrations`; `/how-ai-doctor-works`; `/internal/contextual-pheno-comparison-demo`; `/internal/demo-proof-walkthrough`; `/internal/pheno-hunt-demo`; `/partners/csv-preview`; `/pheno-comparison`; `/pheno-expression-showcase`; `/pheno-hunts/:id/compare`; `/pheno-hunts/:id/showcase`; `/pricing`; `/privacy`; `/quick-log`; `/refund`; `/reset-password`; `/sensors/csv-preview`; `/terms`; `/tools/blueprint-targets`; `/tools/grow-help-toolkit`; `/tools/vpd-calculator`; `/unsubscribe`; `/vpd-chart`; `/welcome`.
 
 ## Authenticated routes — sitemap excluded, robots.txt disallowed
 

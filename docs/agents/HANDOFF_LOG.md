@@ -80,8 +80,8 @@ base: verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2820
 head_sha: read the current head on GitHub
 state: pushed draft
-current_step: pushed items 1, 8, restore (pin src/test/plant-card-actions-archive-restore-menu.test.tsx renegotiated with founder approval), 17, 18. Item 12 audited: all times render at view time in the viewer's browser zone with a DST-correct label; no user time-zone setting exists; waiting on founder choice of where a set zone lives
-next_action: founder picks item-12 approach (profile column = migration, or per-device preference)
+current_step: pushed items 1, 8, restore, 17, 18; item 12 spec docs/specs/user-time-zone-profile-setting.md (founder chose profiles.time_zone); item 21 audited: tents.brand is free text in CreateTentDialog, EditTentDialog and the DB (string | null, no check) so there is no list to fix; the typo is a stored value only the grower can edit
+next_action: founder approves the item-12 migration PR (separate, held) and picks the next item; a native <datalist> brand suggestion for item 21 is optional and unbuilt
 post_merge_check: on verdantgrowdiary.com, the fixture plant page shows "Grow: <name>" and Timeline Recent Quick Logs rows show "Plant: ... · Tent: ..."
 active_writer: Claude session claude/new-session-azpsz3
 decisions: no migration/RLS/auth edits (held); items 2,4,5,6 fixed by #2794; item 3 not reproduced (in-flight guard + idempotency key; duplicates 6.5 h apart); item 7 fixed by f2d6ca2; names never guessed (unknown id reads "name unavailable")
@@ -98,7 +98,7 @@ reviewer_sha: none yet
 session_state: one self check-in armed (send_later) for PR #2820 CI
 claimed_by: Claude, 2026-11-03 16:45 CT
 owner: Claude
-last_updated: 2026-11-03 18:05 CT, by Claude
+last_updated: 2026-11-03 18:25 CT, by Claude
 ```
 
 ### QUICK-LOG-WATER-VOLUME-UNITS-SPEC

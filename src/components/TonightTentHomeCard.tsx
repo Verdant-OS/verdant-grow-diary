@@ -16,7 +16,7 @@ function formatMetricValue(metric: TonightMetricView): string {
     case "missing":
       return COPY.missing;
     case "not_computed":
-      return "—";
+      return COPY.vpdNotComputed;
     case "unavailable":
       return COPY.unavailable;
     case "loading":
@@ -69,6 +69,16 @@ export default function TonightTentHomeCard(props: {
   }
 
   const hasDemo = metrics.some((m) => m.source === "demo");
+  const tempMetric = metrics.find((metric) => metric.key === "temp");
+  const rhMetric = metrics.find((metric) => metric.key === "rh");
+  const tempMs = tempMetric?.capturedAt ? Date.parse(tempMetric.capturedAt) : NaN;
+  const rhMs = rhMetric?.capturedAt ? Date.parse(rhMetric.capturedAt) : NaN;
+  const rhIsOlderReading = Number.isFinite(tempMs) && Number.isFinite(rhMs) && rhMs < tempMs;
+  const vpdMetric = metrics.find((metric) => metric.key === "vpd");
+  const splitCaptureVpd =
+    (vpdMetric?.state === "not_computed" || vpdMetric?.state === "unavailable") &&
+    (tempMetric?.state === "value" || tempMetric?.state === "invalid") &&
+    (rhMetric?.state === "value" || rhMetric?.state === "invalid");
   return (
     <section
       aria-labelledby="tonight-tent-home-heading"
@@ -111,7 +121,14 @@ export default function TonightTentHomeCard(props: {
           >
             <dt className="truncate text-xs text-muted-foreground">{metric.label}</dt>
             <dd className="mt-1 text-base font-semibold leading-tight tabular-nums [overflow-wrap:anywhere] sm:text-lg">
-              {formatMetricValue(metric)}
+              {metric.key === "vpd" && splitCaptureVpd ? (
+                <>
+                  <span aria-hidden="true">{COPY.vpdNotComputed}</span>
+                  <span className="sr-only">{COPY.vpdNotComputedLabel}</span>
+                </>
+              ) : (
+                formatMetricValue(metric)
+              )}
             </dd>
             {metric.sourceLabel && (
               <dd className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
@@ -119,6 +136,14 @@ export default function TonightTentHomeCard(props: {
                 {metric.ageText ? ` · ${metric.ageText}` : ""}
               </dd>
             )}
+            {metric.key === "rh" && rhIsOlderReading ? (
+              <dd
+                className="mt-0.5 text-[11px] leading-tight text-muted-foreground"
+                data-testid="tonight-tent-home-metric-rh-older"
+              >
+                {COPY.olderReading}
+              </dd>
+            ) : null}
             {metric.calculated && (
               <dd
                 className="mt-0.5 text-[11px] leading-tight text-muted-foreground"

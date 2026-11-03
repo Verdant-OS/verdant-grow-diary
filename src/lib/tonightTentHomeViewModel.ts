@@ -44,6 +44,12 @@ export const TONIGHT_TENT_HOME_COPY = {
   // Not "Loading…": that exact text is the app shell's global loading screen.
   loading: "Checking…",
   invalidValue: "—",
+  /** Visible mark when VPD was not computed from the latest capture. */
+  vpdNotComputed: "—",
+  /** Accessible name for that mark. The visible mark stays the dash. */
+  vpdNotComputedLabel: "VPD not computed: humidity is from an older reading",
+  /** Cue when RH (or another metric) is older than the temperature on the card. */
+  olderReading: "older reading",
   lastLogPrefix: "Last log in this grow:",
   noLogToday: "No log today",
   lastLogUnavailable: "Last log: not available",

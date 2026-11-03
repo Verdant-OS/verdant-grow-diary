@@ -1,13 +1,14 @@
 /**
  * Service-role wiring for customized-upload ingest.
  *
- * Not registered in supabase/config.toml and not deployed. #2702 merged at
- * 2:40 PM CT on 2026-11-02; registration still needs config.toml, which this
- * change does not edit. `requireLiveSensorEntitlement` runs before any claim
- * bind or reading insert. touchClaim calls reserve_ecowitt_custom_upload_receipt
- * before insert. bindClaim must call bind_ecowitt_custom_upload_claim,
- * which updates only when passkey_sha256 IS NULL, and must not write
- * last_received_at or last_captured_at.
+ * Not registered in supabase/config.toml and not deployed. There is no Edge
+ * entry and no caller of handleEcowittCustomUploadWithEntitlement yet, so
+ * end-to-end storage is unproven. `requireLiveSensorEntitlement` runs before
+ * commit. commitIngest calls commit_ecowitt_custom_upload_ingest, which
+ * rechecks the claim, reserves the receipt, binds the first sender, and
+ * inserts readings in one transaction. A Postgres 23505 means every row
+ * collided, so the receipt rolls back and the response is duplicate with
+ * stored 0. partial:<n> keeps the rows that did not collide.
  * This module does not read a client-supplied user id from the gateway body.
  */
 import { requireLiveSensorEntitlement } from "./liveSensorEntitlementGate.ts";
@@ -23,6 +24,24 @@ import type {
 } from "./ecowittCustomUploadIngestRules.ts";
 
 export const ECOWITT_CUSTOM_UPLOAD_RESERVE_RPC = "reserve_ecowitt_custom_upload_receipt" as const;
+export const ECOWITT_CUSTOM_UPLOAD_BIND_RPC = "bind_ecowitt_custom_upload_claim" as const;
+export const ECOWITT_CUSTOM_UPLOAD_COMMIT_RPC = "commit_ecowitt_custom_upload_ingest" as const;
+
+export function classifyEcowittReadingInsertError(
+  error: { readonly code?: string; readonly message?: string } | null,
+): "duplicate" | "failed" | null {
+  if (error === null) return null;
+  if (error.code === "23505") return "duplicate";
+  return "failed";
+}
+
+export function ecowittServiceRoleInsertResult(
+  error: { readonly code?: string; readonly message?: string } | null,
+): { ok: true } | { ok: false; reason: "duplicate" | "failed" } {
+  const classified = classifyEcowittReadingInsertError(error);
+  if (classified === null) return { ok: true };
+  return { ok: false, reason: classified };
+}
 
 export class EcowittCustomUploadClaimBind {
   static readonly rpcName = "bind_ecowitt_custom_upload_claim";
@@ -55,8 +74,58 @@ export type EcowittReserveReceipt =
   | { readonly ok: true }
   | {
       readonly ok: false;
-      readonly reason: "rate_limited" | "duplicate_captured_at" | "claim_not_found";
+      readonly reason:
+        "rate_limited" | "duplicate_captured_at" | "claim_not_found" | "store_failed";
     };
+
+export function ecowittCustomUploadReadingsRpcPayload(
+  rows: readonly EcowittCustomUploadStoredReading[],
+): ReadonlyArray<{
+  readonly metric: EcowittCustomUploadStoredReading["metric"];
+  readonly value: number;
+  readonly quality: EcowittCustomUploadStoredReading["quality"];
+  readonly raw_payload: EcowittCustomUploadStoredReading["rawPayload"];
+}> {
+  return rows.map((row) => ({
+    metric: row.metric,
+    value: row.value,
+    quality: row.quality,
+    raw_payload: row.rawPayload,
+  }));
+}
+
+export type EcowittCommitResult =
+  | { readonly ok: true; readonly stored: number; readonly reason: "stored" | "partial" }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "duplicate"
+        | "store_failed"
+        | "rate_limited"
+        | "duplicate_captured_at"
+        | "claim_not_found"
+        | "passkey_mismatch";
+    };
+
+export function readEcowittCommitResult(data: unknown, submitted: number): EcowittCommitResult {
+  const value = Array.isArray(data) ? data[0] : data;
+  if (value === "ok") return { ok: true, stored: submitted, reason: "stored" };
+  if (typeof value === "string" && value.startsWith("partial:")) {
+    const stored = Number(value.slice("partial:".length));
+    if (Number.isInteger(stored) && stored > 0 && stored < submitted) {
+      return { ok: true, stored, reason: "partial" };
+    }
+  }
+  if (
+    value === "rate_limited" ||
+    value === "duplicate_captured_at" ||
+    value === "claim_not_found" ||
+    value === "passkey_mismatch"
+  ) {
+    return { ok: false, reason: value };
+  }
+  return { ok: false, reason: "store_failed" };
+}
 
 export function readEcowittReserveReceipt(data: unknown): EcowittReserveReceipt {
   const value = Array.isArray(data) ? data[0] : data;
@@ -89,18 +158,21 @@ export async function reserveEcowittCustomUploadReceipt(
     p_received_at: receivedAt,
     p_captured_at: capturedAt,
   });
-  if (error) return { ok: false, reason: "claim_not_found" };
+  if (error) return { ok: false, reason: "store_failed" };
   return readEcowittReserveReceipt(data);
 }
 
 export interface EcowittCustomUploadServiceRole {
   lookupClaim(tokenSha256: string): Promise<EcowittCustomUploadClaim | null>;
-  bindClaim(
-    claimId: string,
-    passkeySha256: string,
-    stationtype: string,
-    receivedAt: string,
-  ): Promise<{ ok: true } | { ok: false }>;
+  callBind(
+    fn: typeof ECOWITT_CUSTOM_UPLOAD_BIND_RPC,
+    args: {
+      readonly p_claim_id: string;
+      readonly p_passkey_sha256: string;
+      readonly p_stationtype: string;
+      readonly p_bound_at: string;
+    },
+  ): Promise<{ readonly data: unknown; readonly error: { readonly message: string } | null }>;
   callReserve(
     fn: typeof ECOWITT_CUSTOM_UPLOAD_RESERVE_RPC,
     args: {
@@ -111,7 +183,26 @@ export interface EcowittCustomUploadServiceRole {
   ): Promise<{ readonly data: unknown; readonly error: { readonly message: string } | null }>;
   insertReadings(
     rows: readonly EcowittCustomUploadStoredReading[],
-  ): Promise<{ ok: true } | { ok: false }>;
+  ): Promise<{ ok: true } | { ok: false; reason: "duplicate" | "failed" }>;
+  callCommit(
+    fn: typeof ECOWITT_CUSTOM_UPLOAD_COMMIT_RPC,
+    args: {
+      readonly p_claim_id: string;
+      readonly p_received_at: string;
+      readonly p_captured_at: string;
+      readonly p_passkey_sha256: string;
+      readonly p_stationtype: string;
+      readonly p_readings: ReturnType<typeof ecowittCustomUploadReadingsRpcPayload>;
+    },
+  ): Promise<{
+    readonly data: unknown;
+    readonly error: { readonly code?: string; readonly message: string } | null;
+  }>;
+  tentChannels(
+    tentId: string,
+  ): Promise<
+    { ok: true; airChannels: readonly number[]; soilChannels: readonly number[] } | { ok: false }
+  >;
 }
 
 export async function handleEcowittCustomUploadWithEntitlement(
@@ -138,16 +229,23 @@ export async function handleEcowittCustomUploadWithEntitlement(
       if (decision.reason === "upgrade_required") return "upgrade_required";
       return "lookup_failed";
     },
-    bindClaim: (claimId, passkeySha256, stationtype, receivedAt) =>
-      deps.serviceRole.bindClaim(claimId, passkeySha256, stationtype, receivedAt),
-    touchClaim: (claimId, receivedAt, capturedAt) =>
-      reserveEcowittCustomUploadReceipt(
-        (fn, args) => deps.serviceRole.callReserve(fn, args),
-        claimId,
-        receivedAt,
-        capturedAt,
-      ),
-    insertReadings: (rows) => deps.serviceRole.insertReadings(rows),
+    commitIngest: async (input) => {
+      const { data, error } = await deps.serviceRole.callCommit(ECOWITT_CUSTOM_UPLOAD_COMMIT_RPC, {
+        p_claim_id: input.claimId,
+        p_received_at: input.receivedAt,
+        p_captured_at: input.capturedAt,
+        p_passkey_sha256: input.passkeySha256,
+        p_stationtype: input.stationtype,
+        p_readings: ecowittCustomUploadReadingsRpcPayload(input.rows),
+      });
+      if (error) {
+        const classified = classifyEcowittReadingInsertError(error);
+        if (classified === "duplicate") return { ok: false, reason: "duplicate" };
+        return { ok: false, reason: "store_failed" };
+      }
+      return readEcowittCommitResult(data, input.rows.length);
+    },
+    tentChannels: (tentId) => deps.serviceRole.tentChannels(tentId),
   };
   return handleEcowittCustomUploadRequest(request, ports);
 }

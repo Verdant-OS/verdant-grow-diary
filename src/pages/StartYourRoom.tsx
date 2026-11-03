@@ -41,7 +41,14 @@ import {
   type StartYourRoomResumePlant,
   type StartYourRoomStep,
 } from "@/lib/startYourRoomRules";
-import { setStartScreenChoice } from "@/lib/startScreenPreferences";
+import {
+  DEFAULT_START_SCREEN,
+  routeForStartScreen,
+  setStartScreenChoice,
+} from "@/lib/startScreenPreferences";
+import { OnboardingFlowControls } from "@/lib/onboardingFlowControls";
+import { OnboardingRestartDialog } from "@/components/OnboardingRestartDialog";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import {
   evaluateVerifiedGrowCreationGate,
   evaluateVerifiedTentCreationGate,
@@ -133,6 +140,7 @@ export default function StartYourRoom() {
   const [draftOwnerReady, setDraftOwnerReady] = useState<string | null>(null);
   const [verificationRetrying, setVerificationRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [restartOpen, setRestartOpen] = useState(false);
   const [confirmedNames, setConfirmedNames] = useState<{
     ownerId: string;
     grow?: { id: string; name: string };
@@ -152,6 +160,7 @@ export default function StartYourRoom() {
   const ownerId = user?.id ?? null;
   const mountedRef = useRef(true);
   const draftWriterRef = useRef(Symbol("start-room-draft"));
+  const abandonDraftRef = useRef(false);
   const ownerIdRef = useRef<string | null>(ownerId);
   // Written at commit, not during render: a discarded render must not leave an
   // owner the committed page is not showing.
@@ -254,6 +263,10 @@ export default function StartYourRoom() {
   useEffect(() => {
     if (!ownerId || draftHydratedFor.current !== ownerId || draftOwnerReady !== ownerId) return;
     if (startRoomDraftWriters.get(ownerId) !== draftWriterRef.current) return;
+    if (abandonDraftRef.current) {
+      clearBrowserSessionFormDraft(ownerId, START_YOUR_ROOM_DRAFT_FORM_ID);
+      return;
+    }
     if (step === "done") {
       clearBrowserSessionFormDraft(ownerId, START_YOUR_ROOM_DRAFT_FORM_ID);
       return;
@@ -389,6 +402,7 @@ export default function StartYourRoom() {
         plantId: ids.plantId ?? appliedResume.plantId,
       }
     : ids;
+  const roomAlreadySaved = OnboardingFlowControls.savedRoom(shownIds);
   const shownForm: StartYourRoomForm = appliedResume
     ? {
         ...form,
@@ -706,13 +720,45 @@ export default function StartYourRoom() {
     nav(plantDetailQuickLogHref(shownIds.plantId), { replace: true });
   }
 
+  function restartFlow() {
+    if (!user) return;
+    const savedRoom = OnboardingFlowControls.savedRoom(shownIds);
+    if (
+      !OnboardingFlowControls.restartEnabled({
+        savedRoom,
+        busy,
+        createOutcomeUnknown,
+      })
+    ) {
+      return;
+    }
+    abandonDraftRef.current = true;
+    OnboardingFlowControls.clearFlowAnswers(user.id);
+    trackFunnelEvent("onboarding_restart", { surface: "start_room" });
+    nav(OnboardingFlowControls.restartHref());
+  }
+
+  function backFlow() {
+    if (!OnboardingFlowControls.backEnabled({ busy, createOutcomeUnknown })) return;
+    trackFunnelEvent("onboarding_back", { surface: "start_room" });
+    nav(OnboardingFlowControls.backHref());
+  }
+
+  function skipFlow() {
+    if (busy) return;
+    trackFunnelEvent("onboarding_skip", { surface: "start_room" });
+    nav(routeForStartScreen(DEFAULT_START_SCREEN), { replace: true });
+  }
+
   function submitRoomFromForm(event: { preventDefault: () => void }) {
     event.preventDefault();
     void submitRoom();
   }
 
   return (
-    <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 py-8">
+    <div
+      className={`flex flex-col items-center px-4 py-8 ${OnboardingFlowControls.mobilePrimaryClearanceClass}`}
+    >
       <div
         className="w-full max-w-md glass rounded-2xl p-6 space-y-4"
         data-testid="start-your-room"
@@ -725,14 +771,52 @@ export default function StartYourRoom() {
           >
             {progress}
           </p>
-          <Link
-            to="/onboarding"
-            className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
-            data-testid="start-your-room-skip-start-screen"
-          >
-            {START_YOUR_ROOM_COPY.skipToStartScreen}
-          </Link>
         </div>
+        <div className="flex flex-wrap gap-2" data-testid="start-room-flow-controls">
+          {OnboardingFlowControls.showsBack("start-room", roomAlreadySaved) ? (
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="start-room-back"
+              disabled={!OnboardingFlowControls.backEnabled({ busy, createOutcomeUnknown })}
+              onClick={backFlow}
+            >
+              {OnboardingFlowControls.backLabel}
+            </Button>
+          ) : null}
+          {OnboardingFlowControls.restartEnabled({
+            savedRoom: roomAlreadySaved,
+            busy: false,
+            createOutcomeUnknown: false,
+          }) ? (
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="start-room-restart"
+              disabled={busy || createOutcomeUnknown}
+              onClick={() => setRestartOpen(true)}
+            >
+              {OnboardingFlowControls.restartLabel}
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            data-testid="start-room-skip"
+            disabled={busy}
+            onClick={skipFlow}
+          >
+            {OnboardingFlowControls.skipLabel}
+          </Button>
+        </div>
+        <OnboardingRestartDialog
+          open={restartOpen}
+          onOpenChange={setRestartOpen}
+          onConfirm={() => {
+            setRestartOpen(false);
+            restartFlow();
+          }}
+        />
 
         <h1
           ref={headingRef}
@@ -847,7 +931,7 @@ export default function StartYourRoom() {
               ) : null}
               <Button
                 type="submit"
-                className="w-full gradient-leaf text-primary-foreground"
+                className={`${OnboardingFlowControls.mobilePrimaryButtonWidthClass} gradient-leaf text-primary-foreground`}
                 disabled={
                   busy ||
                   createOutcomeUnknown ||
@@ -877,7 +961,7 @@ export default function StartYourRoom() {
             </ul>
             <Button
               type="button"
-              className="w-full gradient-leaf text-primary-foreground"
+              className={`${OnboardingFlowControls.mobilePrimaryButtonWidthClass} gradient-leaf text-primary-foreground`}
               disabled={!canFinish(shownIds)}
               onClick={finish}
               data-testid="start-room-finish"

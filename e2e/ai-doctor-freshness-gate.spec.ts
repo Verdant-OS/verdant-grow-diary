@@ -372,6 +372,15 @@ async function openCanonicalAiReview(page: Page) {
   }
   await expect(page.getByTestId("plant-detail-disclosure-ai-content")).toBeVisible();
 
+  // The context panel lives in the collapsed "How this was decided" disclosure
+  // under the single readiness summary (docs/specs/ai-doctor-readiness-single-summary.md
+  // R7). Open it the way a grower would before asserting on the panel.
+  const provenance = page.getByTestId("ai-doctor-readiness-provenance");
+  await expect(provenance).toBeAttached();
+  if ((await provenance.getAttribute("open")) === null) {
+    await provenance.locator("summary").click();
+  }
+
   await expect(page.getByText("No real plants yet")).toHaveCount(0);
   await expect(page.getByTestId("agreement-reconsent-gate")).toHaveCount(0);
   await expect(page.getByTestId("plant-ai-doctor-context-panel")).toBeVisible();

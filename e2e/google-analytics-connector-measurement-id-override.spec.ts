@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { pointSpecAtGoogleAnalyticsCollectionHost } from "./utils/googleAnalyticsCollectionHost";
 import {
   ANALYTICS_CONSENT_STORAGE_KEY,
   waitForAnalyticsClientReady,
@@ -38,7 +39,8 @@ import {
 const OVERRIDE_MEASUREMENT_ID = "G-E2EOVRID99";
 
 const PORT = Number(process.env["GA_OVERRIDE_E2E_PORT"] ?? 5183);
-const ORIGIN = `http://127.0.0.1:${PORT}`;
+const APP_ORIGIN = `http://127.0.0.1:${PORT}`;
+const ORIGIN = pointSpecAtGoogleAnalyticsCollectionHost(5195, PORT);
 
 let server: ChildProcessWithoutNullStreams | undefined;
 
@@ -93,7 +95,7 @@ test.describe("GA4 measurement id follows the connector value", () => {
     server.stdout.on("data", () => {});
     server.stderr.on("data", () => {});
 
-    await waitForServer(ORIGIN, remaining());
+    await waitForServer(APP_ORIGIN, remaining());
     const page = await browser.newPage();
     try {
       await waitForAnalyticsClientReady(page, ORIGIN, remaining());

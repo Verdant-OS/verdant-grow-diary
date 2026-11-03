@@ -3,6 +3,7 @@ import { useLocation } from "@/lib/react-router-compat";
 import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
 import { buildSafeAnalyticsPageLocation, sanitizePagePath } from "@/lib/analyticsPageViewRules";
 import { readAnalyticsConsent, subscribeToAnalyticsConsent } from "@/lib/analyticsConsent";
+import { isGoogleAnalyticsCollectionHost } from "@/lib/googleAnalyticsHost";
 import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
 
 export { sanitizePagePath } from "@/lib/analyticsPageViewRules";
@@ -23,6 +24,7 @@ function trackPageView(path: string, title: string) {
   if (readAnalyticsConsent() !== "granted") return;
   // Install the gtag stub if needed so cold loads are not dropped before AnalyticsShell hydrates.
   loadGoogleAnalytics();
+  if (!isGoogleAnalyticsCollectionHost(window.location.hostname)) return;
   if (typeof window.gtag !== "function") return;
   const safePath = sanitizePagePath(path);
   // Explicit page_view event (config uses send_page_view: false). SPA-safe, path-sanitized.

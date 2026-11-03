@@ -36,8 +36,10 @@ import {
   AI_DOCTOR_MANUAL_SENSOR_SOURCES,
   classifyAiDoctorCurrentSensorEvidence,
   currentSensorEvidenceIsFreshLive,
+  buildAiDoctorCurrentSensorSnapshot,
   mergeAiDoctorCurrentSensorWindows,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
+import type { ReadinessCSignal } from "@/lib/aiDoctorReadinessSummaryRules";
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
 import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImportedHistoryDisclosurePanel";
@@ -136,6 +138,13 @@ export interface PlantDetailAiDoctorLiveReviewProps {
   persist?: Parameters<typeof useAiDoctorLiveReview>[0]["persist"];
   /** Test seam: pre-resolved sensor classification (otherwise read live). */
   sensorClassificationOverride?: Classification | null;
+  /** Optional: reports start-blocking state, eligibility and context to a readiness summary. */
+  onReadinessSignal?: (signal: ReadinessCSignal) => void;
+  /**
+   * Optional: hides the pre-start confidence line when a parent readiness summary
+   * already states the verdict. Once a review has started, the line renders as before.
+   */
+  hidePreStartConfidenceCopy?: boolean;
 }
 
 export default function PlantDetailAiDoctorLiveReview({
@@ -167,6 +176,8 @@ function PlantDetailAiDoctorLiveReviewScope({
   invoke,
   persist,
   sensorClassificationOverride,
+  onReadinessSignal,
+  hidePreStartConfidenceCopy = false,
 }: PlantDetailAiDoctorLiveReviewProps) {
   const historicalStartTrackedRef = useRef(false);
   const reviewStartTrackedRef = useRef(false);
@@ -365,6 +376,47 @@ function PlantDetailAiDoctorLiveReviewScope({
   // context from a manual retry.
   const activeReviewRequest =
     acceptedReviewRequest?.scopeKey === historyScopeKey ? acceptedReviewRequest : null;
+
+  const readinessSignalSnapshot = useMemo(
+    () => buildAiDoctorCurrentSensorSnapshot(currentSensorRows),
+    [currentSensorRows],
+  );
+  const readinessSignalHold: ReadinessCSignal["hold"] = currentSensorPending
+    ? "pending"
+    : queryHistoryRecovery.blocksReview || queryRootZoneRecovery.blocksReview
+      ? "recovery"
+      : "none";
+  const readinessSignalMissingKey = context.missing.join("|");
+  const readinessSignalSource = readinessSignalSnapshot?.annotation.source ?? null;
+  const readinessSignalCapturedAt = readinessSignalSnapshot?.capturedAt ?? null;
+  const readinessSignalStale = readinessSignalSnapshot?.annotation.stale ?? null;
+  const readinessSignalHasSensor = readinessSignalSnapshot !== null;
+  useEffect(() => {
+    if (!onReadinessSignal) return;
+    onReadinessSignal({
+      hold: readinessSignalHold,
+      gate: eligibility.mode,
+      ctx: context.readiness,
+      missing: readinessSignalMissingKey ? readinessSignalMissingKey.split("|") : [],
+      sensor: readinessSignalHasSensor
+        ? {
+            source: readinessSignalSource,
+            capturedAt: readinessSignalCapturedAt,
+            stale: readinessSignalStale,
+          }
+        : null,
+    });
+  }, [
+    onReadinessSignal,
+    readinessSignalHold,
+    eligibility.mode,
+    context.readiness,
+    readinessSignalMissingKey,
+    readinessSignalSource,
+    readinessSignalCapturedAt,
+    readinessSignalStale,
+    readinessSignalHasSensor,
+  ]);
   const buildEvidenceAcceptanceForPacket = useCallback(
     (reviewPacket: AiDoctorReviewRequestPacket, reviewMode: "standard" | "historical_review") =>
       buildAiDoctorReviewEvidenceAcceptance({
@@ -907,12 +959,14 @@ function PlantDetailAiDoctorLiveReviewScope({
         ) : null}
       </header>
 
-      <p
-        className="text-xs text-muted-foreground"
-        data-testid="plant-ai-doctor-live-review-confidence-copy"
-      >
-        {confidenceCopy}
-      </p>
+      {hidePreStartConfidenceCopy && !activeReviewRequest ? null : (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="plant-ai-doctor-live-review-confidence-copy"
+        >
+          {confidenceCopy}
+        </p>
+      )}
       {activeReviewVisibility.showsStaleEvidenceNote ? (
         <p
           className="text-xs text-muted-foreground"

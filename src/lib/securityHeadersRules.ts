@@ -39,6 +39,12 @@ export const KNOWN_THIRD_PARTY_ORIGINS = {
     "https://*.ingest.us.sentry.io",
     "https://*.ingest.de.sentry.io",
   ],
+  /**
+   * posthog-js 1.444.0 with api_host https://us.i.posthog.com and no asset_host
+   * override sends events to the ingestion host and loads /static assets from
+   * https://us-assets.i.posthog.com (RequestRouter, region US).
+   */
+  posthog: ["https://us.i.posthog.com", "https://us-assets.i.posthog.com"],
 } as const;
 
 export const CONTENT_SECURITY_POLICY_REPORT_ONLY_HEADER = "Content-Security-Policy-Report-Only";
@@ -64,6 +70,7 @@ export function buildContentSecurityPolicyReportOnly(): string {
     lovableAuth,
     sentryIngest,
     cloudflareInsights,
+    posthog,
   } = KNOWN_THIRD_PARTY_ORIGINS;
   const directives: ReadonlyArray<[string, string]> = [
     ["default-src", "'self'"],
@@ -73,7 +80,9 @@ export function buildContentSecurityPolicyReportOnly(): string {
     ["object-src", "'none'"],
     [
       "script-src",
-      joinSources(["'self'", "'unsafe-inline'"], paddle, googleAnalytics, cloudflareInsights),
+      joinSources(["'self'", "'unsafe-inline'"], paddle, googleAnalytics, cloudflareInsights, [
+        posthog[1],
+      ]),
     ],
     ["style-src", joinSources(["'self'", "'unsafe-inline'"], [googleFonts[0]])],
     ["font-src", joinSources(["'self'", "data:"], [googleFonts[1]])],
@@ -81,7 +90,15 @@ export function buildContentSecurityPolicyReportOnly(): string {
     ["media-src", "'self' blob: https:"],
     [
       "connect-src",
-      joinSources(["'self'"], supabase, paddle, googleAnalytics, lovableAuth, sentryIngest),
+      joinSources(
+        ["'self'"],
+        supabase,
+        paddle,
+        googleAnalytics,
+        lovableAuth,
+        sentryIngest,
+        posthog,
+      ),
     ],
     ["frame-src", joinSources(["'self'"], paddle)],
     ["worker-src", "'self' blob:"],

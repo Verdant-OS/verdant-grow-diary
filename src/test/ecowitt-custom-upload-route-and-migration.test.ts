@@ -47,6 +47,15 @@ describe("EcoWitt plain-HTTP route", () => {
     expect(worker).toBe(source);
     expect(shared).toBe(rules);
   });
+
+  it("keeps the Edge ingest rules byte-identical to src/lib", () => {
+    const rules = readFileSync(resolve(ROOT, "src/lib/ecowittCustomUploadIngestRules.ts"), "utf8");
+    const shared = readFileSync(
+      resolve(ROOT, "supabase/functions/_shared/ecowittCustomUploadIngestRules.ts"),
+      "utf8",
+    );
+    expect(shared).toBe(rules);
+  });
 });
 
 describe("EcoWitt claim migration", () => {
@@ -62,11 +71,24 @@ describe("EcoWitt claim migration", () => {
     expect(MIGRATION).not.toContain("encode(gen_random_bytes(");
     expect(MIGRATION).not.toContain("encode(digest(");
     expect(MIGRATION).toContain("last_captured_at timestamptz");
-    expect(MIGRATION).toContain(
+    expect(MIGRATION).not.toContain(
       "GRANT EXECUTE ON FUNCTION public.reserve_ecowitt_custom_upload_receipt(uuid, timestamptz, timestamptz) TO service_role",
     );
+    expect(MIGRATION).not.toContain(
+      "GRANT EXECUTE ON FUNCTION public.bind_ecowitt_custom_upload_claim(uuid, text, text, timestamptz)",
+    );
+    expect(MIGRATION).toContain("GRANT SELECT (");
+    expect(MIGRATION).not.toContain("token_sha256,\n  passkey_sha256");
+    expect(MIGRATION).toContain(
+      "GRANT EXECUTE ON FUNCTION public.commit_ecowitt_custom_upload_ingest(uuid, timestamptz, timestamptz, text, text, jsonb)",
+    );
+    expect(MIGRATION).toContain("passkey_sha256 = NULL");
+    expect(MIGRATION).toContain("p_captured_at <= v_last_captured");
     expect(MIGRATION).toContain("public.revoke_ecowitt_custom_upload_claim");
     expect(MIGRATION).toContain("public.rotate_ecowitt_custom_upload_claim");
+    expect(MIGRATION).toMatch(
+      /rotate_ecowitt_custom_upload_claim[\s\S]*IF NOT FOUND THEN\s*RAISE EXCEPTION 'claim not found';/,
+    );
     expect(MIGRATION).not.toContain("PASSKEY");
   });
 });

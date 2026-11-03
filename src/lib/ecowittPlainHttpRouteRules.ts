@@ -4,6 +4,8 @@
  * Code only. Nothing here changes DNS, a Cloudflare dashboard, or a live
  * worker. Non-matching paths are left alone (they are not rewritten to `/`).
  * The upstream base is injected. This file has no hostnames and no secrets.
+ * The token is in the path because EcoWitt customized upload is plain HTTP.
+ * The first accepted packet binds the gateway. Rotate replaces that token.
  */
 
 export const ECOWITT_PLAIN_HTTP_MAX_BODY_BYTES = 64 * 1024;

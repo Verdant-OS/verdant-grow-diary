@@ -535,7 +535,7 @@ interface TimelineEnvironmentChild {
   vpd_kpa?: unknown;
 }
 
-interface TimelineEnvironmentSibling {
+export interface TimelineEnvironmentSibling {
   id?: string;
   event_type?: unknown;
   source?: unknown;
@@ -560,7 +560,7 @@ function sensorFromEnvironmentChild(
 }
 
 /** Readings on the manual environment row saved in the same request as `root`. */
-function sensorFromExactEnvironmentSibling(
+export function sensorFromExactEnvironmentSibling(
   root: TimelineEnvironmentSibling,
   rows: readonly TimelineEnvironmentSibling[],
 ): QuickLogCorrectionSensorValues | null {

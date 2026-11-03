@@ -64,6 +64,61 @@ INSERT INTO public.tents (id, user_id) VALUES
 
 \ir ../migrations/20261102150000_ecowitt_custom_upload_claims.sql
 
+CREATE TABLE public.sensor_readings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  tent_id uuid NOT NULL,
+  metric text NOT NULL,
+  value numeric NOT NULL,
+  quality text NOT NULL,
+  source text NOT NULL,
+  captured_at timestamptz NOT NULL,
+  ts timestamptz NOT NULL DEFAULT now(),
+  raw_payload jsonb
+);
+
+CREATE UNIQUE INDEX sensor_readings_dedupe_uidx
+  ON public.sensor_readings (user_id, tent_id, source, metric, captured_at);
+
+CREATE OR REPLACE FUNCTION public.validate_sensor_reading()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF NEW.metric NOT IN (
+    'temperature_c','humidity_pct','vpd_kpa','co2_ppm','soil_moisture_pct',
+    'ph','ec','ppfd'
+  ) THEN
+    RAISE EXCEPTION 'invalid sensor metric: %', NEW.metric;
+  END IF;
+  IF NEW.quality NOT IN ('ok','degraded','stale','invalid') THEN
+    RAISE EXCEPTION 'invalid sensor quality: %', NEW.quality;
+  END IF;
+  IF NEW.source NOT IN (
+    'live','manual','csv','demo','stale','invalid',
+    'pi_bridge','sim',
+    'webhook_generic','node_red_bridge',
+    'esp32_arduino','esp32_arduino_sht31','esp32_esphome','esp32_mqtt_bridge',
+    'home_assistant_bridge','ha_forwarded',
+    'ecowitt','mqtt','webhook'
+  ) THEN
+    RAISE EXCEPTION 'invalid sensor source: %', NEW.source;
+  END IF;
+  IF NEW.value IS NULL OR NEW.value = 'NaN'::numeric THEN
+    RAISE EXCEPTION 'sensor value must be a finite number';
+  END IF;
+  IF NEW.captured_at IS NOT NULL AND NEW.captured_at > now() + interval '5 minutes' THEN
+    RAISE EXCEPTION 'captured_at cannot be more than 5 minutes in the future';
+  END IF;
+  RETURN NEW;
+END
+$function$;
+
+CREATE TRIGGER validate_sensor_reading
+  BEFORE INSERT OR UPDATE ON public.sensor_readings
+  FOR EACH ROW EXECUTE FUNCTION public.validate_sensor_reading();
+
 CREATE TABLE public.pgtap_ecowitt_scratch (
   k text PRIMARY KEY,
   claim_id uuid,
@@ -73,7 +128,7 @@ CREATE TABLE public.pgtap_ecowitt_scratch (
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.pgtap_ecowitt_scratch
   TO authenticated, service_role;
 
-SELECT plan(50);
+SELECT plan(79);
 
 SELECT has_table(
   'public'::name,
@@ -128,8 +183,28 @@ SELECT ok(
 );
 
 SELECT ok(
-  has_table_privilege('authenticated', 'public.ecowitt_custom_upload_claims', 'SELECT'),
-  'authenticated can select'
+  has_column_privilege('authenticated', 'public.ecowitt_custom_upload_claims', 'tent_id', 'SELECT'),
+  'authenticated can select tent_id'
+);
+
+SELECT ok(
+  NOT has_column_privilege(
+    'authenticated',
+    'public.ecowitt_custom_upload_claims',
+    'token_sha256',
+    'SELECT'
+  ),
+  'authenticated cannot select token_sha256'
+);
+
+SELECT ok(
+  NOT has_column_privilege(
+    'authenticated',
+    'public.ecowitt_custom_upload_claims',
+    'passkey_sha256',
+    'SELECT'
+  ),
+  'authenticated cannot select passkey_sha256'
 );
 
 SELECT ok(
@@ -138,12 +213,21 @@ SELECT ok(
 );
 
 SELECT ok(
-  has_function_privilege(
+  NOT has_function_privilege(
     'service_role',
     'public.reserve_ecowitt_custom_upload_receipt(uuid,timestamptz,timestamptz)',
     'EXECUTE'
   ),
-  'service role can execute reserve'
+  'service role cannot execute reserve'
+);
+
+SELECT ok(
+  NOT has_function_privilege(
+    'service_role',
+    'public.bind_ecowitt_custom_upload_claim(uuid,text,text,timestamptz)',
+    'EXECUTE'
+  ),
+  'service role cannot execute bind'
 );
 
 SELECT ok(
@@ -358,7 +442,6 @@ SELECT lives_ok(
       claim uuid;
     BEGIN
       SELECT claim_id INTO claim FROM public.pgtap_ecowitt_scratch WHERE k = 'created';
-      EXECUTE 'SET LOCAL ROLE service_role';
       SELECT public.reserve_ecowitt_custom_upload_receipt(
         claim,
         '2026-11-02 18:00:00+00',
@@ -396,7 +479,6 @@ SELECT lives_ok(
       claim uuid;
     BEGIN
       SELECT claim_id INTO claim FROM public.pgtap_ecowitt_scratch WHERE k = 'created';
-      EXECUTE 'SET LOCAL ROLE service_role';
       SELECT public.reserve_ecowitt_custom_upload_receipt(
         claim,
         '2026-11-02 18:00:07+00',
@@ -434,7 +516,6 @@ SELECT lives_ok(
       claim uuid;
     BEGIN
       SELECT claim_id INTO claim FROM public.pgtap_ecowitt_scratch WHERE k = 'created';
-      EXECUTE 'SET LOCAL ROLE service_role';
       SELECT public.reserve_ecowitt_custom_upload_receipt(
         claim,
         '2026-11-02 18:00:09+00',
@@ -472,7 +553,6 @@ SELECT lives_ok(
       claim uuid;
     BEGIN
       SELECT claim_id INTO claim FROM public.pgtap_ecowitt_scratch WHERE k = 'created';
-      EXECUTE 'SET LOCAL ROLE service_role';
       SELECT public.reserve_ecowitt_custom_upload_receipt(
         claim,
         '2026-11-02 18:00:18+00',
@@ -660,7 +740,6 @@ SELECT lives_ok(
       claim uuid;
     BEGIN
       SELECT claim_id INTO claim FROM public.pgtap_ecowitt_scratch WHERE k = 'created';
-      EXECUTE 'SET LOCAL ROLE service_role';
       SELECT public.reserve_ecowitt_custom_upload_receipt(
         claim,
         '2026-11-02 18:01:00+00',
@@ -722,6 +801,414 @@ $$,
 SELECT ok(
   (SELECT token FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again') ~ '^[0-9a-f]{48}$',
   'the claim created after revoke is a 48 hex token'
+);
+
+SELECT lives_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+      first_bind boolean;
+      second_bind boolean;
+    BEGIN
+      first_bind := public.bind_ecowitt_custom_upload_claim(
+        cid,
+        repeat('ab', 32),
+        'GW1200',
+        '2026-11-02 18:00:00+00'
+      );
+      second_bind := public.bind_ecowitt_custom_upload_claim(
+        cid,
+        repeat('cd', 32),
+        'GW1200B',
+        '2026-11-02 18:01:00+00'
+      );
+      IF first_bind IS NOT TRUE OR second_bind IS NOT FALSE THEN
+        RAISE EXCEPTION 'bind results % %', first_bind, second_bind;
+      END IF;
+      IF (
+        SELECT passkey_sha256
+        FROM public.ecowitt_custom_upload_claims
+        WHERE id = cid
+      ) IS DISTINCT FROM repeat('ab', 32) THEN
+        RAISE EXCEPTION 'second bind replaced the passkey';
+      END IF;
+    END
+  $body$
+$$,
+  'bind updates only while passkey_sha256 is null'
+);
+
+SELECT has_function(
+  'public'::name,
+  'commit_ecowitt_custom_upload_ingest'::name,
+  ARRAY['uuid', 'timestamptz', 'timestamptz', 'text', 'text', 'jsonb']::name[],
+  'commit ingest is one function'
+);
+
+SELECT throws_ok(
+  $$DO $body$
+    BEGIN
+      EXECUTE 'SET LOCAL ROLE authenticated';
+      PERFORM public.commit_ecowitt_custom_upload_ingest(
+        '11111111-1111-4111-8111-111111111111'::uuid,
+        '2026-11-02 18:00:00+00'::timestamptz,
+        '2026-11-02 18:00:00+00'::timestamptz,
+        repeat('ab', 32),
+        'GW1200',
+        '[{"metric":"humidity_pct","value":55,"quality":"ok"}]'::jsonb
+      );
+    END
+  $body$
+$$,
+  '42501',
+  NULL,
+  'authenticated cannot call commit'
+);
+
+SELECT lives_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+      result text;
+    BEGIN
+      result := public.commit_ecowitt_custom_upload_ingest(
+        cid,
+        '2026-11-02 19:00:00+00',
+        '2026-11-02 19:00:00+00',
+        repeat('ab', 32),
+        'GW1200',
+        '[{"metric":"humidity_pct","value":55,"quality":"ok","raw_payload":{"vendor":"ecowitt"}}]'::jsonb
+      );
+      IF result IS DISTINCT FROM 'ok' THEN
+        RAISE EXCEPTION 'commit result %', result;
+      END IF;
+    END
+  $body$
+$$,
+  'service commit stores the reading and binds the first sender'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.sensor_readings),
+  1,
+  'the first commit stored one row'
+);
+
+SELECT is(
+  (SELECT passkey_sha256 FROM public.ecowitt_custom_upload_claims
+    WHERE id = (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again')),
+  repeat('ab', 32),
+  'the first sender is bound'
+);
+
+SELECT is(
+  public.commit_ecowitt_custom_upload_ingest(
+    (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again'),
+    '2026-11-02 19:00:01+00',
+    '2026-11-02 19:00:10+00',
+    repeat('cd', 32),
+    'GW1200B',
+    '[{"metric":"humidity_pct","value":40,"quality":"ok"}]'::jsonb
+  ),
+  'rate_limited',
+  'a second packet inside the gap is rate limited'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.sensor_readings),
+  1,
+  'a rate-limited commit stores zero rows'
+);
+
+SELECT is(
+  public.commit_ecowitt_custom_upload_ingest(
+    (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again'),
+    '2026-11-02 20:00:00+00',
+    '2026-11-02 18:00:00+00',
+    repeat('ab', 32),
+    'GW1200',
+    '[{"metric":"humidity_pct","value":40,"quality":"ok"}]'::jsonb
+  ),
+  'duplicate_captured_at',
+  'an older captured_at is a replay'
+);
+
+SELECT is(
+  public.commit_ecowitt_custom_upload_ingest(
+    (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again'),
+    '2026-11-02 20:00:00+00',
+    '2026-11-02 20:00:00+00',
+    repeat('cd', 32),
+    'GW1200B',
+    '[{"metric":"humidity_pct","value":40,"quality":"ok"}]'::jsonb
+  ),
+  'passkey_mismatch',
+  'a second passkey stores nothing'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.sensor_readings),
+  1,
+  'the mismatched passkey stored zero rows'
+);
+
+SELECT lives_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+    BEGIN
+      PERFORM set_config(
+        'request.jwt.claims',
+        '{"sub":"11111111-1111-4111-8111-111111111111","is_anonymous":false}',
+        true
+      );
+      UPDATE public.ecowitt_custom_upload_claims
+      SET revoked_at = clock_timestamp()
+      WHERE id = cid;
+      IF public.commit_ecowitt_custom_upload_ingest(
+        cid,
+        '2026-11-02 21:00:00+00',
+        '2026-11-02 21:00:00+00',
+        repeat('ab', 32),
+        'GW1200',
+        '[{"metric":"humidity_pct","value":40,"quality":"ok"}]'::jsonb
+      ) IS DISTINCT FROM 'claim_not_found' THEN
+        RAISE EXCEPTION 'revoked claim stored';
+      END IF;
+      UPDATE public.ecowitt_custom_upload_claims
+      SET revoked_at = NULL
+      WHERE id = cid;
+    END
+  $body$
+$$,
+  'a revoked claim stores zero rows'
+);
+
+SELECT lives_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+      rotated text;
+    BEGIN
+      PERFORM set_config(
+        'request.jwt.claims',
+        '{"sub":"11111111-1111-4111-8111-111111111111","is_anonymous":false}',
+        true
+      );
+      EXECUTE 'SET LOCAL ROLE authenticated';
+      rotated := public.rotate_ecowitt_custom_upload_claim(cid);
+      IF rotated !~ '^[0-9a-f]{48}$' THEN
+        RAISE EXCEPTION 'rotate token %', rotated;
+      END IF;
+    END
+  $body$
+$$,
+  'owner A rotates the scratch claim'
+);
+
+SELECT is(
+  (
+    SELECT passkey_sha256 IS NULL AND bound_at IS NULL AND stationtype IS NULL
+    FROM public.ecowitt_custom_upload_claims
+    WHERE id = (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again')
+  ),
+  true,
+  'rotate clears the passkey binding'
+);
+
+SELECT throws_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+    BEGIN
+      CREATE OR REPLACE FUNCTION public.ecowitt_pgtap_fail_reading()
+      RETURNS trigger LANGUAGE plpgsql AS $fn$
+      BEGIN
+        RAISE EXCEPTION 'forced reading failure';
+      END
+      $fn$;
+      CREATE TRIGGER ecowitt_pgtap_fail_reading
+        BEFORE INSERT ON public.sensor_readings
+        FOR EACH ROW EXECUTE FUNCTION public.ecowitt_pgtap_fail_reading();
+      PERFORM public.commit_ecowitt_custom_upload_ingest(
+        cid,
+        '2026-11-02 22:00:00+00',
+        '2026-11-02 22:00:00+00',
+        repeat('ab', 32),
+        'GW1200',
+        '[{"metric":"temperature_c","value":22,"quality":"ok"}]'::jsonb
+      );
+    END
+  $body$
+$$,
+  'P0001',
+  'forced reading failure',
+  'a failed insert raises'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.sensor_readings),
+  1,
+  'the failed insert left the earlier row and stored nothing new'
+);
+
+SELECT is(
+  (
+    SELECT last_received_at = '2026-11-02 19:00:00+00'::timestamptz
+    FROM public.ecowitt_custom_upload_claims
+    WHERE id = (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again')
+  ),
+  true,
+  'the failed insert rolled the reserve back'
+);
+
+SELECT lives_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+      result text;
+    BEGIN
+      DROP TRIGGER IF EXISTS ecowitt_pgtap_fail_reading ON public.sensor_readings;
+      result := public.commit_ecowitt_custom_upload_ingest(
+        cid,
+        '2026-11-02 22:00:00+00',
+        '2026-11-02 22:00:00+00',
+        repeat('ab', 32),
+        'GW1200',
+        '[{"metric":"temperature_c","value":22,"quality":"ok"}]'::jsonb
+      );
+      IF result IS DISTINCT FROM 'ok' THEN
+        RAISE EXCEPTION 'retry result %', result;
+      END IF;
+    END
+  $body$
+$$,
+  'a retry after the failed insert stores the reading'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.sensor_readings),
+  2,
+  'the retry stored the reading'
+);
+
+SELECT is(
+  public.commit_ecowitt_custom_upload_ingest(
+    (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again'),
+    '2026-11-02 23:00:00+00',
+    '2026-11-02 22:00:00+00',
+    repeat('ab', 32),
+    'GW1200',
+    '[{"metric":"humidity_pct","value":40,"quality":"ok"}]'::jsonb
+  ),
+  'duplicate_captured_at',
+  'an equal captured_at is a replay'
+);
+
+SELECT throws_ok(
+  $$DO $body$
+    BEGIN
+      PERFORM set_config(
+        'request.jwt.claims',
+        '{"sub":"11111111-1111-4111-8111-111111111111","is_anonymous":false}',
+        true
+      );
+      EXECUTE 'SET LOCAL ROLE authenticated';
+      PERFORM token_sha256 FROM public.ecowitt_custom_upload_claims LIMIT 1;
+    END
+  $body$
+$$,
+  '42501',
+  NULL,
+  'an owner select cannot read token_sha256'
+);
+
+SELECT throws_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+    BEGIN
+      INSERT INTO public.sensor_readings (
+        user_id, tent_id, source, metric, value, quality, captured_at, ts, raw_payload
+      )
+      SELECT user_id, tent_id, 'live', 'humidity_pct', 55, 'ok',
+        '2026-11-02 23:30:00+00', '2026-11-02 23:30:00+00', '{}'::jsonb
+      FROM public.ecowitt_custom_upload_claims
+      WHERE id = cid;
+      PERFORM public.commit_ecowitt_custom_upload_ingest(
+        cid,
+        '2026-11-02 23:30:00+00',
+        '2026-11-02 23:30:00+00',
+        repeat('ab', 32),
+        'GW1200',
+        '[{"metric":"humidity_pct","value":55,"quality":"ok","raw_payload":{"vendor":"ecowitt"}}]'::jsonb
+      );
+    END
+  $body$
+$$,
+  '23505',
+  'sensor reading already stored',
+  'a packet whose every metric collides rolls back'
+);
+
+SELECT is(
+  (
+    SELECT last_received_at = '2026-11-02 22:00:00+00'::timestamptz
+    FROM public.ecowitt_custom_upload_claims
+    WHERE id = (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again')
+  ),
+  true,
+  'the all-duplicate packet rolled the receipt back'
+);
+
+SELECT lives_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+      result text;
+    BEGIN
+      INSERT INTO public.sensor_readings (
+        user_id, tent_id, source, metric, value, quality, captured_at, ts
+      )
+      SELECT user_id, tent_id, 'live', 'temperature_c', 22, 'ok',
+        '2026-11-03 00:00:00+00', '2026-11-03 00:00:00+00'
+      FROM public.ecowitt_custom_upload_claims
+      WHERE id = cid;
+      result := public.commit_ecowitt_custom_upload_ingest(
+        cid,
+        '2026-11-03 00:00:00+00',
+        '2026-11-03 00:00:00+00',
+        repeat('ab', 32),
+        'GW1200',
+        $json$[{"metric":"temperature_c","value":22.2,"quality":"ok","raw_payload":{"channels":[{"channel":2,"includedInMean":true}],"aggregation":"mean"}},{"metric":"humidity_pct","value":60,"quality":"degraded","raw_payload":{"channels":[{"channel":2,"rawKey":"humidity2","suspect":false,"includedInMean":true},{"channel":3,"rawKey":"humidity3","suspect":true,"includedInMean":false,"rawValue":"0"}],"aggregation":"mean"}}]$json$::jsonb
+      );
+      IF result IS DISTINCT FROM 'partial:1' THEN
+        RAISE EXCEPTION 'partial result %', result;
+      END IF;
+    END
+  $body$
+$$,
+  'one colliding metric still stores the other'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::integer
+    FROM public.sensor_readings
+    WHERE metric = 'temperature_c' AND captured_at = '2026-11-03 00:00:00+00'
+  ),
+  1,
+  'the colliding temperature row was not duplicated'
+);
+
+SELECT is(
+  (
+    SELECT raw_payload->'channels'->1->>'includedInMean'
+    FROM public.sensor_readings
+    WHERE metric = 'humidity_pct' AND captured_at = '2026-11-03 00:00:00+00'
+  ),
+  'false',
+  'the stored humidity payload keeps the suspect channel flag'
 );
 
 SELECT * FROM finish(true);

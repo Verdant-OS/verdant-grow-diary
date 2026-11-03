@@ -41,6 +41,8 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
   } | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [csvHasOlder, setCsvHasOlder] = useState(false);
+  const [olderError, setOlderError] = useState(false);
 
   const tentIds = useMemo(() => {
     const s = new Set<string>();
@@ -81,17 +83,40 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
           .eq("source", "csv")
           .in("tent_id", scopedTentIds)
           .order("captured_at", { ascending: false })
+          .order("id", { ascending: false })
           .limit(TimelineBoundedRead.csvPageSize);
 
         if (cancelled || request !== latestRequest) return;
         if (error) throw error;
         if (!Array.isArray(data))
           throw new Error("CSV environment context response is not a list.");
+        const page = (data as Record<string, unknown>[]).map((row) =>
+          TimelineBoundedRead.shapeCsvRow(row),
+        );
+        let hasOlder = false;
+        if (page.length === TimelineBoundedRead.csvPageSize) {
+          const cursor = page[page.length - 1];
+          const captured = cursor?.captured_at;
+          const id = cursor?.id;
+          if (typeof captured === "string" && captured.length > 0 && typeof id === "string" && id) {
+            const probe = await supabase
+              .from("sensor_readings")
+              .select(TimelineBoundedRead.csvSelect)
+              .eq("source", "csv")
+              .in("tent_id", scopedTentIds)
+              .or(TimelineBoundedRead.csvOlderKeyset(captured, id))
+              .order("captured_at", { ascending: false })
+              .order("id", { ascending: false })
+              .limit(1);
+            if (cancelled || request !== latestRequest) return;
+            if (probe.error) throw probe.error;
+            hasOlder = Array.isArray(probe.data) && probe.data.length > 0;
+          }
+        }
+        setCsvHasOlder(hasOlder);
         setReadState({
           scopeKey,
-          rows: (data as Record<string, unknown>[]).map((row) =>
-            TimelineBoundedRead.shapeCsvRow(row),
-          ),
+          rows: page,
           status: "success",
         });
       } catch {
@@ -115,17 +140,18 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
     };
   }, [growId, tentIdsKey, scopeKey, retryAttempt]);
 
-  const oldestCapturedAt = rows.reduce<string | null>((oldest, row) => {
-    const captured = row.captured_at;
-    if (typeof captured !== "string" || captured.length === 0) return oldest;
-    if (oldest === null || captured < oldest) return captured;
-    return oldest;
-  }, null);
-  const csvHasOlder = rows.length > 0 && rows.length % TimelineBoundedRead.csvPageSize === 0;
+  const cursor = rows.length > 0 ? rows[rows.length - 1] : null;
+  const cursorCapturedAt =
+    cursor && typeof cursor.captured_at === "string" && cursor.captured_at.length > 0
+      ? cursor.captured_at
+      : null;
+  const cursorId =
+    cursor && typeof cursor.id === "string" && cursor.id.length > 0 ? cursor.id : null;
 
   async function loadOlderCsv() {
-    if (!growId || !oldestCapturedAt || loadingOlder) return;
+    if (!growId || !cursorCapturedAt || !cursorId || loadingOlder) return;
     setLoadingOlder(true);
+    setOlderError(false);
     try {
       const scopedTentIds = JSON.parse(tentIdsKey) as string[];
       const { data, error } = await supabase
@@ -133,13 +159,17 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
         .select(TimelineBoundedRead.csvSelect)
         .eq("source", "csv")
         .in("tent_id", scopedTentIds)
+        .or(TimelineBoundedRead.csvOlderKeyset(cursorCapturedAt, cursorId))
         .order("captured_at", { ascending: false })
-        .lt("captured_at", oldestCapturedAt)
-        .limit(TimelineBoundedRead.csvPageSize);
+        .order("id", { ascending: false })
+        .limit(TimelineBoundedRead.csvOlderFetchLimit);
       if (error || !Array.isArray(data)) throw error ?? new Error("CSV page unavailable");
-      const page = (data as Record<string, unknown>[]).map((row) =>
+      const fetched = (data as Record<string, unknown>[]).map((row) =>
         TimelineBoundedRead.shapeCsvRow(row),
       );
+      const hasAnother = fetched.length > TimelineBoundedRead.csvPageSize;
+      const page = hasAnother ? fetched.slice(0, TimelineBoundedRead.csvPageSize) : fetched;
+      setCsvHasOlder(hasAnother);
       setReadState((previous) => {
         const current = previous?.scopeKey === scopeKey ? previous.rows : rows;
         const seen = new Set(current.map((row) => row.id).filter(Boolean));
@@ -147,11 +177,7 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
         return { scopeKey, rows: [...current, ...extra], status: "success" };
       });
     } catch {
-      setReadState((previous) => ({
-        scopeKey,
-        rows: previous?.scopeKey === scopeKey ? previous.rows : rows,
-        status: "error",
-      }));
+      setOlderError(true);
     } finally {
       setLoadingOlder(false);
     }
@@ -222,6 +248,20 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
             onClick={() => setRetryAttempt((attempt) => attempt + 1)}
           >
             Retry CSV context
+          </Button>
+        </div>
+      ) : null}
+      {olderError ? (
+        <div role="alert" className="space-y-2 text-xs text-muted-foreground">
+          <p>Older CSV context could not be loaded.</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="timeline-csv-load-older-retry"
+            onClick={() => void loadOlderCsv()}
+          >
+            Retry older CSV context
           </Button>
         </div>
       ) : null}

@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### TENT-NEXT-STEP-DEAD-END
+
+```text
+TASK TENT-NEXT-STEP-DEAD-END  priority: other  status: OPEN
+goal: Tent Detail's One-Tent Loop card gives a real next step when the tent's verified active plant count is known: "Add plant" for an empty tent, "Choose a plant below to open it." for several; unchanged when the count is unknown.
+why: Live audit 2026-11-03 finding 2: on an identified tent with assigned plants the card said "Next step unavailable until this record is selected."
+branch: claude/tent-next-step-dead-end
+base: verdant-grow-diary
+checkout: git fetch origin claude/tent-next-step-dead-end verdant-grow-diary && git switch claude/tent-next-step-dead-end
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub (this block rides the first commit)
+state: implemented and tested locally; draft PR.
+current_step: draft PR open.
+next_action: Matthew names the reviewer and merge authority. Signed-in visual check of Tent Detail is NOT_MEASURED.
+post_merge_check: after Publish, open a fixture tent with two or more plants on https://verdantgrowdiary.com and confirm the card reads "Choose a plant below to open it." NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: mirrors the grow case's "Add tent" activation; uses the existing verified count (resolveVerifiedAssignedPlantCount), so a stale or failed read keeps the generic state; never selects a plant (remembered-target ban unaffected).
+tried_and_rejected: a same-page anchor link to the plant list (hash navigation through the compat shim is untested; copy without a link is enough).
+commands: bunx vitest run src/test/one-tent-loop-tent-plant-count.test.tsx --reporter=dot
+files_touched: src/lib/oneTentLoopNavigationRules.ts; src/pages/TentDetail.tsx; src/test/one-tent-loop-tent-plant-count.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: the rest of finding 2 (Timeline banners, AI Doctor first CTA, Action Queue preamble) needs founder layout decisions
+gotchas: callers that do not pass tentPlantCount keep today's behaviour, so existing pins stay valid
+links: audit finding 2 (private upload, not committed)
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 16:38 CT, by Claude
+```
+
 ### AI-DOCTOR-READINESS-SUMMARY-IMPL
 
 ```text

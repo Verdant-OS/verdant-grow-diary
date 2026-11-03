@@ -30,10 +30,12 @@ export interface TimelineDiaryLike {
 export interface TimelineCsvContextPanelProps {
   growId: string | null | undefined;
   entries: readonly TimelineDiaryLike[];
+  /** Banner and older-page controls. Chips still render when this is false. */
+  showChrome?: boolean;
 }
 
 export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
-  const { growId, entries } = props;
+  const { growId, entries, showChrome = true } = props;
   const [readState, setReadState] = useState<{
     scopeKey: string;
     rows: CsvSensorReadingRow[];
@@ -213,6 +215,14 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
   if (readStatus === "success" && matchedByEntry.size === 0 && !csvHasOlder) return null;
 
   const hasCachedMatches = matchedByEntry.size > 0;
+  const chips = [...matchedByEntry.values()].map((c) => (
+    <CsvTimelineEnvironmentChip
+      key={c.diaryEntryId}
+      diaryEntryId={c.diaryEntryId}
+      snapshot={c.snapshot}
+    />
+  ));
+  if (!showChrome) return <>{chips}</>;
 
   return (
     <section data-testid="timeline-csv-context-panel" className="mt-4 space-y-2">
@@ -277,13 +287,7 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
           {loadingOlder ? "Loading older CSV context…" : "Load older CSV context"}
         </Button>
       ) : null}
-      {[...matchedByEntry.values()].map((c) => (
-        <CsvTimelineEnvironmentChip
-          key={c.diaryEntryId}
-          diaryEntryId={c.diaryEntryId}
-          snapshot={c.snapshot}
-        />
-      ))}
+      {chips}
     </section>
   );
 }

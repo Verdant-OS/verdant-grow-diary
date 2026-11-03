@@ -178,17 +178,23 @@ describe("TimelineBoundedRead", () => {
     expect(summary.suspiciousFlagCount).toBe(1);
   });
 
-  it("opens CSV context only after the grower asks, and pages timestamp ties by id", async () => {
+  it("renders the CSV chip while the context toggle stays closed, and pages timestamp ties by id", async () => {
     render(
       <TimelineCsvContextGate
         growId="g1"
         entries={[{ id: "d1", tent_id: "tA", entry_at: "2026-06-01T12:00:00.000Z" }]}
       />,
     );
+    const chip = await screen.findByTestId("csv-timeline-chip-d1");
+    expect(chip).toHaveAttribute("data-source", "CSV");
+    expect(chip.textContent).toContain("20.0 °C");
     expect(screen.queryByTestId("timeline-csv-context-panel")).toBeNull();
+    expect(screen.getByTestId("timeline-csv-context-open")).toBeTruthy();
+    const first = queries[0];
+    expect(String(first?.select)).not.toContain("raw_payload,");
+    expect(String(first?.select)).toContain("vpd_source:raw_payload->>vpd_source");
     fireEvent.click(screen.getByTestId("timeline-csv-context-open"));
     const older = await screen.findByTestId("timeline-csv-load-older");
-    const first = queries[0];
     expect(first?.limit).toBe(TimelineBoundedRead.csvPageSize);
     expect(first?.orders).toEqual([
       ["captured_at", { ascending: false }],

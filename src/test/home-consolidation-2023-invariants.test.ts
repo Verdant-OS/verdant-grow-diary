@@ -26,42 +26,46 @@ function redirectOf(pathAndQuery: string) {
 }
 
 describe("#2023 home consolidation", () => {
-  it.each(["/welcome", "/features", "/demo"])("%s is a permanent 308 straight to /", (path) => {
-    expect(redirectOf(path)).toMatchObject({ kind: "redirect", status: 308, location: "/" });
+  it("/demo is a permanent 308 straight to /", () => {
+    expect(redirectOf("/demo")).toMatchObject({ kind: "redirect", status: 308, location: "/" });
   });
 
-  it("keeps signup attribution and return-to through the redirect", () => {
+  it.each(["/welcome", "/features"])("%s is served as its own page, not redirected", (path) => {
+    expect(redirectOf(path)).toMatchObject({ kind: "continue", location: null });
+  });
+
+  it("keeps signup attribution and return-to on the /welcome landing page", () => {
     const attributed = buildAttributedLandingPath({ source: "operator_outreach" });
     expect(attributed.startsWith("/welcome?")).toBe(true);
     const decision = redirectOf(`${attributed}&redirectTo=%2Ftimeline`);
-    expect(decision).toMatchObject({ kind: "redirect", status: 308 });
-    const location = (decision as { location: string }).location;
-    const landed = new URL(location, VERDANT_SITE_ORIGIN);
-    expect(landed.pathname).toBe("/");
+    expect(decision).toMatchObject({ kind: "continue", location: null });
+    const landed = new URL(`${attributed}&redirectTo=%2Ftimeline`, VERDANT_SITE_ORIGIN);
+    expect(landed.pathname).toBe("/welcome");
     expect(landed.searchParams.get("redirectTo")).toBe("/timeline");
     expect(resolvePaidAcquisitionSource(landed.searchParams)).toBe("operator_outreach");
   });
 
-  it("publishes / as the canonical home and no /welcome document or canonical", () => {
+  it("publishes / as the canonical home, with /welcome and /features self-canonical", () => {
     const home = STATIC_PUBLIC_OUTPUT_DOCUMENTS.find((doc) => doc.path === "/");
     expect(home?.metadata.url).toBe(`${VERDANT_SITE_ORIGIN}/`);
-    for (const doc of STATIC_PUBLIC_OUTPUT_DOCUMENTS) {
-      expect(doc.path).not.toBe("/welcome");
-      expect(new URL(doc.metadata.url).pathname).not.toBe("/welcome");
+    for (const path of ["/welcome", "/features"]) {
+      const doc = STATIC_PUBLIC_OUTPUT_DOCUMENTS.find((candidate) => candidate.path === path);
+      expect(doc?.metadata.url).toBe(`${VERDANT_SITE_ORIGIN}${path}`);
     }
   });
 
-  it("lists / and not /welcome in the sitemap", () => {
+  it("lists /, /welcome and /features in the sitemap", () => {
     const locs = [...read("public/sitemap.xml").matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
     expect(locs).toContain(`${VERDANT_SITE_ORIGIN}/`);
-    expect(locs.filter((loc) => new URL(loc).pathname === "/welcome")).toEqual([]);
+    expect(locs).toContain(`${VERDANT_SITE_ORIGIN}/welcome`);
+    expect(locs).toContain(`${VERDANT_SITE_ORIGIN}/features`);
   });
 
-  it("points llms.txt Home at / and lists /welcome only as a redirect route", () => {
+  it("points llms.txt Home at / and lists /welcome as a public page", () => {
     const llms = read("public/llms.txt");
     expect(llms).toContain("- [Home](/):");
-    expect(llms).not.toMatch(/\]\(\/welcome[)?#]/);
-    expect(getRoutesByAccess("redirect").map((route) => route.path)).toContain("/welcome");
-    expect(getRoutesByAccess("public").map((route) => route.path)).not.toContain("/welcome");
+    expect(llms).toContain("](/welcome)");
+    expect(getRoutesByAccess("public").map((route) => route.path)).toContain("/welcome");
+    expect(getRoutesByAccess("redirect").map((route) => route.path)).not.toContain("/welcome");
   });
 });

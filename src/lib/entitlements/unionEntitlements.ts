@@ -18,7 +18,11 @@ import type { BillingSubscriptionRow, PlanId } from "./types";
 import { subscriptionGrantsAccess } from "../paddleSubscriptionAccessRules";
 
 export type EntitlementSource =
-  "free" | "byo_paddle" | "lovable_paddle_subscription" | "lovable_paddle_lifetime";
+  | "free"
+  | "byo_paddle"
+  | "lovable_paddle_subscription"
+  | "lovable_paddle_lifetime"
+  | "lovable_stripe_subscription";
 
 export interface PickStrongestResult {
   row: BillingSubscriptionRow | null;
@@ -118,7 +122,7 @@ export function resolveUnionEntitlements(input: ResolveUnionInput): ResolvedEnti
   });
   const picked = pickStrongestBilling(input.byoRow, mappedLovable, input.now);
   const resolved = resolveEntitlements(picked.row, input.now, input.opts);
-  return { ...resolved, source: picked.source };
+  return { ...resolved, source: mappedLovable?.provider === "stripe" && picked.row === mappedLovable ? "lovable_stripe_subscription" : picked.source };
 }
 
 /**

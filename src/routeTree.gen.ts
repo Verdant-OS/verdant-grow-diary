@@ -71,6 +71,7 @@ import { Route as AppTentsRouteImport } from './routes/_app/tents'
 import { Route as AppTimelineRouteImport } from './routes/_app/timeline'
 import { Route as BillingPlanRouteImport } from './routes/billing.$plan'
 import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
+import { Route as CheckoutStripeRouteImport } from './routes/checkout.stripe'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as CultivarsIndexRouteImport } from './routes/cultivars.index'
 import { Route as CultivarsSlugRouteImport } from './routes/cultivars.$slug'
@@ -160,6 +161,7 @@ import { Route as AppGrowsGrowIdLearningRouteImport } from './routes/_app/grows_
 import { Route as AppPhenoHuntsIdKeepersRouteImport } from './routes/_app/pheno-hunts_.$id.keepers'
 import { Route as AppPhenoHuntsIdWorkspaceRouteImport } from './routes/_app/pheno-hunts_.$id.workspace'
 import { Route as AppReportsPostGrowGrowIdRouteImport } from './routes/_app/reports_.post-grow.$growId'
+import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as AppGeneticsHealthKindIdRouteImport } from './routes/_app/genetics.health.$kind.$id'
 import { Route as AppGeneticsTraceKindIdRouteImport } from './routes/_app/genetics.trace.$kind.$id'
 
@@ -469,6 +471,11 @@ const BillingPlanRoute = BillingPlanRouteImport.update({
 const CheckoutCancelRoute = CheckoutCancelRouteImport.update({
   id: '/checkout/cancel',
   path: '/checkout/cancel',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutStripeRoute = CheckoutStripeRouteImport.update({
+  id: '/checkout/stripe',
+  path: '/checkout/stripe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
@@ -965,6 +972,12 @@ const AppReportsPostGrowGrowIdRoute =
     path: '/reports/post-grow/$growId',
     getParentRoute: () => AppRoute,
   } as any)
+const ApiPublicPaymentsWebhookRoute =
+  ApiPublicPaymentsWebhookRouteImport.update({
+    id: '/api/public/payments/webhook',
+    path: '/api/public/payments/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppGeneticsHealthKindIdRoute = AppGeneticsHealthKindIdRouteImport.update({
   id: '/health/$kind/$id',
   path: '/health/$kind/$id',
@@ -1037,6 +1050,7 @@ export interface FileRoutesByFullPath {
   '/timeline': typeof AppTimelineRoute
   '/billing/$plan': typeof BillingPlanRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
+  '/checkout/stripe': typeof CheckoutStripeRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
@@ -1126,6 +1140,7 @@ export interface FileRoutesByFullPath {
   '/pheno-hunts/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
   '/pheno-hunts/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
   '/reports/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1189,6 +1204,7 @@ export interface FileRoutesByTo {
   '/timeline': typeof AppTimelineRoute
   '/billing/$plan': typeof BillingPlanRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
+  '/checkout/stripe': typeof CheckoutStripeRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
@@ -1278,6 +1294,7 @@ export interface FileRoutesByTo {
   '/pheno-hunts/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
   '/pheno-hunts/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
   '/reports/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1345,6 +1362,7 @@ export interface FileRoutesById {
   '/_app/timeline': typeof AppTimelineRoute
   '/billing/$plan': typeof BillingPlanRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
+  '/checkout/stripe': typeof CheckoutStripeRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/cultivars/$slug': typeof CultivarsSlugRoute
   '/docs/mcp-api': typeof DocsMcpApiRoute
@@ -1434,6 +1452,7 @@ export interface FileRoutesById {
   '/_app/pheno-hunts_/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
   '/_app/pheno-hunts_/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
   '/_app/reports_/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/_app/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/_app/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1500,6 +1519,7 @@ export interface FileRouteTypes {
     | '/timeline'
     | '/billing/$plan'
     | '/checkout/cancel'
+    | '/checkout/stripe'
     | '/checkout/success'
     | '/cultivars/$slug'
     | '/docs/mcp-api'
@@ -1589,6 +1609,7 @@ export interface FileRouteTypes {
     | '/pheno-hunts/$id/keepers'
     | '/pheno-hunts/$id/workspace'
     | '/reports/post-grow/$growId'
+    | '/api/public/payments/webhook'
     | '/genetics/health/$kind/$id'
     | '/genetics/trace/$kind/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -1652,6 +1673,7 @@ export interface FileRouteTypes {
     | '/timeline'
     | '/billing/$plan'
     | '/checkout/cancel'
+    | '/checkout/stripe'
     | '/checkout/success'
     | '/cultivars/$slug'
     | '/docs/mcp-api'
@@ -1741,6 +1763,7 @@ export interface FileRouteTypes {
     | '/pheno-hunts/$id/keepers'
     | '/pheno-hunts/$id/workspace'
     | '/reports/post-grow/$growId'
+    | '/api/public/payments/webhook'
     | '/genetics/health/$kind/$id'
     | '/genetics/trace/$kind/$id'
   id:
@@ -1807,6 +1830,7 @@ export interface FileRouteTypes {
     | '/_app/timeline'
     | '/billing/$plan'
     | '/checkout/cancel'
+    | '/checkout/stripe'
     | '/checkout/success'
     | '/cultivars/$slug'
     | '/docs/mcp-api'
@@ -1896,6 +1920,7 @@ export interface FileRouteTypes {
     | '/_app/pheno-hunts_/$id/keepers'
     | '/_app/pheno-hunts_/$id/workspace'
     | '/_app/reports_/post-grow/$growId'
+    | '/api/public/payments/webhook'
     | '/_app/genetics/health/$kind/$id'
     | '/_app/genetics/trace/$kind/$id'
   fileRoutesById: FileRoutesById
@@ -1937,6 +1962,7 @@ export interface RootRouteChildren {
   WelcomeRoute: typeof WelcomeRoute
   BillingPlanRoute: typeof BillingPlanRoute
   CheckoutCancelRoute: typeof CheckoutCancelRoute
+  CheckoutStripeRoute: typeof CheckoutStripeRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
   CultivarsSlugRoute: typeof CultivarsSlugRoute
   DocsMcpApiRoute: typeof DocsMcpApiRoute
@@ -1963,6 +1989,7 @@ export interface RootRouteChildren {
   CustomerGuideOreozVsGelonadeComparisonRoute: typeof CustomerGuideOreozVsGelonadeComparisonRoute
   PhenoHuntsIdCompareRoute: typeof PhenoHuntsIdCompareRoute
   PhenoHuntsIdShowcaseRoute: typeof PhenoHuntsIdShowcaseRoute
+  ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2399,6 +2426,13 @@ declare module '@tanstack/react-router' {
       path: '/checkout/cancel'
       fullPath: '/checkout/cancel'
       preLoaderRoute: typeof CheckoutCancelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/stripe': {
+      id: '/checkout/stripe'
+      path: '/checkout/stripe'
+      fullPath: '/checkout/stripe'
+      preLoaderRoute: typeof CheckoutStripeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkout/success': {
@@ -3024,6 +3058,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReportsPostGrowGrowIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/payments/webhook': {
+      id: '/api/public/payments/webhook'
+      path: '/api/public/payments/webhook'
+      fullPath: '/api/public/payments/webhook'
+      preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/genetics/health/$kind/$id': {
       id: '/_app/genetics/health/$kind/$id'
       path: '/health/$kind/$id'
@@ -3310,6 +3351,7 @@ const rootRouteChildren: RootRouteChildren = {
   WelcomeRoute: WelcomeRoute,
   BillingPlanRoute: BillingPlanRoute,
   CheckoutCancelRoute: CheckoutCancelRoute,
+  CheckoutStripeRoute: CheckoutStripeRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
   CultivarsSlugRoute: CultivarsSlugRoute,
   DocsMcpApiRoute: DocsMcpApiRoute,
@@ -3339,6 +3381,7 @@ const rootRouteChildren: RootRouteChildren = {
     CustomerGuideOreozVsGelonadeComparisonRoute,
   PhenoHuntsIdCompareRoute: PhenoHuntsIdCompareRoute,
   PhenoHuntsIdShowcaseRoute: PhenoHuntsIdShowcaseRoute,
+  ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

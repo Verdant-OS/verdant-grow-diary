@@ -8,7 +8,7 @@ describe("buildCheckoutTrustCopy", () => {
     expect(live.state).toBe("live");
     expect(live.canCreateLiveCharge).toBe(true);
     expect(live.faqAnswer).not.toContain("sandbox");
-    expect(live.faqAnswer).toContain("Paddle");
+    expect(live.faqAnswer).toContain("Stripe");
 
     for (const result of [
       buildCheckoutTrustCopy({ environment: "sandbox", blocked: true }),

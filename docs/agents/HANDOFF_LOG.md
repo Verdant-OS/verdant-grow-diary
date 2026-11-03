@@ -69,38 +69,72 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### AI-DOCTOR-READINESS-SUMMARY-IMPL
+### PLANT-OVERVIEW-TENT-READINGS-COPY
 
 ```text
-TASK AI-DOCTOR-READINESS-SUMMARY-IMPL  priority: other  status: OPEN
-goal: Implement the one-summary AI Doctor readiness card on Plant Detail per docs/specs/ai-doctor-readiness-single-summary.md (spec PR #2809).
-why: Live audit 2026-11-03 finding 3. Plant Detail shows readiness from six rule sets that can disagree.
-branch: claude/ai-doctor-readiness-summary (Matthew chose a separate branch, 2026-11-03)
+TASK PLANT-OVERVIEW-TENT-READINGS-COPY  priority: other  status: OPEN
+goal: D2 from spec #2809: the Plant Detail overview's What's Missing prompt says "No plant snapshot. Tent readings are used in AI review." when the plant has no snapshot but its tent has a current reading.
+why: Live audit 2026-11-03 finding 3; the overview contradicted the AI review section.
+branch: claude/plant-overview-tent-readings-copy
 base: verdant-grow-diary
-checkout: git fetch origin claude/ai-doctor-readiness-summary verdant-grow-diary && git switch claude/ai-doctor-readiness-summary
-pr: opened as a draft after this commit; read the URL from GitHub
-head_sha: round-1 commit acb836e3bdc136586aca11543209283c93518701; this block's commit follows it, so read the current head on GitHub
-state: rounds 1, 2a and 2b committed: rules, optional signal props on F/A/C, container section, Plant Detail layout. Draft PR, awaiting CI and independent review.
-current_step: draft PR open; CI running.
-next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ). Signed-in visual check of Plant Detail is NOT_MEASURED (needs fixture credentials).
-post_merge_check: after Publish, open a plant's AI review on https://verdantgrowdiary.com with the fixture account. Exactly one readiness verdict is visible before a review starts. NOT_MEASURED until live /version.json reports the merge SHA.
+checkout: git fetch origin claude/plant-overview-tent-readings-copy verdant-grow-diary && git switch claude/plant-overview-tent-readings-copy
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2812
+head_sha: f5bb606681c2b3574a0f4aa752d8929683a26f1c (Grok's merge of the base into the branch; re-read on GitHub before any current-head claim)
+state: ready for review; Grok (verdant-ultra-bot) APPROVED at f5bb606; 35 required checks running there. Matthew: merge when green (2026-11-03).
+current_step: waiting on required CI at f5bb606.
+next_action: when all 35 required contexts pass at the exact head, enqueue squash pinned to that head.
+post_merge_check: after Publish, a plant with no plant snapshot whose tent has a current reading shows "No plant snapshot" on https://verdantgrowdiary.com with the fixture account. NOT_MEASURED until live /version.json reports the merge SHA.
 active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
-decisions: D1 keep local preview collapsed; D2 overview copy is a later slice; D3 C stays visible with its pre-start confidence line hidden on Plant Detail.
-tried_and_rejected: hiding C in the disclosure (it owns the Start review control).
-commands: bunx vitest run src/test/ai-doctor-readiness-summary-rules.test.ts --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
-files_touched: src/lib/aiDoctorReadinessSummaryRules.ts; src/constants/aiDoctorReadinessSummaryCopy.ts; src/components/AiDoctorReadinessSummary.tsx; src/components/PlantDetailAiDoctorReadinessSection.tsx; src/components/PlantDetailAiDoctorReadiness.tsx; src/components/AiDoctorContextReadinessPanel.tsx; src/components/PlantDetailAiDoctorContextReadinessMount.tsx; src/components/PlantDetailAiDoctorLiveReview.tsx; src/pages/PlantDetail.tsx; src/test/ai-doctor-readiness-summary-rules.test.ts; src/test/ai-doctor-readiness-signal-props.test.tsx; src/test/ai-doctor-live-review-readiness-signal.test.tsx; src/test/ai-doctor-readiness-summary-section.test.tsx; src/test/plant-detail-information-architecture.test.ts (3 structure pins renegotiated); docs/agents/HANDOFF_LOG.md
-files_remaining: none for this slice
+decisions: tent read reuses the AI Doctor readiness windows; loading or failed reads keep the plant-diary wording.
+tried_and_rejected: importing aiDoctor modules into the panel (trips the harvest-watch no-AI scan); the read lives in useTentCurrentReadingsPresence.
+commands: bunx vitest run src/test/plant-detail-whats-missing-tent-readings.test.tsx --reporter=dot
+files_touched: src/lib/plantDetailWhatsMissing.ts; src/hooks/useTentCurrentReadingsPresence.ts; src/components/PlantDetailWhatsMissing.tsx; src/pages/PlantDetail.tsx; src/test/plant-detail-whats-missing-tent-readings.test.tsx
+files_remaining: none
 blockers: none
 open_questions: none
-gotchas: the pre-commit full-project tsc runs out of memory at the default heap; commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify). Prettier runs on staged .md files.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2809
+gotchas: this block was first committed on the PR branch (5927065); the base merge at f5bb606 resolved the HANDOFF_LOG conflict to the base side and dropped it, so it is restored here.
+links: docs/specs/ai-doctor-readiness-single-summary.md section 10
+artifacts: none
+reviewer_seat: Grok (verdant-ultra-bot)
+reviewer_sha: f5bb606681c2b3574a0f4aa752d8929683a26f1c APPROVED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03, by Claude
+```
+
+### QUICK-LOG-WATER-VOLUME-UNITS-SPEC
+
+```text
+TASK QUICK-LOG-WATER-VOLUME-UNITS-SPEC  priority: other  status: OPEN
+goal: Spec ml / L / gal entry for the Quick Log Water volume, storing volume_ml unchanged (docs/specs/quick-log-water-volume-units.md).
+why: Live audit 2026-11-03 finding 4: Water requires millilitres; growers note gallons.
+branch: claude/quick-log-water-volume-units
+base: verdant-grow-diary
+checkout: git fetch origin claude/quick-log-water-volume-units verdant-grow-diary && git switch claude/quick-log-water-volume-units
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub (this block's commit is the first)
+state: spec drafted; founder decisions D1 (default unit), D2 (runoff), D3 (presets) open.
+current_step: draft PR open.
+next_action: Matthew decides D1-D3; route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ).
+post_merge_check: docs only; none until the implementation slice.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: storage stays volume_ml; convert typed text to canonical ml exactly once; existing gates read only canonical ml.
+tried_and_rejected: a per-unit copy of the 50,000 ml gate (two gates could disagree).
+commands: none (docs only)
+files_touched: docs/specs/quick-log-water-volume-units.md; docs/agents/HANDOFF_LOG.md
+files_remaining: none for the spec slice
+blockers: none
+open_questions: D1, D2, D3 in the spec section 8
+gotchas: remembered entry unit (D1 b) is a display preference, not a remembered target; the target ban still holds.
+links: audit finding 4 (private upload, not committed)
 artifacts: none
 reviewer_seat: not requested
 reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-03 13:40 CT, by Claude
+last_updated: 2026-11-03, by Claude
 ```
 
 ### PHOTO-VIEWER-CAPTION-TILES
@@ -1376,6 +1410,41 @@ last_updated: 2026-10-29 18:40 UTC, by Claude (pr link and ready state recorded)
 ```
 
 ## Closed
+
+### AI-DOCTOR-READINESS-SUMMARY-IMPL
+
+```text
+TASK AI-DOCTOR-READINESS-SUMMARY-IMPL  priority: other  status: CLOSED
+goal: Implement the one-summary AI Doctor readiness card on Plant Detail per docs/specs/ai-doctor-readiness-single-summary.md (spec PR #2809).
+why: Live audit 2026-11-03 finding 3. Plant Detail shows readiness from six rule sets that can disagree.
+branch: claude/ai-doctor-readiness-summary (Matthew chose a separate branch, 2026-11-03)
+base: verdant-grow-diary
+checkout: git fetch origin claude/ai-doctor-readiness-summary verdant-grow-diary && git switch claude/ai-doctor-readiness-summary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2810 (merged)
+head_sha: round-1 commit acb836e3bdc136586aca11543209283c93518701; this block's commit follows it, so read the current head on GitHub
+state: CLOSED (merged). #2810 squash-merged through the merge queue as 7ca284b9490cb5a6c30a7cc356b967eb62d4f58a on 2026-11-03 at 20:44 UTC.
+current_step: none; closed
+next_action: None; closed. post_merge_check below stays with this owner; a live failure reopens it.
+post_merge_check: after Publish, open a plant's AI review on https://verdantgrowdiary.com with the fixture account. Exactly one readiness verdict is visible before a review starts. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: D1 keep local preview collapsed; D2 overview copy is a later slice; D3 C stays visible with its pre-start confidence line hidden on Plant Detail.
+tried_and_rejected: hiding C in the disclosure (it owns the Start review control).
+commands: bunx vitest run src/test/ai-doctor-readiness-summary-rules.test.ts --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/lib/aiDoctorReadinessSummaryRules.ts; src/constants/aiDoctorReadinessSummaryCopy.ts; src/components/AiDoctorReadinessSummary.tsx; src/components/PlantDetailAiDoctorReadinessSection.tsx; src/components/PlantDetailAiDoctorReadiness.tsx; src/components/AiDoctorContextReadinessPanel.tsx; src/components/PlantDetailAiDoctorContextReadinessMount.tsx; src/components/PlantDetailAiDoctorLiveReview.tsx; src/pages/PlantDetail.tsx; src/test/ai-doctor-readiness-summary-rules.test.ts; src/test/ai-doctor-readiness-signal-props.test.tsx; src/test/ai-doctor-live-review-readiness-signal.test.tsx; src/test/ai-doctor-readiness-summary-section.test.tsx; src/test/plant-detail-information-architecture.test.ts (3 structure pins renegotiated); docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: none
+gotchas: the pre-commit full-project tsc runs out of memory at the default heap; commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify). Prettier runs on staged .md files.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2809
+artifacts: none
+reviewer_seat: Grok (verdant-ultra-bot), independent of this Claude session
+reviewer_sha: see PR #2810 review record (approval at the final head before merge)
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+closure: merged as 7ca284b9490cb5a6c30a7cc356b967eb62d4f58a (#2810)
+owner: Claude
+last_updated: 2026-11-03, by Claude (closed in the water-volume spec PR)
+```
 
 ### HONO-NODE-SERVER-GHSA-RMXM
 

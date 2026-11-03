@@ -79,7 +79,7 @@ branch: cursor/csv-import-display-6fff
 base: verdant-grow-diary
 checkout: git fetch origin cursor/csv-import-display-6fff verdant-grow-diary && git switch cursor/csv-import-display-6fff
 pr: ready for review; no auto-merge
-head_sha: review round after 302d55940704de6b6f995efd9fafcf31055c717f
+head_sha: review round after 302d55940; full-chain visible rows expect Derived VPD for calculated rows
 state: one push for the C/A/D review; PR 2744 stays non-draft; auto-merge off; Cheeko's yes is pending
 current_step: CO2 filter guard, Derived VPD label, snapshot remainder copy, committed sensor-row count, router Link
 next_action: report the new head and required CI. Do not merge. Do not enable auto-merge. Cheeko's yes waits until reviewers A, D, and C re-pass at this head.

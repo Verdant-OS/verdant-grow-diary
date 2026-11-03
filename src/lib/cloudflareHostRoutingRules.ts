@@ -54,8 +54,8 @@ export const SEO_SNAPSHOT_HEADER_VALUE = "1";
 
 const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
   "/strains": "/cultivars",
-  "/welcome": "/",
-  "/features": "/",
+  // /welcome and /features are real public pages, not aliases of /: /welcome is
+  // the marketing landing and sign-out exit, /features is the capability index.
   "/demo": "/",
   "/refunds": "/refund",
   "/refund-policy": "/refund",

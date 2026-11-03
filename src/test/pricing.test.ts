@@ -440,7 +440,7 @@ describe("Safety: no private data on public page", () => {
     // needed to avoid selling an AI credit pack the current plan cannot spend.
     // It renders only a generic eligibility state; no subscription fields.
     // Any other @/hooks import (dashboard data hooks) remains forbidden.
-    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useMyEntitlements\b)/);
+    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useStripeCheckout\b|useMyEntitlements\b)/);
     // And the checkout hook itself must stay free of private data reads —
     // it may read auth session state, never tables or the supabase client.
     const CHECKOUT_HOOK = readSrc("hooks/usePaddleCheckout.ts");
@@ -492,9 +492,9 @@ describe("sitemap", () => {
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/pricing");
   });
 
-  it("still includes apex and /hardware-integrations, and omits the retired /welcome alias", () => {
+  it("still includes apex and /hardware-integrations, and includes the /welcome start-here page", () => {
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/");
-    expect(SITEMAP).not.toContain("https://verdantgrowdiary.com/welcome");
+    expect(SITEMAP).toContain("https://verdantgrowdiary.com/welcome");
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/hardware-integrations");
   });
 
@@ -542,7 +542,11 @@ describe("Pricing manifest snapshot (narrow)", () => {
       },
       { path: "/hardware-integrations", access: "public" },
       { path: "/pricing", access: "public" },
-      { path: "/welcome", access: "redirect", description: "→ /" },
+      {
+        path: "/welcome",
+        access: "public",
+        description: "Public start-here guide; the marketing landing and sign-out exit.",
+      },
     ]);
   });
 });

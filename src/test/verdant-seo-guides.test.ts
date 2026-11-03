@@ -235,7 +235,7 @@ describe("Verdant SEO guide pages (28)", () => {
 describe("Sitemap and robots discoverability", () => {
   it("sitemap includes /, /pricing, /guides, and every guide URL", () => {
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/");
-    expect(SITEMAP).not.toContain("https://verdantgrowdiary.com/welcome");
+    expect(SITEMAP).toContain("https://verdantgrowdiary.com/welcome");
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/pricing");
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/guides");
     for (const slug of EXPECTED_SLUGS) {

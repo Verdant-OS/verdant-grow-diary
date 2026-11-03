@@ -169,9 +169,9 @@ describe("sitemap", () => {
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/hardware-integrations");
   });
 
-  it("includes the apex and omits the retired /welcome alias", () => {
+  it("includes the apex and includes the /welcome start-here page", () => {
     expect(SITEMAP).toContain("https://verdantgrowdiary.com/");
-    expect(SITEMAP).not.toContain("https://verdantgrowdiary.com/welcome");
+    expect(SITEMAP).toContain("https://verdantgrowdiary.com/welcome");
   });
 
   it("excludes private/authenticated routes", () => {

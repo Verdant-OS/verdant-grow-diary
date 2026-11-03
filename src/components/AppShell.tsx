@@ -38,6 +38,7 @@ import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
 import {
   QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS,
   QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS,
+  mainContentFabClearanceCss,
   mobileShellToastOffsetCss,
 } from "@/lib/quickLogFabClearanceRules";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
@@ -469,6 +470,8 @@ export default function AppShell({ children }: { children?: ReactNode }) {
 
         {/* Only while this shell (and its bottom nav) is mounted, and only below md. */}
         <style data-testid="mobile-shell-toast-offset">{mobileShellToastOffsetCss()}</style>
+        {/* #main-content padding for every signed-in page, not only Dashboard. */}
+        <style data-testid="main-content-fab-clearance">{mainContentFabClearanceCss()}</style>
 
         {/* Mobile floating + — same QuickLogV2 entry as header/+ */}
         <button

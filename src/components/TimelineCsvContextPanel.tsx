@@ -19,6 +19,7 @@ import {
   type CsvSensorReadingRow,
   type CsvTimelineContextEntry,
 } from "@/lib/environmentCsvTimelineContextViewModel";
+import { TimelineBoundedRead } from "@/lib/timelineBoundedRead";
 
 export interface TimelineDiaryLike {
   id: string;
@@ -39,6 +40,7 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
     status: "loading" | "success" | "error";
   } | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
+  const [loadingOlder, setLoadingOlder] = useState(false);
 
   const tentIds = useMemo(() => {
     const s = new Set<string>();
@@ -75,11 +77,11 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
       try {
         const { data, error } = await supabase
           .from("sensor_readings")
-          .select("id,tent_id,source,metric,value,captured_at,raw_payload")
+          .select(TimelineBoundedRead.csvSelect)
           .eq("source", "csv")
           .in("tent_id", scopedTentIds)
           .order("captured_at", { ascending: false })
-          .limit(2000);
+          .limit(TimelineBoundedRead.csvPageSize);
 
         if (cancelled || request !== latestRequest) return;
         if (error) throw error;
@@ -87,7 +89,9 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
           throw new Error("CSV environment context response is not a list.");
         setReadState({
           scopeKey,
-          rows: data as CsvSensorReadingRow[],
+          rows: (data as Record<string, unknown>[]).map((row) =>
+            TimelineBoundedRead.shapeCsvRow(row),
+          ),
           status: "success",
         });
       } catch {
@@ -110,6 +114,48 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
       window.removeEventListener("verdant:csv-imported", onImported);
     };
   }, [growId, tentIdsKey, scopeKey, retryAttempt]);
+
+  const oldestCapturedAt = rows.reduce<string | null>((oldest, row) => {
+    const captured = row.captured_at;
+    if (typeof captured !== "string" || captured.length === 0) return oldest;
+    if (oldest === null || captured < oldest) return captured;
+    return oldest;
+  }, null);
+  const csvHasOlder = rows.length > 0 && rows.length % TimelineBoundedRead.csvPageSize === 0;
+
+  async function loadOlderCsv() {
+    if (!growId || !oldestCapturedAt || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const scopedTentIds = JSON.parse(tentIdsKey) as string[];
+      const { data, error } = await supabase
+        .from("sensor_readings")
+        .select(TimelineBoundedRead.csvSelect)
+        .eq("source", "csv")
+        .in("tent_id", scopedTentIds)
+        .order("captured_at", { ascending: false })
+        .lt("captured_at", oldestCapturedAt)
+        .limit(TimelineBoundedRead.csvPageSize);
+      if (error || !Array.isArray(data)) throw error ?? new Error("CSV page unavailable");
+      const page = (data as Record<string, unknown>[]).map((row) =>
+        TimelineBoundedRead.shapeCsvRow(row),
+      );
+      setReadState((previous) => {
+        const current = previous?.scopeKey === scopeKey ? previous.rows : rows;
+        const seen = new Set(current.map((row) => row.id).filter(Boolean));
+        const extra = page.filter((row) => !row.id || !seen.has(row.id));
+        return { scopeKey, rows: [...current, ...extra], status: "success" };
+      });
+    } catch {
+      setReadState((previous) => ({
+        scopeKey,
+        rows: previous?.scopeKey === scopeKey ? previous.rows : rows,
+        status: "error",
+      }));
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
 
   const matchedByEntry = useMemo(() => {
     const out = new Map<string, CsvTimelineContextEntry>();
@@ -138,7 +184,7 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
   }, [rows, entries, growId, tentIds]);
 
   if (!growId || tentIds.length === 0) return null;
-  if (readStatus === "success" && matchedByEntry.size === 0) return null;
+  if (readStatus === "success" && matchedByEntry.size === 0 && !csvHasOlder) return null;
 
   const hasCachedMatches = matchedByEntry.size > 0;
 
@@ -178,6 +224,18 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
             Retry CSV context
           </Button>
         </div>
+      ) : null}
+      {csvHasOlder ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="timeline-csv-load-older"
+          disabled={loadingOlder}
+          onClick={() => void loadOlderCsv()}
+        >
+          {loadingOlder ? "Loading older CSV context…" : "Load older CSV context"}
+        </Button>
       ) : null}
       {[...matchedByEntry.values()].map((c) => (
         <CsvTimelineEnvironmentChip

@@ -18,20 +18,11 @@ import { useAuth } from "@/store/auth";
 export const IMPORTED_SENSOR_HISTORY_QUERY_LIMIT = 200;
 
 export const IMPORTED_SENSOR_HISTORY_SELECT =
-  "id,tent_id,source,metric,value,quality,ts,captured_at,created_at,raw_payload" as const;
+  "id,tent_id,source,metric,value,quality,ts,captured_at,created_at" as const;
 
 export type ImportedSensorHistoryRow = Pick<
   SensorReadingRow,
-  | "id"
-  | "tent_id"
-  | "source"
-  | "metric"
-  | "value"
-  | "quality"
-  | "ts"
-  | "captured_at"
-  | "created_at"
-  | "raw_payload"
+  "id" | "tent_id" | "source" | "metric" | "value" | "quality" | "ts" | "captured_at" | "created_at"
 >;
 
 function normalizeLimit(limit: number): number {

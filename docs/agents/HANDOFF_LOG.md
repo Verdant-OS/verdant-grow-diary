@@ -78,11 +78,11 @@ why: Issues 2778, 2779, 2780, 2781, and part of 2706. A tent open was resolving 
 branch: cursor/quick-log-target-save-1baf
 base: verdant-grow-diary
 checkout: git fetch origin cursor/quick-log-target-save-1baf verdant-grow-diary && git switch cursor/quick-log-target-save-1baf
-pr: NOT_MEASURED until the draft is opened
-head_sha: d6b9abb71 is the implementation commit; the handoff stamp is the following commit on this branch
-state: pushed draft after the next push
-current_step: tests and typecheck passed locally; commit and draft PR remain
-next_action: confirm the draft PR is still draft and required CI is green at its head
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2793 draft
+head_sha: d6b9abb71 is the implementation; 504ecc08c stamps this block; the pin-fix commit is the child of 504ecc08c. Read origin/cursor/quick-log-target-save-1baf for the exact head. This line cannot name that child.
+state: draft PR 2793, not ready, no auto-merge
+current_step: three CI pins updated after measured tap counts; required CI recheck follows the pin-fix push
+next_action: keep the PR draft until required checks are green at the exact head and Moonbow routes review
 post_merge_check: bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx
 active_writer: Grok cloud agent on cursor/quick-log-target-save-1baf
 decisions: tent context is never rewritten to a plant; last-used target applies only when the route has no tent or plant; success closes the sheet and names the target in the toast; reading time is sheet state wired to occurredAt; GrowerTimeLabel is the shared formatter; correction temperature displays the grower unit and converts once to Celsius on save
@@ -100,7 +100,7 @@ reviewer_sha: none
 session_state: Grok implementation session
 claimed_by: Grok 2026-11-03
 owner: Grok
-last_updated: 2026-11-02 21:10 CT, by Grok
+last_updated: 2026-11-02 21:36 CT, by Grok
 
 TASK CREATE-DIALOG-DISABLED-REASON  priority: P2  status: OPEN
 goal: disabled primary buttons in New grow, New tent, and New plant state their reason, and each name field has a visible label that is its accessible name.

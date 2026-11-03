@@ -9,6 +9,7 @@
  * interactive React application still boots from the same asset shell.
  */
 
+import { FEATURES_COPY, WELCOME_COPY } from "../../constants/welcomeFeaturesCopy";
 import { formatVerificationStatus, VERDANT_CULTIVARS } from "../../constants/verdantCultivars";
 import {
   VERDANT_BLUEPRINT_TARGETS_FAQ,
@@ -651,6 +652,16 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
     description:
       "See what changed in your grow and decide what to do next. Verdant turns logs, photos, and sensor readings from the gear you already own into one plant timeline.",
     imageAlt: "Verdant Grow Diary",
+  }),
+  publicDocument("/welcome", {
+    title: WELCOME_COPY.title,
+    description: WELCOME_COPY.description,
+    imageAlt: "Verdant start-here guide",
+  }),
+  publicDocument("/features", {
+    title: FEATURES_COPY.title,
+    description: FEATURES_COPY.description,
+    imageAlt: "Verdant features overview",
   }),
   publicDocument("/pricing", {
     title: "Pricing — Free, Pro & Craft | Verdant Grow Diary",

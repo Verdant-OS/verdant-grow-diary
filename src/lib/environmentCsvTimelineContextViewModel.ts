@@ -129,6 +129,39 @@ export function csvEntryOwnsSnapshot(
   return candidate.entryId < current.entryId;
 }
 
+/**
+ * One chip per CSV snapshot (#2736). When several diary entries match the same
+ * snapshot, only its owner keeps the chip: the nearest entry, then the earlier
+ * entry time, then the lower entry id (`csvEntryOwnsSnapshot`). Entries whose
+ * time cannot be parsed keep their match unchanged. Pure and order-independent.
+ */
+export function keepOneCsvChipPerSnapshot(
+  matches: readonly CsvTimelineContextEntry[],
+  entryAtById: ReadonlyMap<string, string | null | undefined>,
+): CsvTimelineContextEntry[] {
+  const owners = new Map<string, { delta: number; entryAt: number; entryId: string }>();
+  for (const match of matches) {
+    if (!match.snapshot) continue;
+    const snapshotAt = Date.parse(match.snapshot.capturedAt);
+    const entryAt = Date.parse(entryAtById.get(match.diaryEntryId) ?? "");
+    if (!Number.isFinite(snapshotAt) || !Number.isFinite(entryAt)) continue;
+    const candidate = {
+      delta: Math.abs(snapshotAt - entryAt),
+      entryAt,
+      entryId: match.diaryEntryId,
+    };
+    const current = owners.get(match.snapshot.capturedAt);
+    if (!current || csvEntryOwnsSnapshot(candidate, current)) {
+      owners.set(match.snapshot.capturedAt, candidate);
+    }
+  }
+  return matches.filter((match) => {
+    if (!match.snapshot) return false;
+    const owner = owners.get(match.snapshot.capturedAt);
+    return !owner || owner.entryId === match.diaryEntryId;
+  });
+}
+
 export function csvOmittedSnapshotCopy(count: number): string {
   const noun = count === 1 ? "snapshot" : "snapshots";
   return `${count} more CSV ${noun} in Sensors`;

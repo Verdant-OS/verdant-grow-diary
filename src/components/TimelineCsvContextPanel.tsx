@@ -14,15 +14,11 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CsvTimelineEnvironmentChip } from "@/components/CsvTimelineEnvironmentChip";
 import { Button } from "@/components/ui/button";
-import { Link } from "@/lib/react-router-compat";
-import { tentDetailPath } from "@/lib/routes";
 import {
-  CsvTimelineSnapshotList,
-  csvEntryOwnsSnapshot,
-  csvOmittedSnapshotCopy,
-  pickNearestCsvTimestamp,
+  buildCsvTimelineContext,
+  keepOneCsvChipPerSnapshot,
   type CsvSensorReadingRow,
-  type CsvTimelineSnapshot,
+  type CsvTimelineContextEntry,
 } from "@/lib/environmentCsvTimelineContextViewModel";
 import { TimelineBoundedRead } from "@/lib/timelineBoundedRead";
 
@@ -195,62 +191,27 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
     if (!growId || entries.length === 0) return out;
     // Run view-model per-tent (scope contract is per-tent).
     for (const tentId of tentIds) {
-      const windowed = CsvTimelineSnapshotList.window({
+      const tentEntries = entries
+        .filter((e) => e.tent_id === tentId)
+        .map((e) => ({
+          id: e.id,
+          grow_id: growId,
+          tent_id: e.tent_id,
+          occurred_at: e.entry_at,
+        }));
+      const ctx = buildCsvTimelineContext({
+        diaryEntries: tentEntries,
         sensorReadings: rows,
         growId,
         tentId,
-        diaryEntries: entries
-          .filter((entry) => entry.tent_id === tentId)
-          .map((entry) => ({
-            id: entry.id,
-            grow_id: growId,
-            tent_id: entry.tent_id,
-            occurred_at: entry.entry_at,
-          })),
       });
-      if (windowed.omittedUnlinked > 0) {
-        omitted.push({ tentId, count: windowed.omittedUnlinked });
-      }
-      const tentCards: { id: string; snapshot: CsvTimelineSnapshot; stamp: string }[] = [];
-      for (const snapshot of windowed.snapshots) {
-        const stamp = `${tentId}:${snapshot.capturedAt}`;
-        if (seen.has(stamp)) continue;
-        seen.add(stamp);
-        tentCards.push({ id: stamp, snapshot, stamp });
-      }
-      const owner = new Map<string, { id: string; delta: number; entryAt: number }>();
-      const stampsByTs = new Map(
-        tentCards.map((card) => [Date.parse(card.snapshot.capturedAt), card.stamp]),
-      );
-      for (const entry of entries) {
-        if (entry.tent_id !== tentId || !entry.entry_at) continue;
-        const entryAt = Date.parse(entry.entry_at);
-        if (!Number.isFinite(entryAt)) continue;
-        const nearest = pickNearestCsvTimestamp(stampsByTs.keys(), entryAt, windowMs);
-        if (!nearest) continue;
-        const stamp = stampsByTs.get(nearest.ts);
-        if (!stamp) continue;
-        const candidate = { delta: nearest.delta, entryAt, entryId: entry.id };
-        const current = owner.get(stamp);
-        if (
-          !current ||
-          csvEntryOwnsSnapshot(candidate, {
-            delta: current.delta,
-            entryAt: current.entryAt,
-            entryId: current.id,
-          })
-        ) {
-          owner.set(stamp, { id: entry.id, delta: nearest.delta, entryAt });
-        }
-      }
-      for (const card of tentCards) {
-        cards.push({ id: owner.get(card.stamp)?.id ?? card.stamp, snapshot: card.snapshot });
+      const entryAtById = new Map(tentEntries.map((e) => [e.id, e.occurred_at]));
+      for (const c of keepOneCsvChipPerSnapshot(ctx, entryAtById)) {
+        out.set(c.diaryEntryId, c);
       }
     }
-    cards.sort((a, b) => Date.parse(b.snapshot.capturedAt) - Date.parse(a.snapshot.capturedAt));
-    return { cards, omitted };
+    return out;
   }, [rows, entries, growId, tentIds]);
-  const snapshots = timeline.cards;
 
   if (!growId || tentIds.length === 0) return null;
   if (readStatus === "success" && matchedByEntry.size === 0 && !csvHasOlder) return null;

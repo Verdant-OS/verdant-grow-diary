@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
-import { tentDetailPath } from "@/lib/routes";
 import { buildCsvTimelineContext } from "@/lib/environmentCsvTimelineContextViewModel";
 import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
 import ImportedSensorHistoryPanel from "@/components/ImportedSensorHistoryPanel";
@@ -63,7 +62,9 @@ function metricRow(
 }
 
 describe("CSV import display #2736–#2739", () => {
-  it("shows one card per distinct reading, including today's import", async () => {
+  // Matthew 2026-11-03: Timeline keeps the base chips, one owner per snapshot.
+  // Unlinked readings are no longer rendered as Timeline cards.
+  it("shows one chip per distinct reading when several entries share it", async () => {
     const rows = [
       ...Array.from({ length: 4 }, () => metricRow(october, "temperature_c", 25.5555555556)),
       ...today.map((capturedAt, index) =>
@@ -82,9 +83,6 @@ describe("CSV import display #2736–#2739", () => {
       </MemoryRouter>,
     );
     await waitFor(() => expect(screen.getAllByText(/78\.0 °F/).length).toBe(1));
-    expect(screen.getByText(/75\.2 °F/)).toBeTruthy();
-    expect(screen.getByText(/76\.1 °F/)).toBeTruthy();
-    expect(screen.getByText(/77\.0 °F/)).toBeTruthy();
     expect(
       CsvTimelineSnapshotList.distinct({
         sensorReadings: rows,
@@ -122,11 +120,6 @@ describe("CSV import display #2736–#2739", () => {
     await waitFor(() => expect(screen.getByTestId("csv-timeline-chip-older-entry")).toBeTruthy());
     expect(screen.getByTestId("csv-timeline-chip-older-entry").textContent).toContain("70.0 °F");
     expect(screen.queryByText(/81\.0 °F/)).toBeNull();
-    expect(screen.getByText(/82\.0 °F/)).toBeTruthy();
-    expect(screen.getByText(/93\.0 °F/)).toBeTruthy();
-    const more = screen.getByTestId("timeline-csv-more-readings");
-    expect(more.textContent).toBe("1 more CSV snapshot in Sensors");
-    expect(more).toHaveAttribute("href", `${tentDetailPath("tent-1")}#imported-history`);
   });
 
   it("pins a diary chip to the nearest CSV reading inside 45 minutes", async () => {

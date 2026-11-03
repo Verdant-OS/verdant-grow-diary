@@ -142,7 +142,11 @@ beforeEach(() => {
 describe("Quick Log → Timeline CTA (standard save)", () => {
   it("exposes 'View diary' with grow-scoped Timeline href (not Plant Detail)", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000042", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000042",
+        environment_event_id: null,
+      },
       error: null,
     });
     renderSheet("plant:plant-1");
@@ -152,7 +156,7 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
 
     const action = getToastAction();
     expect(action.label).toBe(QUICK_LOG_TIMELINE_CTA_LABEL);
-    expect(action.message).toBe("Log saved");
+    expect(action.message).toBe("Log saved · Plant 1 (Tent 1)");
 
     const rpcBefore = rpcMock.mock.calls.length;
     action.onClick();
@@ -176,7 +180,11 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
 
   it("tent target routes to grow-scoped Timeline without plantId", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000045", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000045",
+        environment_event_id: null,
+      },
       error: null,
     });
     renderSheet("tent:tent-1");
@@ -186,27 +194,33 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
 
     const action = getToastAction();
     action.onClick();
-    expect(navigateMock).toHaveBeenCalledWith("/timeline?growId=grow-1&tentId=tent-1#timeline-entry-77777777-7777-4777-8777-000000000045");
+    expect(navigateMock).toHaveBeenCalledWith(
+      "/timeline?growId=grow-1&tentId=tent-1#timeline-entry-77777777-7777-4777-8777-000000000045",
+    );
     expect(navigateMock.mock.calls[0][0]).not.toMatch(/^\/tents\//);
     expect(navigateMock.mock.calls[0][0]).not.toContain("plantId=");
   });
 
-  it("post-save panel View diary CTA uses the same grow-scoped route", async () => {
+  it("keeps a single toast View diary CTA on the same grow-scoped route", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000043", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000043",
+        environment_event_id: null,
+      },
       error: null,
     });
     renderSheet("plant:plant-1");
     clickNote();
     clickSave();
     await waitFor(() => screen.getByTestId("qlv2-post-save"));
+    expect(screen.queryByTestId("quick-log-post-save-view")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View diary" })).not.toBeInTheDocument();
 
-    const viewBtn = screen.getByTestId("quick-log-post-save-view");
-    expect(viewBtn).not.toBeDisabled();
-    expect(viewBtn.textContent).toMatch(/View diary/i);
-
+    const action = getToastAction();
+    expect(action.label).toBe(QUICK_LOG_TIMELINE_CTA_LABEL);
     const rpcBefore = rpcMock.mock.calls.length;
-    fireEvent.click(viewBtn);
+    action.onClick();
     expect(navigateMock).toHaveBeenCalledWith(
       "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-77777777-7777-4777-8777-000000000043",
     );
@@ -217,7 +231,11 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
 describe("Quick Log → Timeline CTA (photo success)", () => {
   it("'Log and photo saved' exposes the same grow-scoped CTA", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000044", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000044",
+        environment_event_id: null,
+      },
       error: null,
     });
     storageUpload.mockResolvedValue({ data: { path: "p" }, error: null });
@@ -234,7 +252,10 @@ describe("Quick Log → Timeline CTA (photo success)", () => {
 
     clickSave();
     await waitFor(() =>
-      expect(toastSuccess).toHaveBeenCalledWith("Log and photo saved", expect.anything()),
+      expect(toastSuccess).toHaveBeenCalledWith(
+        "Log and photo saved · Plant 1 (Tent 1)",
+        expect.anything(),
+      ),
     );
 
     const action = getToastAction();

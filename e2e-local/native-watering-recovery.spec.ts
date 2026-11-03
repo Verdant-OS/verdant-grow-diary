@@ -118,7 +118,7 @@ for (const mode of ["close/reopen", "reload onto another plant"] as const) {
       await page
         .getByTestId("qlv2-target-content")
         .getByRole("option", {
-          name: "Plant · " + f.primary.plantName,
+          name: f.primary.plantName + " (" + f.primary.tentName + ")",
           exact: true,
         })
         .click();
@@ -228,7 +228,7 @@ for (const mode of ["close/reopen", "reload onto another plant"] as const) {
       expect(await wateringRows(f.owner)).toEqual(water);
 
       await page.getByTestId("qlv2-save-retry").click();
-      await expect(page.getByTestId("qlv2-post-save")).toBeVisible();
+      await expect(page.getByRole("button", { name: "View diary" })).toBeVisible();
       expect(requests).toHaveLength(2);
       expect(requests[1]).toEqual(original);
       expect(receipts).toHaveLength(2);
@@ -242,7 +242,7 @@ for (const mode of ["close/reopen", "reload onto another plant"] as const) {
       expect(await visibleEventIds(f.owner, [f.witnessId])).toEqual([]);
       expect(fingerprint(await witnessRows(f))).toBe(otherBefore);
 
-      await page.getByTestId("quick-log-post-save-view").click();
+      await page.getByRole("button", { name: "View diary" }).click();
       await expect(page).toHaveURL(
         (url) =>
           url.pathname === "/timeline" &&

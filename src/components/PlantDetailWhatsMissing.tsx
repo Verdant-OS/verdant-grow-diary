@@ -5,7 +5,7 @@
  * Read-only. Uses existing page data signals only. No writes, RPC,
  * timed runs, or autonomous actions.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { HelpCircle, Plus, Upload, Activity } from "lucide-react";
 import { Link } from "@/lib/react-router-compat";
 
@@ -40,12 +40,12 @@ function TentCurrentReadingsProbe({
   onChange,
 }: {
   tentId: string;
-  onChange: (value: TentCurrentReadings) => void;
+  onChange: (tentId: string, value: TentCurrentReadings) => void;
 }) {
   const value = useTentCurrentReadingsPresence(tentId);
   useEffect(() => {
-    onChange(value);
-  }, [onChange, value]);
+    onChange(tentId, value);
+  }, [onChange, tentId, value]);
   return null;
 }
 
@@ -70,8 +70,19 @@ export default function PlantDetailWhatsMissing({
   hasPlantPhoto = false,
   tentId,
 }: PlantDetailWhatsMissingProps) {
-  const [tentCurrentReadings, setTentCurrentReadings] = useState<TentCurrentReadings>("unknown");
+  // Keyed by tent so a newly assigned tent never renders the previous tent's result.
+  const [tentReport, setTentReport] = useState<{
+    tentId: string;
+    value: TentCurrentReadings;
+  } | null>(null);
+  const reportTentReadings = useCallback(
+    (reportedTentId: string, value: TentCurrentReadings) =>
+      setTentReport({ tentId: reportedTentId, value }),
+    [],
+  );
   const probeTentId = isUuid(tentId) ? tentId : null;
+  const tentCurrentReadings: TentCurrentReadings =
+    probeTentId !== null && tentReport?.tentId === probeTentId ? tentReport.value : "unknown";
   const { data: rawRows, isLoading, isError } = usePlantRecentActivity(plantId ?? null);
 
   const signals = useMemo(() => {
@@ -85,9 +96,9 @@ export default function PlantDetailWhatsMissing({
       growId,
       stage,
       ...signals,
-      tentCurrentReadings: probeTentId ? tentCurrentReadings : "unknown",
+      tentCurrentReadings,
     });
-  }, [plantId, growId, stage, signals, probeTentId, tentCurrentReadings]);
+  }, [plantId, growId, stage, signals, tentCurrentReadings]);
 
   return (
     <section
@@ -99,7 +110,7 @@ export default function PlantDetailWhatsMissing({
         <TentCurrentReadingsProbe
           key={probeTentId}
           tentId={probeTentId}
-          onChange={setTentCurrentReadings}
+          onChange={reportTentReadings}
         />
       ) : null}
       <header className="flex items-center gap-2 mb-3">

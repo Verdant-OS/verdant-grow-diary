@@ -141,7 +141,7 @@ describe("QuickLogV2Sheet — structured feeding", () => {
       /showTimelineConfirmation\(FEEDING_SAVE_SUCCESS_MESSAGE,[\s\S]*?growId:\s*resolved\.growId[\s\S]*?targetType:\s*\(resolved\.targetType[\s\S]*?growEventId/,
     );
     expect(source).toMatch(
-      /buildQuickLogTimelineNavTarget\(\{[\s\S]*?growId:\s*postSave\.growId[\s\S]*?growEventId:\s*postSave\.growEventId/,
+      /buildQuickLogTimelineNavTarget\(\{[\s\S]*?growId:\s*scope\.growId[\s\S]*?growEventId:\s*scope\.growEventId/,
     );
     const feedingPanel = readFileSync(
       resolve(process.cwd(), "src/components/FeedingHistoryPanel.tsx"),

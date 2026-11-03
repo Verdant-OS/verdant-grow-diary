@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### AI-DOCTOR-READINESS-SUMMARY-SPEC
+
+```text
+TASK AI-DOCTOR-READINESS-SUMMARY-SPEC  priority: other  status: OPEN
+goal: Docs-only spec for one AI Doctor readiness summary on Plant Detail, with the existing five readiness surfaces kept in a collapsed provenance disclosure.
+why: Live read-only audit 2026-11-03 finding 3. Plant Detail shows readiness from five rule sets that can disagree (e.g. "Ready for cautious check-in" beside "Context is partial").
+branch: claude/new-session-5qygai
+base: verdant-grow-diary
+checkout: git fetch origin claude/new-session-5qygai verdant-grow-diary && git switch claude/new-session-5qygai
+pr: read the URL from GitHub after push (draft)
+head_sha: read git rev-parse origin/claude/new-session-5qygai after the push
+state: pushed draft, docs only
+current_step: spec written at docs/specs/ai-doctor-readiness-single-summary.md
+next_action: founder answers D1 and D2 in spec section 4; then an independent docs review at the exact head. Implementation is a separate later slice and branch.
+post_merge_check: NOT_APPLICABLE (docs only; no runtime change)
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: verdict is worst-of run gate, context readiness and view-model state; the run gate stays authoritative and unchanged; existing panels move into a collapsed disclosure, none deleted; no new queries.
+tried_and_rejected: replacing the run gate rules with a unified rule set (changes AI Doctor behavior and pins; out of scope)
+commands: none beyond docs safety; no code changed
+files_touched: docs/specs/ai-doctor-readiness-single-summary.md; docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: founder decisions D1, D2
+open_questions: whether surface B (timeline evidence readiness) produced the audit's "Strong" label; NOT_MEASURED
+gotchas: PR #2805 also changes src/pages/PlantDetail.tsx; the implementation slice should follow it. Do not commit the audit screenshots (private account data).
+links: none yet
+artifacts: docs/specs/ai-doctor-readiness-single-summary.md
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access, no writes outside the repo, no GitHub comments
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 13:20 CT, by Claude
+```
+
 ### POSTHOG-PUBLIC-CLIENT-KEY
 
 ```text

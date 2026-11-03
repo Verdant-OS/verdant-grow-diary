@@ -171,6 +171,40 @@ owner: Cheeko
 last_updated: 2026-11-02 20:40 CT, by Grok
 ```
 
+### HANDOFF-CONFIG
+
+```text
+TASK HANDOFF-CONFIG  priority: other  status: OPEN
+goal: Commit .handoff/config.md, the agent-handoff plugin's config (verification commands, convention docs, doc index), so /plan, /execute and /verify read the repo's real commands.
+why: Matthew chose a separate draft PR (2026-11-03) over committing it on #2817 or keeping it local.
+branch: claude/new-session-5qygai (recreated from verdant-grow-diary; the earlier branch merged as #2809 and was deleted)
+base: verdant-grow-diary
+checkout: git fetch origin claude/new-session-5qygai verdant-grow-diary && git switch claude/new-session-5qygai
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub (this block rides the first commit)
+state: config written from Matthew's answers (en; targeted vitest; typecheck with 8 GB heap; eslint; AGENTS.md conventions).
+current_step: draft PR open.
+next_action: Matthew names the reviewer and merge authority.
+post_merge_check: none (agent tooling config; no runtime effect).
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: config lives at .handoff/config.md as the plugin expects; no secrets or production values in it.
+tried_and_rejected: local .git/info/exclude (blocked by a guard hook); committing on #2817's branch (would move a PR under review).
+commands: none
+files_touched: .handoff/config.md; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: reviewer and merge authority
+gotchas: none
+links: none
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03, by Claude
+```
+
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text

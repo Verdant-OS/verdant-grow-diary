@@ -355,6 +355,8 @@ describe("manual duplicate receipt verification", () => {
       quality: "ok",
       device_id: null,
       raw_payload: null,
+      notes: null,
+      unit_unconfirmed: false,
     },
   ];
 

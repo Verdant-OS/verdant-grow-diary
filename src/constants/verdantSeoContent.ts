@@ -722,7 +722,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     targetKeyword: "import grow controller csv",
     introHeading: "Quick answer",
     intro:
-      "Yes. Verdant imports the CSV you export from your AC Infinity or Spider Farmer app, free. Open Sensors → Import historical data, pick the file, check the preview and import. Verdant reads the time, temperature, humidity, VPD and CO₂ columns. The temperature unit comes from the column header. If the header doesn't name it, Verdant asks This is °F or This is °C only when every sampled temperature is from 0 to 45. A sample above 45 is treated as °F with no question. Any other range is treated as °C with no question. Every reading stays at its original time, labeled as CSV, never as live data.",
+      "Yes. Verdant imports the CSV you export from your AC Infinity or Spider Farmer app, free. Open Sensors → Import historical data, pick the file, check the preview and import. Verdant reads the time, temperature, humidity, VPD, CO₂, and PPFD/PAR columns. The temperature unit comes from the column header. If the header doesn't name it, Verdant asks This is °F or This is °C only when every sampled temperature is from 0 to 45. A sample above 45 is treated as °F with no question. Any other range is treated as °C with no question. Every reading stays at its original time, labeled as CSV, never as live data.",
     modifiedOn: "2026-11-02",
     howTo: {
       name: "How to import a grow controller CSV",
@@ -801,7 +801,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         continuations: [
           {
             heading: "Why some rows get skipped",
-            body: "Some values change without a prompt. Humidity above 0 and up to 1 is multiplied by 100. A file VPD outside 0 to 10 kPa is not kept; when the row still has temperature and humidity, Verdant stores a calculated VPD instead, and that VPD is calculated, not measured. PPFD or PAR outside 0 to 2,500 is dropped and the row is kept. CO₂ outside 0 to 10,000 ppm is dropped and the row is kept. The whole row is skipped when temperature, after the unit is applied, is below -40 °C or above 80 °C (that is below -40 °F or above 176 °F when the file is Fahrenheit), or when humidity is below 0 or above 100. A temperature or humidity that isn't a number also skips the row, and so does a missing or unreadable time.",
+            body: "Some values change without a prompt. Humidity above 0 and up to 1 is multiplied by 100. A file VPD outside 0 to 10 kPa is not kept; when the row still has temperature and humidity, Verdant stores a calculated VPD instead, and that VPD is calculated, not measured. PPFD or PAR outside 0 to 2,500 is dropped and the row is kept. CO₂ outside 0 to 10,000 ppm is dropped and the row is kept. The whole row is skipped when temperature, after the unit is applied, is below -40 °C or above 80 °C (that is below -40 °F or above 176 °F when the file is Fahrenheit), or when humidity is below 0 or above 100. A temperature or humidity that isn't a number also skips the row. A blank temperature or humidity cell is left empty and does not skip the row by itself. A missing or unreadable time skips the row. A row that has a time but no usable reading is skipped.",
             bullets: [
               {
                 text: "Out-of-range temperature (below -40 °C or above 80 °C after the unit is applied) skips the row.",
@@ -817,7 +817,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
               },
             ],
             closing:
-              "The preview shows what will be saved before anything is written. A cluster of skipped rows usually means a sensor dropped out or the wrong unit was picked; re-import and choose the other unit.",
+              "The preview shows what will be saved before anything is written. Choosing the wrong unit does not skip rows. The unit prompt only appears when every temperature is between 0 and 45, and a wrong choice stores the wrong temperatures and a wrong calculated VPD. If temperatures look off after import (for example 24 shown as 24°F), delete that import and re-import choosing the other unit.",
           },
         ],
       },

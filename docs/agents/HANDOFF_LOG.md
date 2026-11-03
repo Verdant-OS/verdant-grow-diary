@@ -79,16 +79,16 @@ branch: cursor/import-grow-sensor-csv-guide-40fe
 base: verdant-grow-diary
 checkout: git fetch origin cursor/import-grow-sensor-csv-guide-40fe verdant-grow-diary && git switch cursor/import-grow-sensor-csv-guide-40fe
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2775
-head_sha: read git rev-parse HEAD after the review-fix commit
+head_sha: read git rev-parse HEAD after the unit-copy commit
 state: ready, auto-merge off
-current_step: review copy for row skips, unit prompt, PPFD, and CT date
+current_step: wrong-unit advice, blank cells, and rows with no usable reading
 next_action: confirm required CI at the new head; do not auto-merge or enqueue
 post_merge_check: after Publish, GET https://verdantgrowdiary.com/guides/import-grow-sensor-csv and confirm HTTP 200, the self-canonical, and the three import steps. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Grok cloud agent
-decisions: Out-of-range VPD, CO2, and PPFD drop that value and keep the row. Humidity above 0 and up to 1 is multiplied by 100. Out-of-range file VPD is replaced by calculated VPD when temperature and humidity remain. Only out-of-range temperature, humidity outside 0-100, a non-numeric temperature or humidity, or a missing or unreadable time skips the row. The unit prompt appears only when every sampled temperature is 0-45. modifiedOn and sitemap lastmod are the CT date 2026-11-02. symptomGuidePaths stays named that way because it is the locked test's full post-v1 path list. GuidePage citation check uses the parsed hostname.
+decisions: A wrong unit does not skip rows. The prompt appears only when every sampled temperature is 0-45, and choosing the other unit stores the converted temperatures and a recalculated VPD. A blank temperature or humidity cell does not skip the row. A row with a time and no usable reading is skipped. The five previously renegotiated locked files stay untouched.
 tried_and_rejected: renaming symptomGuidePaths. That assertion compares the whole post-v1 registry, so a rename edits more of the locked test.
 commands: bunx vitest run src/test/guide-import-grow-sensor-csv.test.tsx src/test/import-grow-sensor-csv-parser-copy.test.ts src/test/route-indexation-matrix.test.ts --reporter=dot
-files_touched: src/constants/verdantSeoContent.ts; src/pages/GuidePage.tsx; src/lib/seoStructuredData.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/guidePublicCopyViewModel.ts; public/sitemap.xml; scripts/validate-jsonld-rich-results.mjs; src/test/guide-import-grow-sensor-csv.test.tsx; src/test/import-grow-sensor-csv-parser-copy.test.ts; src/test/verdant-seo-guides.test.ts; src/test/verdant-seo-sitemap-robots.test.ts; src/test/verdant-guides-glossary-head-invariants.test.ts; docs/knowledge-library/post-v1-public-route-cohorts.json; docs/seo/route-indexation-matrix.md; scripts/knowledge/validate-roadmap.test.mjs
+files_touched: src/constants/verdantSeoContent.ts; src/pages/GuidePage.tsx; src/lib/seoStructuredData.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/guidePublicCopyViewModel.ts; public/sitemap.xml; scripts/validate-jsonld-rich-results.mjs; src/test/guide-import-grow-sensor-csv.test.tsx; src/test/import-grow-sensor-csv-parser-copy.test.ts; src/test/import-grow-sensor-csv-unit-copy.test.ts; src/test/verdant-seo-guides.test.ts; src/test/verdant-seo-sitemap-robots.test.ts; src/test/verdant-guides-glossary-head-invariants.test.ts; docs/knowledge-library/post-v1-public-route-cohorts.json; docs/seo/route-indexation-matrix.md; scripts/knowledge/validate-roadmap.test.mjs
 files_remaining: none
 blockers: gated. Needs Cheeko's own-words yes at the final head. Six locked files were renegotiated: the five additive pins plus the dateModified expectation this PR added.
 open_questions: none
@@ -100,7 +100,7 @@ reviewer_sha: f504015f1bf025a6f6ab70071016cd54da8fe474
 session_state: no production writes
 claimed_by: Grok, 2026-11-03
 owner: Grok
-last_updated: 2026-11-02 20:35 CT, by Grok. Review copy, hostname check, CT date, PPFD column.
+last_updated: 2026-11-02 21:05 CT, by Grok. Wrong-unit copy no longer claims skipped rows. Blank cells and no-metric rows are named.
 ```
 
 ### CREATE-DIALOG-DISABLED-REASON

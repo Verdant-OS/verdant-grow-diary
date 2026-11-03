@@ -11,6 +11,7 @@ import {
   ECOWITT_CUSTOM_UPLOAD_DEFAULT_INTERVAL_SECONDS,
   isCustomUploadPacketStale,
 } from "@/lib/ecowittCustomUploadIngestRules";
+import { isSensorTestbenchProvenance } from "@/lib/sensorTestbenchIndicatorRules";
 import { celsiusToFahrenheit } from "@/lib/temperatureUnits";
 
 export type EcowittStationClaimState = "none" | "unbound" | "active" | "revoked";
@@ -23,6 +24,16 @@ export interface EcowittStationReadingInput {
   readonly source: string;
   readonly quality: string;
   readonly capturedAt: string | null;
+  /**
+   * Provenance fence fields from the bounded list read (`raw_payload->>vendor`,
+   * `raw_payload->metadata->>confidence`, `->>reported_verdant_source`, and the
+   * count of nested gateway marker columns). Optional so older callers and old
+   * rows keep working; a row they mark as testbench never renders as live.
+   */
+  readonly vendor?: string | null;
+  readonly confidence?: string | null;
+  readonly reportedVerdantSource?: string | null;
+  readonly gatewayMarkerCount?: number;
 }
 
 export interface EcowittStationCardInput {
@@ -166,6 +177,55 @@ function finiteReadingValue(value: number | string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+const GATEWAY_MARKER_COLUMNS = [
+  "gateway_stationtype",
+  "gateway_model",
+  "gateway_dateutc",
+  "gateway_freq",
+  "gateway_runtime",
+  "gateway_wh65batt",
+  "gateway_wh25batt",
+] as const;
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+/**
+ * Reads the provenance fence columns that `TimelineBoundedRead.sensorListSelect`
+ * flattens out of `raw_payload`. The generated row type does not name them, so
+ * they are read loosely; missing columns (old rows, other selects) yield nulls.
+ */
+export function ecowittStationFenceFromListRow(row: object): {
+  vendor: string | null;
+  confidence: string | null;
+  reportedVerdantSource: string | null;
+  gatewayMarkerCount: number;
+} {
+  const loose = row as Record<string, unknown>;
+  return {
+    vendor: stringOrNull(loose.vendor),
+    confidence: stringOrNull(loose.confidence),
+    reportedVerdantSource: stringOrNull(loose.reported_verdant_source),
+    gatewayMarkerCount: GATEWAY_MARKER_COLUMNS.filter((key) => {
+      const value = loose[key];
+      return value !== null && value !== undefined && value !== "";
+    }).length,
+  };
+}
+
+/** Same shared fence the base EcoWitt snapshot card applies (#2732 P2-1). */
+function isTestbenchReading(reading: EcowittStationReadingInput): boolean {
+  const reported = reading.reportedVerdantSource ?? null;
+  return isSensorTestbenchProvenance({
+    vendor: reading.vendor ?? null,
+    confidence: reading.confidence ?? null,
+    verdantSource: reported,
+    physicalGatewayEvidence:
+      reported?.trim().toLowerCase() === "live" && (reading.gatewayMarkerCount ?? 0) >= 2,
+  });
+}
+
 function latestLive(
   readings: readonly EcowittStationReadingInput[],
   tentId: string,
@@ -176,6 +236,7 @@ function latestLive(
   for (const reading of readings) {
     if (reading.tentId !== tentId) continue;
     if (reading.source !== "live") continue;
+    if (isTestbenchReading(reading)) continue;
     if (reading.quality !== "ok" && reading.quality !== "degraded") continue;
     if (reading.metric !== metric || !isLiveMetric(reading.metric)) continue;
     if (finiteReadingValue(reading.value) === null) continue;
@@ -257,6 +318,24 @@ export function buildEcowittCustomUploadStationCard(
       co2: null,
       lastReadingLabel: null,
       canCreateLink: false,
+    };
+  }
+
+  // Values belong to this station only once its claim is bound. An unbound or
+  // missing claim has received no packet, so any live row for the tent came
+  // from another pathway and must not be shown here (#2732 P2-1).
+  if (input.claimState !== "active") {
+    return {
+      ...base,
+      emptyMessage: ECOWITT_CUSTOM_UPLOAD_COPY.empty,
+      freshness: "none",
+      freshnessLabel: null,
+      edgeNote: null,
+      indoorTempF: null,
+      indoorRh: null,
+      soil1: null,
+      co2: null,
+      lastReadingLabel: null,
     };
   }
 

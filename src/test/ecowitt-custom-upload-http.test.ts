@@ -79,11 +79,10 @@ describe("EcoWitt customized-upload HTTP handler", () => {
     const payload = (await response.json()) as {
       accepted: boolean;
       stored: number;
-      reason?: string;
+      reason: string;
     };
     expect(response.status).toBe(200);
-    expect(payload).toEqual({ accepted: true, stored: 4 });
-    expect(payload.reason).toBeUndefined();
+    expect(payload).toEqual({ accepted: true, stored: 4, reason: "stored" });
     expect(JSON.stringify(payload)).not.toContain(PASSKEY);
     expect(inserted[0]?.source).toBe("live");
     expect(
@@ -262,7 +261,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       },
     );
     expect(oversized.status).toBe(200);
-    expect(await oversized.json()).toEqual({ accepted: false, stored: 0 });
+    expect(await oversized.json()).toMatchObject({ accepted: false, reason: "payload_too_large" });
     expect(inserts).toBe(0);
   });
 

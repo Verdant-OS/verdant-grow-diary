@@ -21,7 +21,6 @@ import {
   runDuplicateAwareCsvHistoryImport,
   isSensorReadingsDedupeUniqueViolation,
   CSV_HISTORY_DEDUPE_CONFLICT_COPY,
-  filterDuplicateRows,
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import {
@@ -178,13 +177,9 @@ export async function persistCsvEnvironmentRows(
   const readExistingKeys = client.fetchExistingSensorReadingKeys
     ? client.fetchExistingSensorReadingKeys.bind(client)
     : async () => new Set<string>();
-  let firstExistingKeys: Set<string> | null = null;
-  const fetchExistingKeys = async (scope: ExistingKeysQueryScope) => {
-    const keys = await readExistingKeys(scope);
-    if (!firstExistingKeys) firstExistingKeys = keys;
-    return keys;
-  };
+  const fetchExistingKeys = async (scope: ExistingKeysQueryScope) => readExistingKeys(scope);
 
+  const committedSourceRows = new Set<number>();
   let unconfirmedWrite = false;
   const result = await runDuplicateAwareCsvHistoryImport({
     rows: inserts,
@@ -200,6 +195,12 @@ export async function persistCsvEnvironmentRows(
         if (res.error && !/^(22|23|42)[0-9A-Z]{3}$/.test(res.error.code ?? "")) {
           unconfirmedWrite = true;
         }
+        if (!res.error) {
+          for (const row of batch) {
+            const sourceRow = insertSourceRow.get(row);
+            if (sourceRow != null) committedSourceRows.add(sourceRow);
+          }
+        }
         return { error: res.error };
       } catch {
         // Return through the batch helper so earlier acknowledged counts survive.
@@ -209,13 +210,7 @@ export async function persistCsvEnvironmentRows(
     },
   });
 
-  const plannedSensorRows = new Set(
-    filterDuplicateRows({
-      rows: inserts,
-      existingKeys: firstExistingKeys ?? new Set(),
-    }).newRows.map((row) => insertSourceRow.get(row)),
-  ).size;
-  const contributedSensorRowCount = result.insertedRows > 0 ? plannedSensorRows : 0;
+  const contributedSensorRowCount = committedSourceRows.size;
 
   if (!result.ok) {
     const partialWrite = result.batchResult?.partialWrite === true || result.insertedRows > 0;

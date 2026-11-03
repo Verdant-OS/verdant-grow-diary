@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
+import { tentDetailPath } from "@/lib/routes";
+import { buildCsvTimelineContext } from "@/lib/environmentCsvTimelineContextViewModel";
 import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
 import ImportedSensorHistoryPanel from "@/components/ImportedSensorHistoryPanel";
 import { EnvironmentCsvImportModal } from "@/components/EnvironmentCsvImportModal";
 import { CsvTimelineSnapshotList } from "@/lib/environmentCsvTimelineContextViewModel";
-import { buildImportedSensorHistoryViewModel } from "@/lib/importedSensorHistoryViewModel";
+import {
+  IMPORTED_CALCULATED_VPD_LABEL,
+  buildImportedSensorHistoryViewModel,
+} from "@/lib/importedSensorHistoryViewModel";
 import { formatCsvPreviewRow } from "@/lib/environmentCsvPreviewCopyRules";
 import { buildCsvImportDoneMessage } from "@/lib/environmentCsvImportViewModel";
 import {
@@ -71,7 +76,11 @@ describe("CSV import display #2736–#2739", () => {
       tent_id: "tent-1",
       entry_at: october,
     }));
-    render(<TimelineCsvContextPanel growId="grow-1" entries={entries} />);
+    render(
+      <MemoryRouter>
+        <TimelineCsvContextPanel growId="grow-1" entries={entries} />
+      </MemoryRouter>,
+    );
     await waitFor(() => expect(screen.getAllByText(/78\.0 °F/).length).toBe(1));
     expect(screen.getByText(/75\.2 °F/)).toBeTruthy();
     expect(screen.getByText(/76\.1 °F/)).toBeTruthy();
@@ -97,23 +106,27 @@ describe("CSV import display #2736–#2739", () => {
       metricRow(
         new Date(Date.parse("2026-11-02T00:00:00.000Z") + index * 3_600_000).toISOString(),
         "temperature_c",
-        (80 - 32) * (5 / 9),
+        (81 + index - 32) * (5 / 9),
       ),
     );
     const rows = [metricRow(olderAt, "temperature_c", (70 - 32) * (5 / 9)), ...newer];
     read.mockResolvedValue({ data: rows, error: null });
     render(
-      <TimelineCsvContextPanel
-        growId="grow-1"
-        entries={[{ id: "older-entry", tent_id: "tent-1", entry_at: olderAt }]}
-      />,
+      <MemoryRouter>
+        <TimelineCsvContextPanel
+          growId="grow-1"
+          entries={[{ id: "older-entry", tent_id: "tent-1", entry_at: olderAt }]}
+        />
+      </MemoryRouter>,
     );
     await waitFor(() => expect(screen.getByTestId("csv-timeline-chip-older-entry")).toBeTruthy());
     expect(screen.getByTestId("csv-timeline-chip-older-entry").textContent).toContain("70.0 °F");
-    expect(screen.getAllByText(/80\.0 °F/).length).toBe(12);
-    expect(screen.getByTestId("timeline-csv-more-readings").textContent).toBe(
-      "1 more CSV readings in Sensors",
-    );
+    expect(screen.queryByText(/81\.0 °F/)).toBeNull();
+    expect(screen.getByText(/82\.0 °F/)).toBeTruthy();
+    expect(screen.getByText(/93\.0 °F/)).toBeTruthy();
+    const more = screen.getByTestId("timeline-csv-more-readings");
+    expect(more.textContent).toBe("1 more CSV snapshot in Sensors");
+    expect(more).toHaveAttribute("href", `${tentDetailPath("tent-1")}#imported-history`);
   });
 
   it("pins a diary chip to the nearest CSV reading inside 45 minutes", async () => {
@@ -128,10 +141,12 @@ describe("CSV import display #2736–#2739", () => {
       error: null,
     });
     render(
-      <TimelineCsvContextPanel
-        growId="grow-1"
-        entries={[{ id: "near-entry", tent_id: "tent-1", entry_at: entryAt }]}
-      />,
+      <MemoryRouter>
+        <TimelineCsvContextPanel
+          growId="grow-1"
+          entries={[{ id: "near-entry", tent_id: "tent-1", entry_at: entryAt }]}
+        />
+      </MemoryRouter>,
     );
     await waitFor(() => expect(screen.getByTestId("csv-timeline-chip-near-entry")).toBeTruthy());
     expect(screen.getByTestId("csv-timeline-chip-near-entry").textContent).toContain("72.0 °F");
@@ -258,5 +273,109 @@ describe("CSV import display #2736–#2739", () => {
     expect(await screen.findByTestId("csv-import-done")).toHaveTextContent(
       "Imported 9 CSV reading(s). From 1 sensor row(s).",
     );
+  });
+
+  it("labels calculated VPD and leaves unknown metric keys unchanged", () => {
+    const vm = buildImportedSensorHistoryViewModel({
+      readings: [
+        {
+          tent_id: "t",
+          source: "csv",
+          metric: "vpd_kpa",
+          value: 1.1,
+          captured_at: "2026-11-02T15:00:00.000Z",
+          vpd_source: "derived",
+        },
+        {
+          tent_id: "t",
+          source: "csv",
+          metric: "leaf_temp_c",
+          value: 22,
+          captured_at: "2026-11-02T15:00:00.000Z",
+        },
+      ],
+      temperatureUnit: "fahrenheit",
+    });
+    expect(vm.recentRows.map((row) => row.metricLabel).sort()).toEqual([
+      IMPORTED_CALCULATED_VPD_LABEL,
+      "leaf_temp_c",
+    ]);
+    expect(vm.metricOptions.map((option) => option.label)).toContain(IMPORTED_CALCULATED_VPD_LABEL);
+    expect(vm.recentRows.map((row) => row.metricLabel)).not.toContain("leaf temp c");
+    const derivedRow = {
+      tent_id: "t",
+      source: "csv",
+      metric: "vpd_kpa",
+      value: 1.1,
+      captured_at: "2026-11-02T15:00:00.000Z",
+      raw_payload: { vpd_source: "derived" },
+    };
+    render(
+      <MemoryRouter>
+        <ImportedSensorHistoryPanel tentId="t" readings={[derivedRow]} />
+      </MemoryRouter>,
+    );
+    expect(screen.getAllByText(IMPORTED_CALCULATED_VPD_LABEL).length).toBeGreaterThan(0);
+    expect(screen.queryByText("VPD (1)")).toBeNull();
+  });
+
+  it("breaks an equal-distance snapshot tie toward the earlier timestamp", () => {
+    const entryAt = "2026-11-02T12:00:00.000Z";
+    const earlier = new Date(Date.parse(entryAt) - 10 * 60_000).toISOString();
+    const later = new Date(Date.parse(entryAt) + 10 * 60_000).toISOString();
+    const rows = [
+      metricRow(later, "temperature_c", (70 - 32) * (5 / 9)),
+      metricRow(earlier, "temperature_c", (60 - 32) * (5 / 9)),
+    ];
+    const diary = [
+      { id: "b-entry", grow_id: "grow-1", tent_id: "tent-1", occurred_at: entryAt },
+      { id: "a-entry", grow_id: "grow-1", tent_id: "tent-1", occurred_at: entryAt },
+    ];
+    const matched = buildCsvTimelineContext({
+      sensorReadings: rows,
+      growId: "grow-1",
+      tentId: "tent-1",
+      diaryEntries: diary,
+    });
+    expect(matched.every((entry) => entry.snapshot?.capturedAt === earlier)).toBe(true);
+    read.mockResolvedValue({ data: rows, error: null });
+    render(
+      <MemoryRouter>
+        <TimelineCsvContextPanel
+          growId="grow-1"
+          entries={diary.map((entry) => ({
+            id: entry.id,
+            tent_id: entry.tent_id,
+            entry_at: entry.occurred_at,
+          }))}
+        />
+      </MemoryRouter>,
+    );
+    return waitFor(() => {
+      expect(screen.getByTestId("csv-timeline-chip-a-entry").textContent).toContain("60.0 °F");
+      expect(screen.queryByTestId("csv-timeline-chip-b-entry")).toBeNull();
+    });
+  });
+
+  it("counts a sensor row only after its insert batch is acknowledged", async () => {
+    const parsed = parseEnvironmentCSVText(
+      "Timestamp,Temp(°F)\n2026-11-02T15:00:00Z,75.2\n2026-11-02T16:00:00Z,76.1\n",
+    );
+    let calls = 0;
+    const res = await persistCsvEnvironmentRows(
+      parsed.validRows,
+      { user_id: "u", grow_id: "g", tent_id: "t" },
+      {
+        insertSensorReadings: async () => {
+          calls += 1;
+          if (calls === 1) return { error: null, insertedCount: 1 };
+          return { error: { message: "rejected", code: "23502" }, insertedCount: 0 };
+        },
+      },
+      1,
+    );
+    expect(res.insertedCount).toBe(1);
+    expect(res.partialWrite).toBe(true);
+    expect(res.contributedSensorRowCount).toBe(1);
   });
 });

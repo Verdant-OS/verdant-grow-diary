@@ -79,13 +79,13 @@ branch: cursor/csv-import-display-6fff
 base: verdant-grow-diary
 checkout: git fetch origin cursor/csv-import-display-6fff verdant-grow-diary && git switch cursor/csv-import-display-6fff
 pr: ready for review; no auto-merge
-head_sha: pending this commit
-state: pushing the gated pin change; PR 2744; auto-merge off
-current_step: friendly-only metric cell, linked snapshots plus newest 12 unlinked, nearest match, P3s
-next_action: one push, update the PR body with before/after pins and real-route proof, wait for required CI 35/35. Do not merge. Do not enable auto-merge.
+head_sha: review round after 302d55940704de6b6f995efd9fafcf31055c717f
+state: one push for the C/A/D review; PR 2744 stays non-draft; auto-merge off; Cheeko's yes is pending
+current_step: CO2 filter guard, Derived VPD label, snapshot remainder copy, committed sensor-row count, router Link
+next_action: report the new head and required CI. Do not merge. Do not enable auto-merge. Cheeko's yes waits until reviewers A, D, and C re-pass at this head.
 post_merge_check: after Publish, import an AC Infinity Fahrenheit CSV on the fixture account and confirm the timeline cards are distinct, the history badge names the vendor, labels say Humidity and VPD, the preview shows °F, and the confirmation names both counts. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Grok cloud agent on this branch
-decisions: diary-linked CSV snapshots always render. Unlinked snapshots keep the newest 12, then one line "N more CSV readings in Sensors" links to /tents/:id#imported-history. A diary chip uses the nearest reading inside 45 minutes. The history metric cell is only the friendly label; the raw key is data-metric. Filter chips are friendly text. Cheeko approved the four locked assertion swaps. Vendor detection rejects a leading "not". Stored payloads keep source_app and drop import_file_name. "From N sensor row(s)" counts rows that inserted a metric.
+decisions: diary-linked CSV snapshots always render. Unlinked snapshots keep the newest 12, then "1 more CSV snapshot" / "N more CSV snapshots" links through the router to tentDetailPath#imported-history. Equal-distance matches keep the earlier timestamp in the view model and the panel; the earlier diary entry owns the chip. Calculated VPD is "Derived VPD" in history, the filter, and the timeline. Unknown metric keys stay the raw key. The CO2 filter guard rejects CO₂ and data-metric=co2_ppm. "From N sensor row(s)" counts source rows in acknowledged batches. Vendor detection rejects a leading "not" without a lookbehind.
 tried_and_rejected: reading raw_payload inside the history view model. A source scan forbids that string there and in the panel. Vendor lookup stays in CsvImportVendorIdentity.
 commands: bunx vitest run src/test/csv-import-display-2736-2739.test.tsx src/test/imported-sensor-history-panel.test.tsx src/test/imported-sensor-history-view-model.test.ts src/test/environment-csv-timeline-mounted-context.test.tsx src/test/environment-csv-preview-copy-rules.test.ts src/test/csv-history-window-presentation.test.tsx src/test/environment-csv-import-persistence.test.ts src/test/csv-parser.test.ts --reporter=dot
 files_touched: src/lib/csvImportVendorIdentity.ts; src/lib/environmentCsvTimelineContextViewModel.ts; src/components/TimelineCsvContextPanel.tsx; src/lib/csvParser.ts; src/lib/environmentCsvImportPersistence.ts; src/lib/environmentCsvPreviewCopyRules.ts; src/lib/environmentCsvImportViewModel.ts; src/components/EnvironmentCsvImportModal.tsx; src/lib/importedSensorHistoryViewModel.ts; src/components/ImportedSensorHistoryPanel.tsx; src/test/csv-import-display-2736-2739.test.tsx; src/test/imported-sensor-history-panel.test.tsx; src/test/imported-history-metric-selector-text.test.tsx; docs/agents/HANDOFF_LOG.md
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: no paused workflows; no production writes
 claimed_by: Grok, 2026-11-02
 owner: Grok
-last_updated: 2026-11-02, by Grok
+last_updated: 2026-11-03, by Grok
 resume here
 ```
 

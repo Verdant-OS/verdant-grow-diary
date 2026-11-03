@@ -14,9 +14,13 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CsvTimelineEnvironmentChip } from "@/components/CsvTimelineEnvironmentChip";
 import { Button } from "@/components/ui/button";
+import { Link } from "@/lib/react-router-compat";
 import { tentDetailPath } from "@/lib/routes";
 import {
   CsvTimelineSnapshotList,
+  csvEntryOwnsSnapshot,
+  csvOmittedSnapshotCopy,
+  pickNearestCsvTimestamp,
   type CsvSensorReadingRow,
   type CsvTimelineSnapshot,
 } from "@/lib/environmentCsvTimelineContextViewModel";
@@ -142,21 +146,29 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
         seen.add(stamp);
         tentCards.push({ id: stamp, snapshot, stamp });
       }
-      const owner = new Map<string, { id: string; delta: number }>();
+      const owner = new Map<string, { id: string; delta: number; entryAt: number }>();
+      const stampsByTs = new Map(
+        tentCards.map((card) => [Date.parse(card.snapshot.capturedAt), card.stamp]),
+      );
       for (const entry of entries) {
         if (entry.tent_id !== tentId || !entry.entry_at) continue;
         const entryAt = Date.parse(entry.entry_at);
         if (!Number.isFinite(entryAt)) continue;
-        let best: { stamp: string; delta: number } | null = null;
-        for (const card of tentCards) {
-          const delta = Math.abs(entryAt - Date.parse(card.snapshot.capturedAt));
-          if (!Number.isFinite(delta) || delta > windowMs) continue;
-          if (best == null || delta < best.delta) best = { stamp: card.stamp, delta };
-        }
-        if (!best) continue;
-        const current = owner.get(best.stamp);
-        if (!current || best.delta < current.delta) {
-          owner.set(best.stamp, { id: entry.id, delta: best.delta });
+        const nearest = pickNearestCsvTimestamp(stampsByTs.keys(), entryAt, windowMs);
+        if (!nearest) continue;
+        const stamp = stampsByTs.get(nearest.ts);
+        if (!stamp) continue;
+        const candidate = { delta: nearest.delta, entryAt, entryId: entry.id };
+        const current = owner.get(stamp);
+        if (
+          !current ||
+          csvEntryOwnsSnapshot(candidate, {
+            delta: current.delta,
+            entryAt: current.entryAt,
+            entryId: current.id,
+          })
+        ) {
+          owner.set(stamp, { id: entry.id, delta: nearest.delta, entryAt });
         }
       }
       for (const card of tentCards) {
@@ -215,12 +227,12 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
       ))}
       {timeline.omitted.map((item) => (
         <p key={item.tentId} className="text-xs text-muted-foreground">
-          <a
-            href={`${tentDetailPath(item.tentId)}#imported-history`}
+          <Link
+            to={`${tentDetailPath(item.tentId)}#imported-history`}
             data-testid="timeline-csv-more-readings"
           >
-            {item.count} more CSV readings in Sensors
-          </a>
+            {csvOmittedSnapshotCopy(item.count)}
+          </Link>
         </p>
       ))}
     </section>

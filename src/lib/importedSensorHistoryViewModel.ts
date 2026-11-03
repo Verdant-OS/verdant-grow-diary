@@ -19,6 +19,7 @@
  */
 
 import { isCsvHistoryRow } from "@/lib/aiDoctorCsvHistoryContextRules";
+import { CSV_DERIVED_VPD_LABEL } from "@/lib/environmentCsvTimelineContextViewModel";
 import {
   AIR_TEMP_C_RANGE,
   HUMIDITY_RANGE,
@@ -72,6 +73,8 @@ export interface ImportedSensorHistoryInputRow {
   value?: number | null;
   /** Optional validity flag used by historical-review eligibility. */
   quality?: string | null;
+  /** Provenance already extracted by the caller. Calculated VPD is never labeled as a measured reading. */
+  vpd_source?: "derived" | "csv" | null;
 }
 
 export interface ImportedSensorHistoryDisplayRow {
@@ -132,6 +135,8 @@ function normalizeSelected(
   return selected;
 }
 
+export const IMPORTED_CALCULATED_VPD_LABEL = CSV_DERIVED_VPD_LABEL;
+
 const IMPORTED_METRIC_LABELS: Record<string, string> = {
   humidity_pct: "Humidity",
   vpd_kpa: "VPD",
@@ -141,12 +146,17 @@ const IMPORTED_METRIC_LABELS: Record<string, string> = {
   ec: "EC",
 };
 
-function formatMetricLabel(metric: string, temperatureUnit: TemperatureUnitPreference): string {
+function formatMetricLabel(
+  metric: string,
+  temperatureUnit: TemperatureUnitPreference,
+  vpdSource?: "derived" | "csv" | null,
+): string {
   if (metric === "temperature_c")
     return `Temperature (${getTemperatureUnitSymbol(temperatureUnit)})`;
   if (metric === "soil_temp_c")
     return `Soil temperature (${getTemperatureUnitSymbol(temperatureUnit)})`;
-  return IMPORTED_METRIC_LABELS[metric] ?? metric.replace(/_/g, " ");
+  if (metric === "vpd_kpa" && vpdSource === "derived") return IMPORTED_CALCULATED_VPD_LABEL;
+  return IMPORTED_METRIC_LABELS[metric] ?? metric;
 }
 
 function formatImportedValue(
@@ -259,11 +269,17 @@ export function buildImportedSensorHistoryViewModel(args: {
       label: "All metrics",
       count: csvRows.length,
     },
-    ...metrics.map((m) => ({
-      id: m,
-      label: formatMetricLabel(m, temperatureUnit),
-      count: metricCounts.get(m) ?? 0,
-    })),
+    ...metrics.map((m) => {
+      const vpdRows = m === "vpd_kpa" ? csvRows.filter((r) => r.metric === "vpd_kpa") : [];
+      const allCalculated = vpdRows.length > 0 && vpdRows.every((r) => r.vpd_source === "derived");
+      return {
+        id: m,
+        label: allCalculated
+          ? IMPORTED_CALCULATED_VPD_LABEL
+          : formatMetricLabel(m, temperatureUnit),
+        count: metricCounts.get(m) ?? 0,
+      };
+    }),
   ];
 
   const matchingRows =
@@ -289,7 +305,7 @@ export function buildImportedSensorHistoryViewModel(args: {
     recentRows.push({
       capturedAt,
       metric: r.metric,
-      metricLabel: formatMetricLabel(r.metric, temperatureUnit),
+      metricLabel: formatMetricLabel(r.metric, temperatureUnit, r.vpd_source),
       value,
       displayValue: formatImportedValue(r.metric, value, temperatureUnit),
       outOfRangeNote: resolveOutOfRangeNote(r.metric, value),

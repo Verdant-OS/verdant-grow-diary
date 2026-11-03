@@ -100,6 +100,40 @@ function entryMs(e: DiaryEntryLike): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
+/** Smaller distance wins. Equal distance keeps the earlier timestamp. */
+export function pickNearestCsvTimestamp(
+  timestamps: Iterable<number>,
+  atMs: number,
+  windowMs: number,
+): { ts: number; delta: number } | null {
+  let bestTs: number | null = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (const ts of timestamps) {
+    const delta = Math.abs(ts - atMs);
+    if (!Number.isFinite(delta) || delta > windowMs) continue;
+    if (bestTs == null || delta < bestDelta || (delta === bestDelta && ts < bestTs)) {
+      bestDelta = delta;
+      bestTs = ts;
+    }
+  }
+  return bestTs == null ? null : { ts: bestTs, delta: bestDelta };
+}
+
+/** Closer diary entry owns a shared snapshot. Equal distance keeps the earlier entry, then the smaller id. */
+export function csvEntryOwnsSnapshot(
+  candidate: { delta: number; entryAt: number; entryId: string },
+  current: { delta: number; entryAt: number; entryId: string },
+): boolean {
+  if (candidate.delta !== current.delta) return candidate.delta < current.delta;
+  if (candidate.entryAt !== current.entryAt) return candidate.entryAt < current.entryAt;
+  return candidate.entryId < current.entryId;
+}
+
+export function csvOmittedSnapshotCopy(count: number): string {
+  const noun = count === 1 ? "snapshot" : "snapshots";
+  return `${count} more CSV ${noun} in Sensors`;
+}
+
 export interface CsvTimelineWindow {
   snapshots: CsvTimelineSnapshot[];
   /** Unlinked observations past the newest-12 cap. Linked snapshots are all included. */
@@ -124,15 +158,8 @@ export class CsvTimelineSnapshotList {
       if (entry.tent_id != null && entry.tent_id !== input.tentId) continue;
       const eMs = entryMs(entry);
       if (eMs == null) continue;
-      let bestTs: number | null = null;
-      let bestDelta = Number.POSITIVE_INFINITY;
-      for (const ts of byTs.keys()) {
-        const delta = Math.abs(ts - eMs);
-        if (delta > windowMs || delta >= bestDelta) continue;
-        bestDelta = delta;
-        bestTs = ts;
-      }
-      if (bestTs != null) linked.add(bestTs);
+      const nearest = pickNearestCsvTimestamp(byTs.keys(), eMs, windowMs);
+      if (nearest) linked.add(nearest.ts);
     }
     const unlinked = [...byTs.keys()].filter((ts) => !linked.has(ts)).sort((a, b) => b - a);
     const shownUnlinked = unlinked.slice(0, CSV_UNLINKED_TIMELINE_CAP);
@@ -234,25 +261,16 @@ export function buildCsvTimelineContext(input: CsvTimelineContextInput): CsvTime
       continue;
     }
 
-    let bestTs: number | null = null;
-    let bestDelta = Number.POSITIVE_INFINITY;
-    for (const t of tsList) {
-      const d = Math.abs(t - eMs);
-      if (d > windowMs) continue;
-      if (d < bestDelta) {
-        bestDelta = d;
-        bestTs = t;
-      }
-    }
-    if (bestTs == null) {
+    const nearest = pickNearestCsvTimestamp(tsList, eMs, windowMs);
+    if (nearest == null) {
       out.push({ diaryEntryId: entry.id, snapshot: null, matchAgeMinutes: null });
       continue;
     }
-    const snap = snapshotFromGroup(byTs.get(bestTs) ?? [], bestTs);
+    const snap = snapshotFromGroup(byTs.get(nearest.ts) ?? [], nearest.ts);
     out.push({
       diaryEntryId: entry.id,
       snapshot: snap,
-      matchAgeMinutes: Math.round(bestDelta / 60_000),
+      matchAgeMinutes: Math.round(nearest.delta / 60_000),
     });
   }
   return out;

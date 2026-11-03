@@ -97,15 +97,24 @@ export default function ImportedSensorHistoryPanel({
     }
   }, [location.hash]);
 
+  const labeledReadings = useMemo(
+    () =>
+      readings.map((row) => ({
+        ...row,
+        vpd_source: CsvImportVendorIdentity.vpdSource(row),
+      })),
+    [readings],
+  );
+
   const vm = useMemo(
     () =>
       buildImportedSensorHistoryViewModel({
-        readings,
+        readings: labeledReadings,
         limit,
         selectedMetric,
         temperatureUnit,
       }),
-    [readings, limit, selectedMetric, temperatureUnit],
+    [labeledReadings, limit, selectedMetric, temperatureUnit],
   );
 
   const handoffVm = useMemo(

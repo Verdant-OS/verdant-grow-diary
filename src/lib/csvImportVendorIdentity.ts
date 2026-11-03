@@ -4,6 +4,18 @@
  */
 import { getCsvVendorLineage, type CsvSourceApp } from "@/lib/sensorReadingVendorLineage";
 
+/** AC Infinity, including spaced or punctuated forms, except a leading "not". */
+function mentionsAcInfinity(haystack: string): boolean {
+  const re = /ac[\s._-]*infinity\b/g;
+  for (const match of haystack.matchAll(re)) {
+    const before = haystack.slice(0, match.index ?? 0);
+    if (before.length > 0 && /[a-z0-9]$/.test(before)) continue;
+    if (/not[\s._-]*$/i.test(before)) continue;
+    return true;
+  }
+  return false;
+}
+
 const VENDOR_LABEL: Record<CsvSourceApp, string> = {
   ac_infinity: "AC Infinity",
   spider_farmer: "Spider Farmer",
@@ -17,9 +29,21 @@ export class CsvImportVendorIdentity {
   ): CsvSourceApp | null {
     const haystack = `${fileName ?? ""}\n${headers.join("\n")}`.toLowerCase();
     // A leading "not" is a negative fixture name, not the vendor.
-    if (/(?<!not[\s._-]*)(?<![a-z0-9])ac[\s._-]*infinity\b/.test(haystack)) return "ac_infinity";
+    if (mentionsAcInfinity(haystack)) return "ac_infinity";
     if (/spider[\s._-]*farmer/.test(haystack)) return "spider_farmer";
     if (/\bvivosun\b/.test(haystack)) return "vivosun";
+    return null;
+  }
+
+  static vpdSource(row: { vpd_source?: unknown; raw_payload?: unknown }): "derived" | "csv" | null {
+    if (row.vpd_source === "derived" || row.vpd_source === "csv") return row.vpd_source;
+    const payload =
+      row.raw_payload && typeof row.raw_payload === "object" && !Array.isArray(row.raw_payload)
+        ? (row.raw_payload as { vpd_source?: unknown })
+        : null;
+    if (payload?.vpd_source === "derived" || payload?.vpd_source === "csv") {
+      return payload.vpd_source;
+    }
     return null;
   }
 

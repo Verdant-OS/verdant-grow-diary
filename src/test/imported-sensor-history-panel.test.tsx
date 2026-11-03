@@ -151,8 +151,11 @@ describe("ImportedSensorHistoryPanel", () => {
     const filters = screen.getByTestId("imported-history-metric-filters");
     expect(filters).toHaveTextContent("Humidity");
     expect(filters).toHaveTextContent("Temperature (°C)");
-    // Live row never leaks into the metric filter list.
+    // Live row never leaks into the metric filter list, including the friendly CO₂ label.
     expect(filters.textContent ?? "").not.toContain("co2_ppm");
+    expect(filters.textContent ?? "").not.toContain("CO₂");
+    expect(screen.queryByTestId("imported-history-metric-filter-co2_ppm")).toBeNull();
+    expect(document.querySelector("[data-metric='co2_ppm']")).toBeNull();
   });
 
   it("shows rounded imported values with canonical units on the reopened history table", () => {

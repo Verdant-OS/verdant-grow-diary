@@ -112,7 +112,8 @@ export default function QuickLogWateringForm({
 }: Props) {
   const temperatureUnit = useTemperatureUnitPreference();
   // D1 b: the remembered unit seeds an untouched form; the form's own unit wins once set.
-  const [rememberedUnit] = useState<WaterEntryUnit>(loadWaterVolumeEntryUnit);
+  // Updated on every unit choice so a form reset (save, Log another) keeps the grower's unit.
+  const [rememberedUnit, setRememberedUnit] = useState<WaterEntryUnit>(loadWaterVolumeEntryUnit);
   const unit: WaterEntryUnit = value.volumeEntryUnit ?? rememberedUnit;
   const volumeText = waterEntryDisplayText(value.volumeEntryText, value.volumeMl, unit);
   const runoffText = waterEntryDisplayText(value.runoffEntryText, value.runoffMl, unit);
@@ -170,6 +171,7 @@ export default function QuickLogWateringForm({
   // poured in); an amount that was never typed (prefill, restore) keeps its ml.
   const chooseUnit = (next: WaterEntryUnit) => {
     saveWaterVolumeEntryUnit(next);
+    setRememberedUnit(next);
     onChange({
       ...value,
       volumeEntryUnit: next,
@@ -295,7 +297,9 @@ export default function QuickLogWateringForm({
           data-testid="qlv2-volume-presets"
         >
           {QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS.map((preset) => {
-            const selected = isWateringVolumePresetSelected(value.volumeMl, preset);
+            // Presets are ml amounts: only an ml entry can be "on" a preset.
+            const selected =
+              unit === "ml" && isWateringVolumePresetSelected(value.volumeMl, preset);
             return (
               <Button
                 key={preset.ml}
@@ -308,11 +312,17 @@ export default function QuickLogWateringForm({
                 onClick={() => {
                   // D3 b: presets are ml amounts, so choosing one switches the entry to ml
                   // (without changing the remembered unit). Runoff keeps its ml amount.
-                  const nextMl = applyWateringVolumePreset(value.volumeMl, preset);
+                  // From L/gal a tap always sets the preset (toggle-off is an ml-only gesture).
+                  // The amount is stored as canonical ml, not as typed text, so a later unit
+                  // change shows it converted instead of reinterpreting its digits.
+                  const nextMl =
+                    unit === "ml"
+                      ? applyWateringVolumePreset(value.volumeMl, preset)
+                      : preset.value;
                   onChange({
                     ...value,
                     volumeEntryUnit: "ml",
-                    volumeEntryText: nextMl,
+                    volumeEntryText: undefined,
                     volumeMl: nextMl,
                     runoffEntryText: undefined,
                   });

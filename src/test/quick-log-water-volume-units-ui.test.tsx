@@ -225,3 +225,44 @@ describe("Quick Log Water volume units", () => {
     expect(runoffInput().value).toBe("946");
   });
 });
+
+describe("Quick Log Water volume units: review fixes (#2814 Bugbot)", () => {
+  it("keeps the chosen unit after the form resets", () => {
+    function ResetHarness() {
+      const [value, setValue] = useState<QuickLogWateringFormState>(EMPTY_QUICKLOG_WATERING_FORM);
+      return (
+        <>
+          <QuickLogWateringForm value={value} onChange={setValue} context={HIDDEN_CONTEXT} />
+          <button type="button" onClick={() => setValue(EMPTY_QUICKLOG_WATERING_FORM)}>
+            reset
+          </button>
+        </>
+      );
+    }
+    render(<ResetHarness />);
+    chooseUnit("gal");
+    fireEvent.click(screen.getByRole("button", { name: "reset" }));
+    expect(screen.getByTestId("qlv2-volume-unit-gal")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Volume (gal)")).toBeInTheDocument();
+  });
+
+  it("does not mark a preset selected for L/gal text, and a tap sets the preset", () => {
+    render(<Harness />);
+    chooseUnit("L");
+    fireEvent.change(volumeInput(), { target: { value: "1" } });
+    expect(latest.volumeMl).toBe("1000");
+    const chip = screen.getByTestId("qlv2-volume-preset-1000");
+    expect(chip).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(chip);
+    expect(latest.volumeMl).toBe("1000");
+    expect(screen.getByLabelText("Volume (ml)")).toBeInTheDocument();
+  });
+
+  it("keeps a preset's ml amount when the unit changes afterwards", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByTestId("qlv2-volume-preset-2000"));
+    chooseUnit("L");
+    expect(latest.volumeMl).toBe("2000");
+    expect(volumeInput().value).toBe("2");
+  });
+});

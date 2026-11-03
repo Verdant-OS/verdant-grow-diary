@@ -21,6 +21,7 @@ import {
   type PhenoDocRecordType,
   type PhenoDocsRestoredDetail,
 } from "@/lib/phenoDocumentationBackupRules";
+import { PHENO_SAVE_DESTINATION_COPY } from "@/constants/phenoSaveDestinationCopy";
 
 // Storage keys are USER-scoped when signed in (see phenoDocStorageKey): the
 // old device-scoped key let another signed-in account on the same device see
@@ -353,9 +354,9 @@ export default function PhenoDocumentationSections({
           data-testid={`pheno-doc-save-${recordType}-${recordId}`}
           onClick={onSave}
           disabled={saveStatus === "conflict"}
-          className="rounded-md border border-border bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+          className="rounded-md border border-border bg-transparent px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary/40 disabled:opacity-50"
         >
-          Save on this device
+          {PHENO_SAVE_DESTINATION_COPY.deviceDraftSave}
         </button>
         {saveStatus === "saved" && (
           <span

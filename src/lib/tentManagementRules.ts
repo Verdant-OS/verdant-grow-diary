@@ -174,6 +174,8 @@ export interface TentDeleteGuardInput {
   /** Null means the assignment query has not produced trustworthy current data. */
   assignedPlantCount: number | null;
   archiveSupported?: boolean;
+  /** Archived plants still linked to the tent. They do not block delete. */
+  archivedAssignedPlantCount?: number | null;
 }
 
 export interface PlantAssignmentQueryLike<T> {
@@ -241,18 +243,23 @@ export function evaluateTentDeleteGuard(input: TentDeleteGuardInput): TentDelete
       recommendedAction: "move_plants_first",
     };
   }
+  const archivedLeft = input.archivedAssignedPlantCount ?? 0;
+  const archivedNote =
+    archivedLeft > 0
+      ? "Archived plants stay in your account and are unassigned from this tent. They are not deleted."
+      : null;
   if (archiveSupported) {
     return {
       canDelete: true,
       canArchive: true,
-      reason: null,
+      reason: archivedNote,
       recommendedAction: "archive",
     };
   }
   return {
     canDelete: true,
     canArchive: false,
-    reason: null,
+    reason: archivedNote,
     recommendedAction: "delete",
   };
 }

@@ -77,7 +77,9 @@ import {
   getActivePlantCount,
   getArchivedPlantLabel,
   shouldShowArchivedToggle,
+  withGrowArchiveVisibility,
 } from "@/lib/archivedPlantVisibilityRules";
+import { ArchivedPlantsToggle } from "@/components/ArchivedPlantsToggle";
 import {
   classifyVpdAgainstStage,
   normalizeVpdStage,
@@ -140,7 +142,9 @@ export default function TentDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const historyAccess = useCsvHistoryWindow(!!id);
-  const [showArchived, setShowArchived] = useState(false);
+  const [showArchived, setShowArchived] = useState(() =>
+    readTentPlantRosterIncludeArchived(id ?? null),
+  );
   const [rosterIncludeArchived, setRosterIncludeArchived] = useState<boolean>(() =>
     readTentPlantRosterIncludeArchived(id ?? null),
   );
@@ -148,6 +152,7 @@ export default function TentDetail() {
     setRosterIncludeArchived(readTentPlantRosterIncludeArchived(id ?? null));
   }, [id]);
   const handleToggleRosterIncludeArchived = (next: boolean) => {
+    setShowArchived(next);
     setRosterIncludeArchived(next);
     writeTentPlantRosterIncludeArchived(id ?? null, next);
   };
@@ -182,7 +187,7 @@ export default function TentDetail() {
   // it (QA 2026-09-24, BUG-006 follow-up). The stage badge and tent menu still
   // show the tent's own. Until the tent's grow row and the plant rows are
   // known, stage grading is withheld (Codex review on #1683).
-  const { grows, loading: growsLoading, error: growsError } = useGrows();
+  const { grows, archivedGrows = [], loading: growsLoading, error: growsError } = useGrows();
   const envStage = resolveTentEnvironmentStage({
     tentId: tent?.id ?? null,
     tentGrowId: tent?.growId ?? null,
@@ -318,7 +323,6 @@ export default function TentDetail() {
       formatSensorSourceLabel({ source: headerVpdObservation.source }))
     : null;
   const tentMeta = getGrowDataMeta(["grow", "tent", id ?? null], user?.id);
-  const activeCount = getActivePlantCount(activePlants);
   // The one safe plant target this tent can prove. Null for zero or several
   // plants — we never invent a default selection. Shared by the One-Tent
   // loop card below and the Quick Log FAB's target key.
@@ -334,11 +338,24 @@ export default function TentDetail() {
   const verifiedActivePlantCount = resolveVerifiedAssignedPlantCount(activePlantsQuery);
   const safePlantId = verifiedActivePlantCount === 1 ? (activePlants[0]?.id ?? null) : null;
   useTentQuickLogTargetEvidence(tent?.id ?? null, safePlantId);
-  // Archive/delete authorization counts all soft-linked plants, including
-  // archived/merged history, and fails closed during every non-current state.
-  const assignedPlantCount = resolveVerifiedAssignedPlantCount(allPlantsQuery);
-  const hasArchived = shouldShowArchivedToggle(allPlants);
-  const visiblePlants = filterVisiblePlants(allPlants, { showArchived });
+  // Delete stays blocked only by active plants. Archived rows are counted
+  // separately so they can be unassigned, and both counts fail closed while
+  // the plant query is not current.
+  const assignedPlantCount = resolveVerifiedAssignedPlantCount(
+    allPlantsQuery,
+    (plant) => plant.isArchived !== true,
+  );
+  const archivedAssignedPlantCount = resolveVerifiedAssignedPlantCount(
+    allPlantsQuery,
+    (plant) => plant.isArchived === true,
+  );
+  const archivedGrowIds = new Set((archivedGrows ?? []).map((grow) => grow.id));
+  const visibilityPlants = withGrowArchiveVisibility(allPlants, archivedGrowIds, {
+    tentGrowArchived: tent?.growId != null && archivedGrowIds.has(tent.growId),
+  });
+  const hasArchived = shouldShowArchivedToggle(visibilityPlants);
+  const visiblePlants = filterVisiblePlants(visibilityPlants, { showArchived });
+  const activeCount = getActivePlantCount(visibilityPlants);
   const rosterActivity = useTentPlantRosterActivity(allPlants);
 
   // Reconcile persisted/URL selected tab against currently visible plants.
@@ -541,6 +558,7 @@ export default function TentDetail() {
             light: tent.light,
           }}
           assignedPlantCount={assignedPlantCount}
+          archivedAssignedPlantCount={archivedAssignedPlantCount}
           onRetryAssignments={() => void allPlantsQuery.refetch()}
           variant="row"
           hideView
@@ -832,18 +850,18 @@ export default function TentDetail() {
       {(() => {
         if (!plantListRead.showRows) return null;
         const tabsVm = buildTentPlantTabsViewModel({
-          plants: allPlants.map((p) => ({
+          plants: visibilityPlants.map((p) => ({
             id: p.id,
             name: p.name,
-            isArchived: p.isArchived,
+            isArchived: p.isArchived === true || p.growArchived === true,
           })),
           includeArchived: rosterIncludeArchived,
           selectedPlantId: selectedPlantTabId,
         });
         const rosterPlantSource =
           tabsVm.selectedPlantId == null
-            ? allPlants
-            : allPlants.filter((p) => p.id === tabsVm.selectedPlantId);
+            ? visibilityPlants
+            : visibilityPlants.filter((p) => p.id === tabsVm.selectedPlantId);
         const scopedRosterKnown =
           plantListRead.complete ||
           rosterPlantSource.some((plant) => rosterIncludeArchived || plant.isArchived !== true);
@@ -882,7 +900,7 @@ export default function TentDetail() {
                       strain: p.strain,
                       stage: p.stage,
                       tentId: p.tentId,
-                      isArchived: p.isArchived,
+                      isArchived: p.isArchived === true || p.growArchived === true,
                       latestLogAt: a?.latestLogAt ?? null,
                       hasRecentPhoto: a?.hasRecentPhoto ?? false,
                       harvestWatchPublicState: a?.harvestWatchPublicState ?? null,
@@ -899,12 +917,12 @@ export default function TentDetail() {
               <TentPlantActivityPanels
                 isLoading={rosterActivity.isLoading}
                 viewModel={buildTentPlantActivityPanelsViewModel({
-                  plants: allPlants.map((p) => ({
+                  plants: visibilityPlants.map((p) => ({
                     id: p.id,
                     name: p.name,
                     strain: p.strain,
                     stage: p.stage,
-                    isArchived: p.isArchived,
+                    isArchived: p.isArchived === true || p.growArchived === true,
                   })),
                   activityByPlantId: rosterActivity.byPlantId,
                   includeArchived: rosterIncludeArchived,
@@ -939,21 +957,11 @@ export default function TentDetail() {
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             {hasArchived && (
-              <button
-                type="button"
-                onClick={() => setShowArchived((v) => !v)}
-                data-testid="tent-detail-show-archived-toggle"
-                aria-pressed={showArchived}
-                className={cn(
-                  "text-xs px-2.5 py-1 rounded-full border transition inline-flex items-center gap-1",
-                  showArchived
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-secondary/50 border-border/50 hover:bg-secondary",
-                )}
-              >
-                <Archive className="h-3 w-3" />
-                {showArchived ? "Hide archived plants" : "Show archived plants"}
-              </button>
+              <ArchivedPlantsToggle
+                pressed={showArchived}
+                onPressedChange={handleToggleRosterIncludeArchived}
+                testId="tent-detail-show-archived-toggle"
+              />
             )}
             <AddExistingPlantDialog tentId={id ?? ""} growId={tent.growId ?? null} />
             <CreatePlantDialog

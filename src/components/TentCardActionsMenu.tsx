@@ -40,6 +40,7 @@ interface TentInput {
 interface Props {
   tent: TentInput;
   assignedPlantCount: number | null;
+  archivedAssignedPlantCount?: number | null;
   /** When true, hide the View Tent action (e.g. already on Tent Detail). */
   hideView?: boolean;
   variant?: "menu" | "row";
@@ -57,6 +58,7 @@ interface Props {
 export default function TentCardActionsMenu({
   tent,
   assignedPlantCount,
+  archivedAssignedPlantCount = null,
   hideView = false,
   variant = "menu",
   onRetryAssignments,
@@ -68,6 +70,7 @@ export default function TentCardActionsMenu({
   const guard = evaluateTentDeleteGuard({
     tentId: tent.id,
     assignedPlantCount,
+    archivedAssignedPlantCount,
     archiveSupported: true,
   });
 
@@ -105,14 +108,30 @@ export default function TentCardActionsMenu({
       return;
     }
     setBusy(true);
-    const { error } = await supabase.from("tents").delete().eq("id", tent.id);
-    setBusy(false);
-    setConfirmDelete(false);
-    if (error) {
-      toast.error(error.message);
+    const detached = await supabase
+      .from("plants")
+      .update({ tent_id: null })
+      .eq("tent_id", tent.id)
+      .eq("is_archived", true)
+      .select("id");
+    if (detached.error) {
+      setBusy(false);
+      setConfirmDelete(false);
+      toast.error(detached.error.message);
       return;
     }
-    toast.success("Tent deleted");
+    const deleted = await supabase.from("tents").delete().eq("id", tent.id).select("id");
+    setBusy(false);
+    setConfirmDelete(false);
+    if (deleted.error) {
+      toast.error(deleted.error.message);
+      return;
+    }
+    if (!deleted.data || deleted.data.length === 0) {
+      toast.error("Tent was not deleted. It may no longer be yours.");
+      return;
+    }
+    toast.success("Tent deleted. Archived plants were kept and unassigned from this tent.");
     invalidate();
   }
 
@@ -146,7 +165,8 @@ export default function TentCardActionsMenu({
             <AlertDialogTitle>Delete {tent.name}?</AlertDialogTitle>
             <AlertDialogDescription>
               {guard.canDelete
-                ? "This permanently removes the tent record. Plants, logs, photos, and sensor history are not deleted."
+                ? (guard.reason ??
+                  "This permanently removes the tent record. Active plants must already be gone. Logs, photos, and sensor history are not deleted.")
                 : guard.reason}
             </AlertDialogDescription>
           </AlertDialogHeader>

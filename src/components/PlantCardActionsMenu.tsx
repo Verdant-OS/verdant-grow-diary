@@ -29,6 +29,7 @@ import {
   Archive,
   RotateCcw,
   GitMerge,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import EditPlantDialog from "@/components/EditPlantDialog";
@@ -42,6 +43,7 @@ import {
   buildRestorePlantPayload,
   resolvePlantArchiveMenuAction,
 } from "@/lib/plantTentRelationshipRules";
+import { PlantLifecycleWriteRules } from "@/lib/plantLifecycleWriteRules";
 
 interface Plant {
   id: string;
@@ -81,6 +83,7 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   /** Lifted Assign/Move dialog — must not live inside DropdownMenuContent. */
   const [assignOpen, setAssignOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -141,6 +144,24 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
     invalidate();
   }
 
+  async function deletePlant() {
+    setBusy(true);
+    const result = await supabase.from("plants").delete().eq("id", plant.id).select("id");
+    setBusy(false);
+    setConfirmDelete(false);
+    if (!PlantLifecycleWriteRules.rowWasWritten(result)) {
+      toast.error(
+        PlantLifecycleWriteRules.failureMessage(
+          result,
+          "Plant was not deleted. Linked records may still reference it.",
+        ),
+      );
+      return;
+    }
+    toast.success("Plant deleted");
+    invalidate();
+  }
+
   const confirmDialogs = (
     <>
       <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
@@ -177,7 +198,10 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={busy}
-              onClick={archivePlant}
+              onClick={(event) => {
+                event.preventDefault();
+                void archivePlant();
+              }}
               data-testid="confirm-archive-plant-submit"
             >
               Archive plant
@@ -203,6 +227,32 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
               data-testid="confirm-restore-plant-submit"
             >
               Restore plant
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent data-testid="confirm-delete-plant">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {plant.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the plant. Logs and photos that the database already cascades or unlinks
+              are updated with it. If the database refuses, the plant stays and you will see the
+              error.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy}
+              onClick={(event) => {
+                event.preventDefault();
+                void deletePlant();
+              }}
+              data-testid="confirm-delete-plant-submit"
+            >
+              Delete plant
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -306,6 +356,15 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
           }
         />
         {archiveOrRestoreRowButton}
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1 text-destructive hover:text-destructive"
+          onClick={() => setConfirmDelete(true)}
+          data-testid="plant-detail-delete-plant"
+        >
+          <Trash2 className="h-4 w-4" /> Delete Plant
+        </Button>
         {confirmDialogs}
       </div>
     );
@@ -383,6 +442,16 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
           />
           <DropdownMenuSeparator />
           {archiveOrRestoreMenuItem}
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onSelect={(e) => {
+              e.preventDefault();
+              setConfirmDelete(true);
+            }}
+            data-testid="plant-card-action-delete"
+          >
+            <Trash2 className="h-4 w-4 mr-2" /> Delete Plant
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <AssignTentDialog

@@ -598,7 +598,11 @@ export default function Tents() {
                           : "Plant count unavailable";
                 const assignedPlantCount = resolveVerifiedAssignedPlantCount(
                   assignmentPlantsQuery,
-                  (plant) => plant.tentId === t.id,
+                  (plant) => plant.tentId === t.id && plant.isArchived !== true,
+                );
+                const archivedAssignedPlantCount = resolveVerifiedAssignedPlantCount(
+                  assignmentPlantsQuery,
+                  (plant) => plant.tentId === t.id && plant.isArchived === true,
                 );
                 // Stage for the environment strip, resolved like Tent Detail
                 // and the Sensors page: the tent's grow row, the tent, and the
@@ -691,6 +695,7 @@ export default function Tents() {
                           light: t.light,
                         }}
                         assignedPlantCount={assignedPlantCount}
+                        archivedAssignedPlantCount={archivedAssignedPlantCount}
                         onRetryAssignments={() => void assignmentPlantsQuery.refetch()}
                       />
                     </div>

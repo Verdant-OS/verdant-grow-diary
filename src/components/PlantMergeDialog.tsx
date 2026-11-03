@@ -53,6 +53,7 @@ import {
   type PlantForMerge,
 } from "@/lib/plantMergeRules";
 import { buildArchivePlantPayload } from "@/lib/plantTentRelationshipRules";
+import { PlantLifecycleWriteRules } from "@/lib/plantLifecycleWriteRules";
 import { plantDetailPath, plantsPath } from "@/lib/routes";
 
 import {
@@ -269,44 +270,56 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   }
 
   async function executeMergeViaRpc() {
-    if (busy) return; // double-submit guard
-    if (!user || !target) return;
-    if (!canExecuteRpc) return;
+    if (busy) return;
+    if (!user || !target || !canExecuteRpc) {
+      toast.error("Merge could not start. Pick a same-grow target and try again.");
+      return;
+    }
     setBusy(true);
-    const { data, error } = await supabase.rpc("merge_duplicate_plant", {
-      source_plant_id: source.id,
-      target_plant_id: target.id,
-    } as never);
-    setBusy(false);
-    setConfirmExecute(false);
-    if (error) {
-      const mapped = mapMergeRpcError(error);
-      toast.error(mapped.message);
-      return;
-    }
-    const parsed = parseMergeRpcSummary(data);
-    if (!parsed) {
-      toast.error("Merge succeeded but the summary was not readable.");
+    try {
+      const { data, error } = await supabase.rpc("merge_duplicate_plant", {
+        source_plant_id: source.id,
+        target_plant_id: target.id,
+      } as never);
+      setBusy(false);
+      setConfirmExecute(false);
+      if (error) {
+        toast.error(mapMergeRpcError(error).message);
+        return;
+      }
+      const parsed = parseMergeRpcSummary(data);
+      if (!parsed) {
+        toast.error("Merge failed. The server did not confirm that the plants were merged.");
+        return;
+      }
+      setResult(parsed);
+      toast.success(`Merged into "${target.name}".`);
       invalidateAfterMerge(target.id);
-      return;
+    } catch (caught) {
+      setBusy(false);
+      setConfirmExecute(false);
+      toast.error(mapMergeRpcError(caught).message);
     }
-    setResult(parsed);
-    toast.success(`Merged into "${target.name}".`);
-    invalidateAfterMerge(target.id);
   }
 
   async function archiveSourceAfterReview() {
     if (busy) return;
     if (!user || !target) return;
     setBusy(true);
-    const { error } = await supabase
+    const archived = await supabase
       .from("plants")
       .update(buildArchivePlantPayload(source.id) as never)
-      .eq("id", source.id);
+      .eq("id", source.id)
+      .select("id");
     setBusy(false);
     setConfirmArchive(false);
-    if (error) {
-      toast.error(error.message);
+    if (!PlantLifecycleWriteRules.rowWasWritten(archived)) {
+      toast.error(
+        PlantLifecycleWriteRules.failureMessage(
+          archived,
+          "Plant was not archived. Nothing changed.",
+        ),
+      );
       return;
     }
     toast.success(`Archived "${source.name}" as a duplicate of "${target.name}"`);
@@ -340,7 +353,21 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (
+          !next &&
+          PlantLifecycleWriteRules.holdMergeDialog({
+            confirming: confirmExecute || confirmArchive,
+            busy,
+          })
+        ) {
+          return;
+        }
+        setOpen(next);
+      }}
+    >
       <DialogTrigger asChild>
         {trigger && isValidElement(trigger) ? (
           cloneElement(trigger as ReactElement<{ disabled?: boolean }>, {
@@ -358,7 +385,16 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="glass max-w-lg" data-testid="plant-merge-dialog">
+      <DialogContent
+        className="glass max-w-lg"
+        data-testid="plant-merge-dialog"
+        onInteractOutside={(event) => {
+          if (confirmExecute || confirmArchive) event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => {
+          if (confirmExecute || confirmArchive) event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="font-display">Merge duplicate plant</DialogTitle>
           <DialogDescription>
@@ -601,6 +637,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
                 disabled={busy || !canExecuteRpc}
                 onClick={(e) => {
                   e.preventDefault();
+                  e.stopPropagation();
                   void executeMergeViaRpc();
                 }}
                 data-testid="confirm-merge-execute-submit"
@@ -632,7 +669,11 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
               <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 disabled={busy}
-                onClick={archiveSourceAfterReview}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void archiveSourceAfterReview();
+                }}
                 data-testid="confirm-merge-archive-submit"
               >
                 Archive duplicate

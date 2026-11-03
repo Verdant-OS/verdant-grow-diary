@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CSV-METRIC-IDENTITY-S1
+
+```text
+TASK CSV-METRIC-IDENTITY-S1  priority: P1  status: OPEN
+goal: The CSV importer never reads soil columns as air temperature or air humidity, and column order never changes what a file means.
+why: CSV QA handoff 2026-11-03 finding F2. On deploy cd0fe0cd, a Spider Farmer soil export with temperature_soil(°C) first was accepted with soil temperature as air temperature_c (reproduced on a real 773-row export); in the original order the same file was rejected.
+branch: claude/csv-metric-identity-s1
+base: verdant-grow-diary @ cd0fe0cd4353c0145eae9d1855b54427240c1f3a
+checkout: git fetch origin claude/csv-metric-identity-s1 verdant-grow-diary && git switch claude/csv-metric-identity-s1
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2808 (draft)
+head_sha: read the PR head (git ls-remote origin claude/csv-metric-identity-s1). Code commit is 43975b85a06c53f7fc4c289a022694b92e23f579; this block is the only later change.
+state: pushed draft; required CI running
+current_step: required CI at the current head
+next_action: when required CI is green at the head, obtain a complete-scope exact-head review from Codex (eligible: did not author or repair). Stay draft until merge gate.
+post_merge_check: on the disposable QA fixture tent at https://verdantgrowdiary.com, with /version.json showing the merged commit, PREVIEW ONLY (cancel, never commit) the QA handoff soil template in original order and with temperature_soil(°C) first; both must show the soil-only message and zero rows. A device export preview must still show air temperature/RH/VPD/CO2/PPFD. NOT_MEASURED until deploy.
+active_writer: Claude (claude.ai session_017UoYKwxBwqjLnPxVUETTHt)
+decisions: Soil headers (any header containing "soil") are set aside before air matching and reported as unsupportedColumns. The error code stays no_sensor_data so the UI flow is unchanged; only the message is soil-specific. unsupportedColumns is optional on the type so an existing scorer-locked test that hand-builds a result still type-checks. PPFD "par" must be a standalone token.
+tried_and_rejected: importing soil metrics now (waits on founder decision Q2 in the triage doc); fixing timestamps in the same PR (F1/S2 waits on founder decisions Q1/Q3).
+commands: bunx vitest run src/test/csv-parser-metric-identity.test.ts src/test/csv-parser.test.ts; NODE_OPTIONS=--max-old-space-size=4096 bunx tsc -p tsconfig.json --noEmit
+files_touched: src/lib/csvParser.ts; src/test/csv-parser-metric-identity.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: independent review not yet obtained
+open_questions: whether #2775 guide copy should mention the soil-only message
+gotchas: do not edit existing CSV tests (scorer lock). Local Bun was 1.4.4; CI pins 1.3.14; bun.lock unchanged.
+links: triage doc claude/audits/csv-qa-friction-triage-2026-11-03.md (claude.ai Project)
+artifacts: PR #2808 body carries the evidence table
+reviewer_seat: Codex (requested on PR #2808)
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; draft; auto-merge off
+claimed_by: Claude, 2026-11-03 12:35 CT
+owner: Claude (Matthew-assigned)
+last_updated: 2026-11-03 12:35 CT, by Claude
+```
+
 ### POSTHOG-PUBLIC-CLIENT-KEY
 
 ```text

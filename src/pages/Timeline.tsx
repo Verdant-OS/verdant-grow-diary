@@ -1645,6 +1645,10 @@ export default function Timeline() {
     user,
     directoryGrowId,
   );
+  const recentLaneTargetNames = useMemo(
+    () => ({ plantNamesById, tentNamesById, plantTentIdsById }),
+    [plantNamesById, tentNamesById, plantTentIdsById],
+  );
   const demoSensorDataPresent = useMemo(
     () => displayEntries.some((row) => deriveTimelineRowSensorSource(row) === "demo"),
     [displayEntries],
@@ -2893,6 +2897,7 @@ export default function Timeline() {
           limit={10}
           growId={activeGrowId ?? null}
           dateFiltered={Boolean(effectiveStartDate || effectiveEndDate)}
+          targetNames={recentLaneTargetNames}
           onEntryChanged={() => {
             void load();
           }}

@@ -55,6 +55,10 @@ import RetractedQuickLogPanel from "@/components/RetractedQuickLogPanel";
 import { quickLogRecentEmptyCopy } from "@/lib/quickLogRecentEmptyStateRules";
 import { cn } from "@/lib/utils";
 import { resolveEffectiveQuickLogCareType } from "@/lib/environmentCheckTimelineViewModel";
+import {
+  resolveQuickLogRowTargetLabel,
+  type QuickLogTargetNameDirectory,
+} from "@/lib/quickLogHistoryTargetLabelRules";
 
 type Builder = (entries: ReturnType<typeof normalizeDiaryEntries>) => QuickLogHistoryRow[];
 
@@ -72,6 +76,8 @@ interface QuickLogHistorySectionProps {
   headerAction?: ReactNode;
   /** Notifies the owner (e.g. Timeline local state) after a correction/retraction. */
   onEntryChanged?: () => void;
+  /** When given, each row names the plant/tent it belongs to. */
+  targetNames?: QuickLogTargetNameDirectory | null;
 }
 
 function fmtDate(iso: string | null, fallback: string): string {
@@ -270,6 +276,7 @@ function Row({
   environmentCheckDetails,
   correctionCount,
   onEntryChanged,
+  targetLabel,
 }: {
   row: QuickLogHistoryRow;
   integrityHandle?: QuickLogEntryHandleRef | null;
@@ -277,6 +284,7 @@ function Row({
   environmentCheckDetails?: unknown;
   correctionCount?: number;
   onEntryChanged?: () => void;
+  targetLabel?: string | null;
 }) {
   const temperatureUnit = useTemperatureUnitPreference();
   const et = getEventType(
@@ -306,6 +314,14 @@ function Row({
           <span className="text-foreground/90 font-medium">
             {fmtDate(row.occurredAt, row.occurredAtLabel)}
           </span>
+          {targetLabel && (
+            <span
+              className="text-xs text-muted-foreground"
+              data-testid="quicklog-history-row-target"
+            >
+              {targetLabel}
+            </span>
+          )}
           <QuickLogEditedBadge correctionCount={correctionCount ?? 0} />
         </div>
         {integrityHandle && (
@@ -391,6 +407,7 @@ function QuickLogHistorySection({
   className,
   headerAction,
   onEntryChanged,
+  targetNames,
 }: QuickLogHistorySectionProps) {
   const rows = useMemo(() => {
     const lifted = liftEntries(rawEntries);
@@ -467,6 +484,7 @@ function QuickLogHistorySection({
               <Row
                 key={r.id}
                 row={r}
+                targetLabel={resolveQuickLogRowTargetLabel(r, targetNames)}
                 integrityHandle={handle}
                 correctionValues={correctionValuePropsFromDiaryDetails(raw?.details)}
                 environmentCheckDetails={raw?.details}
@@ -489,6 +507,7 @@ export function RecentQuickLogActivityPanel({
   growId = null,
   dateFiltered = false,
   onEntryChanged,
+  targetNames = null,
 }: {
   rawEntries: NormalizeDiaryInput["rawEntries"];
   limit?: number;
@@ -497,6 +516,8 @@ export function RecentQuickLogActivityPanel({
   /** True when the page's date filter limited `rawEntries` to a range. */
   dateFiltered?: boolean;
   onEntryChanged?: () => void;
+  /** Plant/tent name directory so each row says which target it belongs to. */
+  targetNames?: QuickLogTargetNameDirectory | null;
 }) {
   const emptyCopy = quickLogRecentEmptyCopy(dateFiltered);
   const temperatureUnit = useTemperatureUnitPreference();
@@ -518,6 +539,7 @@ export function RecentQuickLogActivityPanel({
         title="Recent Quick Logs"
         laneKey="recent"
         onEntryChanged={onEntryChanged}
+        targetNames={targetNames}
         icon={<Activity className="h-3.5 w-3.5 text-primary" />}
         builder={(entries) => buildRecentQuickLogActivity(entries, limit)}
         emptyTitle={emptyCopy.title}

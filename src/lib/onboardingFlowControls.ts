@@ -8,7 +8,12 @@ import {
   START_SCREEN_OPTIONS,
   type StartScreenChoice,
 } from "@/lib/startScreenPreferences";
-import { START_YOUR_ROOM_DRAFT_FORM_ID } from "@/lib/startYourRoomDraftRules";
+import { getHierarchyCreateOutcomeRecoveryAttempts } from "@/lib/hierarchyCreateOutcomeRecovery";
+import {
+  parseStartYourRoomDraft,
+  START_YOUR_ROOM_DRAFT_FORM_ID,
+} from "@/lib/startYourRoomDraftRules";
+import { EMPTY_START_YOUR_ROOM_IDS } from "@/lib/startYourRoomRules";
 
 /** Ordered onboarding surfaces. The first step has no Back control. */
 export type OnboardingFlowStep = "start-screen" | "start-room";
@@ -70,6 +75,15 @@ export class OnboardingFlowControls {
     return !input.savedRoom && !input.busy && !input.createOutcomeUnknown;
   }
 
+  /** Same in-flight fence as Restart. A saved room hides Back entirely. */
+  static backEnabled(input: { busy: boolean; createOutcomeUnknown: boolean }): boolean {
+    return !input.busy && !input.createOutcomeUnknown;
+  }
+
+  static createOutcomeUnknown(userId: string): boolean {
+    return getHierarchyCreateOutcomeRecoveryAttempts(userId).length > 0;
+  }
+
   static backHref(): "/onboarding" {
     return "/onboarding";
   }
@@ -87,10 +101,36 @@ export class OnboardingFlowControls {
     writeBrowserSessionFormDraft(userId, CHOICE_FORM_ID, choice);
   }
 
-  /** Drop the start-screen answer and the start-room form draft. */
+  /**
+   * Drop the start-screen answer and the start-room form draft.
+   * A known failure has no row, so its pending ids are cleared with the draft.
+   * An unknown create may already have inserted that row, so the pending ids
+   * stay in the room draft and the next save reuses them.
+   */
   static clearFlowAnswers(userId: string): void {
     clearBrowserSessionFormDraft(userId, CHOICE_FORM_ID);
-    clearBrowserSessionFormDraft(userId, START_YOUR_ROOM_DRAFT_FORM_ID);
+    if (!OnboardingFlowControls.createOutcomeUnknown(userId)) {
+      clearBrowserSessionFormDraft(userId, START_YOUR_ROOM_DRAFT_FORM_ID);
+      return;
+    }
+    const draft = readBrowserSessionFormDraft(
+      userId,
+      START_YOUR_ROOM_DRAFT_FORM_ID,
+      parseStartYourRoomDraft,
+    );
+    if (!draft) return;
+    const pending = draft.pendingRowIds;
+    if (!pending.grow && !pending.tent && !pending.plant) {
+      clearBrowserSessionFormDraft(userId, START_YOUR_ROOM_DRAFT_FORM_ID);
+      return;
+    }
+    writeBrowserSessionFormDraft(userId, START_YOUR_ROOM_DRAFT_FORM_ID, {
+      step: "grow",
+      form: draft.form,
+      ids: { ...EMPTY_START_YOUR_ROOM_IDS },
+      pendingRowIds: pending,
+      saveError: null,
+    });
   }
 }
 

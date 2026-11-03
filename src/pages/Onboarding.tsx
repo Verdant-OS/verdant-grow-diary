@@ -30,6 +30,7 @@ import {
 import { shouldPreferStartYourRoom } from "@/lib/startYourRoomRules";
 import { Sprout } from "lucide-react";
 import { OnboardingFlowControls } from "@/lib/onboardingFlowControls";
+import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 
 export const ONBOARDING_GROWS_LOADING_COPY = "Loading your grows…";
 import {
@@ -88,6 +89,7 @@ export default function Onboarding() {
   const [searchParams] = useSearchParams();
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
   const [restartOpen, setRestartOpen] = useState(false);
+  const { createOutcomeUnknown } = useHierarchyCreateOutcomeRecovery({ ownerId: user?.id });
   const [starterBusy, setStarterBusy] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [starterRetrying, setStarterRetrying] = useState(false);
@@ -180,7 +182,11 @@ export default function Onboarding() {
   }
 
   function confirmRestart() {
-    if (user) OnboardingFlowControls.clearFlowAnswers(user.id);
+    if (!user || createOutcomeUnknown || OnboardingFlowControls.createOutcomeUnknown(user.id)) {
+      setRestartOpen(false);
+      return;
+    }
+    OnboardingFlowControls.clearFlowAnswers(user.id);
     setChoice(DEFAULT_START_SCREEN);
     setRestartOpen(false);
     trackFunnelEvent("onboarding_restart", { surface: "onboarding" });
@@ -262,7 +268,7 @@ export default function Onboarding() {
 
   return (
     <div
-      className={`flex min-h-0 flex-col items-center px-6 py-10 ${OnboardingFlowControls.mobilePrimaryClearanceClass}`}
+      className={`flex flex-col items-center px-6 py-10 ${OnboardingFlowControls.mobilePrimaryClearanceClass}`}
     >
       <div className="w-full max-w-md glass rounded-2xl p-6">
         {preferRoom && !csvHistoryIntent ? (
@@ -363,7 +369,7 @@ export default function Onboarding() {
             type="button"
             variant="ghost"
             data-testid="onboarding-restart"
-            disabled={starterBusy}
+            disabled={starterBusy || createOutcomeUnknown}
             onClick={() => setRestartOpen(true)}
           >
             {OnboardingFlowControls.restartLabel}

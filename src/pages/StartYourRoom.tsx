@@ -738,7 +738,14 @@ export default function StartYourRoom() {
     nav(OnboardingFlowControls.restartHref());
   }
 
+  function backFlow() {
+    if (!OnboardingFlowControls.backEnabled({ busy, createOutcomeUnknown })) return;
+    trackFunnelEvent("onboarding_back", { surface: "start_room" });
+    nav(OnboardingFlowControls.backHref());
+  }
+
   function skipFlow() {
+    if (busy) return;
     trackFunnelEvent("onboarding_skip", { surface: "start_room" });
     nav(routeForStartScreen(DEFAULT_START_SCREEN), { replace: true });
   }
@@ -750,7 +757,7 @@ export default function StartYourRoom() {
 
   return (
     <div
-      className={`flex min-h-0 flex-col items-center px-4 py-8 ${OnboardingFlowControls.mobilePrimaryClearanceClass}`}
+      className={`flex flex-col items-center px-4 py-8 ${OnboardingFlowControls.mobilePrimaryClearanceClass}`}
     >
       <div
         className="w-full max-w-md glass rounded-2xl p-6 space-y-4"
@@ -771,10 +778,8 @@ export default function StartYourRoom() {
               type="button"
               variant="outline"
               data-testid="start-room-back"
-              onClick={() => {
-                trackFunnelEvent("onboarding_back", { surface: "start_room" });
-                nav(OnboardingFlowControls.backHref());
-              }}
+              disabled={!OnboardingFlowControls.backEnabled({ busy, createOutcomeUnknown })}
+              onClick={backFlow}
             >
               {OnboardingFlowControls.backLabel}
             </Button>
@@ -794,7 +799,13 @@ export default function StartYourRoom() {
               {OnboardingFlowControls.restartLabel}
             </Button>
           ) : null}
-          <Button type="button" variant="ghost" data-testid="start-room-skip" onClick={skipFlow}>
+          <Button
+            type="button"
+            variant="ghost"
+            data-testid="start-room-skip"
+            disabled={busy}
+            onClick={skipFlow}
+          >
             {OnboardingFlowControls.skipLabel}
           </Button>
         </div>
@@ -950,7 +961,7 @@ export default function StartYourRoom() {
             </ul>
             <Button
               type="button"
-              className="w-[calc(100%-4.5rem)] gradient-leaf text-primary-foreground md:w-full"
+              className={`${OnboardingFlowControls.mobilePrimaryButtonWidthClass} gradient-leaf text-primary-foreground`}
               disabled={!canFinish(shownIds)}
               onClick={finish}
               data-testid="start-room-finish"

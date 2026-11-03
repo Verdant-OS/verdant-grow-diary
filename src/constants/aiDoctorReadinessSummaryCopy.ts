@@ -57,3 +57,8 @@ export const AI_DOCTOR_READINESS_SUMMARY_AGE_SUFFIXES = {
   hours: "h ago",
   days: "d ago",
 } as const;
+
+/** Plant Detail AI review: heading, provenance disclosure and missing-list labels. */
+export const AI_DOCTOR_READINESS_SUMMARY_HEADING = "AI review readiness" as const;
+export const AI_DOCTOR_READINESS_SUMMARY_PROVENANCE_LABEL = "How this was decided" as const;
+export const AI_DOCTOR_READINESS_SUMMARY_MISSING_HEADING = "Missing" as const;

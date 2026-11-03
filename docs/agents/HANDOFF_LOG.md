@@ -78,18 +78,18 @@ why: Live audit 2026-11-03 finding 3. Plant Detail shows readiness from six rule
 branch: claude/ai-doctor-readiness-summary (Matthew chose a separate branch, 2026-11-03)
 base: verdant-grow-diary
 checkout: git fetch origin claude/ai-doctor-readiness-summary verdant-grow-diary && git switch claude/ai-doctor-readiness-summary
-pr: not yet opened (opens as a draft after round 2)
+pr: opened as a draft after this commit; read the URL from GitHub
 head_sha: round-1 commit acb836e3bdc136586aca11543209283c93518701; this block's commit follows it, so read the current head on GitHub
-state: round 1 committed (pure rules, copy, 245 unit tests). Round 2 (component wiring) not started.
-current_step: round 2: optional onReadinessSignal props on F, A and C; hidePreStartConfidenceCopy on C; Plant Detail layout with a mounted-while-collapsed disclosure that opens on D's anchor hash; component test.
-next_action: run round 2 per spec R7-R8 and acceptance tests 8, 11-13.
+state: rounds 1, 2a and 2b committed: rules, optional signal props on F/A/C, container section, Plant Detail layout. Draft PR, awaiting CI and independent review.
+current_step: draft PR open; CI running.
+next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ). Signed-in visual check of Plant Detail is NOT_MEASURED (needs fixture credentials).
 post_merge_check: after Publish, open a plant's AI review on https://verdantgrowdiary.com with the fixture account. Exactly one readiness verdict is visible before a review starts. NOT_MEASURED until live /version.json reports the merge SHA.
 active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
 decisions: D1 keep local preview collapsed; D2 overview copy is a later slice; D3 C stays visible with its pre-start confidence line hidden on Plant Detail.
 tried_and_rejected: hiding C in the disclosure (it owns the Start review control).
 commands: bunx vitest run src/test/ai-doctor-readiness-summary-rules.test.ts --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
-files_touched: src/lib/aiDoctorReadinessSummaryRules.ts; src/constants/aiDoctorReadinessSummaryCopy.ts; src/test/ai-doctor-readiness-summary-rules.test.ts; docs/agents/HANDOFF_LOG.md
-files_remaining: src/pages/PlantDetail.tsx; src/components/PlantDetailAiDoctorReadiness.tsx; src/components/PlantDetailAiDoctorContextReadinessMount.tsx; src/components/AiDoctorContextReadinessPanel.tsx; src/components/PlantDetailAiDoctorLiveReview.tsx; new src/components/AiDoctorReadinessSummary.tsx; new component test
+files_touched: src/lib/aiDoctorReadinessSummaryRules.ts; src/constants/aiDoctorReadinessSummaryCopy.ts; src/components/AiDoctorReadinessSummary.tsx; src/components/PlantDetailAiDoctorReadinessSection.tsx; src/components/PlantDetailAiDoctorReadiness.tsx; src/components/AiDoctorContextReadinessPanel.tsx; src/components/PlantDetailAiDoctorContextReadinessMount.tsx; src/components/PlantDetailAiDoctorLiveReview.tsx; src/pages/PlantDetail.tsx; src/test/ai-doctor-readiness-summary-rules.test.ts; src/test/ai-doctor-readiness-signal-props.test.tsx; src/test/ai-doctor-live-review-readiness-signal.test.tsx; src/test/ai-doctor-readiness-summary-section.test.tsx; src/test/plant-detail-information-architecture.test.ts (3 structure pins renegotiated); docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
 blockers: none
 open_questions: none
 gotchas: the pre-commit full-project tsc runs out of memory at the default heap; commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify). Prettier runs on staged .md files.
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-03 13:05 CT, by Claude
+last_updated: 2026-11-03 13:40 CT, by Claude
 ```
 
 ### PHOTO-VIEWER-CAPTION-TILES

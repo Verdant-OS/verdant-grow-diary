@@ -251,3 +251,14 @@ export interface ReadinessCSignal {
     stale: boolean | null;
   } | null;
 }
+
+/** Combine F's read state with C's start-blocking hold (spec §3 `hold`). Missing signals are pending. */
+export function resolveReadinessHold(
+  f: ReadinessFSignal | null | undefined,
+  c: ReadinessCSignal | null | undefined,
+): ReadinessHold {
+  if (f?.readError) return "read_error";
+  if (!f || !c || f.loading || c.hold === "pending") return "pending";
+  if (c.hold === "recovery") return "recovery";
+  return "none";
+}

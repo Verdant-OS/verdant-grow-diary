@@ -57,20 +57,38 @@ export function saturationVaporPressureKpa(tempC: number): number {
 }
 
 /**
- * Shared numeric guard for every VPD derived from temperature and humidity.
- * `calculateVPD` and `deriveVpd` both call this so a temperature outside
- * [-40, 80] °C or a humidity outside [0, 100] is rejected in one place,
- * and a negative result is clamped to 0 before the 2-decimal round.
+ * Numeric VPD from temperature and humidity.
+ *
+ * `kpa` rejects temperature outside [-40, 80] °C. That guard is for display
+ * derivation (`deriveVpd`). Ingest calls `calculateVPD`, which uses
+ * `withoutTempRange`, so a stored reading outside that band is unchanged.
  */
 export class VpdFromTempRh {
   static readonly minTempC = -40;
   static readonly maxTempC = 80;
 
   static kpa(tempC: number | null | undefined, rhPct: number | null | undefined): number | null {
+    return VpdFromTempRh.compute(tempC, rhPct, true);
+  }
+
+  static withoutTempRange(
+    tempC: number | null | undefined,
+    rhPct: number | null | undefined,
+  ): number | null {
+    return VpdFromTempRh.compute(tempC, rhPct, false);
+  }
+
+  private static compute(
+    tempC: number | null | undefined,
+    rhPct: number | null | undefined,
+    enforceTempRange: boolean,
+  ): number | null {
     if (typeof tempC !== "number" || !Number.isFinite(tempC)) return null;
     if (typeof rhPct !== "number" || !Number.isFinite(rhPct)) return null;
     if (rhPct < 0 || rhPct > 100) return null;
-    if (tempC < VpdFromTempRh.minTempC || tempC > VpdFromTempRh.maxTempC) return null;
+    if (enforceTempRange && (tempC < VpdFromTempRh.minTempC || tempC > VpdFromTempRh.maxTempC)) {
+      return null;
+    }
     const vpd = saturationVaporPressureKpa(tempC) * (1 - rhPct / 100);
     if (!Number.isFinite(vpd)) return null;
     return Math.round(Math.max(0, vpd) * 100) / 100;

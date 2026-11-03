@@ -98,7 +98,14 @@ export default function SensorChart({
         metric === "temp" && typeof raw === "number"
           ? convertCelsiusForDisplay(raw, temperatureUnit)
           : raw;
-      return { ts: r.ts, value: typeof v === "number" && Number.isFinite(v) ? v : null };
+      const finite = typeof v === "number" && Number.isFinite(v) ? v : null;
+      const calculated = r.vpdPointKind === "calculated";
+      return {
+        ts: r.ts,
+        value: finite,
+        recorded: calculated ? null : finite,
+        calculated: calculated ? finite : null,
+      };
     });
   }, [filteredData, metric, temperatureUnit]);
   const plottedPointCount = useMemo(
@@ -142,6 +149,20 @@ export default function SensorChart({
             />
             {legendLabel} · {plottedPointCount} {plottedPointCount === 1 ? "point" : "points"}
           </span>
+          {metric === "vpd" &&
+            filteredData.some((reading) => reading.vpdPointKind === "calculated") && (
+              <span
+                data-testid="sensor-chart-calculated-legend"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+              >
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-0 w-4 border-t border-dashed"
+                  style={{ borderColor: axisMeta.color }}
+                />
+                calculated from temp + RH
+              </span>
+            )}
           {!hideExportButton && (
             <button
               type="button"
@@ -233,19 +254,45 @@ export default function SensorChart({
               fontSize: 12,
             }}
             labelFormatter={(v) => formatChartTooltipTimestamp(v as string)}
-            formatter={(v: number) => [
+            formatter={(v: number, name: string) => [
               formatSensorChartTooltipValue(v, metric, temperatureUnit),
-              legendLabel,
+              name === "calculated" ? "calculated from temp + RH" : legendLabel,
             ]}
           />
-          <Series
-            type="monotone"
-            dataKey="value"
-            stroke={axisMeta.color}
-            strokeWidth={2}
-            fill={`url(#${id})`}
-            dot={false}
-          />
+          {metric === "vpd" ? (
+            <>
+              <Series
+                type="monotone"
+                dataKey="recorded"
+                name="recorded"
+                stroke={axisMeta.color}
+                strokeWidth={2}
+                fill={`url(#${id})`}
+                dot={false}
+                connectNulls={false}
+              />
+              <Series
+                type="monotone"
+                dataKey="calculated"
+                name="calculated"
+                stroke={axisMeta.color}
+                strokeWidth={2}
+                strokeDasharray="5 4"
+                fill="none"
+                connectNulls={false}
+                dot={{ r: 3, fill: "transparent", stroke: axisMeta.color, strokeWidth: 2 }}
+              />
+            </>
+          ) : (
+            <Series
+              type="monotone"
+              dataKey="value"
+              stroke={axisMeta.color}
+              strokeWidth={2}
+              fill={`url(#${id})`}
+              dot={false}
+            />
+          )}
         </Comp>
       </ResponsiveContainer>
     </div>

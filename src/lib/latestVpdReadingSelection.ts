@@ -66,8 +66,11 @@ export class LatestVpdReadingSelection {
         readObservedSensorMetric(reading, "rh"),
       );
       if (vpd === null) continue;
-      const observed = Array.isArray(reading.observedMetrics) ? reading.observedMetrics : [];
-      derived.push({ ...reading, vpd, observedMetrics: [...observed, "vpd"] });
+      derived.push({
+        ...reading,
+        vpd,
+        vpdPointKind: "calculated",
+      });
     }
     return sortSensorReadingsNewestFirst([...recorded, ...derived]);
   }

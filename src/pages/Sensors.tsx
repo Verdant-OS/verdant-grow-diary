@@ -552,38 +552,30 @@ export default function Sensors() {
             m.key === "vpd"
               ? LatestVpdReadingSelection.historyForChart(readingsByMetric.vpd, filtered)
               : readingsByMetric[m.key];
-          const latestMetricReading = readingsByMetric[m.key][0] ?? null;
+          const recordedLatest = readingsByMetric[m.key][0] ?? null;
+          const latestMetricReading =
+            m.key === "vpd" && vpdChoice.kind === "derived"
+              ? (latestTrustedVpdInputs?.reading ?? recordedLatest)
+              : recordedLatest;
           const rawValue = readObservedSensorMetric(latestMetricReading, m.key);
-          const currentIsDerived = m.key === "vpd" && vpdChoice.kind === "derived";
-          const metricEvidenceReading = currentIsDerived
-            ? (latestTrustedVpdInputs?.reading ?? latestMetricReading)
-            : (latestMetricReading ??
-              (m.key === "vpd" ? (latestTrustedVpdInputs?.reading ?? null) : null));
+          const chosenVpd = vpdChoice.kind === "none" ? null : vpdChoice.vpdKpa;
+          const metricEvidenceReading =
+            latestMetricReading ??
+            (m.key === "vpd" ? (latestTrustedVpdInputs?.reading ?? null) : null);
           const metricTrust = classifySensorReadingTrust(metricEvidenceReading);
           const metricSource = metricEvidenceReading?.source ?? null;
           const metricClassification = classifyGrowDataSource(
             metricEvidenceReading
               ? {
                   source: metricSource,
-                  value: rawValue ?? derivedVpdKpa,
+                  value: m.key === "vpd" ? chosenVpd : rawValue,
                   timestamp: metricEvidenceReading.ts,
                 }
               : { source: null, value: null, timestamp: null },
             { now: nowMs },
           );
-          // Derive VPD from temp + RH when no VPD value is present.
-          let value: number | null | undefined =
-            currentIsDerived && vpdChoice.kind === "derived" ? vpdChoice.vpdKpa : rawValue;
-          let isDerived = currentIsDerived;
-          if (
-            m.key === "vpd" &&
-            !currentIsDerived &&
-            (value == null || !Number.isFinite(value as number)) &&
-            derivedVpdKpa !== null
-          ) {
-            value = derivedVpdKpa;
-            isDerived = true;
-          }
+          const value: number | null | undefined = m.key === "vpd" ? chosenVpd : rawValue;
+          const isDerived = m.key === "vpd" && vpdChoice.kind === "derived";
           // Recent values for soil stuck-at-bound detection (newest 3).
           const recentValues = m.key === "soil" ? recentSoilValues : undefined;
           const state = classifySensorMetricState({

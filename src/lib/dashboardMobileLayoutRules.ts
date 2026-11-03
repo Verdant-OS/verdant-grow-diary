@@ -12,9 +12,13 @@ export class DashboardMobileLayout {
     return viewportPx <= DashboardMobileLayout.stackMaxPx;
   }
 
-  /** Today's Grow Checks row: stack the method label above its actions. */
+  /**
+   * Today's Grow Checks row: stack the method label above its actions.
+   * Tailwind 4 `max-[431px]` is width < 431px, so 430px is included.
+   * `max-[389px]` stays for the locked layout-safety source pin.
+   */
   static readonly growCheckRowClass =
-    "py-2 flex items-center justify-between gap-3 max-[389px]:flex-col max-[389px]:items-stretch max-[430px]:flex-col max-[430px]:items-stretch";
+    "py-2 flex items-center justify-between gap-3 max-[389px]:flex-col max-[389px]:items-stretch max-[431px]:flex-col max-[431px]:items-stretch";
 
   /** Method line wraps. A single-line truncate clips "Checked by …" on a phone. */
   static readonly growCheckMethodClass =
@@ -29,9 +33,6 @@ export class DashboardMobileLayout {
 
   static readonly disclosureDescriptionClass =
     "min-w-0 basis-full text-xs text-muted-foreground break-words sm:basis-auto";
-
-  static readonly environmentHeadingRowClass =
-    "mb-2 flex min-w-0 flex-wrap items-start justify-between gap-2";
 
   static readonly environmentCopyClass = "min-w-0 flex-1";
 

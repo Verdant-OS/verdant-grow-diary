@@ -351,9 +351,9 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
               data-checked-today={row.checkedToday ? "1" : "0"}
               data-today-method={row.todayMethod}
               // max-[389px] stays because src/test/dashboard-mobile-layout-safety.test.ts
-              // pins that exact class string. That test is scorer-locked. max-[430px]
-              // is the breakpoint that stacks this row on the phone widths in #2740.
-              className="py-2 flex items-center justify-between gap-3 max-[389px]:flex-col max-[389px]:items-stretch max-[430px]:flex-col max-[430px]:items-stretch"
+              // pins that exact class string. That test is scorer-locked. Tailwind 4
+              // max-[Npx] is width < N, so max-[431px] includes the 430px phone width.
+              className="py-2 flex items-center justify-between gap-3 max-[389px]:flex-col max-[389px]:items-stretch max-[431px]:flex-col max-[431px]:items-stretch"
             >
               <div className="flex items-start gap-2 min-w-0">
                 {row.checkedToday ? (

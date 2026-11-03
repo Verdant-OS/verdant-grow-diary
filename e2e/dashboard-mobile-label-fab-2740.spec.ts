@@ -173,8 +173,8 @@ async function assertMethodLabelStacksAtPhoneWidth(page: Page) {
     };
   });
   expect(layout.methodTop).toBeGreaterThanOrEqual(layout.nameBottom - 1);
-  // Column layout from max-[430px]:flex-col. Buttons beside the method sit
-  // above its bottom edge, so this fails if that class is removed.
+  // Column layout through 430px. Buttons beside the method sit above its
+  // bottom edge, so this fails if that stack class is missing at this width.
   expect(layout.actionsTop).toBeGreaterThanOrEqual(layout.methodBottom - 1);
   expect(layout.methodScrollWidth).toBeLessThanOrEqual(layout.methodClientWidth);
 }
@@ -206,7 +206,7 @@ test.describe("Dashboard mobile label and FAB clearance #2740", () => {
       await openShell(page, { width, height: 852 });
       await expect(page.getByTestId("dashboard-root")).toBeVisible();
       await assertNoHorizontalOverflow(page);
-      if (width === 393) await assertMethodLabelStacksAtPhoneWidth(page);
+      await assertMethodLabelStacksAtPhoneWidth(page);
 
       const noteHeight = await page
         .getByTestId("dashboard-daily-grow-check-panel-row-action-note")

@@ -32,7 +32,7 @@ describe("Issue #2740 dashboard labels at 360, 393, and 430px", () => {
     expect(DashboardMobileLayout.growCheckMethodClass).toMatch(/break-words/);
     expect(PANEL).toContain(DashboardMobileLayout.growCheckRowClass);
     expect(PANEL).toContain(DashboardMobileLayout.growCheckMethodClass);
-    expect(PANEL).toMatch(/max-\[430px\]:flex-col max-\[430px\]:items-stretch/);
+    expect(PANEL).toMatch(/max-\[431px\]:flex-col max-\[431px\]:items-stretch/);
     expect(PANEL).not.toMatch(/dashboard-daily-grow-check-panel-row-method"[\s\S]{0,120}truncate/);
   });
 

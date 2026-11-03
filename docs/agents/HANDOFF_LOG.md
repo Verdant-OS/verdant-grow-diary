@@ -80,8 +80,8 @@ base: verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2820
 head_sha: read the current head on GitHub
 state: pushed draft
-current_step: pushed items 1 (export escaping test), 8 (archive zero-row toast) and 17+18 (row target label on Recent Quick Logs; grow name line on Plant/Tent detail). Restore zero-row fix BLOCKED: needs scorer-lock pin src/test/plant-card-actions-archive-restore-menu.test.tsx renegotiated (its supabase mock lacks .select); unlock was denied in-session; patch kept off-branch pending founder
-next_action: founder decides on the restore pin renegotiation, then picks the next slice (suggested 12 time zones)
+current_step: pushed items 1, 8, restore (pin src/test/plant-card-actions-archive-restore-menu.test.tsx renegotiated with founder approval), 17, 18. Item 12 audited: all times render at view time in the viewer's browser zone with a DST-correct label; no user time-zone setting exists; waiting on founder choice of where a set zone lives
+next_action: founder picks item-12 approach (profile column = migration, or per-device preference)
 post_merge_check: on verdantgrowdiary.com, the fixture plant page shows "Grow: <name>" and Timeline Recent Quick Logs rows show "Plant: ... · Tent: ..."
 active_writer: Claude session claude/new-session-azpsz3
 decisions: no migration/RLS/auth edits (held); items 2,4,5,6 fixed by #2794; item 3 not reproduced (in-flight guard + idempotency key; duplicates 6.5 h apart); item 7 fixed by f2d6ca2; names never guessed (unknown id reads "name unavailable")
@@ -89,7 +89,7 @@ tried_and_rejected: editing existing test files under scorer-lock; new test file
 commands: bunx vitest run src/test/grow-and-target-context-labels.test.tsx src/test/quick-log-recent-row-target-label.test.tsx src/test/plant-archive-outcome-toast.test.tsx src/test/tent-name-markup-export-escape.test.ts --reporter=dot
 files_touched: src/test/tent-name-markup-export-escape.test.ts, src/components/PlantCardActionsMenu.tsx, src/test/plant-archive-outcome-toast.test.tsx, src/lib/detailPageGrowContextRules.ts, src/lib/quickLogHistoryTargetLabelRules.ts, src/components/DetailGrowContextLine.tsx, src/components/QuickLogHistoryPanels.tsx, src/pages/PlantDetail.tsx, src/pages/TentDetail.tsx, src/pages/Timeline.tsx, src/test/grow-and-target-context-labels.test.tsx, src/test/quick-log-recent-row-target-label.test.tsx, docs/agents/HANDOFF_LOG.md
 files_remaining: per founder choice
-blockers: restore pin (founder); live /version.json probe blocked by a session egress hook; no production DB/Worker log access
+blockers: item 12 design choice (founder); live /version.json probe blocked by a session egress hook; no production DB/Worker log access
 open_questions: is #2794 live?
 gotchas: #2817 overlaps items 6 and 15; #2819 touches the tent next-step card; a base-merge bot pushes to this branch, so fetch before pushing
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2794
@@ -98,7 +98,7 @@ reviewer_sha: none yet
 session_state: one self check-in armed (send_later) for PR #2820 CI
 claimed_by: Claude, 2026-11-03 16:45 CT
 owner: Claude
-last_updated: 2026-11-03 17:50 CT, by Claude
+last_updated: 2026-11-03 18:05 CT, by Claude
 ```
 
 ### QUICK-LOG-WATER-VOLUME-UNITS-SPEC

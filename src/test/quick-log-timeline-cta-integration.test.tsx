@@ -201,7 +201,7 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
     expect(navigateMock.mock.calls[0][0]).not.toContain("plantId=");
   });
 
-  it("post-save panel View diary CTA uses the same grow-scoped route", async () => {
+  it("keeps a single toast View diary CTA on the same grow-scoped route", async () => {
     rpcMock.mockResolvedValue({
       data: {
         ok: true,
@@ -214,13 +214,13 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
     clickNote();
     clickSave();
     await waitFor(() => screen.getByTestId("qlv2-post-save"));
+    expect(screen.queryByTestId("quick-log-post-save-view")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View diary" })).not.toBeInTheDocument();
 
-    const viewBtn = screen.getByTestId("quick-log-post-save-view");
-    expect(viewBtn).not.toBeDisabled();
-    expect(viewBtn.textContent).toMatch(/View diary/i);
-
+    const action = getToastAction();
+    expect(action.label).toBe(QUICK_LOG_TIMELINE_CTA_LABEL);
     const rpcBefore = rpcMock.mock.calls.length;
-    fireEvent.click(viewBtn);
+    action.onClick();
     expect(navigateMock).toHaveBeenCalledWith(
       "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-77777777-7777-4777-8777-000000000043",
     );

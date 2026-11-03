@@ -241,7 +241,6 @@ import {
   quickLogSaveRequiresHistoryCheck,
 } from "@/lib/quickLogSaveErrorMessage";
 import {
-  QUICK_LOG_POST_SAVE_VIEW_LABEL,
   QUICK_LOG_POST_SAVE_ANOTHER_LABEL,
   QUICK_LOG_POST_SAVE_CLOSE_LABEL,
   QUICK_LOG_POST_SAVE_TITLE,
@@ -3286,21 +3285,6 @@ function QuickLogV2SheetForOwner({
     navigateToTimeline(navigation.href, navigation.hash, navigation.path);
   }
 
-  function handleViewTimeline() {
-    if (!postSave) return;
-    const nav = buildQuickLogTimelineNavTarget({
-      growId: postSave.growId,
-      targetType: postSave.targetType,
-      targetId: postSave.targetId,
-      tentId: postSave.tentId,
-      plantId: postSave.targetType === "plant" ? postSave.targetId : null,
-      growEventId: postSave.growEventId,
-    });
-    if (!nav) return;
-    onOpenChange(false);
-    navigateToTimeline(nav.href, nav.hash, nav.path);
-  }
-
   /**
    * Intercept Sheet open-state changes so backdrop / escape / swipe
    * dismissals cannot close the sheet mid-save. Opening is always
@@ -4322,24 +4306,6 @@ function QuickLogV2SheetForOwner({
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2 pt-1">
-                  <Button
-                    type="button"
-                    className="flex-1"
-                    onClick={handleViewTimeline}
-                    disabled={
-                      !buildQuickLogTimelineNavTarget({
-                        growId: postSave.growId,
-                        targetType: postSave.targetType,
-                        targetId: postSave.targetId,
-                        tentId: postSave.tentId,
-                        plantId: postSave.targetType === "plant" ? postSave.targetId : null,
-                        growEventId: postSave.growEventId,
-                      })
-                    }
-                    data-testid="quick-log-post-save-view"
-                  >
-                    {QUICK_LOG_POST_SAVE_VIEW_LABEL}
-                  </Button>
                   <Button
                     type="button"
                     variant="outline"

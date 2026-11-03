@@ -8,6 +8,7 @@ import {
 } from "./lib/cloudflareHostRoutingRules";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { ServiceUnavailablePage } from "./lib/serviceUnavailablePage";
 import { installRequestHostnameReader } from "./lib/requestHostname.server";
 
 // Server renders resolve checkout against the request host (see requestHostname.ts).
@@ -65,7 +66,10 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return withHostHeaders(request, await normalizeCatastrophicSsrResponse(response));
+      return withHostHeaders(
+        request,
+        ServiceUnavailablePage.present(await normalizeCatastrophicSsrResponse(response)),
+      );
     } catch (error) {
       console.error(error);
       return withHostHeaders(

@@ -16,7 +16,7 @@ import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
 
 export const POSTHOG_DEFAULT_API_HOST = "https://us.i.posthog.com";
 
-const DISTINCT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SIGNUP_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EXCEPTION_TYPE_RE = /^[A-Za-z_][A-Za-z0-9_.$]{0,79}$/;
 const SENSITIVE_KEY_RE =
@@ -87,7 +87,7 @@ export function decidePostHogStartup(input: {
 export function posthogDistinctId(userId: string | null | undefined): string | null {
   if (typeof userId !== "string") return null;
   const trimmed = userId.trim();
-  if (!trimmed || trimmed.includes("@") || !DISTINCT_ID_RE.test(trimmed)) return null;
+  if (!trimmed || trimmed.includes("@") || !UUID_RE.test(trimmed)) return null;
   return trimmed;
 }
 
@@ -195,8 +195,6 @@ const NUMERIC_PRODUCT_PROPERTY_KEYS: ReadonlySet<string> = new Set([
   ...WEB_VITALS_VALUE_KEYS,
 ]);
 
-const PAGEVIEW_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 const PRODUCT_PROPERTY_KEYS: Record<string, readonly string[]> = {
   $pageview: PAGEVIEW_PROPERTY_KEYS,
   $pageleave: PAGEVIEW_PROPERTY_KEYS,
@@ -294,7 +292,7 @@ function allowProductProperties(
       continue;
     }
     if (key === "$pageview_id" || key === "$prev_pageview_id") {
-      if (typeof value === "string" && PAGEVIEW_ID_RE.test(value)) out[key] = value;
+      if (typeof value === "string" && UUID_RE.test(value)) out[key] = value;
       continue;
     }
     if (NUMERIC_PRODUCT_PROPERTY_KEYS.has(key)) {

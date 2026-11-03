@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### POSTHOG-PAGELEAVE-WEB-VITALS
+
+```text
+TASK POSTHOG-PAGELEAVE-WEB-VITALS  priority: other  status: OPEN
+goal: consented PostHog sessions send $pageleave and $web_vitals, so web analytics shows bounce rate, session duration, scroll depth and Core Web Vitals.
+why: buildPostHogInitOptions set capture_pageleave and capture_performance to false. The before_send scrubber had no allowlist for either event. PostHog inbox report 01a19f80-1bf9-757e-bc07-913aa0e3e76b.
+branch: posthog-self-driving/fixanalytics-capture-pageleave-and-web-fd2513
+base: verdant-grow-diary
+checkout: git fetch origin posthog-self-driving/fixanalytics-capture-pageleave-and-web-fd2513 verdant-grow-diary && git switch posthog-self-driving/fixanalytics-capture-pageleave-and-web-fd2513
+pr: read the URL from GitHub after push
+head_sha: read git rev-parse HEAD after checkout
+state: pushed draft
+current_step: draft PR open; required CI and an independent exact-head review are not yet measured
+next_action: confirm 35/35 required checks at the head, then route an independent exact-head review. Do not merge, enqueue, or publish.
+post_merge_check: after Publish, on https://verdantgrowdiary.com with analytics consent granted, close a tab and confirm one $pageleave and one $web_vitals event in project 545866 with $pathname as a sanitized path. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: PostHog self-driving Claude session on this branch
+decisions: capture_pageleave true lets the SDK send $pageleave on pagehide. No manual $pageleave on route change, because posthog-js puts $prev_pageview_* on the next $pageview for SPA navigation, and a manual pageleave would count scroll depth twice. capture_performance is { web_vitals: true, web_vitals_attribution: false, network_timing: false }; attribution stays off so no DOM selector leaves the browser. The scrubber keeps only sanitized paths, UUID page ids, finite non-negative scroll/duration numbers and the four $web_vitals_*_value numbers; nested $web_vitals_*_event objects are dropped.
+tried_and_rejected: manual $pageleave before each route pageview (see decisions).
+commands: bunx vitest run src/test/posthog-pageleave-web-vitals.test.ts src/test/posthog-analytics-rules.test.ts src/test/posthog-consent-client.test.ts --reporter=dot
+files_touched: src/lib/posthogAnalyticsRules.ts; src/test/posthog-analytics-rules.test.ts (two pins, scorer unlock declared); src/test/posthog-pageleave-web-vitals.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: independent exact-head review and the per-item merge yes
+open_questions: none
+gotchas: posthog-js records $prev_pageview_pathname from raw window.location.pathname, so the scrubber must sanitize it.
+links: https://us.posthog.com/project/545866/inbox/reports/01a19f80-1bf9-757e-bc07-913aa0e3e76b
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; auto-merge off
+claimed_by: Claude (PostHog self-driving), 2026-11-03
+owner: Claude (PostHog self-driving)
+last_updated: 2026-11-03 00:15 CT, by Claude
+```
+
 ### POSTHOG-PUBLIC-CLIENT-KEY
 
 ```text

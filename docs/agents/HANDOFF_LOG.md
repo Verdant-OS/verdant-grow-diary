@@ -78,9 +78,9 @@ why: Issue #2804. The caption joined stage and the raw UTC ISO and ignored the n
 branch: cursor/photo-viewer-caption-tiles-1ba3
 base: verdant-grow-diary
 checkout: git fetch origin cursor/photo-viewer-caption-tiles-1ba3 verdant-grow-diary && git switch cursor/photo-viewer-caption-tiles-1ba3
-pr: read the URL from GitHub after push
-head_sha: read git rev-parse HEAD after the push
-state: implemented locally until pushed
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2805
+head_sha: 410407c055349e67857bb57334d4dcfce6aef2d7
+state: pushed; CI not yet read
 current_step: caption class, tile buttons, and plant-page lightbox wiring
 next_action: confirm required CI at the head. Do not merge, enqueue, or request review.
 post_merge_check: after Publish, open a photo from a plant Recent Photos tile and confirm the viewer caption is the note or a local time, never a raw ISO. NOT_MEASURED until live /version.json reports the SHA.

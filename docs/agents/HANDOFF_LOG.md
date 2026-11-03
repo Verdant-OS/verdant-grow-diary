@@ -69,38 +69,38 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### CSV-METRIC-IDENTITY-S1
+### AI-DOCTOR-READINESS-SUMMARY-IMPL
 
 ```text
-TASK CSV-METRIC-IDENTITY-S1  priority: P1  status: OPEN
-goal: The CSV importer never reads soil columns as air temperature or air humidity, and column order never changes what a file means.
-why: CSV QA handoff 2026-11-03 finding F2. On deploy cd0fe0cd, a Spider Farmer soil export with temperature_soil(°C) first was accepted with soil temperature as air temperature_c (reproduced on a real 773-row export); in the original order the same file was rejected.
-branch: claude/csv-metric-identity-s1
-base: verdant-grow-diary (branched at cd0fe0cd4353c0145eae9d1855b54427240c1f3a; base ac10d68ef281b2b9e01d77dea17da63869a0a6a1 merged in 2026-11-03 13:25 CT)
-checkout: git fetch origin claude/csv-metric-identity-s1 verdant-grow-diary && git switch claude/csv-metric-identity-s1
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2808 (draft)
-head_sha: read the PR head (git ls-remote origin claude/csv-metric-identity-s1). Code commit is 43975b85a06c53f7fc4c289a022694b92e23f579; later commits are this block and a base merge only.
-state: pushed draft; at f48043f0 all 63 check runs completed with 0 failures (4 cancelled runs superseded by passing reruns); base merged for a HANDOFF_LOG conflict, CI re-running
-current_step: required CI at the current head
-next_action: when required CI is green at the head, obtain a complete-scope exact-head review from Codex (eligible: did not author or repair). Stay draft until merge gate.
-post_merge_check: on the disposable QA fixture tent at https://verdantgrowdiary.com, with /version.json showing the merged commit, PREVIEW ONLY (cancel, never commit) the QA handoff soil template in original order and with temperature_soil(°C) first; both must show the soil-only message and zero rows. A device export preview must still show air temperature/RH/VPD/CO2/PPFD. NOT_MEASURED until deploy.
-active_writer: Claude (claude.ai session_017UoYKwxBwqjLnPxVUETTHt)
-decisions: Soil headers (any header containing "soil") are set aside before air matching and reported as unsupportedColumns. The error code stays no_sensor_data so the UI flow is unchanged; only the message is soil-specific. unsupportedColumns is optional on the type so an existing scorer-locked test that hand-builds a result still type-checks. PPFD "par" must be a standalone token.
-tried_and_rejected: importing soil metrics now (waits on founder decision Q2 in the triage doc); fixing timestamps in the same PR (F1/S2 waits on founder decisions Q1/Q3).
-commands: bunx vitest run src/test/csv-parser-metric-identity.test.ts src/test/csv-parser.test.ts; NODE_OPTIONS=--max-old-space-size=4096 bunx tsc -p tsconfig.json --noEmit
-files_touched: src/lib/csvParser.ts; src/test/csv-parser-metric-identity.test.ts; docs/agents/HANDOFF_LOG.md
-files_remaining: none
-blockers: independent review not yet obtained
-open_questions: whether #2775 guide copy should mention the soil-only message
-gotchas: do not edit existing CSV tests (scorer lock). Local Bun was 1.4.4; CI pins 1.3.14; bun.lock unchanged.
-links: triage doc claude/audits/csv-qa-friction-triage-2026-11-03.md (claude.ai Project)
-artifacts: PR #2808 body carries the evidence table
-reviewer_seat: Codex (requested on PR #2808)
+TASK AI-DOCTOR-READINESS-SUMMARY-IMPL  priority: other  status: OPEN
+goal: Implement the one-summary AI Doctor readiness card on Plant Detail per docs/specs/ai-doctor-readiness-single-summary.md (spec PR #2809).
+why: Live audit 2026-11-03 finding 3. Plant Detail shows readiness from six rule sets that can disagree.
+branch: claude/ai-doctor-readiness-summary (Matthew chose a separate branch, 2026-11-03)
+base: verdant-grow-diary
+checkout: git fetch origin claude/ai-doctor-readiness-summary verdant-grow-diary && git switch claude/ai-doctor-readiness-summary
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: round-1 commit acb836e3bdc136586aca11543209283c93518701; this block's commit follows it, so read the current head on GitHub
+state: rounds 1, 2a and 2b committed: rules, optional signal props on F/A/C, container section, Plant Detail layout. Draft PR, awaiting CI and independent review.
+current_step: draft PR open; CI running.
+next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ). Signed-in visual check of Plant Detail is NOT_MEASURED (needs fixture credentials).
+post_merge_check: after Publish, open a plant's AI review on https://verdantgrowdiary.com with the fixture account. Exactly one readiness verdict is visible before a review starts. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: D1 keep local preview collapsed; D2 overview copy is a later slice; D3 C stays visible with its pre-start confidence line hidden on Plant Detail.
+tried_and_rejected: hiding C in the disclosure (it owns the Start review control).
+commands: bunx vitest run src/test/ai-doctor-readiness-summary-rules.test.ts --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/lib/aiDoctorReadinessSummaryRules.ts; src/constants/aiDoctorReadinessSummaryCopy.ts; src/components/AiDoctorReadinessSummary.tsx; src/components/PlantDetailAiDoctorReadinessSection.tsx; src/components/PlantDetailAiDoctorReadiness.tsx; src/components/AiDoctorContextReadinessPanel.tsx; src/components/PlantDetailAiDoctorContextReadinessMount.tsx; src/components/PlantDetailAiDoctorLiveReview.tsx; src/pages/PlantDetail.tsx; src/test/ai-doctor-readiness-summary-rules.test.ts; src/test/ai-doctor-readiness-signal-props.test.tsx; src/test/ai-doctor-live-review-readiness-signal.test.tsx; src/test/ai-doctor-readiness-summary-section.test.tsx; src/test/plant-detail-information-architecture.test.ts (3 structure pins renegotiated); docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: none
+gotchas: the pre-commit full-project tsc runs out of memory at the default heap; commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify). Prettier runs on staged .md files.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2809
+artifacts: none
+reviewer_seat: not requested
 reviewer_sha: NOT_MEASURED
-session_state: no production writes; draft; auto-merge off
-claimed_by: Claude, 2026-11-03 12:35 CT
-owner: Claude (Matthew-assigned)
-last_updated: 2026-11-03 13:25 CT, by Claude
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 13:40 CT, by Claude
 ```
 
 ### PHOTO-VIEWER-CAPTION-TILES

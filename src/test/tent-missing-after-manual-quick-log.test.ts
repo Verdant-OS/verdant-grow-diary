@@ -3,11 +3,9 @@
  * sibling, and the Tonight card never reads that sibling.
  *
  * `buildQuickLogV2SavePayload` puts temperature and humidity on the RPC
- * params and does not write `details.manual_sensor_snapshot`. The card's
- * snapshot reader only accepts diary envelopes, so empty `sensor_readings`
- * plus an idle snapshot render Missing. Projecting the environment sibling
- * (the shape `sensorReadingFromQuickLogEnvironmentRow` already returns)
- * into the card's row input is what makes the reading visible.
+ * params and on `details.sensor_snapshot`. The Tonight card still ignores
+ * that diary envelope until the environment sibling is projected as a row,
+ * so empty `sensor_readings` plus an idle snapshot render Missing.
  */
 import { describe, expect, it } from "vitest";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
@@ -97,15 +95,18 @@ describe("tent Quick Log manual reading is invisible to the Tonight card until p
     expect(saved.payload.p_humidity_pct).toBe(60);
     expect(saved.payload.p_vpd_kpa).toBeNull();
     const details = saved.payload.p_details ?? {};
-    expect(details.manual_sensor_snapshot).toBeUndefined();
-    expect(details.sensor_snapshot).toBeUndefined();
+    expect(details.sensor_snapshot).toMatchObject({ source: "manual", rh: 60 });
+    expect(details.manual_sensor_snapshot).toMatchObject({
+      source: "manual",
+      humidity_percent: 60,
+    });
     expect(details.environment_check).toBeUndefined();
     expect(
       snapshotFromManualSensorSnapshot(
         LOGGED_AT,
         details.manual_sensor_snapshot as Record<string, unknown> | undefined,
       ),
-    ).toBeNull();
+    ).not.toBeNull();
 
     const reading = environmentReading(TENT, LOGGED_AT);
     expect(reading?.source).toBe("manual");

@@ -182,6 +182,21 @@ const SEAMS: Array<{ event: string; file: string; extra?: RegExp[] }> = [
     file: "src/hooks/useCheckoutReturnCompletionTracking.ts",
     extra: [/surface\s*\}/],
   },
+  {
+    event: "onboarding_back",
+    file: "src/pages/StartYourRoom.tsx",
+    extra: [/surface:\s*"start_room"/],
+  },
+  {
+    event: "onboarding_restart",
+    file: "src/pages/StartYourRoom.tsx",
+    extra: [/surface:\s*"start_room"/],
+  },
+  {
+    event: "onboarding_skip",
+    file: "src/pages/StartYourRoom.tsx",
+    extra: [/surface:\s*"start_room"/],
+  },
 ];
 
 const QUICK_LOG_SUCCESS_SEAMS: Array<{

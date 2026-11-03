@@ -310,12 +310,12 @@ describe("quickLogV2Rules — tent-scoped Target picker helpers", () => {
   it("filters targets by visible Plant · / Tent · label", () => {
     const filtered = filterQuickLogV2TargetOptions(options, "sg 2");
     expect(filtered.map((o) => o.id)).toEqual(["sg2"]);
-    expect(formatQuickLogV2TargetOptionLabel(filtered[0]!)).toBe("Plant · SG 2");
+    expect(formatQuickLogV2TargetOptionLabel(filtered[0]!)).toBe("SG 2");
     expect(filterQuickLogV2TargetOptions(options, "VEG").map((o) => o.id)).toEqual(["veg-b"]);
     expect(filterQuickLogV2TargetOptions(options, "   ")).toEqual(options);
   });
 
-  it("auto-selects the sole plant in tent when selectedKey is still empty", () => {
+  it("keeps Whole tent when the tent has a sole plant and selectedKey is empty", () => {
     const soleOptions: QuickLogV2TargetOption[] = [
       { type: "tent", id: "clones", label: "Clones", tentId: "clones", growId: "g1" },
       { type: "plant", id: "c1", label: "Clone A", tentId: "clones", growId: "g1" },
@@ -327,10 +327,10 @@ describe("quickLogV2Rules — tent-scoped Target picker helpers", () => {
         selectedKey: null,
         recentPlantId: null,
       }),
-    ).toBe("plant:c1");
+    ).toBe("tent:clones");
   });
 
-  it("prefers a recent plant that belongs to the tent over sole-plant logic", () => {
+  it("keeps Whole tent when a recent plant belongs to the tent", () => {
     expect(
       resolveTentScopedQuickLogPlantSelection({
         tentId: "veg-b",
@@ -338,7 +338,7 @@ describe("quickLogV2Rules — tent-scoped Target picker helpers", () => {
         selectedKey: null,
         recentPlantId: "sg2",
       }),
-    ).toBe("plant:sg2");
+    ).toBe("tent:veg-b");
   });
 
   it("does not rewrite an explicit tent: selectedKey to a plant via sole auto-select", () => {

@@ -69,38 +69,38 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### AI-DOCTOR-READINESS-SUMMARY-SPEC
+### PHOTO-VIEWER-CAPTION-TILES
 
 ```text
-TASK AI-DOCTOR-READINESS-SUMMARY-SPEC  priority: other  status: OPEN
-goal: Docs-only spec for one AI Doctor readiness summary on Plant Detail, with the existing six readiness surfaces kept in a collapsed provenance disclosure.
-why: Live read-only audit 2026-11-03 finding 3. Plant Detail shows readiness from six rule sets that can disagree (e.g. "Ready for cautious check-in" beside "Context is partial").
-branch: claude/new-session-5qygai
+TASK PHOTO-VIEWER-CAPTION-TILES  priority: P1  status: OPEN
+goal: Timeline photo viewer caption shows the entry note, or the timeline local-time formatter when the note is blank, and plant Recent Photos, the plant hero, and Timeline Photo history open that viewer.
+why: Issue #2804. The caption joined stage and the raw UTC ISO and ignored the note. Those three tiles were not controls.
+branch: cursor/photo-viewer-caption-tiles-1ba3
 base: verdant-grow-diary
-checkout: git fetch origin claude/new-session-5qygai verdant-grow-diary && git switch claude/new-session-5qygai
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2809 (draft)
-head_sha: checkpoint 5a5697024d388cc7ae33e948d8f54a4256792743 observed on origin 2026-11-03 18:31 UTC; this block's own commit follows it, so confirm the current head on the PR
-state: pushed draft, docs only
-current_step: spec written at docs/specs/ai-doctor-readiness-single-summary.md
-next_action: Codex independent review at the current head of #2809 (re-routed after the D3 amendment). Implementation is on branch claude/ai-doctor-readiness-summary (separate PR).
-post_merge_check: NOT_APPLICABLE (docs only; no runtime change)
-active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
-decisions: D3 (Matthew): C stays visible with its pre-start confidence line hidden on Plant Detail. verdict is worst-of run gate, context readiness and view-model state; the run gate stays authoritative and unchanged; existing panels move into a collapsed disclosure, none deleted; no new queries.
-tried_and_rejected: replacing the run gate rules with a unified rule set (changes AI Doctor behavior and pins; out of scope)
-commands: none beyond docs safety; no code changed
-files_touched: docs/specs/ai-doctor-readiness-single-summary.md; docs/agents/HANDOFF_LOG.md
-files_remaining: none for this slice
-blockers: none; Matthew decided D1 (keep local preview, collapsed) and D2 (overview tent-readings copy, separate later slice) on 2026-11-03
-open_questions: whether surface B (timeline evidence readiness) produced the audit's "Strong" label; NOT_MEASURED
-gotchas: PR #2805 also changes src/pages/PlantDetail.tsx; the implementation slice should follow it. Do not commit the audit screenshots (private account data).
-links: none yet
-artifacts: docs/specs/ai-doctor-readiness-single-summary.md
-reviewer_seat: Codex, routed by Matthew 2026-11-03; the request at a71d322e7a135a5b4469cea4663712c437b93ef7 is superseded by this head
-reviewer_sha: NOT_MEASURED (no verdict yet)
-session_state: no production access; PR comments limited to review-thread replies and the [ROUTE] request
-claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
-owner: Claude
-last_updated: 2026-11-03 13:05 CT, by Claude (D3 amendment)
+checkout: git fetch origin cursor/photo-viewer-caption-tiles-1ba3 verdant-grow-diary && git switch cursor/photo-viewer-caption-tiles-1ba3
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2805
+head_sha: 71024e9d10201391d3143617911b3644b280916c
+state: pushed; required CI re-running after the null-safe plant photo wiring
+current_step: caption class, tile buttons, plant lightbox, and null-safe hero open
+next_action: confirm required CI at the pushed head. Do not merge, enqueue, or request review.
+post_merge_check: after Publish, open a photo from a plant Recent Photos tile and confirm the viewer caption is the note or a local time, never a raw ISO. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Grok cloud agent on this branch
+decisions: TimelinePhotoLightboxCaption.fromItem is the only caption path. Tiles are buttons. Focus returns to the opener when the viewer unmounts. Alt text still includes the raw entry instant because src/test/timeline-photo-lightbox-rules.test.ts is scorer-locked and pins that string.
+tried_and_rejected: rewriting the locked alt assertion. The scorer lock refused the edit.
+commands: bunx vitest run src/test/timeline-photo-caption-and-open.test.tsx src/test/timeline-photo-lightbox-component.test.tsx src/test/timeline-photo-lightbox-rules.test.ts --reporter=dot
+files_touched: src/lib/timelinePhotoLightboxRules.ts; src/components/TimelinePhotoLightbox.tsx; src/components/PhotoHistoryPanel.tsx; src/components/PlantDetailPhotoStrip.tsx; src/components/PlantPhoto.tsx; src/components/PlantPhotoView.tsx; src/pages/PlantDetail.tsx; src/pages/Timeline.tsx; src/test/timeline-photo-caption-and-open.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work
+open_questions: none
+gotchas: do not edit the locked alt-text test. Upload size warning is out of scope.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2804
+artifacts: local screenshots, not committed
+reviewer_seat: not requested; Moonbow routes review
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; auto-merge off
+claimed_by: Grok, 2026-11-03
+owner: Grok
+last_updated: 2026-11-02 23:20 CT, by Grok
 ```
 
 ### POSTHOG-PUBLIC-CLIENT-KEY
@@ -140,6 +140,36 @@ last_updated: 2026-11-02 20:40 CT, by Grok
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text
+TASK QUICK-LOG-TARGET-SAVE  priority: P1  status: OPEN
+goal: One draft PR for Quick Log target selection, one save, optional reading time, one time-label class, and correction temperature units.
+why: Issues 2778, 2779, 2780, 2781, and part of 2706. A tent open was resolving to the sole or recent plant, and a successful save left the sheet open.
+branch: cursor/quick-log-target-save-1baf
+base: verdant-grow-diary
+checkout: git fetch origin cursor/quick-log-target-save-1baf verdant-grow-diary && git switch cursor/quick-log-target-save-1baf
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2793 ready
+head_sha: d6b9abb71 is the implementation; 504ecc08c stamps this block; the pin-fix commit is the child of 504ecc08c. Read origin/cursor/quick-log-target-save-1baf for the exact head. This line cannot name that child.
+state: ready PR 2793, no auto-merge
+current_step: three CI pins updated after measured tap counts; required CI recheck follows the pin-fix push
+next_action: keep the PR draft until required checks are green at the exact head and Moonbow routes review
+post_merge_check: bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx
+active_writer: Grok cloud agent on cursor/quick-log-target-save-1baf
+decisions: tent context is never rewritten to a plant; last-used target applies only when the route has no tent or plant; success closes the sheet and names the target in the toast; reading time is sheet state wired to occurredAt; GrowerTimeLabel is the shared formatter; correction temperature displays the grower unit and converts once to Celsius on save
+tried_and_rejected: leaving the sole-plant pins unchanged would keep the bug
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx src/test/quick-log-v2-rules.test.ts src/test/quick-log-route-target-rules.test.ts src/test/mobile-quick-log-single-fab.test.ts src/test/app-shell-mobile-quick-log-routing.test.tsx src/test/quick-log-v2-sheet-watering.test.tsx src/test/quick-log-v2-sheet-feeding.test.tsx src/test/quick-log-v2-refresh-sheet.test.tsx src/test/quick-log-timeline-cta-integration.test.tsx
+files_touched: src/components/AppShell.tsx src/components/QuickLogEntryIntegrityControls.tsx src/components/QuickLogV2Sheet.tsx src/pages/TentDetail.tsx src/lib/quickLogV2Rules.ts src/lib/quickLogRouteTargetRules.ts src/lib/growerTimeLabel.ts src/lib/quickLogReadingTime.ts src/lib/timelineEntryTimestampFormat.ts src/lib/quickLogGroupedTimelineFilterViewModel.ts src/lib/quickLogSnapshotStripAdapter.ts src/lib/wateringCadenceHistoryRules.ts src/lib/growDiaryPdfExport.ts and the renegotiated tests named in the PR
+files_remaining: none for this slice
+blockers: none for repository work. Moonbow routes review and merge. No production write.
+open_questions: none
+gotchas: scorer pins that encoded sole-plant launch and a stay-open sheet were renegotiated in the same change. .claude/scorer-unlock.json is local only.
+links: issues 2778 2779 2780 2781 2706
+artifacts: src/test/quick-log-target-save-reading-time.test.tsx
+reviewer_seat: not requested
+reviewer_sha: none
+session_state: Grok implementation session
+claimed_by: Grok 2026-11-02
+owner: Grok
+last_updated: 2026-11-02 21:36 CT, by Grok
+
 TASK CREATE-DIALOG-DISABLED-REASON  priority: P2  status: OPEN
 goal: disabled primary buttons in New grow, New tent, and New plant state their reason, and each name field has a visible label that is its accessible name.
 why: Issue 3 (FA-F01, FA-F02, FA-F05). Cheeko approved building only (2026-10-31). Create tent and Create plant were disabled with no description, and the name fields were announced as their placeholders.

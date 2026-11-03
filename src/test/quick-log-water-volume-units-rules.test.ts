@@ -5,6 +5,11 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  getLocalStorageItemForTest,
+  removeLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
+import {
   maxInWaterEntryUnit,
   mlToWaterEntryDisplay,
   savesAsMlAmount,
@@ -123,18 +128,18 @@ describe("display helpers", () => {
 describe("waterVolumeEntryUnitPreference (14, storage)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    window.localStorage.removeItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY);
+    removeLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY);
   });
 
   it("defaults to ml and remembers a chosen unit", () => {
     expect(loadWaterVolumeEntryUnit()).toBe("ml");
     expect(saveWaterVolumeEntryUnit("gal")).toBe(true);
     expect(loadWaterVolumeEntryUnit()).toBe("gal");
-    expect(window.localStorage.getItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("gal");
+    expect(getLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("gal");
   });
 
   it("falls back to ml for an unknown stored value", () => {
-    window.localStorage.setItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "quart");
+    setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "quart");
     expect(loadWaterVolumeEntryUnit()).toBe("ml");
   });
 

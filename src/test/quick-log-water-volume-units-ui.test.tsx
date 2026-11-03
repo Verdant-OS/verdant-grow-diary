@@ -4,6 +4,11 @@
  */
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  getLocalStorageItemForTest,
+  removeLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 import { fireEvent, render, screen } from "@testing-library/react";
 
 import QuickLogWateringForm from "@/components/QuickLogWateringForm";
@@ -63,11 +68,11 @@ const chooseUnit = (unit: "ml" | "L" | "gal") =>
   fireEvent.click(screen.getByTestId(`qlv2-volume-unit-${unit}`));
 
 beforeEach(() => {
-  window.localStorage.removeItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY);
+  removeLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY);
   latest = EMPTY_QUICKLOG_WATERING_FORM;
 });
 afterEach(() => {
-  window.localStorage.removeItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY);
+  removeLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY);
 });
 
 describe("Quick Log Water volume units", () => {
@@ -142,7 +147,7 @@ describe("Quick Log Water volume units", () => {
   });
 
   it("11: a prefill keeps its stored ml unless the grower edits it", () => {
-    window.localStorage.setItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
+    setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
     render(<Harness initial={{ ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "1893" }} />);
     expect(volumeInput().value).toBe("0.5");
     expect(payloadVolume(latest).volume_ml).toBe(1893);
@@ -153,7 +158,7 @@ describe("Quick Log Water volume units", () => {
   });
 
   it("a prefill above the warning threshold still warns in another unit", () => {
-    window.localStorage.setItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
+    setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
     render(<Harness initial={{ ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "10001" }} />);
     expect(volumeInput().value).toBe("2.64");
     expect(screen.getByTestId("qlv2-large-water-warning")).toHaveTextContent("10,001 ml");
@@ -161,7 +166,7 @@ describe("Quick Log Water volume units", () => {
   });
 
   it("a tiny prefill shows a nonzero amount and saves its ml", () => {
-    window.localStorage.setItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
+    setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
     render(<Harness initial={{ ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "1" }} />);
     expect(volumeInput().value).toBe("0.00026");
     expect(screen.getByTestId("qlv2-volume-saves-as")).toHaveTextContent("Saves as 1 ml.");
@@ -169,7 +174,7 @@ describe("Quick Log Water volume units", () => {
   });
 
   it("12: a restored record shows its stored ml in the entry unit and saves it unchanged", () => {
-    window.localStorage.setItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
+    setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
     render(<Harness initial={{ ...EMPTY_QUICKLOG_WATERING_FORM, volumeMl: "3785" }} />);
     expect(volumeInput().value).toBe("1");
     expect(payloadVolume(latest).volume_ml).toBe(3785);
@@ -178,16 +183,16 @@ describe("Quick Log Water volume units", () => {
   it("14: remembers the chosen unit; a preset does not overwrite it", () => {
     const first = render(<Harness />);
     chooseUnit("gal");
-    expect(window.localStorage.getItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("gal");
+    expect(getLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("gal");
     first.unmount();
     render(<Harness />);
     expect(screen.getByTestId("qlv2-volume-unit-gal")).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByTestId("qlv2-volume-preset-1000"));
-    expect(window.localStorage.getItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("gal");
+    expect(getLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("gal");
   });
 
   it("14: an unknown stored unit opens in ml", () => {
-    window.localStorage.setItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "quart");
+    setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "quart");
     render(<Harness />);
     expect(screen.getByLabelText("Volume (ml)")).toBeInTheDocument();
   });

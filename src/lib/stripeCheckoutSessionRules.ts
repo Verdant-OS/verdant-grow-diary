@@ -1,0 +1,88 @@
+/**
+ * Pure Stripe Checkout Session request shaping. Test mode only.
+ * Return URLs are built from an allowlisted origin. The client cannot
+ * supply a success URL, a price id, or a quantity.
+ */
+import {
+  classifyStripePlanId,
+  isStripeCustomerId,
+  type StripeTestPlanId,
+} from "@/lib/stripeTestModeCatalogRules";
+
+export const STRIPE_CHECKOUT_RETURN_ORIGINS = [
+  "https://verdantgrowdiary.com",
+  "https://www.verdantgrowdiary.com",
+  "http://127.0.0.1:8080",
+  "http://localhost:8080",
+] as const;
+
+const RETURN_ORIGINS = new Set<string>(STRIPE_CHECKOUT_RETURN_ORIGINS);
+
+export function resolveStripeCheckoutReturnOrigin(
+  origin: string | undefined,
+):
+  | { ok: true; origin: string }
+  | { ok: false; reason: "return_origin_unset" | "return_origin_rejected" } {
+  if (typeof origin !== "string" || origin.length === 0) {
+    return { ok: false, reason: "return_origin_unset" };
+  }
+  if (!RETURN_ORIGINS.has(origin)) return { ok: false, reason: "return_origin_rejected" };
+  return { ok: true, origin };
+}
+
+export function buildStripeReturnUrls(origin: string): { successUrl: string; cancelUrl: string } {
+  return {
+    successUrl: `${origin}/checkout/success`,
+    cancelUrl: `${origin}/checkout/cancel`,
+  };
+}
+
+export interface StripeCheckoutFormInput {
+  mode: "subscription" | "payment";
+  priceId: string;
+  userId: string;
+  planId: string;
+  successUrl: string;
+  cancelUrl: string;
+  customerId?: string | null;
+}
+
+export function buildStripeCheckoutForm(input: StripeCheckoutFormInput): string {
+  const params = new URLSearchParams();
+  params.set("mode", input.mode);
+  params.set("line_items[0][price]", input.priceId);
+  params.set("line_items[0][quantity]", "1");
+  params.set("client_reference_id", input.userId);
+  params.set("metadata[user_id]", input.userId);
+  params.set("metadata[plan_id]", input.planId);
+  params.set("success_url", input.successUrl);
+  params.set("cancel_url", input.cancelUrl);
+  params.set("managed_payments[enabled]", "true");
+  if (input.mode === "subscription") {
+    params.set("subscription_data[metadata][user_id]", input.userId);
+    params.set("subscription_data[metadata][plan_id]", input.planId);
+  }
+  if (input.customerId && isStripeCustomerId(input.customerId)) {
+    params.set("customer", input.customerId);
+  }
+  return params.toString();
+}
+
+export type StripePriceVerdict = "ok" | "live" | "mismatch";
+
+export function priceMatchesStripeCatalog(
+  planId: StripeTestPlanId,
+  price: unknown,
+): StripePriceVerdict {
+  const plan = classifyStripePlanId(planId);
+  if (plan.kind !== "subscription" && plan.kind !== "credit_pack") return "mismatch";
+  if (price == null || typeof price !== "object") return "mismatch";
+  const record = price as Record<string, unknown>;
+  if (record.livemode === true) return "live";
+  if (record.livemode !== false) return "mismatch";
+  if (record.active !== true) return "mismatch";
+  if (typeof record.currency !== "string" || record.currency.toLowerCase() !== "usd")
+    return "mismatch";
+  if (record.unit_amount !== plan.amountCents) return "mismatch";
+  return "ok";
+}

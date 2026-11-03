@@ -140,8 +140,9 @@ export function buildSensorReadingsCsv(
   temperatureUnit?: TemperatureUnitPreference | "F" | "C",
   options?: BuildSensorReadingsCsvOptions,
 ): string {
+  const exportable = readings.filter((reading) => reading.vpdPointKind !== "calculated");
   const resolvedUnit = resolveExportTemperatureUnit(temperatureUnit);
-  const distinctTents = new Set(readings.map(resolveReadingTentId).filter(Boolean));
+  const distinctTents = new Set(exportable.map(resolveReadingTentId).filter(Boolean));
   const includeTent =
     options?.includeTentColumn === true ||
     options?.tentNamesById !== undefined ||
@@ -164,8 +165,8 @@ export function buildSensorReadingsCsv(
   const header = includeTent ? `${baseHeader},Tent` : baseHeader;
   const clocked =
     nowMs !== undefined && Number.isFinite(nowMs)
-      ? readings.map((r) => refreshForExport(r, new Date(nowMs)))
-      : readings;
+      ? exportable.map((r) => refreshForExport(r, new Date(nowMs)))
+      : exportable;
   const rows = clocked.map((r) => {
     const cells: Array<string | number | null | undefined> = [
       formatUtcTimestamp(r.ts),

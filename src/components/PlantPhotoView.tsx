@@ -10,6 +10,8 @@ interface Props {
   caption?: string;
   ctaLabel?: string | null;
   testId?: string;
+  /** Makes the photo a control that opens the shared viewer. */
+  onOpen?: () => void;
 }
 
 /**
@@ -26,6 +28,7 @@ export default function PlantPhotoView({
   caption = "No plant photo yet",
   ctaLabel = "Add photo",
   testId = "plant-photo",
+  onOpen,
 }: Props) {
   const trimmed = typeof src === "string" ? src.trim() : "";
   const [errored, setErrored] = useState(false);
@@ -69,7 +72,7 @@ export default function PlantPhotoView({
     );
   }
 
-  return (
+  const image = (
     <img
       src={trimmed}
       alt={alt}
@@ -78,5 +81,22 @@ export default function PlantPhotoView({
       data-testid={testId}
       loading="lazy"
     />
+  );
+
+  if (!onOpen) return image;
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`Open photo: ${alt || "Plant photo"}`}
+      data-testid={`${testId}-open`}
+      className={cn(
+        "block w-full focus:outline-hidden focus:ring-2 focus:ring-primary/60",
+        className,
+      )}
+    >
+      {image}
+    </button>
   );
 }

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { EcowittCustomUploadStationCard } from "@/components/EcowittCustomUploadStationCard";
 import { EcowittCustomUploadStationMount } from "@/components/EcowittCustomUploadStationMount";
@@ -67,6 +68,97 @@ describe("EcoWitt station revoke and rotate", () => {
     expect(resolved.claimState).toBe("active");
     expect(resolved.justCreatedToken).toBe(TOKEN);
     expect(resolved.lastReceivedAt).toBe("2026-11-02T18:00:00.000Z");
+  });
+
+  it("clears the previous claim as soon as the tent changes", async () => {
+    const claims = {
+      rpc: vi.fn(),
+      from: () => ({
+        select: () => ({
+          eq: (_column: string, tent: string) => ({
+            is: () => ({
+              maybeSingle: () =>
+                new Promise((resolve) => {
+                  setTimeout(() => {
+                    resolve(
+                      tent === TENT
+                        ? {
+                            data: {
+                              id: CLAIM,
+                              bound_at: "2026-11-02T18:00:00.000Z",
+                              revoked_at: null,
+                              last_received_at: null,
+                              interval_seconds: 16,
+                            },
+                            error: null,
+                          }
+                        : { data: null, error: null },
+                    );
+                  }, 30);
+                }),
+            }),
+          }),
+        }),
+      }),
+    } as unknown as EcowittClaimMountClient;
+
+    function Harness() {
+      const [tentId, setTentId] = useState(TENT);
+      return (
+        <>
+          <button type="button" onClick={() => setTentId("33333333-3333-4333-8333-333333333333")}>
+            switch
+          </button>
+          <EcowittCustomUploadStationMount
+            tentId={tentId}
+            readings={[]}
+            now={NOW}
+            claims={claims}
+          />
+        </>
+      );
+    }
+
+    render(<Harness />);
+    expect(await screen.findByTestId("ecowitt-custom-upload-revoke")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "switch" }));
+    expect(screen.queryByTestId("ecowitt-custom-upload-revoke")).toBeNull();
+    expect(screen.queryByTestId("ecowitt-custom-upload-rotate")).toBeNull();
+  });
+
+  it("does not offer create until the open-claim load finishes", async () => {
+    let finishLoad: (value: unknown) => void = () => undefined;
+    const claims = {
+      rpc: vi.fn(async () => ({ data: null, error: { message: "exists" } })),
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            is: () => ({
+              maybeSingle: () =>
+                new Promise((resolve) => {
+                  finishLoad = resolve;
+                }),
+            }),
+          }),
+        }),
+      }),
+    } as unknown as EcowittClaimMountClient;
+
+    render(
+      <EcowittCustomUploadStationMount tentId={TENT} readings={[]} now={NOW} claims={claims} />,
+    );
+    expect(screen.queryByTestId("ecowitt-custom-upload-create")).toBeNull();
+    finishLoad({
+      data: {
+        id: CLAIM,
+        bound_at: null,
+        revoked_at: null,
+        last_received_at: null,
+        interval_seconds: 16,
+      },
+      error: null,
+    });
+    expect(await screen.findByTestId("ecowitt-custom-upload-revoke")).toBeTruthy();
   });
 
   it("renders revoke and rotate from the view model", () => {

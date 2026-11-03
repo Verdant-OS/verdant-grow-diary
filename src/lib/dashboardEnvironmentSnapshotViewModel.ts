@@ -16,6 +16,7 @@
  */
 import { captureRefIn, captureRefsKnown, rowCaptureRef } from "@/lib/sensorCaptureRefRules";
 import { format } from "date-fns";
+import { calculateVPD } from "@/lib/sensors/calculateVPD";
 import { isStale, snapshotFromReadings, type SensorReadingLike } from "@/lib/sensorSnapshot";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
@@ -392,7 +393,29 @@ export function buildTentSnapshotView(
         : snap.vpd;
   // A rejected capture's VPD keeps its Invalid label but never its number,
   // matching Tonight and Tent Detail (Copilot on #2459 at de8c1b27).
-  const vpdShownKpa = cohortVpdRejected ? null : vpdKpa;
+  // This snapshot is one cohort, so stored VPD and the temperature/RH pair
+  // share one timestamp. Cross-time replacement of an older stored VPD is
+  // Tonight's canonical value, passed in by the caller. Here, a current
+  // cohort that stored temperature and humidity but no VPD is calculated.
+  // A stale missing VPD stays unknown.
+  const cohortAtMs = snap.ts ? Date.parse(snap.ts) : Number.NaN;
+  const cohortCurrent =
+    Number.isFinite(cohortAtMs) &&
+    !isStale(new Date(cohortAtMs).toISOString(), now, undefined, provenance);
+  const cohortDerivedKpa =
+    typeof snap.vpd === "number" || !cohortCurrent
+      ? null
+      : calculateVPD(
+          typeof snap.temp === "number" ? snap.temp : null,
+          typeof snap.rh === "number" ? snap.rh : null,
+        );
+  const vpdShownKpa = cohortVpdRejected
+    ? null
+    : vpdKpa !== null
+      ? vpdKpa
+      : canonical?.unavailable === true || canonical?.missing === true || canonicalRejected
+        ? null
+        : cohortDerivedKpa;
   const canonicalSource: SensorReadingSource | null =
     provenance === "live" || provenance === "manual" || provenance === "csv"
       ? provenance

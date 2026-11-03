@@ -3,6 +3,7 @@
  * `buildEcowittCustomUploadStationCard`. This component does not read the
  * network, mint tokens, or send device commands.
  */
+import { ECOWITT_CUSTOM_UPLOAD_COPY } from "@/constants/ecowittCustomUploadCopy";
 import type { EcowittStationCardModel } from "@/lib/ecowittCustomUploadStationCardViewModel";
 
 export interface EcowittCustomUploadStationCardProps {
@@ -51,12 +52,12 @@ export function EcowittCustomUploadStationCard(props: EcowittCustomUploadStation
       ) : (
         <dl className="grid gap-3 sm:grid-cols-2">
           <Metric
-            label="Indoor temperature"
+            label={ECOWITT_CUSTOM_UPLOAD_COPY.indoorTemp}
             value={model.indoorTempF}
             testId="ecowitt-custom-upload-temp"
           />
           <Metric
-            label="Indoor humidity"
+            label={ECOWITT_CUSTOM_UPLOAD_COPY.indoorRh}
             value={model.indoorRh}
             testId="ecowitt-custom-upload-rh"
           />
@@ -64,6 +65,15 @@ export function EcowittCustomUploadStationCard(props: EcowittCustomUploadStation
           <Metric label="CO2" value={model.co2} testId="ecowitt-custom-upload-co2" />
         </dl>
       )}
+
+      {model.edgeNote ? (
+        <p
+          data-testid="ecowitt-custom-upload-edge"
+          className="mt-2 text-[11px] text-muted-foreground"
+        >
+          {model.edgeNote}
+        </p>
+      ) : null}
 
       {model.lastReadingLabel ? (
         <p

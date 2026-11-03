@@ -1,0 +1,170 @@
+/**
+ * Stripe test-mode catalog. Six purchasable products. Founder Lifetime is
+ * retired and is not a Stripe product. Amounts come from the pricing
+ * constants. Price ids are environment names only — never literal price_ ids
+ * from a Stripe account.
+ *
+ * Pure. No React, no Supabase, no fetch, no clock.
+ */
+import { CREDIT_PACKS, PRICING } from "@/constants/pricing";
+
+export const STRIPE_API_VERSION = "2026-02-25.preview";
+
+/** Shared digital-goods tax code for the six test-mode products. Not a price id. */
+export const STRIPE_DIGITAL_TAX_CODE = "txcd_10103100";
+
+export const STRIPE_SUBSCRIPTION_PLAN_IDS = [
+  "pro_monthly",
+  "pro_annual",
+  "craft_monthly",
+  "craft_annual",
+] as const;
+
+export const STRIPE_CREDIT_PACK_PLAN_IDS = ["credit_pack_50", "credit_pack_150"] as const;
+
+export const STRIPE_TEST_PLAN_IDS = [
+  ...STRIPE_SUBSCRIPTION_PLAN_IDS,
+  ...STRIPE_CREDIT_PACK_PLAN_IDS,
+] as const;
+
+export type StripeSubscriptionPlanId = (typeof STRIPE_SUBSCRIPTION_PLAN_IDS)[number];
+export type StripeCreditPackPlanId = (typeof STRIPE_CREDIT_PACK_PLAN_IDS)[number];
+export type StripeTestPlanId = (typeof STRIPE_TEST_PLAN_IDS)[number];
+
+const PRICE_ENV_NAMES: Readonly<Record<StripeTestPlanId, string>> = Object.freeze({
+  pro_monthly: "STRIPE_PRICE_PRO_MONTHLY",
+  pro_annual: "STRIPE_PRICE_PRO_ANNUAL",
+  craft_monthly: "STRIPE_PRICE_CRAFT_MONTHLY",
+  craft_annual: "STRIPE_PRICE_CRAFT_ANNUAL",
+  credit_pack_50: "STRIPE_PRICE_CREDIT_PACK_50",
+  credit_pack_150: "STRIPE_PRICE_CREDIT_PACK_150",
+});
+
+const RETIRED_PLAN_IDS = new Set(["founder_lifetime", "founder-lifetime"]);
+
+export type StripePlanClass =
+  | { kind: "retired" }
+  | {
+      kind: "subscription";
+      planId: StripeSubscriptionPlanId;
+      amountCents: number;
+      mode: "subscription";
+    }
+  | {
+      kind: "credit_pack";
+      planId: StripeCreditPackPlanId;
+      amountCents: number;
+      credits: number;
+      mode: "payment";
+    }
+  | { kind: "unknown" };
+
+function isSubscriptionPlan(value: string): value is StripeSubscriptionPlanId {
+  return (STRIPE_SUBSCRIPTION_PLAN_IDS as ReadonlyArray<string>).includes(value);
+}
+
+function isCreditPackPlan(value: string): value is StripeCreditPackPlanId {
+  return (STRIPE_CREDIT_PACK_PLAN_IDS as ReadonlyArray<string>).includes(value);
+}
+
+export function stripePriceEnvName(planId: string): string | null {
+  if (!isSubscriptionPlan(planId) && !isCreditPackPlan(planId)) return null;
+  return PRICE_ENV_NAMES[planId];
+}
+
+export function stripeCatalogAmountCents(planId: StripeTestPlanId): number {
+  switch (planId) {
+    case "pro_monthly":
+      return PRICING.pro.monthlyPrice * 100;
+    case "pro_annual":
+      return PRICING.pro.annualPrice * 100;
+    case "craft_monthly":
+      return PRICING.craft.monthlyPrice * 100;
+    case "craft_annual":
+      return PRICING.craft.annualPrice * 100;
+    case "credit_pack_50":
+      return CREDIT_PACKS[0].priceUsd * 100;
+    case "credit_pack_150":
+      return CREDIT_PACKS[1].priceUsd * 100;
+    default: {
+      const neverPlan: never = planId;
+      throw new Error(`Unhandled Stripe test plan: ${neverPlan}`);
+    }
+  }
+}
+
+export function stripeCreditPackCredits(planId: StripeCreditPackPlanId): number {
+  const pack = CREDIT_PACKS.find((entry) => entry.sku === planId);
+  if (!pack) throw new Error(`Missing credit pack constant: ${planId}`);
+  return pack.credits;
+}
+
+export function classifyStripePlanId(planId: string): StripePlanClass {
+  const requested = planId.trim();
+  if (RETIRED_PLAN_IDS.has(requested)) return { kind: "retired" };
+  if (isSubscriptionPlan(requested)) {
+    return {
+      kind: "subscription",
+      planId: requested,
+      amountCents: stripeCatalogAmountCents(requested),
+      mode: "subscription",
+    };
+  }
+  if (isCreditPackPlan(requested)) {
+    return {
+      kind: "credit_pack",
+      planId: requested,
+      amountCents: stripeCatalogAmountCents(requested),
+      credits: stripeCreditPackCredits(requested),
+      mode: "payment",
+    };
+  }
+  return { kind: "unknown" };
+}
+
+export function assertStripeTestSecret(
+  secret: string,
+): { ok: true } | { ok: false; reason: "test_mode_required" } {
+  if (typeof secret !== "string" || secret.length === 0)
+    return { ok: false, reason: "test_mode_required" };
+  if (!secret.startsWith("sk_test_")) return { ok: false, reason: "test_mode_required" };
+  if (secret.includes("sk_live_")) return { ok: false, reason: "test_mode_required" };
+  if (/\s/.test(secret)) return { ok: false, reason: "test_mode_required" };
+  return { ok: true };
+}
+
+const PRICE_ID_RE = /^price_[A-Za-z0-9_]+$/;
+
+export function assertStripePriceId(
+  priceId: string,
+): { ok: true } | { ok: false; reason: "price_not_configured" } {
+  if (typeof priceId !== "string" || !PRICE_ID_RE.test(priceId)) {
+    return { ok: false, reason: "price_not_configured" };
+  }
+  if (priceId.includes("sk_live_") || priceId.includes("sk_test_")) {
+    return { ok: false, reason: "price_not_configured" };
+  }
+  return { ok: true };
+}
+
+export function isStripeCustomerId(value: string): boolean {
+  return /^cus_[A-Za-z0-9]+$/.test(value);
+}
+
+export function isStripeSubscriptionId(value: string): boolean {
+  return /^sub_[A-Za-z0-9]+$/.test(value);
+}
+
+export function isStripeTestCheckoutSessionId(value: string): boolean {
+  return /^cs_test_[A-Za-z0-9]+$/.test(value);
+}
+
+export function isStripeEventId(value: string): boolean {
+  return /^evt_[A-Za-z0-9]+$/.test(value);
+}
+
+const USER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isCheckoutUserId(value: string): boolean {
+  return USER_ID_RE.test(value);
+}

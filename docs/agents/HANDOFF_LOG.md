@@ -69,77 +69,141 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### ECOWITT-CUSTOM-UPLOAD-EDGE-2746
+### AI-DOCTOR-READINESS-SUMMARY-IMPL
 
 ```text
-TASK ECOWITT-CUSTOM-UPLOAD-EDGE-2746  priority: P1  status: OPEN
-goal: register the ecowitt-custom-upload Edge function on top of slice 1 and keep every gateway response at HTTP 200.
-why: Issue #2746. Stacked on #2732. The gateway must not see rejection reasons or retry-storm on non-200.
-branch: cursor/ecowitt-custom-upload-edge-6bc1
-base: ultra/2717-ecowitt-live-ingest
-checkout: git fetch origin cursor/ecowitt-custom-upload-edge-6bc1 && git switch cursor/ecowitt-custom-upload-edge-6bc1
-pr: draft; read the URL after push
-head_sha: read git rev-parse HEAD after the commit
-state: local until pushed; draft only
-current_step: handler, config.toml, domain-reach row, and Deno handler e2e
-next_action: keep the PR draft. Do not retarget until #2732 merges. Cheeko's yes is required on config.toml and the edge workflow at the exact head. Do not deploy.
-post_merge_check: after an authorized deploy, a GW1200 form POST to the function returns 200. NOT_MEASURED until then.
-active_writer: Grok cloud session for issue 2746
-decisions: missing interval_seconds fails closed. Slice-1 default interval stays 16 seconds. No 60 second fallback.
-tried_and_rejected: returning the plan reason in the JSON body. The gateway log carries the fixed reason code instead.
-commands: /tmp/deno/bin/deno test --no-lock --allow-env supabase/functions/ecowitt-custom-upload/handler_e2e_test.ts
-files_touched: supabase/functions/ecowitt-custom-upload/; supabase/functions/_shared/ecowittCustomUploadHttp.ts; supabase/config.toml; config/edge-function-domain-reach.json; .github/workflows/sensor-ingest-webhook-edge-tests.yml
-files_remaining: none in this slice
-blockers: Cheeko yes on gated files; founder deploy
+TASK AI-DOCTOR-READINESS-SUMMARY-IMPL  priority: other  status: OPEN
+goal: Implement the one-summary AI Doctor readiness card on Plant Detail per docs/specs/ai-doctor-readiness-single-summary.md (spec PR #2809).
+why: Live audit 2026-11-03 finding 3. Plant Detail shows readiness from six rule sets that can disagree.
+branch: claude/ai-doctor-readiness-summary (Matthew chose a separate branch, 2026-11-03)
+base: verdant-grow-diary
+checkout: git fetch origin claude/ai-doctor-readiness-summary verdant-grow-diary && git switch claude/ai-doctor-readiness-summary
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: round-1 commit acb836e3bdc136586aca11543209283c93518701; this block's commit follows it, so read the current head on GitHub
+state: rounds 1, 2a and 2b committed: rules, optional signal props on F/A/C, container section, Plant Detail layout. Draft PR, awaiting CI and independent review.
+current_step: draft PR open; CI running.
+next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ). Signed-in visual check of Plant Detail is NOT_MEASURED (needs fixture credentials).
+post_merge_check: after Publish, open a plant's AI review on https://verdantgrowdiary.com with the fixture account. Exactly one readiness verdict is visible before a review starts. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: D1 keep local preview collapsed; D2 overview copy is a later slice; D3 C stays visible with its pre-start confidence line hidden on Plant Detail.
+tried_and_rejected: hiding C in the disclosure (it owns the Start review control).
+commands: bunx vitest run src/test/ai-doctor-readiness-summary-rules.test.ts --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/lib/aiDoctorReadinessSummaryRules.ts; src/constants/aiDoctorReadinessSummaryCopy.ts; src/components/AiDoctorReadinessSummary.tsx; src/components/PlantDetailAiDoctorReadinessSection.tsx; src/components/PlantDetailAiDoctorReadiness.tsx; src/components/AiDoctorContextReadinessPanel.tsx; src/components/PlantDetailAiDoctorContextReadinessMount.tsx; src/components/PlantDetailAiDoctorLiveReview.tsx; src/pages/PlantDetail.tsx; src/test/ai-doctor-readiness-summary-rules.test.ts; src/test/ai-doctor-readiness-signal-props.test.tsx; src/test/ai-doctor-live-review-readiness-signal.test.tsx; src/test/ai-doctor-readiness-summary-section.test.tsx; src/test/plant-detail-information-architecture.test.ts (3 structure pins renegotiated); docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
 open_questions: none
-gotchas: do not push ultra/2717-ecowitt-live-ingest. Draft CI skips the full suite until a non-author marks the parent ready.
-links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2746
-artifacts: local deno and vitest
+gotchas: the pre-commit full-project tsc runs out of memory at the default heap; commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify). Prettier runs on staged .md files.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2809
+artifacts: none
 reviewer_seat: not requested
 reviewer_sha: NOT_MEASURED
-session_state: no production writes; PR stays draft
-claimed_by: Grok, 2026-11-02
-owner: Grok
-last_updated: 2026-11-02
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 13:40 CT, by Claude
 ```
 
-### ECOWITT-CLAIM-TOKEN-LIVE-INGEST-2717
+### PHOTO-VIEWER-CAPTION-TILES
 
 ```text
-TASK ECOWITT-CLAIM-TOKEN-LIVE-INGEST-2717  priority: P1  status: OPEN
-goal: slice 1 stores a valid EcoWitt custom-upload POST as a live tent reading. Migration apply, edge deploy, and the real GW1206 pass stay outside this branch.
-why: Issue #2717. Cheeko's live EcoWitt path. Draft PR #2732. Team Ultra ran out of usage; this session was assigned the existing branch.
-branch: ultra/2717-ecowitt-live-ingest
+TASK PHOTO-VIEWER-CAPTION-TILES  priority: P1  status: OPEN
+goal: Timeline photo viewer caption shows the entry note, or the timeline local-time formatter when the note is blank, and plant Recent Photos, the plant hero, and Timeline Photo history open that viewer.
+why: Issue #2804. The caption joined stage and the raw UTC ISO and ignored the note. Those three tiles were not controls.
+branch: cursor/photo-viewer-caption-tiles-1ba3
 base: verdant-grow-diary
-checkout: git fetch origin ultra/2717-ecowitt-live-ingest verdant-grow-diary && git switch ultra/2717-ecowitt-live-ingest
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2732
-head_sha: read git rev-parse HEAD after the claim-parser commit; previous remote head 2307cb96c295c418726febe879072d9bb45b7370
-state: pushed draft
-current_step: pgcrypto call sites in the new migration and pgTAP already use extensions.digest and extensions.gen_random_bytes. readOpenClaim no longer has a null guard the only caller can never reach.
-next_action: keep the PR draft. Required full-suite and lint jobs stay skipped until a non-author marks the PR ready. Do not apply the migration or deploy the edge function.
-post_merge_check: after a separate authorized apply and Publish, a GW1206 customized-upload POST to /ew/<token> writes source live indoor temp and humidity. NOT_MEASURED until then.
-active_writer: Grok cloud session assigned 2026-11-02 to push this branch
-decisions: empty maybeSingle (data null, error null) is no open claim. A present row still goes through readOpenClaim, and a non-object still fails closed as malformed_response. No new migration. Do not edit config.toml, do not deploy, do not mark ready.
-tried_and_rejected: rewriting the claim service into a static class. The file already uses injected-client functions and the bug is one unreachable guard.
-commands: bunx vitest run src/test/ecowitt-custom-upload-claim-actions.test.ts src/test/ecowitt-custom-upload-route-and-migration.test.ts --reporter=dot
-files_touched: src/lib/ecowittCustomUploadClaimService.ts; src/test/ecowitt-custom-upload-claim-actions.test.ts; docs/agents/HANDOFF_LOG.md
-files_remaining: none in slice 1 repository scope
-blockers: founder apply and deploy; draft CI skips Full test suite and Lint, typecheck, test, build
-open_questions: none for the parser
-gotchas: Supabase maybeSingle returns data null when no row exists. The loader returns before readOpenClaim in that case. pgcrypto on Supabase is extensions.digest, already qualified at 2307cb96.
-links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2717; https://github.com/Verdant-OS/verdant-grow-diary/pull/2732#discussion_r4448230482
-artifacts: local vitest on the claim-actions file
-reviewer_seat: prior REQUEST_CHANGES at 85ec9a2af are stale for this head; a new independent review is not requested by this push
+checkout: git fetch origin cursor/photo-viewer-caption-tiles-1ba3 verdant-grow-diary && git switch cursor/photo-viewer-caption-tiles-1ba3
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2805
+head_sha: 71024e9d10201391d3143617911b3644b280916c
+state: pushed; required CI re-running after the null-safe plant photo wiring
+current_step: caption class, tile buttons, plant lightbox, and null-safe hero open
+next_action: confirm required CI at the pushed head. Do not merge, enqueue, or request review.
+post_merge_check: after Publish, open a photo from a plant Recent Photos tile and confirm the viewer caption is the note or a local time, never a raw ISO. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Grok cloud agent on this branch
+decisions: TimelinePhotoLightboxCaption.fromItem is the only caption path. Tiles are buttons. Focus returns to the opener when the viewer unmounts. Alt text still includes the raw entry instant because src/test/timeline-photo-lightbox-rules.test.ts is scorer-locked and pins that string.
+tried_and_rejected: rewriting the locked alt assertion. The scorer lock refused the edit.
+commands: bunx vitest run src/test/timeline-photo-caption-and-open.test.tsx src/test/timeline-photo-lightbox-component.test.tsx src/test/timeline-photo-lightbox-rules.test.ts --reporter=dot
+files_touched: src/lib/timelinePhotoLightboxRules.ts; src/components/TimelinePhotoLightbox.tsx; src/components/PhotoHistoryPanel.tsx; src/components/PlantDetailPhotoStrip.tsx; src/components/PlantPhoto.tsx; src/components/PlantPhotoView.tsx; src/pages/PlantDetail.tsx; src/pages/Timeline.tsx; src/test/timeline-photo-caption-and-open.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work
+open_questions: none
+gotchas: do not edit the locked alt-text test. Upload size warning is out of scope.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2804
+artifacts: local screenshots, not committed
+reviewer_seat: not requested; Moonbow routes review
 reviewer_sha: NOT_MEASURED
-session_state: no production writes; PR stays draft
-claimed_by: Grok, 2026-11-02
-owner: Grok (takeover from Team Ultra by explicit assignment)
-last_updated: 2026-11-02 17:30 CT, by Grok
+session_state: no production writes; auto-merge off
+claimed_by: Grok, 2026-11-03
+owner: Grok
+last_updated: 2026-11-02 23:20 CT, by Grok
+```
+
+### POSTHOG-PUBLIC-CLIENT-KEY
+
+```text
+TASK POSTHOG-PUBLIC-CLIENT-KEY  priority: other  status: OPEN
+goal: Lovable production builds initialise PostHog from the committed public phc_ client key after analytics consent.
+why: The live bundle reads VITE_POSTHOG_KEY and VITE_POSTHOG_HOST, and Lovable builds from the committed .env. Neither variable was set, so PostHog never initialised. Cheeko chose committing the public client key.
+branch: cursor/posthog-public-client-key-f411
+base: verdant-grow-diary
+checkout: git fetch origin cursor/posthog-public-client-key-f411 verdant-grow-diary && git switch cursor/posthog-public-client-key-f411
+pr: read the URL from GitHub after push
+head_sha: read git rev-parse HEAD after the push
+state: implementation in this commit; merge waits on Cheeko's own-words yes at the exact head SHA
+current_step: consent test waits on vi.dynamicImportSettled; committed env presence and per-directive CSP assertions added. Secret scan stays red until a separate base allowlist lands.
+next_action: confirm required CI is green at the head, then wait for Cheeko's yes at that SHA. Do not merge, enqueue, or publish.
+post_merge_check: after Publish, load https://verdantgrowdiary.com while signed out, grant analytics consent, and confirm a request to https://us.i.posthog.com. Before consent, that request must be absent. NOT_MEASURED until live /version.json reports this SHA.
+active_writer: Grok cloud agent on this branch
+decisions: Commit only the public phc_ key and https://us.i.posthog.com in .env. CSP adds that host plus https://us-assets.i.posthog.com because posthog-js 1.444.0 RequestRouter loads /static from the region assets host when api_host is the US ingestion host and asset_host is unset. script-src lists the assets host; connect-src lists both. .env.example stays empty and says phx_ keys must never be committed.
+tried_and_rejected: none
+commands: bunx vitest run src/test/posthog-env-consent-startup.test.ts src/test/security-headers-rules.test.ts src/test/posthog-consent-client.test.ts --reporter=dot
+files_touched: .env; .env.example; src/lib/securityHeadersRules.ts; src/test/posthog-env-consent-startup.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: env/config gate — Cheeko's own-words yes at the exact head SHA before merge
+open_questions: none
+gotchas: do not commit a phx_ key. Do not edit workflows, wrangler, package.json, lockfiles, migrations, or auth. Existing posthog-consent-client.test.ts stays untouched; it stubs an empty key and injects a fixture reader.
+links: none yet
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; auto-merge off
+claimed_by: Grok, 2026-11-03
+owner: Cheeko
+last_updated: 2026-11-02 20:40 CT, by Grok
 ```
 
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text
+TASK QUICK-LOG-TARGET-SAVE  priority: P1  status: OPEN
+goal: One draft PR for Quick Log target selection, one save, optional reading time, one time-label class, and correction temperature units.
+why: Issues 2778, 2779, 2780, 2781, and part of 2706. A tent open was resolving to the sole or recent plant, and a successful save left the sheet open.
+branch: cursor/quick-log-target-save-1baf
+base: verdant-grow-diary
+checkout: git fetch origin cursor/quick-log-target-save-1baf verdant-grow-diary && git switch cursor/quick-log-target-save-1baf
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2793 ready
+head_sha: d6b9abb71 is the implementation; 504ecc08c stamps this block; the pin-fix commit is the child of 504ecc08c. Read origin/cursor/quick-log-target-save-1baf for the exact head. This line cannot name that child.
+state: ready PR 2793, no auto-merge
+current_step: three CI pins updated after measured tap counts; required CI recheck follows the pin-fix push
+next_action: keep the PR draft until required checks are green at the exact head and Moonbow routes review
+post_merge_check: bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx
+active_writer: Grok cloud agent on cursor/quick-log-target-save-1baf
+decisions: tent context is never rewritten to a plant; last-used target applies only when the route has no tent or plant; success closes the sheet and names the target in the toast; reading time is sheet state wired to occurredAt; GrowerTimeLabel is the shared formatter; correction temperature displays the grower unit and converts once to Celsius on save
+tried_and_rejected: leaving the sole-plant pins unchanged would keep the bug
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx src/test/quick-log-v2-rules.test.ts src/test/quick-log-route-target-rules.test.ts src/test/mobile-quick-log-single-fab.test.ts src/test/app-shell-mobile-quick-log-routing.test.tsx src/test/quick-log-v2-sheet-watering.test.tsx src/test/quick-log-v2-sheet-feeding.test.tsx src/test/quick-log-v2-refresh-sheet.test.tsx src/test/quick-log-timeline-cta-integration.test.tsx
+files_touched: src/components/AppShell.tsx src/components/QuickLogEntryIntegrityControls.tsx src/components/QuickLogV2Sheet.tsx src/pages/TentDetail.tsx src/lib/quickLogV2Rules.ts src/lib/quickLogRouteTargetRules.ts src/lib/growerTimeLabel.ts src/lib/quickLogReadingTime.ts src/lib/timelineEntryTimestampFormat.ts src/lib/quickLogGroupedTimelineFilterViewModel.ts src/lib/quickLogSnapshotStripAdapter.ts src/lib/wateringCadenceHistoryRules.ts src/lib/growDiaryPdfExport.ts and the renegotiated tests named in the PR
+files_remaining: none for this slice
+blockers: none for repository work. Moonbow routes review and merge. No production write.
+open_questions: none
+gotchas: scorer pins that encoded sole-plant launch and a stay-open sheet were renegotiated in the same change. .claude/scorer-unlock.json is local only.
+links: issues 2778 2779 2780 2781 2706
+artifacts: src/test/quick-log-target-save-reading-time.test.tsx
+reviewer_seat: not requested
+reviewer_sha: none
+session_state: Grok implementation session
+claimed_by: Grok 2026-11-02
+owner: Grok
+last_updated: 2026-11-02 21:36 CT, by Grok
+
 TASK CREATE-DIALOG-DISABLED-REASON  priority: P2  status: OPEN
 goal: disabled primary buttons in New grow, New tent, and New plant state their reason, and each name field has a visible label that is its accessible name.
 why: Issue 3 (FA-F01, FA-F02, FA-F05). Cheeko approved building only (2026-10-31). Create tent and Create plant were disabled with no description, and the name fields were announced as their placeholders.

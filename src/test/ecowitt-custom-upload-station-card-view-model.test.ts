@@ -108,4 +108,73 @@ describe("EcoWitt customized-upload station card view model", () => {
     expect(stale.indoorTempF).toBe("68.0 °F");
     expect(stale.emptyMessage).toBeNull();
   });
+
+  it("keeps numeric strings from sensor_readings and labels tent air", () => {
+    const model = buildEcowittCustomUploadStationCard({
+      tentId: TENT,
+      now: NOW,
+      lastReceivedAt: "2026-11-02T18:00:00.000Z",
+      claimState: "active",
+      justCreatedToken: null,
+      readings: [
+        {
+          tentId: TENT,
+          metric: "temperature_c",
+          value: "22.2",
+          source: "live",
+          quality: "ok",
+          capturedAt: "2026-11-02T18:00:00.000Z",
+        },
+        {
+          tentId: TENT,
+          metric: "humidity_pct",
+          value: "55",
+          source: "live",
+          quality: "ok",
+          capturedAt: "2026-11-02T18:00:00.000Z",
+        },
+      ],
+    });
+    expect(model.emptyMessage).toBeNull();
+    expect(model.indoorTempF).toBe("72.0 °F");
+    expect(model.indoorRh).toBe("55 %");
+    expect(ECOWITT_CUSTOM_UPLOAD_COPY.indoorTemp).toBe("Tent temperature");
+    expect(ECOWITT_CUSTOM_UPLOAD_COPY.indoorRh).toBe("Tent humidity");
+  });
+
+  it("shows a degraded rail reading instead of hiding it", () => {
+    const model = buildEcowittCustomUploadStationCard({
+      tentId: TENT,
+      now: NOW,
+      lastReceivedAt: "2026-11-02T18:00:00.000Z",
+      claimState: "active",
+      justCreatedToken: null,
+      readings: [
+        {
+          tentId: TENT,
+          metric: "soil_moisture_pct",
+          value: 0,
+          source: "live",
+          quality: "degraded",
+          capturedAt: "2026-11-02T18:00:00.000Z",
+        },
+      ],
+    });
+    expect(model.emptyMessage).toBeNull();
+    expect(model.soil1).toBe("0 %");
+    expect(model.edgeNote).toBe(ECOWITT_CUSTOM_UPLOAD_COPY.edgeRail);
+  });
+
+  it("hides create while the open-claim lookup is still pending", () => {
+    const pending = buildEcowittCustomUploadStationCard({
+      tentId: TENT,
+      now: NOW,
+      lastReceivedAt: null,
+      claimState: "none",
+      justCreatedToken: null,
+      claimLookup: "pending",
+      readings: [],
+    });
+    expect(pending.canCreateLink).toBe(false);
+  });
 });

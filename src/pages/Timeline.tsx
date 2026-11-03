@@ -112,7 +112,9 @@ import {
   buildDiaryRangeReportUrl,
   defaultDiaryRangeReportRange,
 } from "@/lib/diaryRangeReportNavigationRules";
-import TimelineCsvContextPanel from "@/components/TimelineCsvContextPanel";
+import { TimelineCsvContextGate } from "@/components/TimelineCsvContextGate";
+import { requireEffectiveSensorReadings } from "@/lib/effectiveSensorReadingRules";
+import { TimelineBoundedRead } from "@/lib/timelineBoundedRead";
 import PhenoHuntTimelineSection from "@/components/PhenoHuntTimelineSection";
 import { cn } from "@/lib/utils";
 import { getEventType } from "@/lib/diary";
@@ -131,6 +133,7 @@ import {
   TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
   timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
+import { TimelineQuickLogEnvironmentSnapshotReadback } from "@/lib/timelineQuickLogEnvironmentSnapshotReadback";
 import { mergeLinkedGrowEventVolume } from "@/lib/timelineLinkedGrowEventVolumeRules";
 import {
   applyTimelineInitialSignedPhoto,
@@ -152,10 +155,7 @@ import {
   dropBlankQuickLogPlaceholderRows,
   projectTimelineDiaryPage,
 } from "@/lib/timelineQuickLogPlaceholderDedupeRules";
-import {
-  effectiveSensorReadingsQuery,
-  requireEffectiveSensorReadings,
-} from "@/lib/effectiveSensorReadings";
+import { effectiveSensorReadingsQuery } from "@/lib/effectiveSensorReadings";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
@@ -442,7 +442,7 @@ function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[]
  */
 /** Timeline-only. The shared root-zone select stays unchanged for the other readers. */
 const TIMELINE_SENSOR_GROW_EVENT_SELECT =
-  "id,plant_id,event_type,source,occurred_at,created_at,environment_events(temperature_c,humidity_pct,vpd_kpa)";
+  "id,plant_id,tent_id,event_type,source,occurred_at,created_at,environment_events(temperature_c,humidity_pct,vpd_kpa)";
 const TIMELINE_LINKED_ROOT_SELECT = "id,created_at,event_type,source,plant_id,occurred_at";
 
 function linkedEnvironmentEventIds(diaryRows: ReadonlyArray<{ details?: unknown }>): string[] {
@@ -480,6 +480,7 @@ async function resolveMissingLinkedGrowEventParents(input: {
       .from("grow_events")
       .select(ROOT_ZONE_GROW_EVENT_SELECT)
       .eq("grow_id", input.growId)
+      .limit(TimelineBoundedRead.idLookupLimit(missingLinkedGrowEventIds))
       .in("id", missingLinkedGrowEventIds);
     if (!input.isCurrent()) return;
     if (linkedResult.error || !Array.isArray(linkedResult.data)) {
@@ -507,7 +508,8 @@ async function loadLinkedRootSensorSiblings(input: {
       .from("grow_events")
       .select(TIMELINE_LINKED_ROOT_SELECT)
       .eq("grow_id", input.growId)
-      .in("id", input.rootIds);
+      .in("id", input.rootIds)
+      .limit(TimelineBoundedRead.idLookupLimit(input.rootIds));
     if (!input.isCurrent()) return;
     if (hasTimelineRequiredReadError(rootResult) || !Array.isArray(rootResult.data)) {
       input.onPartial();
@@ -1030,10 +1032,11 @@ export default function Timeline() {
           if (!isCurrentRequest()) return;
           await loadLinkedRootSensorSiblings({
             growId: activeGrowId,
-            rootIds: findMissingLinkedGrowEventIds({
-              diaryEntries: diaryRows,
-              growEvents: nextGrowEvents,
-            }),
+            // Every linked root, including one already on this grow_events
+            // page. The page's environment list is the newest 100 rows, so
+            // the created_at sibling can be absent there. Roots on the page
+            // also omit created_at, which the exact-sibling join requires.
+            rootIds: linkedEnvironmentEventIds(diaryRows),
             isCurrent: isCurrentRequest,
             onRoots: (rows) =>
               setTimelineLinkedRoots((current) => {
@@ -1192,7 +1195,7 @@ export default function Timeline() {
         // capture in the correct observation-date window, while sorting
         // null captured_at last can hide a newer legacy reading.
         let capturedQuery = effectiveSensorReadingsQuery()
-          .select("*")
+          .select(TimelineBoundedRead.sensorListSelect)
           .in("tent_id", tentIds)
           .eq("source", "manual")
           .not("captured_at", "is", null)
@@ -1200,7 +1203,7 @@ export default function Timeline() {
           .order("ts", { ascending: false })
           .limit(TIMELINE_MANUAL_SENSOR_ROW_LIMIT + 1);
         let legacyQuery = effectiveSensorReadingsQuery()
-          .select("*")
+          .select(TimelineBoundedRead.sensorListSelect)
           .in("tent_id", tentIds)
           .eq("source", "manual")
           .is("captured_at", null)
@@ -1229,6 +1232,8 @@ export default function Timeline() {
           setManualSensorHistoryLimited(false);
           return;
         }
+        TimelineBoundedRead.stampMissingRawPayload(capturedResult.data);
+        TimelineBoundedRead.stampMissingRawPayload(legacyResult.data);
         const manualPage = completeManualSensorTimelineRows([
           ...requireEffectiveSensorReadings(capturedResult.data),
           ...requireEffectiveSensorReadings(legacyResult.data),
@@ -1533,13 +1538,26 @@ export default function Timeline() {
     () =>
       dropBlankQuickLogPlaceholderRows(
         mergeTimelineMeasurementDisplayEntries(
-          enrichedEntries,
+          TimelineQuickLogEnvironmentSnapshotReadback.attach(enrichedEntries, [
+            ...timelineLinkedRoots,
+            ...timelineSensorEvents,
+            ...supplementalLinkedGrowEvents,
+            ...growEvents,
+          ]),
           manualSensorMeasurementEntries.map((entry) =>
             formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
           ),
         ),
       ),
-    [enrichedEntries, manualSensorMeasurementEntries, temperatureUnit],
+    [
+      enrichedEntries,
+      growEvents,
+      manualSensorMeasurementEntries,
+      supplementalLinkedGrowEvents,
+      temperatureUnit,
+      timelineLinkedRoots,
+      timelineSensorEvents,
+    ],
   );
 
   const requestedEntryId = parseTimelineEntryDetailId(
@@ -2860,7 +2878,7 @@ export default function Timeline() {
         </Link>
       </div>
 
-      <TimelineCsvContextPanel
+      <TimelineCsvContextGate
         growId={activeGrowId}
         entries={entries.map((e) => ({ id: e.id, tent_id: e.tent_id, entry_at: e.entry_at }))}
       />
@@ -2947,6 +2965,9 @@ export default function Timeline() {
         <PhotoHistoryPanel
           rawEntries={scopedHistoryEntries}
           limit={24}
+          onOpenPhoto={(id) => {
+            if (findTimelinePhotoIndexById(lightboxItems, id) >= 0) setLightboxPhotoId(id);
+          }}
           onEntryChanged={() => {
             void load();
           }}

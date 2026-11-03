@@ -13,7 +13,8 @@
  * grant `usable` because it cannot distinguish a test packet from a physical
  * sensor. The legacy timeline presence boolean is never promoted to usable.
  */
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { ReadinessFSignal } from "@/lib/aiDoctorReadinessSummaryRules";
 import {
   Stethoscope,
   AlertCircle,
@@ -69,6 +70,8 @@ interface PlantDetailAiDoctorReadinessProps {
   tentId?: string | null;
   stage?: string | null;
   hasPlantPhoto?: boolean;
+  /** Optional: reports current-sensor read state to a parent readiness summary. */
+  onReadinessSignal?: (signal: ReadinessFSignal) => void;
 }
 
 const NO_CURRENT_SENSOR_ROWS: never[] = [];
@@ -203,6 +206,7 @@ export default function PlantDetailAiDoctorReadiness({
   tentId,
   stage,
   hasPlantPhoto = false,
+  onReadinessSignal,
 }: PlantDetailAiDoctorReadinessProps) {
   const nowMs = useNowTick();
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
@@ -261,6 +265,18 @@ export default function PlantDetailAiDoctorReadiness({
 
   // A failed read cannot prove absence; a surviving usable snapshot can still help.
   const currentSensorError = (mixedFailed || manualFailed) && sensorSnapshot?.status !== "usable";
+
+  const refetchRef = useRef(refetchCurrentSensorRows);
+  refetchRef.current = refetchCurrentSensorRows;
+  const retryCurrentSensorRows = useCallback(() => refetchRef.current(), []);
+  const signalLoading = isLoading || currentSensorLoading;
+  useEffect(() => {
+    onReadinessSignal?.({
+      loading: signalLoading,
+      readError: currentSensorError,
+      retry: retryCurrentSensorRows,
+    });
+  }, [onReadinessSignal, signalLoading, currentSensorError, retryCurrentSensorRows]);
 
   const result = useMemo(() => {
     return buildPlantDetailAiDoctorReadiness({

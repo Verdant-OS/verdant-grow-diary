@@ -345,6 +345,8 @@ export function tentDetailHeaderRejection(
  * - Tonight has nothing yet (loading, missing, unavailable): keep the tent
  *   page's own observation, which also covers manual-history VPD that Tonight
  *   does not read.
+ * - Tonight's newest climate capture cannot compute VPD (`not_computed`):
+ *   show no value. An older pair must not fill the header.
  * - The tent page's own observation is newer than Tonight's capture (a Quick
  *   Log manual VPD, which Tonight does not read): keep it rather than replace
  *   newer evidence with older (Codex P2 on #2303). At the same instant a
@@ -477,6 +479,17 @@ export function resolveTentDetailVpd(input: {
       stale: false,
       calculated: false,
       rejected: true,
+    };
+  }
+  // The dashboard card shows no VPD for a split capture. The tent header
+  // must not restore the previous pair in that same state (#2800).
+  if (tonight?.state === "not_computed") {
+    return {
+      value: null,
+      capturedAt: null,
+      source: null,
+      stale: false,
+      calculated: false,
     };
   }
   // With no valid stand-in, a rejection is reported as such, so the page

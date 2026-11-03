@@ -38,25 +38,31 @@ export function EcowittCustomUploadStationMount(props: EcowittCustomUploadStatio
   const [session, setSession] = useState<EcowittStationSession | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const generation = useRef(0);
+  const [claimLookup, setClaimLookup] = useState<"pending" | "ready">("pending");
+  const loadGeneration = useRef(0);
+  const actionGeneration = useRef(0);
 
   useEffect(() => {
-    const ticket = ++generation.current;
+    const ticket = ++loadGeneration.current;
     setSession(null);
     setActionError(null);
+    setLoaded(null);
     if (tentId === null) {
-      setLoaded(null);
+      setClaimLookup("ready");
       return;
     }
+    setClaimLookup("pending");
     let cancelled = false;
     void loadOpenEcowittCustomUploadClaim(claims, tentId).then((loadedClaim) => {
-      if (cancelled || ticket !== generation.current) return;
+      if (cancelled || ticket !== loadGeneration.current) return;
       if (!loadedClaim.ok) {
         setLoaded(null);
         setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.lookupFailed);
+        setClaimLookup("ready");
         return;
       }
       setLoaded(loadedClaim.claim);
+      setClaimLookup("ready");
     });
     return () => {
       cancelled = true;
@@ -76,51 +82,55 @@ export function EcowittCustomUploadStationMount(props: EcowittCustomUploadStatio
         claimId: resolved.claimId,
         justCreatedToken: resolved.justCreatedToken,
         createError: actionError,
+        claimLookup,
       }),
-    [tentId, readings, now, resolved, actionError],
+    [tentId, readings, now, resolved, actionError, claimLookup],
   );
 
   async function onCreateLink(): Promise<void> {
-    const ticket = ++generation.current;
+    const ticket = ++actionGeneration.current;
+    const loadTicket = loadGeneration.current;
     setCreating(true);
     setActionError(null);
     try {
       const created = await createEcowittCustomUploadClaim(claims, tentId);
-      if (ticket !== generation.current) return;
+      if (ticket !== actionGeneration.current || loadTicket !== loadGeneration.current) return;
       if (!created.ok) {
         setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.createFailed);
         return;
       }
       setSession({ kind: "created", claimId: created.claimId, token: created.uploadToken });
     } finally {
-      if (ticket === generation.current) setCreating(false);
+      if (ticket === actionGeneration.current) setCreating(false);
     }
   }
 
   async function onRevokeLink(): Promise<void> {
-    const ticket = ++generation.current;
+    const ticket = ++actionGeneration.current;
+    const loadTicket = loadGeneration.current;
     setCreating(true);
     setActionError(null);
     try {
       const revoked = await revokeEcowittCustomUploadClaim(claims, resolved.claimId);
-      if (ticket !== generation.current) return;
+      if (ticket !== actionGeneration.current || loadTicket !== loadGeneration.current) return;
       if (!revoked.ok || !revoked.revoked) {
         setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.revokeFailed);
         return;
       }
       setSession({ kind: "revoked" });
     } finally {
-      if (ticket === generation.current) setCreating(false);
+      if (ticket === actionGeneration.current) setCreating(false);
     }
   }
 
   async function onRotateLink(): Promise<void> {
-    const ticket = ++generation.current;
+    const ticket = ++actionGeneration.current;
+    const loadTicket = loadGeneration.current;
     setCreating(true);
     setActionError(null);
     try {
       const rotated = await rotateEcowittCustomUploadClaim(claims, resolved.claimId);
-      if (ticket !== generation.current) return;
+      if (ticket !== actionGeneration.current || loadTicket !== loadGeneration.current) return;
       if (!rotated.ok) {
         setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.rotateFailed);
         return;
@@ -132,7 +142,7 @@ export function EcowittCustomUploadStationMount(props: EcowittCustomUploadStatio
       }
       setSession({ kind: "rotated", claimId, token: rotated.uploadToken });
     } finally {
-      if (ticket === generation.current) setCreating(false);
+      if (ticket === actionGeneration.current) setCreating(false);
     }
   }
 

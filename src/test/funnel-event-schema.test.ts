@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+// @vitest-environment-options {"url":"https://verdantgrowdiary.com/"}
+// GA only collects on the production host (#2693), so these run there.
 /**
  * Per-event funnel-analytics schema contract.
  *

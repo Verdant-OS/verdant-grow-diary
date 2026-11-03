@@ -2077,9 +2077,13 @@ function QuickLogV2SheetForOwner({
         : lockedOccurred instanceof Date
           ? lockedOccurred.toISOString()
           : null;
-    if (pendingSubmission && lockedIso && lockedIso !== readingTime.iso) {
+    const readingTimeEdited = readingTimeLocal.trim().length > 0;
+    if (pendingSubmission && lockedIso && readingTimeEdited && lockedIso !== readingTime.iso) {
       setLocalError(QUICK_LOG_RETRY_READING_TIME_REFUSAL);
       return;
+    }
+    if (pendingSubmission && lockedIso && !readingTimeEdited) {
+      readingTime.iso = lockedIso;
     }
     const archivedSaveBlock = quickLogArchivedGrowActionBlock({
       growId: resolved.growId,

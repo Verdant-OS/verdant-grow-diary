@@ -988,11 +988,18 @@ export default function Dashboard() {
                               temperatureUnit,
                               // Same Tonight derivation the tent page and /tents list use,
                               // so a newer manual temperature/RH pair replaces an older CSV VPD.
+                              // The home tent reuses Tonight's diary snapshot. Other tents stay
+                              // idle here: Dashboard loads that diary snapshot for one tent.
                               canonicalVpd: tentsListCanonicalVpd(
                                 tentRows as BuildTentSnapshotInput[],
                                 tent.id,
                                 nowTick,
-                                { status: "idle", snapshot: null },
+                                tent.id === homeTent?.id
+                                  ? {
+                                      status: homeSnapshotState.status,
+                                      snapshot: homeSnapshotState.snapshot,
+                                    }
+                                  : { status: "idle", snapshot: null },
                                 sensorReadStatus === "loading" ||
                                   sensorReadStatus === "error" ||
                                   sensorReadStatus === "refresh_error"

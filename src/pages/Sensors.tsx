@@ -50,12 +50,7 @@ import { isSensorHashAnchorMounted } from "@/lib/sensorHashAnchorRules";
 import { readSensorsPlantRouteIntent } from "@/lib/sensorRoutePlantIntentRules";
 import { SENSOR_SOURCES_PARAM, parseSensorSourcesParam } from "@/lib/sensorSourceUrlRules";
 import { classifySensorMetricState, type SensorMetricKey } from "@/lib/sensorMetricStateRules";
-import {
-  deriveVpd,
-  formatVpdKpa,
-  VPD_DERIVED_NOTE,
-  VPD_ROUNDING_NOTE,
-} from "@/lib/vpdCalculationRules";
+import { formatVpdKpa, VPD_DERIVED_NOTE, VPD_ROUNDING_NOTE } from "@/lib/vpdCalculationRules";
 import SensorSourceLegendCompact from "@/components/SensorSourceLegendCompact";
 import { buildSoilMoistureReadingViewModel } from "@/lib/soilMoistureReadingViewModel";
 import EcowittBridgeTroubleshootingPanel from "@/components/EcowittBridgeTroubleshootingPanel";
@@ -333,26 +328,26 @@ export default function Sensors() {
     [filtered, previousVpdInputs],
   );
   const storedVpdReading = vpdStabilityReadings[0] ?? null;
-  const vpdChoice = LatestVpdReadingSelection.choose({
-    storedVpdKpa: readObservedSensorMetric(storedVpdReading, "vpd"),
-    storedCapturedAtMs: Date.parse(storedVpdReading?.capturedAt || storedVpdReading?.ts || ""),
-    pairTempC: latestTrustedVpdInputs?.temperatureC ?? null,
-    pairRh: latestTrustedVpdInputs?.humidityPct ?? null,
-    pairCapturedAtMs: latestTrustedVpdInputs
-      ? Date.parse(latestTrustedVpdInputs.reading.capturedAt || latestTrustedVpdInputs.reading.ts)
-      : null,
-  });
+  const storedVpdKpa = readObservedSensorMetric(storedVpdReading, "vpd");
+  const storedCapturedAtMs = Date.parse(storedVpdReading?.capturedAt || storedVpdReading?.ts || "");
+  const pairTempC = latestTrustedVpdInputs?.temperatureC ?? null;
+  const pairRh = latestTrustedVpdInputs?.humidityPct ?? null;
+  const pairCapturedAtMs = latestTrustedVpdInputs
+    ? Date.parse(latestTrustedVpdInputs.reading.capturedAt || latestTrustedVpdInputs.reading.ts)
+    : null;
+  const vpdChoice = useMemo(
+    () =>
+      LatestVpdReadingSelection.choose({
+        storedVpdKpa,
+        storedCapturedAtMs,
+        pairTempC,
+        pairRh,
+        pairCapturedAtMs,
+      }),
+    [storedVpdKpa, storedCapturedAtMs, pairTempC, pairRh, pairCapturedAtMs],
+  );
   const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
-  const derivedVpdKpa = useMemo(() => {
-    if (vpdChoice.kind === "derived") return vpdChoice.vpdKpa;
-    if (latestObservedVpd !== null || !latestTrustedVpdInputs) return null;
-    const derived = deriveVpd({
-      temperature: latestTrustedVpdInputs.temperatureC,
-      humidity: latestTrustedVpdInputs.humidityPct,
-      temperatureUnit: "C",
-    });
-    return derived.kind === "derived" ? derived.vpdKpa : null;
-  }, [latestObservedVpd, latestTrustedVpdInputs, vpdChoice]);
+  const derivedVpdKpa = vpdChoice.kind === "derived" ? vpdChoice.vpdKpa : null;
   // Remember inputs only while their derived estimate is on screen; an
   // observed VPD must never seed a later stale derivation.
   useEffect(() => {
@@ -554,12 +549,16 @@ export default function Sensors() {
           // newer sparse temperature snapshot must not erase or relabel an
           // older soil observation, and compatibility zeroes are never read.
           const metricReadings =
-            m.key === "vpd" && vpdChoice.kind === "derived" ? [] : readingsByMetric[m.key];
-          const latestMetricReading = metricReadings[0] ?? null;
+            m.key === "vpd"
+              ? LatestVpdReadingSelection.historyForChart(readingsByMetric.vpd, filtered)
+              : readingsByMetric[m.key];
+          const latestMetricReading = readingsByMetric[m.key][0] ?? null;
           const rawValue = readObservedSensorMetric(latestMetricReading, m.key);
-          const metricEvidenceReading =
-            latestMetricReading ??
-            (m.key === "vpd" ? (latestTrustedVpdInputs?.reading ?? null) : null);
+          const currentIsDerived = m.key === "vpd" && vpdChoice.kind === "derived";
+          const metricEvidenceReading = currentIsDerived
+            ? (latestTrustedVpdInputs?.reading ?? latestMetricReading)
+            : (latestMetricReading ??
+              (m.key === "vpd" ? (latestTrustedVpdInputs?.reading ?? null) : null));
           const metricTrust = classifySensorReadingTrust(metricEvidenceReading);
           const metricSource = metricEvidenceReading?.source ?? null;
           const metricClassification = classifyGrowDataSource(
@@ -573,10 +572,12 @@ export default function Sensors() {
             { now: nowMs },
           );
           // Derive VPD from temp + RH when no VPD value is present.
-          let value: number | null | undefined = rawValue;
-          let isDerived = false;
+          let value: number | null | undefined =
+            currentIsDerived && vpdChoice.kind === "derived" ? vpdChoice.vpdKpa : rawValue;
+          let isDerived = currentIsDerived;
           if (
             m.key === "vpd" &&
+            !currentIsDerived &&
             (value == null || !Number.isFinite(value as number)) &&
             derivedVpdKpa !== null
           ) {

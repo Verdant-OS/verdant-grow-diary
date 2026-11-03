@@ -1,4 +1,10 @@
+import type { SensorReading } from "@/mock";
 import { calculateVPD } from "@/lib/sensors/calculateVPD";
+import {
+  hasObservedSensorMetric,
+  readObservedSensorMetric,
+  sortSensorReadingsNewestFirst,
+} from "@/lib/sensorReadingSelectionRules";
 
 export type LatestVpdReadingChoice =
   | { kind: "stored"; vpdKpa: number; capturedAtMs: number }
@@ -37,6 +43,33 @@ export class LatestVpdReadingSelection {
       return { kind: "stored", vpdKpa: storedVpd, capturedAtMs: storedAt };
     }
     return { kind: "none" };
+  }
+
+  /**
+   * Chart series for the sensors VPD card.
+   *
+   * Recorded VPD rows stay. Temperature and humidity rows that did not store
+   * VPD contribute a derived point. With no recorded VPD row the series stays
+   * empty, so a value calculated only for the current card does not draw a
+   * chart of one invented point.
+   */
+  static historyForChart(
+    recorded: readonly SensorReading[],
+    cohort: readonly SensorReading[],
+  ): SensorReading[] {
+    if (recorded.length === 0) return [];
+    const derived: SensorReading[] = [];
+    for (const reading of cohort) {
+      if (hasObservedSensorMetric(reading, "vpd")) continue;
+      const vpd = calculateVPD(
+        readObservedSensorMetric(reading, "temp"),
+        readObservedSensorMetric(reading, "rh"),
+      );
+      if (vpd === null) continue;
+      const observed = Array.isArray(reading.observedMetrics) ? reading.observedMetrics : [];
+      derived.push({ ...reading, vpd, observedMetrics: [...observed, "vpd"] });
+    }
+    return sortSensorReadingsNewestFirst([...recorded, ...derived]);
   }
 }
 

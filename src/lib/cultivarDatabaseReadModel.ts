@@ -14,6 +14,7 @@
 import {
   CULTIVAR_GUIDE_SECTION_KEYS,
   buildCultivarSearchAlias,
+  findCultivarBySlug,
   type CultivarAnalyticalMethod,
   type CultivarCannabinoidClaim,
   type CultivarChemotype,
@@ -141,9 +142,8 @@ const CHEMOTYPES: readonly CultivarChemotype[] = [
   "unknown",
 ];
 /**
- * V1.1 serves sample reference data only: the source notice promises the
- * transport never upgrades the evidence state, so any other verification
- * status is refused rather than rendered as "Source-backed".
+ * Database rows stay on sample unless the approved bundled profile for that
+ * slug is itself a non-sample status. A row cannot upgrade evidence.
  */
 const VERIFICATION_STATUSES: readonly CultivarVerificationStatus[] = ["sample"];
 const CONFIDENCES: readonly CultivarConfidence[] = ["high", "medium", "community"];
@@ -531,6 +531,64 @@ function groupBy(
 // Sources
 // ---------------------------------------------------------------------------
 
+function readClaimList(value: unknown): VerdantCultivarProfile["lineageClaims"] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    if (
+      typeof row.claim !== "string" ||
+      typeof row.source !== "string" ||
+      typeof row.date !== "string"
+    ) {
+      return [];
+    }
+    return [{ claim: row.claim, source: row.source, date: row.date }];
+  });
+}
+
+function readSameNameList(value: unknown): VerdantCultivarProfile["sameNameLines"] {
+  if (value == null) return [];
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const fields = [
+      "name",
+      "breeder",
+      "lineage",
+      "seedType",
+      "relation",
+      "source",
+      "date",
+    ] as const;
+    if (fields.some((field) => typeof row[field] !== "string")) return [];
+    return [
+      {
+        name: row.name as string,
+        breeder: row.breeder as string,
+        lineage: row.lineage as string,
+        seedType: row.seedType as string,
+        relation: row.relation as string,
+        source: row.source as string,
+        date: row.date as string,
+      },
+    ];
+  });
+}
+
+function readFaqList(value: unknown): VerdantCultivarProfile["editorialFaq"] {
+  if (value == null) return null;
+  if (!Array.isArray(value)) return null;
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    if (typeof row.question !== "string" || typeof row.answer !== "string") return [];
+    return [{ question: row.question, answer: row.answer }];
+  });
+}
+
 function mapSources(
   rows: readonly CultivarDatabaseRow[],
   issues: CultivarDatabaseIssue[],
@@ -566,7 +624,17 @@ function mapSources(
       continue;
     }
     seenKeys.add(key);
-    byId.set(id, { key, title, publisher, url, sourceType, retrievedAt, licenseNotes });
+    const linkPolicy = row.link_policy;
+    byId.set(id, {
+      key,
+      title,
+      publisher,
+      url,
+      sourceType,
+      retrievedAt,
+      licenseNotes,
+      ...(linkPolicy === "nofollow" || linkPolicy === "unlinked" ? { linkPolicy } : {}),
+    });
   }
   return byId;
 }
@@ -878,10 +946,27 @@ export function mapCultivarDatabaseSnapshot(
     const lifeCycle = read.oneOf("life_cycle", LIFE_CYCLES);
     const seedExpression = read.oneOf("seed_expression", SEED_EXPRESSIONS);
     const marketClassification = read.oneOf("market_classification", MARKET_CLASSIFICATIONS);
-    const difficultyRaw = read.oneOf("difficulty", Object.keys(DIFFICULTY_LABELS));
+    const difficultyRaw =
+      row.difficulty == null ? null : read.oneOf("difficulty", Object.keys(DIFFICULTY_LABELS));
     const heightCategory = read.oneOf("height_category", HEIGHT_CATEGORIES);
     const chemotype = read.oneOf("chemotype", CHEMOTYPES);
-    const verificationStatus = read.oneOf("verification_status", VERIFICATION_STATUSES);
+    const bundledStatus =
+      slug !== undefined ? findCultivarBySlug(slug)?.verificationStatus : undefined;
+    // A row with no bundled profile cannot upgrade evidence. reviewed and
+    // verified claims are kept as sample instead of being rejected or indexed.
+    const claimedVerification = row.verification_status;
+    const verificationStatus =
+      bundledStatus === undefined &&
+      (claimedVerification === "sample" ||
+        claimedVerification === "reviewed" ||
+        claimedVerification === "verified")
+        ? ("sample" as const)
+        : read.oneOf(
+            "verification_status",
+            bundledStatus === undefined || bundledStatus === "sample"
+              ? VERIFICATION_STATUSES
+              : [bundledStatus],
+          );
     const dataOriginRaw = read.oneOf("data_origin", Object.keys(DATA_ORIGINS));
     const lastVerifiedAt = read.timestamp("last_verified_at");
     const flowerWeeks = read.text("flowering_window_label");
@@ -1204,7 +1289,10 @@ export function mapCultivarDatabaseSnapshot(
       lifeCycle,
       seedExpression,
       marketClassification,
-      difficulty: DIFFICULTY_LABELS[difficultyRaw],
+      difficulty:
+        difficultyRaw == null
+          ? null
+          : DIFFICULTY_LABELS[difficultyRaw as keyof typeof DIFFICULTY_LABELS],
       heightCategory,
       flowerWeeks,
       floweringDaysMin,
@@ -1222,8 +1310,12 @@ export function mapCultivarDatabaseSnapshot(
       terpeneClaims: claims.terpeneClaims,
       cannabinoidClaims: claims.cannabinoidClaims,
       publicationStatus,
-      verificationStatus,
-      dataOrigin: DATA_ORIGINS[dataOriginRaw],
+      verificationStatus:
+        difficultyRaw == null || bundledStatus === undefined ? "sample" : verificationStatus,
+      dataOrigin:
+        difficultyRaw == null || bundledStatus === undefined
+          ? "sample"
+          : DATA_ORIGINS[dataOriginRaw],
       lastVerifiedAt,
       guideVersion,
       contentSchemaVersion,
@@ -1232,7 +1324,20 @@ export function mapCultivarDatabaseSnapshot(
       guideOverlays: {},
       phenoHuntFocus,
       samplePhenos,
+      lineageClaims: readClaimList(row.lineage_claims),
+      sameNameLines: readSameNameList(row.same_name_lines),
+      sameNameNote: typeof row.same_name_note === "string" ? row.same_name_note : null,
+      editorialFaq: readFaqList(row.editorial_faq),
+      dek: typeof row.dek === "string" ? row.dek : null,
+      metaDescription: typeof row.meta_description === "string" ? row.meta_description : null,
     });
+    if (difficultyRaw == null) {
+      issues.push({
+        slug,
+        path: "cultivars.difficulty",
+        message: "null difficulty is unverified; the profile stays sample and noindex",
+      });
+    }
     sectionsBySlug[slug] = sections;
     sourcesBySlug[slug] = profileSources.map((item) => item.source);
     aliasRecordsBySlug[slug] = aliasRecords.map(({ alias, normalizedAlias, sourceKey }) => ({

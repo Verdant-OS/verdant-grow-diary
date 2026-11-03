@@ -85,6 +85,25 @@ export async function reserveEcowittCustomUploadReceipt(
   return readEcowittReserveReceipt(data);
 }
 
+/** Args for commit_ecowitt_custom_upload_ingest. The function reads raw_payload. */
+type EcowittCustomUploadCommitReading = {
+  readonly metric: EcowittCustomUploadStoredReading["metric"];
+  readonly value: number;
+  readonly quality: EcowittCustomUploadStoredReading["quality"];
+  readonly raw_payload: EcowittCustomUploadStoredReading["rawPayload"];
+};
+
+function toEcowittCommitReading(
+  row: EcowittCustomUploadStoredReading,
+): EcowittCustomUploadCommitReading {
+  return {
+    metric: row.metric,
+    value: row.value,
+    quality: row.quality,
+    raw_payload: row.rawPayload,
+  };
+}
+
 export interface EcowittCustomUploadServiceRole {
   lookupClaim(tokenSha256: string): Promise<EcowittCustomUploadClaim | null>;
   callBind(
@@ -115,7 +134,7 @@ export interface EcowittCustomUploadServiceRole {
       readonly p_captured_at: string;
       readonly p_passkey_sha256: string;
       readonly p_stationtype: string;
-      readonly p_readings: readonly EcowittCustomUploadStoredReading[];
+      readonly p_readings: readonly EcowittCustomUploadCommitReading[];
     },
   ): Promise<{
     readonly data: unknown;
@@ -159,7 +178,7 @@ export async function handleEcowittCustomUploadWithEntitlement(
         p_captured_at: input.capturedAt,
         p_passkey_sha256: input.passkeySha256,
         p_stationtype: input.stationtype,
-        p_readings: input.rows,
+        p_readings: input.rows.map(toEcowittCommitReading),
       });
       if (error) {
         const classified = classifyEcowittReadingInsertError(error);

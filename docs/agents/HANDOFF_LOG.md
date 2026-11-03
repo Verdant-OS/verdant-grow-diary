@@ -78,17 +78,17 @@ why: Search-to-first-value page for how the CSV importer reads columns, units, V
 branch: cursor/import-grow-sensor-csv-guide-40fe
 base: verdant-grow-diary
 checkout: git fetch origin cursor/import-grow-sensor-csv-guide-40fe verdant-grow-diary && git switch cursor/import-grow-sensor-csv-guide-40fe
-pr: see GitHub after push
-head_sha: read git rev-parse HEAD after the guide commit
-state: local until pushed
-current_step: page, sitemap, JSON-LD, tests, and screenshots
-next_action: confirm required CI at the pushed head; do not auto-merge or enqueue
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2775
+head_sha: read git rev-parse HEAD after the cohort commit
+state: ready, auto-merge off
+current_step: post-v1 cohort plus regenerated indexation matrix
+next_action: confirm required CI at the new head; do not auto-merge or enqueue
 post_merge_check: after Publish, GET https://verdantgrowdiary.com/guides/import-grow-sensor-csv and confirm HTTP 200, the self-canonical, and the three import steps. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Grok cloud agent
 decisions: copy follows the draft except where csvParser.ts and EnvironmentCsvImportModal.tsx disagree (saved temperature unit; a bad value skips the whole row; unit prompt only after header and values fail). HowTo is a new known JSON-LD type. Breadcrumb label stays "Grower Guides".
 tried_and_rejected: leaving temperatures as always °F. ImportedSensorHistoryPanel follows the saved preference.
 commands: bunx vitest run src/test/guide-import-grow-sensor-csv.test.tsx --reporter=dot
-files_touched: src/constants/verdantSeoContent.ts; src/pages/GuidePage.tsx; src/lib/seoStructuredData.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/guidePublicCopyViewModel.ts; public/sitemap.xml; scripts/validate-jsonld-rich-results.mjs; src/test/guide-import-grow-sensor-csv.test.tsx; src/test/verdant-seo-guides.test.ts; src/test/verdant-seo-sitemap-robots.test.ts; src/test/verdant-guides-glossary-head-invariants.test.ts
+files_touched: src/constants/verdantSeoContent.ts; src/pages/GuidePage.tsx; src/lib/seoStructuredData.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/guidePublicCopyViewModel.ts; public/sitemap.xml; scripts/validate-jsonld-rich-results.mjs; src/test/guide-import-grow-sensor-csv.test.tsx; src/test/verdant-seo-guides.test.ts; src/test/verdant-seo-sitemap-robots.test.ts; src/test/verdant-guides-glossary-head-invariants.test.ts; docs/knowledge-library/post-v1-public-route-cohorts.json; docs/seo/route-indexation-matrix.md
 files_remaining: none
 blockers: none for repository work
 open_questions: none
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: no production writes
 claimed_by: Grok, 2026-11-03
 owner: Grok
-last_updated: 2026-11-02 19:16 CT, by Grok
+last_updated: 2026-11-02 19:46 CT, by Grok. roadmap-500.json left untouched (base-tracked, identity digest pinned). Route registered as PV1-CONTROLLER-CSV-IMPORT-GUIDE.
 ```
 
 ### CREATE-DIALOG-DISABLED-REASON

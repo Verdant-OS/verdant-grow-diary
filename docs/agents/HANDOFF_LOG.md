@@ -79,8 +79,8 @@ branch: cursor/quick-log-target-save-1baf
 base: verdant-grow-diary
 checkout: git fetch origin cursor/quick-log-target-save-1baf verdant-grow-diary && git switch cursor/quick-log-target-save-1baf
 pr: NOT_MEASURED until the draft is opened
-head_sha: local, record the pushed SHA after the first push
-state: implemented, local only
+head_sha: d6b9abb71 is the implementation commit; the handoff stamp is the following commit on this branch
+state: pushed draft after the next push
 current_step: tests and typecheck passed locally; commit and draft PR remain
 next_action: confirm the draft PR is still draft and required CI is green at its head
 post_merge_check: bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx

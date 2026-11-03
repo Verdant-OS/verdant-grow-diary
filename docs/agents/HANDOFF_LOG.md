@@ -148,9 +148,9 @@ base: verdant-grow-diary
 checkout: git fetch origin claude/grow-scoped-pickers-spec verdant-grow-diary && git switch claude/grow-scoped-pickers-spec
 pr: opened as a draft after this commit; read the URL from GitHub
 head_sha: read the current head on GitHub (this block rides the first commit)
-state: spec drafted; founder decisions D1 (other grows), D2 (single-tent preselect), D3 (filter threshold) open.
+state: spec drafted; Matthew decided D1 (a) collapsed Other grows, D2 (a) single-tent preselect on Sensors/Daily Check, D3 (b) always show the filter (2026-11-03).
 current_step: draft PR open.
-next_action: Matthew decides D1-D3 and names the reviewer.
+next_action: Reviewer A (Sour Diesel) pass at the exact head plus green required CI; Matthew authorized merge on that basis (docs only).
 post_merge_check: docs only; none until the implementation slice.
 active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
 decisions: scope by the existing active grow (src/store/grows.tsx); no remembered tent/plant target (ban stays); Quick Log target rule unchanged, only ordering/grouping.
@@ -159,7 +159,7 @@ commands: none (docs only)
 files_touched: docs/specs/grow-scoped-pickers.md; docs/agents/HANDOFF_LOG.md
 files_remaining: none for the spec slice
 blockers: none
-open_questions: D1, D2, D3 in spec section 7
+open_questions: none (D1-D3 decided)
 gotchas: Sensors and Daily Check read all account tents (useGrowTents()/useTents() with no grow); the fix scopes the list before any default is chosen.
 links: audit findings 1 and 10 (private upload, not committed)
 artifacts: none

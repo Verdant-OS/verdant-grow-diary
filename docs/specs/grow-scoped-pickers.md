@@ -1,6 +1,6 @@
 # Grow-scoped pickers: keep the active grow as the context
 
-Status: DRAFT spec, Claude. Founder decisions D1–D3 open (§7).
+Status: DRAFT spec, Claude. Founder decisions recorded 2026-11-03 (§7): D1 (a), D2 (a), D3 (b) always.
 Source findings: grower workflow audit 2026-11-03, finding 1 ("Context does not travel
 consistently") and finding 10 ("Account clutter overwhelms selection").
 Deploy branch audited: `verdant-grow-diary` at `72e17e5` (#2775).
@@ -29,11 +29,12 @@ tent, in front of the grower.
 
 - **R1. The active grow is the default scope.** Sensors, Daily Check and the global Quick Log list
   the active grow's non-archived tents and plants first, under the grow's name. Tents and plants of
-  other grows stay reachable (D1). A grow in the route (`/grows/:growId/...`) wins over the active
-  grow, as today.
+  other grows stay reachable below them in a collapsed "Other grows" group (D1 a). A grow in the
+  route (`/grows/:growId/...`) wins over the active grow, as today.
 - **R2. No silent tent choice outside the active grow.** With no route tent and no explicit grower
-  choice, a page may preselect a tent only from the active grow, and only as D2 allows. It never
-  falls back to the newest tent in another grow.
+  choice, Sensors and Daily Check preselect a tent only when the active grow has exactly one
+  non-archived tent, and only once the tent list has loaded (D2 a). They never fall back to the
+  newest tent in another grow. Quick Log does not use this rule (R4).
 - **R3. Ask when there is no single answer.** When D2 does not preselect, Sensors and Daily Check
   show "Choose a tent" with no tent selected, and fetch no tent readings until one is chosen. They
   never show another grow's readings under the current page.
@@ -42,8 +43,10 @@ tent, in front of the grower.
   Only the ordering and grouping of the list change (R1). No last-used target is stored or restored.
 - **R5. Name the scope the page uses.** Where a page filters by the active grow, its grow switcher
   shows that grow, not "Switch grow…". Action Queue passes the same grow id it filters by.
-- **R6. Large accounts (finding 10).** When a picker lists more than D3's threshold of tents or
-  plants, it offers type-to-filter by name. Archived tents and plants stay hidden as today.
+- **R6. Large accounts (finding 10).** Every tent and plant picker covered here always offers
+  type-to-filter by name, whatever the number of options (D3 b). Filtering matches across both the
+  active grow's group and the "Other grows" group, and a match inside a collapsed group expands it.
+  Archived tents and plants stay hidden as today.
 - **R7. Copy is data.** Group headings ("Other grows"), "Choose a tent" and any helper text live in a
   constants module with exact-string tests.
 
@@ -67,8 +70,8 @@ tent, in front of the grower.
 Pure rules (a new `src/lib/growScopedPickerRules.ts`, no React or I/O):
 
 1. Given tents in grows A (active) and B, the ordered options put all of A's tents first under A's
-   name, then B's under "Other grows" (or omit B, per D1).
-2. With no route tent and no explicit choice: active grow has one tent → that tent if D2 (a); two or
+   name, then B's under a collapsed "Other grows" group (D1 a).
+2. With no route tent and no explicit choice: active grow has one tent → that tent (D2 a); two or
    more → no selection; zero → no selection. A newer tent in grow B is never selected.
 3. A route grow overrides the active grow for scope and preselection.
 4. Archived tents never appear; a list still loading never preselects.
@@ -83,7 +86,9 @@ Components:
    (`quick-log-remembered-target-write-paths.test.tsx` stays green unchanged).
 9. Action Queue with no grow in the URL shows the active grow's name in the switcher, not
    "Switch grow…".
-10. With more than D3's threshold of options, typing filters the list by name; fewer shows no filter.
+10. Every covered picker shows the filter, including one with a single option. Typing filters by
+    name across both groups and expands "Other grows" when a match is there; clearing the filter
+    restores the full grouped list.
 
 Each new test must fail before the change (RED count in the PR body).
 
@@ -102,6 +107,11 @@ Collision check at `72e17e5`: no open PR touches `Sensors.tsx`, `DailyCheck.tsx`
 `src/store/grows.tsx`. #2814 changes one line in `QuickLogV2Sheet.tsx` (the Water prefill), unrelated.
 
 ## 7. Founder decisions
+
+Recorded 2026-11-03 (Matthew): **D1 (a)** other grows shown in a collapsed group; **D2 (a)**
+preselect only when the active grow has exactly one tent, on Sensors and Daily Check only, never
+while the tent list is loading, and Quick Log's target rule unchanged; **D3 (b)** always show
+type-to-filter (not the recommended threshold). The options are kept below for the record.
 
 - **D1. Other grows in pickers.** (a) Show them below the active grow under a collapsed "Other grows"
   group. (b) Hide them; switching grow is the way to reach them. **Recommended: (a)**: a grower

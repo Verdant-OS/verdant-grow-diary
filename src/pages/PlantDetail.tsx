@@ -48,13 +48,9 @@ import { usePlantGalleryPhotoCount } from "@/hooks/usePlantGalleryPhotoCount";
 import PlantDetailHarvestEvidenceReportMount from "@/components/PlantDetailHarvestEvidenceReportMount";
 import { isHarvestWatchEligible } from "@/lib/harvestWatchEligibilityRules";
 import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
-import PlantDetailAiDoctorReadiness from "@/components/PlantDetailAiDoctorReadiness";
-import PlantDetailAiDoctorContextPanel from "@/components/PlantDetailAiDoctorContextPanel";
-import PlantDetailAiDoctorLiveReview from "@/components/PlantDetailAiDoctorLiveReview";
-import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
+import PlantDetailAiDoctorReadinessSection from "@/components/PlantDetailAiDoctorReadinessSection";
 import PlantProfileContextCard from "@/components/PlantProfileContextCard";
 import { updatePlantProfileMetadata } from "@/lib/plantProfileMetadataUpdate";
-import PlantDetailTimelineEvidenceReadinessLaunch from "@/components/PlantDetailTimelineEvidenceReadinessLaunch";
 import PlantDetailAskDoctorHelper from "@/components/PlantDetailAskDoctorHelper";
 import {
   PLANT_AI_DOCTOR_REVIEW_ANCHOR_ID,
@@ -66,10 +62,7 @@ import PlantDetailSectionNav from "@/components/PlantDetailSectionNav";
 import { PLANT_DETAIL_SECTION_ANCHORS } from "@/lib/plantDetailSectionAnchors";
 import PlantDetailDisclosureSection from "@/components/PlantDetailDisclosureSection";
 import { usePlantDetailDisclosureNavigation } from "@/hooks/usePlantDetailDisclosureNavigation";
-import {
-  PLANT_AI_DOCTOR_CONTEXT_PANEL_ANCHOR_ID,
-  PLANT_DETAIL_HARVEST_EVIDENCE_ANCHOR_ID,
-} from "@/lib/plantDetailDisclosureRules";
+import { PLANT_DETAIL_HARVEST_EVIDENCE_ANCHOR_ID } from "@/lib/plantDetailDisclosureRules";
 
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
@@ -1097,47 +1090,21 @@ export default function PlantDetail() {
             aria-label="Plant AI Doctor review"
             className="min-w-0 scroll-mt-16 space-y-3 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <PlantDetailAiDoctorReadiness
+            <PlantDetailAiDoctorReadinessSection
               plantId={plant.id}
               growId={plant.growId ?? null}
               tentId={plant.tentId ?? null}
-              stage={plant.stage ?? null}
-              hasPlantPhoto={!!plant.photo}
-            />
-            <PlantDetailAiDoctorContextReadinessMount
-              plantId={plant.id}
-              growId={plant.growId ?? null}
-              tentId={plant.tentId ?? null}
+              tentName={tent?.name ?? null}
               plantName={plant.name}
               strain={plant.strain}
               stage={plant.stage ?? null}
               medium={plant.medium ?? null}
               potSize={plant.potSize ?? null}
               plantType={plant.plantType ?? null}
-            />
-            <PlantDetailTimelineEvidenceReadinessLaunch
-              plantId={plant.id}
-              growId={plant.growId ?? null}
-              tentId={plant.tentId ?? null}
-              plantName={plant.name}
-              strain={plant.strain}
-              stage={plant.stage ?? null}
               hasPlantPhoto={!!plant.photo}
-            />
-            <PlantDetailAiDoctorLiveReview
-              plantId={plant.id}
               plant={plant}
-              growId={plant.growId ?? null}
-              tentId={plant.tentId ?? null}
             />
           </section>
-          <div
-            id={PLANT_AI_DOCTOR_CONTEXT_PANEL_ANCHOR_ID}
-            tabIndex={-1}
-            className="min-w-0 scroll-mt-16 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <PlantDetailAiDoctorContextPanel plantId={plant.id} plant={plant} />
-          </div>
           <div
             id={PLANT_DETAIL_SECTION_ANCHORS.doctor}
             tabIndex={-1}

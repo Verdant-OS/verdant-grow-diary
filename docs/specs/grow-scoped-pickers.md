@@ -17,7 +17,7 @@ only-plant auto-selection are banned").
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Sensors opened "UX Audit Test Tent", not the active grow's tent                           | `Sensors.tsx:105` calls `useGrowTents()` with no grow, so every non-archived tent in the account is listed newest first (`growRepo.ts:25-27`). With no route tent, `resolveGrowTentSelection` returns `availableIds[0]` (`growTentSelectionRules.ts:49`), i.e. the newest tent in any grow      |
 | Daily Check opened with "Dry Tent" selected                                               | `DailyCheck.tsx:161` calls `useTents()` (all grows); with no route tent and no plant, `DailyCheck.tsx:322-327` sets the tent to `selectableTents[0]`                                                                                                                                            |
-| Global Quick Log listed all account tents and plants                                      | `QuickLogV2Sheet.tsx:817-832` passes every grow id as visible to `buildQuickLogV2TargetOptions` (`quickLogV2Rules.ts:66`), so targets from all grows appear in one list                                                                                                                         |
+| Global Quick Log listed all account tents and plants                                      | `QuickLogV2Sheet.tsx:817-832` passes every grow id as visible to `buildQuickLogV2TargetOptions` (`quickLogV2Rules.ts:63`), so targets from all grows appear in one list                                                                                                                         |
 | Action Queue said it was scoped to the active grow while its switcher said "Switch grow…" | The page filters by `urlGrowId ?? activeGrowId` (`ActionQueue.tsx:407`) but passes only `urlGrowId` to `GrowBreadcrumbs` (`ActionQueue.tsx:1011`). With no grow in the URL, `GrowSwitcher` gets `currentGrowId = null` and shows the "Switch grow…" placeholder (`GrowBreadcrumbs.tsx:152-163`) |
 | An active grow already exists                                                             | `src/store/grows.tsx:69-119` keeps `activeGrowId` per owner (`verdant.activeGrow.<ownerId>`) and falls back to the first grow (`:266-269`)                                                                                                                                                      |
 
@@ -60,7 +60,7 @@ tent, in front of the grower.
 ## 4. Safety fences
 
 - No page shows a tent's readings as current for a tent the grower did not choose or the route did
-  not name, except the D2 single-tent case within the active grow.
+  not name, except the D2 single-tent case on Sensors and Daily Check within the active grow.
 - Unknown or loading tent lists never preselect (same as `tentsLoaded` gating today).
 - Quick Log never writes to a target the grower did not see selected beside Save.
 - The active grow fallback (`grows[0]` when none stored) is unchanged.

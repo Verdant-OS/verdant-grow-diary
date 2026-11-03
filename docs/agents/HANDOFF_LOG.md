@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### GROW-SCOPED-PICKERS-SPEC
+
+```text
+TASK GROW-SCOPED-PICKERS-SPEC  priority: other  status: OPEN
+goal: Spec active-grow scoping for Sensors, Daily Check and global Quick Log pickers, no cross-grow tent fallback, and the Action Queue switcher naming the grow it filters by (docs/specs/grow-scoped-pickers.md).
+why: Live audit 2026-11-03 findings 1 and 10: pages opened tents from other grows; pickers list every tent in the account.
+branch: claude/grow-scoped-pickers-spec
+base: verdant-grow-diary
+checkout: git fetch origin claude/grow-scoped-pickers-spec verdant-grow-diary && git switch claude/grow-scoped-pickers-spec
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub (this block rides the first commit)
+state: spec drafted; Matthew decided D1 (a) collapsed Other grows, D2 (a) single-tent preselect on Sensors/Daily Check, D3 (b) always show the filter (2026-11-03).
+current_step: draft PR open.
+next_action: Reviewer A (Sour Diesel) pass at the exact head plus green required CI. Merge authority: Matthew in this Claude session's chat, 2026-11-03 22:22 UTC: "since #2817 is docs only, A's pass plus green CI is enough for me to merge it".
+post_merge_check: docs only; none until the implementation slice.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: scope by the existing active grow (src/store/grows.tsx); no remembered tent/plant target (ban stays); Quick Log target rule unchanged, only ordering/grouping.
+tried_and_rejected: a remembered last-used tent (banned and test-pinned).
+commands: none (docs only)
+files_touched: docs/specs/grow-scoped-pickers.md; docs/agents/HANDOFF_LOG.md
+files_remaining: none for the spec slice
+blockers: none
+open_questions: none (D1-D3 decided)
+gotchas: Sensors and Daily Check read all account tents (useGrowTents()/useTents() with no grow); the fix scopes the list before any default is chosen.
+links: audit findings 1 and 10 (private upload, not committed)
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 16:28 CT, by Claude
+```
+
 ### AI-DOCTOR-READINESS-SUMMARY-IMPL
 
 ```text
@@ -135,40 +169,6 @@ session_state: no production writes; auto-merge off
 claimed_by: Grok, 2026-11-03
 owner: Grok
 last_updated: 2026-11-02 23:20 CT, by Grok
-```
-
-### GROW-SCOPED-PICKERS-SPEC
-
-```text
-TASK GROW-SCOPED-PICKERS-SPEC  priority: other  status: OPEN
-goal: Spec active-grow scoping for Sensors, Daily Check and global Quick Log pickers, no cross-grow tent fallback, and the Action Queue switcher naming the grow it filters by (docs/specs/grow-scoped-pickers.md).
-why: Live audit 2026-11-03 findings 1 and 10: pages opened tents from other grows; pickers list every tent in the account.
-branch: claude/grow-scoped-pickers-spec
-base: verdant-grow-diary
-checkout: git fetch origin claude/grow-scoped-pickers-spec verdant-grow-diary && git switch claude/grow-scoped-pickers-spec
-pr: opened as a draft after this commit; read the URL from GitHub
-head_sha: read the current head on GitHub (this block rides the first commit)
-state: spec drafted; Matthew decided D1 (a) collapsed Other grows, D2 (a) single-tent preselect on Sensors/Daily Check, D3 (b) always show the filter (2026-11-03).
-current_step: draft PR open.
-next_action: Reviewer A (Sour Diesel) pass at the exact head plus green required CI; Matthew authorized merge on that basis (docs only).
-post_merge_check: docs only; none until the implementation slice.
-active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
-decisions: scope by the existing active grow (src/store/grows.tsx); no remembered tent/plant target (ban stays); Quick Log target rule unchanged, only ordering/grouping.
-tried_and_rejected: a remembered last-used tent (banned and test-pinned).
-commands: none (docs only)
-files_touched: docs/specs/grow-scoped-pickers.md; docs/agents/HANDOFF_LOG.md
-files_remaining: none for the spec slice
-blockers: none
-open_questions: none (D1-D3 decided)
-gotchas: Sensors and Daily Check read all account tents (useGrowTents()/useTents() with no grow); the fix scopes the list before any default is chosen.
-links: audit findings 1 and 10 (private upload, not committed)
-artifacts: none
-reviewer_seat: not requested
-reviewer_sha: NOT_MEASURED
-session_state: no production access
-claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
-owner: Claude
-last_updated: 2026-11-03, by Claude
 ```
 
 ### POSTHOG-PUBLIC-CLIENT-KEY

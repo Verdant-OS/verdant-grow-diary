@@ -1,8 +1,7 @@
 // Layout proof for #2740. Hermetic mocked session only. No production writes.
 //
-// This file is not on the explicit `e2e:mocked-closure` list. That list lives
-// in package.json, which is scorer-locked, and the mocked-e2e workflow does
-// not glob specs. It is run locally and left out of required checks.
+// package.json `e2e:mocked-closure` names this file. The Mocked E2E closure
+// workflow runs that script. That job is not one of the 35 required checks.
 import { expect, test, type Page } from "@playwright/test";
 import { CURRENT_AGREEMENT_LIST } from "../src/constants/agreements";
 
@@ -28,7 +27,7 @@ const FAKE_TENT_ID = "22222222-2222-4222-8222-222222222222";
 const FAKE_TENT = {
   id: FAKE_TENT_ID,
   grow_id: FAKE_GROW_ID,
-  name: "Mobile Proof Tent",
+  name: "North wall proof tent with the long method line",
   brand: "",
   size: "2x2",
   stage: "veg",
@@ -114,7 +113,10 @@ async function mockSignedInSupabase(page: Page) {
   await page.route(/\/functions\/v1\//, (route) =>
     route.fulfill({ status: 404, contentType: "application/json", body: "{}" }),
   );
-  await page.route(/google-analytics\.com|googletagmanager\.com/, (route) => route.abort());
+  await page.route(
+    /^https:\/\/(?:[^/]+\.)?(?:google-analytics\.com|googletagmanager\.com)\//,
+    (route) => route.abort(),
+  );
 }
 
 async function acceptReconsentGateIfShown(page: Page) {
@@ -146,6 +148,37 @@ async function assertNoHorizontalOverflow(page: Page) {
   expect(fit.scrollWidth).toBeLessThanOrEqual(fit.clientWidth);
 }
 
+async function assertMethodLabelStacksAtPhoneWidth(page: Page) {
+  const method = page.getByTestId("dashboard-daily-grow-check-panel-row-method").first();
+  await expect(method).toBeVisible();
+  const layout = await method.evaluate((element) => {
+    const row = element.closest("[data-testid='dashboard-daily-grow-check-panel-row']");
+    const nameEl = row?.querySelector(
+      "[data-testid='dashboard-daily-grow-check-panel-plant-link']",
+    );
+    const actionsEl = row?.querySelector(
+      "[data-testid='dashboard-daily-grow-check-panel-row-actions']",
+    );
+    if (!nameEl || !actionsEl) throw new Error("grow-check name or actions missing");
+    const nameBox = nameEl.getBoundingClientRect();
+    const methodBox = element.getBoundingClientRect();
+    const actionsBox = actionsEl.getBoundingClientRect();
+    return {
+      methodScrollWidth: element.scrollWidth,
+      methodClientWidth: element.clientWidth,
+      methodTop: methodBox.top,
+      methodBottom: methodBox.bottom,
+      nameBottom: nameBox.bottom,
+      actionsTop: actionsBox.top,
+    };
+  });
+  expect(layout.methodTop).toBeGreaterThanOrEqual(layout.nameBottom - 1);
+  // Column layout from max-[430px]:flex-col. Buttons beside the method sit
+  // above its bottom edge, so this fails if that class is removed.
+  expect(layout.actionsTop).toBeGreaterThanOrEqual(layout.methodBottom - 1);
+  expect(layout.methodScrollWidth).toBeLessThanOrEqual(layout.methodClientWidth);
+}
+
 async function assertFabClearsLastContent(page: Page) {
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const clearance = await page.evaluate(() => {
@@ -173,6 +206,7 @@ test.describe("Dashboard mobile label and FAB clearance #2740", () => {
       await openShell(page, { width, height: 852 });
       await expect(page.getByTestId("dashboard-root")).toBeVisible();
       await assertNoHorizontalOverflow(page);
+      if (width === 393) await assertMethodLabelStacksAtPhoneWidth(page);
 
       const noteHeight = await page
         .getByTestId("dashboard-daily-grow-check-panel-row-action-note")

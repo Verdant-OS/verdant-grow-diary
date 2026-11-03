@@ -31,7 +31,7 @@ export class DashboardMobileLayout {
     "min-w-0 basis-full text-xs text-muted-foreground break-words sm:basis-auto";
 
   static readonly environmentHeadingRowClass =
-    "mb-2 flex min-w-0 items-start justify-between gap-2";
+    "mb-2 flex min-w-0 flex-wrap items-start justify-between gap-2";
 
   static readonly environmentCopyClass = "min-w-0 flex-1";
 

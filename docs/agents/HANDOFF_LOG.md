@@ -80,8 +80,8 @@ base: verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2820
 head_sha: read the current head on GitHub
 state: pushed draft
-current_step: pushed items 1, 8, restore, 17, 18; item 12 spec docs/specs/user-time-zone-profile-setting.md (founder chose profiles.time_zone); item 21 audited: tents.brand is free text in CreateTentDialog, EditTentDialog and the DB (string | null, no check) so there is no list to fix; the typo is a stored value only the grower can edit
-next_action: founder approves the item-12 migration PR (separate, held) and picks the next item; a native <datalist> brand suggestion for item 21 is optional and unbuilt
+current_step: items 1, 7, 8, restore, 12 (spec + held migration PR #2828 on claude/profiles-time-zone-migration), 17, 18, 21 done; item 14 spec docs/specs/quick-log-structured-sensor-readings.md (reading time, air temp/RH/VPD and F/C already exist; soil temp, soil EC, VWC, CO2, PPFD missing from Quick Log)
+next_action: founder picks item-14 option (A: extend manual_sensor_snapshot, no schema; or a shortcut to the existing manual reading card) and approves #2828 when ready
 post_merge_check: on verdantgrowdiary.com, the fixture plant page shows "Grow: <name>" and Timeline Recent Quick Logs rows show "Plant: ... · Tent: ..."
 active_writer: Claude session claude/new-session-azpsz3
 decisions: no migration/RLS/auth edits (held); items 2,4,5,6 fixed by #2794; item 3 not reproduced (in-flight guard + idempotency key; duplicates 6.5 h apart); item 7 fixed by f2d6ca2; names never guessed (unknown id reads "name unavailable")
@@ -98,7 +98,7 @@ reviewer_sha: none yet
 session_state: one self check-in armed (send_later) for PR #2820 CI
 claimed_by: Claude, 2026-11-03 16:45 CT
 owner: Claude
-last_updated: 2026-11-03 18:25 CT, by Claude
+last_updated: 2026-11-03 18:50 CT, by Claude
 ```
 
 ### QUICK-LOG-WATER-VOLUME-UNITS-SPEC

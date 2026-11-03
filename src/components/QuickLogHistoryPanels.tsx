@@ -25,7 +25,11 @@ import {
 import { getEventType } from "@/lib/diary";
 import { TimelineQuickLogEnvironmentSnapshotReadback } from "@/lib/timelineQuickLogEnvironmentSnapshotReadback";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
-import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import {
   formatTimelineEntryTimestamp,
   TIMELINE_ENTRY_UNKNOWN_TIME,
@@ -156,6 +160,20 @@ function countRows(
   return rows.reduce((total, row) => total + (predicate(row) ? 1 : 0), 0);
 }
 
+function formatHistoryClimate(
+  climate: NonNullable<QuickLogHistoryRow["climate"]>,
+  unit: TemperatureUnitPreference,
+): string {
+  const parts: string[] = [];
+  if (typeof climate.tempC === "number") {
+    const shown = convertCelsiusForDisplay(climate.tempC, unit);
+    if (shown !== null) parts.push(`${shown.toFixed(1)}${getTemperatureUnitSymbol(unit)}`);
+  }
+  if (typeof climate.rh === "number") parts.push(`${climate.rh}% RH`);
+  if (typeof climate.vpd === "number") parts.push(`VPD ${climate.vpd}`);
+  return parts.join(" · ");
+}
+
 function buildRecentDiaryPdfInput(
   rawEntries: NormalizeDiaryInput["rawEntries"],
   limit: number,
@@ -260,7 +278,12 @@ function Row({
   correctionCount?: number;
   onEntryChanged?: () => void;
 }) {
-  const et = getEventType(row.eventType);
+  const temperatureUnit = useTemperatureUnitPreference();
+  const et = getEventType(
+    row.climate && (row.eventType === "note" || row.eventType === "observation")
+      ? "measurement"
+      : row.eventType,
+  );
   const Icon = et.icon;
   return (
     <li
@@ -327,6 +350,11 @@ function Row({
         </div>
       )}
 
+      {row.climate ? (
+        <p className="mt-2 text-sm text-foreground/90" data-testid="quicklog-history-climate">
+          {formatHistoryClimate(row.climate, temperatureUnit)}
+        </p>
+      ) : null}
       {row.noteBody ? (
         <div
           className="rounded-lg bg-background/30 p-2"

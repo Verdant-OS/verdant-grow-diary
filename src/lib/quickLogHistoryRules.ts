@@ -217,6 +217,8 @@ export interface QuickLogHistoryRow {
   /** Structured summary (e.g. "500 ml", "pH 6.2") when available. */
   summarySuffix?: string;
   manualHandheld: ManualHandheldReadings | null;
+  /** Celsius temperature and humidity copied from a saved sensor snapshot. */
+  climate: { tempC?: number; rh?: number; vpd?: number } | null;
   photoUrl: string | null;
   warnings: string[];
 }
@@ -316,6 +318,7 @@ function toRow(entry: NormalizedDiaryEntry): QuickLogHistoryRow {
     rawNote: enriched.note ?? "",
     ...(identity.summarySuffix ? { summarySuffix: identity.summarySuffix } : {}),
     manualHandheld: parseManualHandheldReadings(enriched.note),
+    climate: climateFromSnapshot(enriched.details.sensorSnapshot),
     photoUrl: enriched.photoUrl,
     warnings: enriched.warnings.slice(),
   };
@@ -366,8 +369,22 @@ export function buildMeasurementHistory(
 ): QuickLogHistoryRow[] {
   return buildLane(entries, (e) => {
     if (hasManualHandheldReadings(e.note)) return true;
+    if (climateFromSnapshot(e.details.sensorSnapshot)) return true;
     return laneForEventType(e.eventType) === "measurement";
   });
+}
+
+function climateFromSnapshot(
+  snapshot: NormalizedDiaryEntry["details"]["sensorSnapshot"],
+): { tempC?: number; rh?: number; vpd?: number } | null {
+  if (!snapshot) return null;
+  const climate: { tempC?: number; rh?: number; vpd?: number } = {};
+  if (typeof snapshot.temp === "number") climate.tempC = snapshot.temp;
+  if (typeof snapshot.rh === "number") climate.rh = snapshot.rh;
+  if (typeof snapshot.vpd === "number") climate.vpd = snapshot.vpd;
+  return climate.tempC !== undefined || climate.rh !== undefined || climate.vpd !== undefined
+    ? climate
+    : null;
 }
 
 function normalizeRecentText(value: string): string {

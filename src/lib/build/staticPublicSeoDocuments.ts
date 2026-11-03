@@ -462,7 +462,7 @@ function buildStaticCultivarJsonLd(cultivar: (typeof VERDANT_CULTIVARS)[number])
         { name: "Lineage", value: cultivar.lineage },
         { name: "Life cycle", value: cultivar.lifeCycle },
         { name: "Reported flower window", value: cultivar.flowerWeeks },
-        ...(cultivar.difficulty ? [{ name: "Difficulty", value: cultivar.difficulty }] : []),
+        { name: "Difficulty", value: cultivar.difficulty },
         { name: "Evidence state", value: formatVerificationStatus(cultivar.verificationStatus) },
       ],
     }),
@@ -915,9 +915,7 @@ const GUIDE_DOCUMENTS = VERDANT_SEO_GUIDES.map((guide) =>
 export function buildStaticCultivarDocument(cultivar: (typeof VERDANT_CULTIVARS)[number]) {
   return publicDocument(`/cultivars/${cultivar.slug}`, {
     title: `${cultivar.name} Cultivar Grow Guide | Verdant`,
-    description:
-      cultivar.metaDescription ??
-      `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`,
+    description: `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`,
     imageAlt: `${cultivar.name} cultivar guide`,
     jsonLd: buildStaticCultivarJsonLd(cultivar),
     robots: cultivarDetailRobots(cultivar.verificationStatus),

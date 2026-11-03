@@ -26,9 +26,8 @@
  *    can subscribe without touching the call sites.
  */
 
-import { isGoogleAnalyticsCollectionHost } from "@/lib/googleAnalyticsHost";
-import { enforceFunnelEventSchema } from "@/lib/funnelEventSchema";
 import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
+import { enforceFunnelEventSchema } from "@/lib/funnelEventSchema";
 
 export const FUNNEL_EVENTS = [
   "signup",
@@ -167,9 +166,7 @@ export function trackFunnelEvent(name: FunnelEventName, params?: FunnelEventPara
   const safe = enforceFunnelEventSchema(name, globallySafe);
   try {
     const g = (window as { gtag?: (...args: unknown[]) => void }).gtag;
-    if (typeof g === "function" && isGoogleAnalyticsCollectionHost(window.location.hostname)) {
-      g("event", name, safe);
-    }
+    if (typeof g === "function") g("event", name, safe);
   } catch {
     // Analytics must never break the product.
   }

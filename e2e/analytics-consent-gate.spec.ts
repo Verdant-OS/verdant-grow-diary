@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "./utils/analyticsConsent";
-import { pointSpecAtGoogleAnalyticsCollectionHost } from "./utils/googleAnalyticsCollectionHost";
 
 /**
  * Consent gate: no gtag.js tag, no `dataLayer`, and no `gtag()` call may exist
@@ -9,8 +8,6 @@ import { pointSpecAtGoogleAnalyticsCollectionHost } from "./utils/googleAnalytic
  */
 import { EXPECTED_MEASUREMENT_ID as MEASUREMENT_ID } from "./utils/analyticsMeasurementId";
 const TAG_SELECTOR = `script[src*="googletagmanager.com/gtag/js"][src*="${MEASUREMENT_ID}"]`;
-
-pointSpecAtGoogleAnalyticsCollectionHost(5191);
 
 test.describe("analytics consent gate", () => {
   test.beforeEach(async ({ page }) => {

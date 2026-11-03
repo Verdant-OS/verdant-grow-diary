@@ -1,6 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { reportErrorWhenReady } from "@/lib/errorReporter";
-import { isGoogleAnalyticsCollectionHost } from "@/lib/googleAnalyticsHost";
 
 /**
  * Top-level error boundary.
@@ -40,11 +39,9 @@ export default class RootErrorBoundary extends Component<Props, State> {
     // analytics exception ping if gtag is already present; no network client is
     // imported here on purpose.
     console.error("[RootErrorBoundary] Uncaught render error:", error, info);
-    if (typeof window !== "undefined") {
-      const g = (window as unknown as { gtag?: (...a: unknown[]) => void }).gtag;
-      if (typeof g === "function" && isGoogleAnalyticsCollectionHost(window.location?.hostname)) {
-        g("event", "exception", { description: String(error?.message ?? error), fatal: false });
-      }
+    const g = (window as unknown as { gtag?: (...a: unknown[]) => void }).gtag;
+    if (typeof g === "function") {
+      g("event", "exception", { description: String(error?.message ?? error), fatal: false });
     }
     void reportErrorWhenReady(error, {
       source: "react_error_boundary",

@@ -1,5 +1,4 @@
 import { GOOGLE_ANALYTICS_MEASUREMENT_ID } from "@/constants/analytics";
-import { isGoogleAnalyticsCollectionHost } from "@/lib/googleAnalyticsHost";
 
 /**
  * Consent-gated GA4 loader.
@@ -24,14 +23,8 @@ let loaded = false;
 
 /** Idempotent. Safe to call on every render / consent change. */
 export function loadGoogleAnalytics(measurementId: string = GOOGLE_ANALYTICS_MEASUREMENT_ID): void {
-  if (typeof window === "undefined" || typeof document === "undefined") return;
-  if (!isGoogleAnalyticsCollectionHost(window.location?.hostname)) {
-    // Same id this call would have configured. On local, CI, and preview that
-    // id is the production fallback, so the kill switch covers that property.
-    setGoogleAnalyticsOptOut(true, measurementId);
-    return;
-  }
   if (loaded) return;
+  if (typeof window === "undefined" || typeof document === "undefined") return;
   loaded = true;
 
   const src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;

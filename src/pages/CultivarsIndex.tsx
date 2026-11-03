@@ -301,7 +301,7 @@ export default function CultivarsIndex() {
                       {cultivar.lifeCycle}
                     </span>
                     <span className="rounded-full border border-border/70 px-2 py-0.5">
-                      {cultivar.difficulty ?? "Not sourced"}
+                      {cultivar.difficulty}
                     </span>
                     <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 text-amber-200">
                       {formatVerificationStatus(cultivar.verificationStatus)}

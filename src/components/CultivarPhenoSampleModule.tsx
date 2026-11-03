@@ -15,7 +15,6 @@ interface Props {
 }
 
 export default function CultivarPhenoSampleModule({ cultivar }: Props) {
-  if (cultivar.samplePhenos.length === 0) return null;
   return (
     <section
       data-testid="cultivar-pheno-sample-module"

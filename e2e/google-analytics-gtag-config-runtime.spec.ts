@@ -1,8 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
 import { grantAnalyticsConsent, waitForAnalyticsClientReady } from "./utils/analyticsConsent";
-import { pointSpecAtGoogleAnalyticsCollectionHost } from "./utils/googleAnalyticsCollectionHost";
-
-pointSpecAtGoogleAnalyticsCollectionHost(5194);
 
 /**
  * End-to-end check: the GA4 bootstrap declared in the TanStack root route head

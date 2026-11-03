@@ -216,9 +216,9 @@ describe("mapSensorReadingRow", () => {
     created_at: "2026-05-01T12:00:00Z",
     device_id: null,
     raw_payload: null,
-    captured_at: null,
     notes: null,
     unit_unconfirmed: false,
+    captured_at: null,
   };
   it("maps each metric onto the correct field", () => {
     expect(mapSensorReadingRow({ ...base, metric: "temperature_c", value: 24.5 })).toMatchObject({
@@ -321,9 +321,9 @@ describe("groupSensorReadingRows", () => {
     created_at: "x",
     device_id: null,
     raw_payload: null,
-    captured_at: null,
     notes: null,
     unit_unconfirmed: false,
+    captured_at: null,
   };
   const row = (
     tent_id: string,
@@ -495,9 +495,9 @@ describe("mock data immutability", () => {
       value: 1,
       device_id: null,
       raw_payload: null,
+    notes: null,
+    unit_unconfirmed: false,
       captured_at: null,
-      notes: null,
-      unit_unconfirmed: false,
     });
     expect(JSON.stringify(tents)).toBe(tentsSnap);
     expect(JSON.stringify(plants)).toBe(plantsSnap);

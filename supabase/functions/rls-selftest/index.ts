@@ -89,6 +89,7 @@ Deno.serve(async (req) => {
         const result = await fn();
         checks.push({
           name,
+          passed: result.passed,
           durationMs: Math.round(performance.now() - start),
           ...result,
         });

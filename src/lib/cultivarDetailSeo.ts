@@ -12,7 +12,6 @@ import type {
   CultivarVerificationStatus,
   VerdantCultivarProfile,
 } from "../constants/verdantCultivars";
-import { CultivarVerifiedProfileRules } from "./cultivarVerifiedProfileRules";
 
 export interface CultivarFaqItem {
   question: string;
@@ -75,9 +74,6 @@ function difficultyPhrase(difficulty: VerdantCultivarProfile["difficulty"]): str
  * effects, or precision the profile does not carry.
  */
 export function buildCultivarFaqItems(cultivar: VerdantCultivarProfile): CultivarFaqItem[] {
-  if (cultivar.editorialFaq && cultivar.editorialFaq.length > 0) {
-    return cultivar.editorialFaq.map((item) => ({ question: item.question, answer: item.answer }));
-  }
   const items: CultivarFaqItem[] = [];
 
   items.push({
@@ -97,14 +93,12 @@ export function buildCultivarFaqItems(cultivar: VerdantCultivarProfile): Cultiva
     });
   }
 
-  if (CultivarVerifiedProfileRules.hasSourcedDifficulty(cultivar.difficulty)) {
-    items.push({
-      question: `Is ${cultivar.name} suitable for beginners?`,
-      answer: `Public reports describe it as ${difficultyPhrase(cultivar.difficulty)} to grow, and it is commonly run as ${
-        cultivar.lifeCycle === "autoflower" ? "an autoflower" : "a photoperiod plant"
-      }. Difficulty varies with your setup and experience, so use this as a rough prior, not a promise.`,
-    });
-  }
+  items.push({
+    question: `Is ${cultivar.name} suitable for beginners?`,
+    answer: `Public reports describe it as ${difficultyPhrase(cultivar.difficulty)} to grow, and it is commonly run as ${
+      cultivar.lifeCycle === "autoflower" ? "an autoflower" : "a photoperiod plant"
+    }. Difficulty varies with your setup and experience, so use this as a rough prior, not a promise.`,
+  });
 
   items.push({
     question: `Will this ${cultivar.name} profile predict how my plant turns out?`,

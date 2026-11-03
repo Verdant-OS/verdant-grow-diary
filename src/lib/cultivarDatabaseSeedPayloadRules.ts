@@ -238,17 +238,6 @@ export function expectedAliasSourceKey(profile: VerdantCultivarProfile): string 
   return profile.sourceKeys[0] ?? null;
 }
 
-/** The ten sample profiles all carry a sourced difficulty. A null difficulty
- * cannot enter the seed payload while the column is NOT NULL. */
-function requireDifficulty(
-  profile: VerdantCultivarProfile,
-): Exclude<VerdantCultivarProfile["difficulty"], null> {
-  if (profile.difficulty == null) {
-    throw new Error(`${profile.slug}: a seed profile needs a sourced difficulty`);
-  }
-  return profile.difficulty;
-}
-
 // ---------------------------------------------------------------------------
 // Bundled → payload
 // ---------------------------------------------------------------------------
@@ -411,7 +400,7 @@ export function buildCultivarDatabaseSeedPayload(
       market_classification: profile.marketClassification,
       lineage_text: profile.lineage,
       description: profile.intro,
-      difficulty: CULTIVAR_DIFFICULTY_DATABASE_VALUES[requireDifficulty(profile)],
+      difficulty: CULTIVAR_DIFFICULTY_DATABASE_VALUES[profile.difficulty],
       height_category: profile.heightCategory,
       chemotype: profile.chemotype,
       flowering_days_min: profile.floweringDaysMin,

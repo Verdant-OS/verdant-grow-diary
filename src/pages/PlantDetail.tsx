@@ -75,6 +75,12 @@ import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel";
 import PlantPhoto from "@/components/PlantPhoto";
+import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+import {
+  buildTimelinePhotoLightboxList,
+  findTimelinePhotoIndexById,
+  type TimelinePhotoLightboxItem,
+} from "@/lib/timelinePhotoLightboxRules";
 import { Badge } from "@/components/ui/badge";
 import {
   getArchivedPlantLabel,
@@ -92,7 +98,7 @@ import { format } from "date-fns";
 import PlantQuickLog from "@/components/PlantQuickLog";
 import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
 import PlantSensorSourceBreakdownCard from "@/components/PlantSensorSourceBreakdownCard";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Zap } from "lucide-react";
 import type {
   PhotoDiagnosisLatestReview,
@@ -368,6 +374,41 @@ export default function PlantDetail() {
   const photoStrip = usePlantDetailPhotoStripItems(plant?.id ?? null, {
     enabled: isActivePlantView,
   });
+  const [plantPhotoViewerId, setPlantPhotoViewerId] = useState<string | null>(null);
+  const [plantProfileViewer, setPlantProfileViewer] = useState<TimelinePhotoLightboxItem | null>(
+    null,
+  );
+  const diaryLightboxItems = useMemo(
+    () =>
+      buildTimelinePhotoLightboxList(
+        (photoStrip.display.rows ?? []).flatMap((row) => {
+          if (typeof row.id !== "string" || row.id.length === 0) return [];
+          const details =
+            row.details && typeof row.details === "object"
+              ? (row.details as Record<string, unknown>)
+              : null;
+          return [
+            {
+              id: row.id,
+              photo_url: typeof row.photo_url === "string" ? row.photo_url : null,
+              entry_at: typeof row.entry_at === "string" ? row.entry_at : null,
+              note: typeof row.note === "string" ? row.note : null,
+              stage: typeof row.stage === "string" ? row.stage : null,
+              details,
+            },
+          ];
+        }),
+      ),
+    [photoStrip.display.rows],
+  );
+  const plantLightboxItems = useMemo(() => {
+    if (!plantProfileViewer) return diaryLightboxItems;
+    return [
+      plantProfileViewer,
+      ...diaryLightboxItems.filter((item) => item.id !== plantProfileViewer.id),
+    ];
+  }, [diaryLightboxItems, plantProfileViewer]);
+  const plantLightboxIndex = findTimelinePhotoIndexById(plantLightboxItems, plantPhotoViewerId);
   // Same unbounded diary read, so the gallery count waits for the active view too.
   const plantGalleryPhotoCount = usePlantGalleryPhotoCount(plant?.id ?? null, {
     enabled: isActivePlantView,
@@ -571,6 +612,10 @@ export default function PlantDetail() {
           photoStrip={photoStrip}
           growId={plant.growId ?? null}
           onUploadPhoto={() => setQuickLogOpen(true)}
+          onOpenPhoto={(entryId) => {
+            setPlantProfileViewer(null);
+            setPlantPhotoViewerId(entryId);
+          }}
           onReviewPhoto={({ photoId, dateLabel, latestReview }) => {
             setPhotoReviewTarget({
               photo: {
@@ -584,6 +629,14 @@ export default function PlantDetail() {
             });
           }}
         />
+        {plantLightboxIndex >= 0 && plantLightboxItems.length > 0 ? (
+          <TimelinePhotoLightbox
+            items={plantLightboxItems}
+            activeIndex={plantLightboxIndex}
+            onClose={() => setPlantPhotoViewerId(null)}
+            onNavigate={(index) => setPlantPhotoViewerId(plantLightboxItems[index]?.id ?? null)}
+          />
+        ) : null}
         <PhotoDiagnosisReviewDialog
           open={photoReviewTarget !== null}
           onOpenChange={(open) => {
@@ -632,6 +685,24 @@ export default function PlantDetail() {
               alt={plant.name}
               className="aspect-square"
               caption="No plant photo yet"
+              onOpen={(url) => {
+                const match = diaryLightboxItems.find((item) => item.photoUrl === url);
+                if (match) {
+                  setPlantProfileViewer(null);
+                  setPlantPhotoViewerId(match.id);
+                  return;
+                }
+                const profile: TimelinePhotoLightboxItem = {
+                  id: "plant-profile-photo",
+                  photoUrl: url,
+                  entryAt: null,
+                  note: "",
+                  stage: plant.stage ?? null,
+                  plantName: plant.name,
+                };
+                setPlantProfileViewer(profile);
+                setPlantPhotoViewerId(profile.id);
+              }}
             />
           </div>
           <div className="min-w-0 space-y-3 rounded-2xl p-5 glass lg:col-span-2">

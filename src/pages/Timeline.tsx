@@ -2962,6 +2962,9 @@ export default function Timeline() {
         <PhotoHistoryPanel
           rawEntries={scopedHistoryEntries}
           limit={24}
+          onOpenPhoto={(id) => {
+            if (findTimelinePhotoIndexById(lightboxItems, id) >= 0) setLightboxPhotoId(id);
+          }}
           onEntryChanged={() => {
             void load();
           }}

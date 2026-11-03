@@ -479,8 +479,8 @@ async function resolveMissingLinkedGrowEventParents(input: {
       .from("grow_events")
       .select(ROOT_ZONE_GROW_EVENT_SELECT)
       .eq("grow_id", input.growId)
-      .in("id", missingLinkedGrowEventIds)
-      .limit(TimelineBoundedRead.idLookupLimit(missingLinkedGrowEventIds));
+      .limit(TimelineBoundedRead.idLookupLimit(missingLinkedGrowEventIds))
+      .in("id", missingLinkedGrowEventIds);
     if (!input.isCurrent()) return;
     if (linkedResult.error || !Array.isArray(linkedResult.data)) {
       input.onPartial();

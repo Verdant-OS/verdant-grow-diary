@@ -140,7 +140,24 @@ describe("PhenoHuntWorkspace", () => {
   it("shows an error state", () => {
     renderAt({ status: "error", error: "Pheno hunt not found." });
     expect(screen.getByTestId("pheno-workspace-error")).toHaveTextContent(/not found/i);
-    expect(screen.queryByRole("button", { name: /^save$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^save to account$/i })).toBeNull();
+  });
+
+  it("names where each candidate save goes (audit finding 8)", () => {
+    renderAt({
+      candidates: [
+        { candidateId: "p1", candidateLabel: "BD #1", strain: "Blue Dream", stage: "flower" },
+      ],
+    });
+    const card = screen.getByTestId("pheno-workspace-candidate-p1");
+    expect(within(card).getByTestId("workspace-save-p1")).toHaveTextContent(/^Save to account$/);
+    expect(
+      within(card).getByRole("heading", { name: "Candidate documentation (this device only)" }),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByRole("button", { name: "Save draft on this device" }),
+    ).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: /^save$/i })).toBeNull();
   });
 
   it("renders candidates with loud trait inputs and a keeper-decision select", () => {

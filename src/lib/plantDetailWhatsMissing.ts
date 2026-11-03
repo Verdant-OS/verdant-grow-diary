@@ -72,6 +72,13 @@ export interface PlantDetailWhatsMissingInput {
   hasSensorSnapshot: boolean;
   /** True when at least one recent activity entry is watering or feeding. */
   hasRecentWateringOrFeed: boolean;
+  /**
+   * Whether the plant's assigned tent has a current reading that AI review uses.
+   * Only "present" changes copy; "unknown" (loading, failed, no tent) and "absent"
+   * keep the plant-diary wording, so the panel never claims tent readings it has
+   * not confirmed. Spec: docs/specs/ai-doctor-readiness-single-summary.md §10.
+   */
+  tentCurrentReadings?: "present" | "absent" | "unknown" | null;
 }
 
 type PlantDetailActivitySignals = Pick<
@@ -187,6 +194,12 @@ const PROMPTS: Record<WhatsMissingPromptKind, { title: string; description: stri
   },
 };
 
+/** D2: the plant has no snapshot of its own, but its tent has current readings. */
+export const NO_PLANT_SNAPSHOT_TENT_READINGS_PROMPT = Object.freeze({
+  title: "No plant snapshot",
+  description: "Tent readings are used in AI review.",
+} as const);
+
 function buildCta(
   kind: WhatsMissingCtaKind,
   plantId?: string | null,
@@ -267,9 +280,13 @@ export function buildPlantDetailWhatsMissing(
   for (const kind of PRIORITY) {
     if (conditions[kind]) {
       const ctaKind = CTA_FOR_KIND[kind];
+      const copy =
+        kind === "no_sensor_snapshot" && input.tentCurrentReadings === "present"
+          ? NO_PLANT_SNAPSHOT_TENT_READINGS_PROMPT
+          : PROMPTS[kind];
       const prompt: WhatsMissingPrompt = {
         kind,
-        ...PROMPTS[kind],
+        ...copy,
         ...(ctaKind ? { cta: buildCta(ctaKind, input.plantId, input.growId) } : {}),
       };
       out.push(prompt);

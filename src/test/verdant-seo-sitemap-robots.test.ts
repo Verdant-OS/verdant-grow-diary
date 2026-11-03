@@ -39,6 +39,7 @@ const REQUIRED_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides/grow-room-vpd-tracker",
   "https://verdantgrowdiary.com/guides/ac-infinity-data-logging",
   "https://verdantgrowdiary.com/guides/spider-farmer-data-logging",
+  "https://verdantgrowdiary.com/guides/import-grow-sensor-csv",
   "https://verdantgrowdiary.com/guides/sensor-truth-grow-room",
   "https://verdantgrowdiary.com/guides/ai-grow-doctor",
   "https://verdantgrowdiary.com/guides/how-to-start-a-grow-journal",

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "sdk_version": "0.24.0",
-  "path": "/functions/v1/mcp",
+  "path": "/mcp",
   "auth": {
     "type": "oauth",
     "issuer": "https://knkwiiywfkbqznbxwqfh.supabase.co/auth/v1",
@@ -26,21 +26,20 @@
           "openWorldHint": false
         },
         "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
           "properties": {
             "includeArchived": {
-              "type": "boolean",
-              "description": "Include archived grows. Defaults to false."
+              "description": "Include archived grows. Defaults to false.",
+              "type": "boolean"
             },
             "limit": {
+              "description": "Maximum rows to return (1–100). Defaults to 25.",
               "type": "integer",
               "minimum": 1,
-              "maximum": 100,
-              "description": "Maximum rows to return (1\u2013100). Defaults to 25."
+              "maximum": 100
             }
-          },
-          "additionalProperties": false,
-          "$schema": "http://json-schema.org/draft-07/schema#"
+          }
         },
         "outputSchema": null
       },
@@ -54,51 +53,51 @@
           "openWorldHint": false
         },
         "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
           "properties": {
             "growId": {
               "type": "string",
               "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
               "description": "Grow id to fetch diary entries for."
             },
             "limit": {
+              "description": "Maximum entries to return (1–50). Defaults to 10.",
               "type": "integer",
               "minimum": 1,
-              "maximum": 50,
-              "description": "Maximum entries to return (1\u201350). Defaults to 10."
+              "maximum": 50
             }
           },
           "required": [
             "growId"
-          ],
-          "additionalProperties": false,
-          "$schema": "http://json-schema.org/draft-07/schema#"
+          ]
         },
         "outputSchema": null
       },
       {
         "name": "get_latest_sensor_snapshot",
         "title": "Get latest sensor snapshot",
-        "description": "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading includes constitution `source` (exactly live/manual/csv/demo/stale/invalid \u2014 vendor/transport tokens such as ecowitt, mqtt, or sim, and any unrecognized label, are never returned as source), `quality`, derived `confidence` (0\u20131), response-time `freshness` (`fresh`, `stale`, or `invalid`), and `current_live`. `quality` is one of ok/degraded/stale/invalid. `live` means fresh validated connected telemetry. Treat a reading as current live telemetry ONLY when `current_live` is true: quality must be `ok`, source must be `live`, and freshness must be `fresh`. Every other source, quality, or freshness state keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and stale or invalid are never current or healthy. Read-only.",
+        "description": "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading includes constitution `source` (exactly live/manual/csv/demo/stale/invalid — vendor/transport tokens such as ecowitt, mqtt, or sim, and any unrecognized label, are never returned as source), `quality`, derived `confidence` (0–1), response-time `freshness` (`fresh`, `stale`, or `invalid`), and `current_live`. `quality` is one of ok/degraded/stale/invalid. `live` means fresh validated connected telemetry. Treat a reading as current live telemetry ONLY when `current_live` is true: quality must be `ok`, source must be `live`, and freshness must be `fresh`. Every other source, quality, or freshness state keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and stale or invalid are never current or healthy. Read-only.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
           "openWorldHint": false
         },
         "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
           "properties": {
             "tentId": {
               "type": "string",
               "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
               "description": "Tent id to fetch the latest readings for."
             }
           },
           "required": [
             "tentId"
-          ],
-          "additionalProperties": false,
-          "$schema": "http://json-schema.org/draft-07/schema#"
+          ]
         },
         "outputSchema": null
       },
@@ -112,29 +111,29 @@
           "openWorldHint": false
         },
         "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
           "properties": {
             "growId": {
               "type": "string",
               "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
               "description": "Owned grow id whose tents and plants should be listed."
             },
             "includeInactivePlants": {
-              "type": "boolean",
-              "description": "Include archived or inactive plant records. Defaults to false."
+              "description": "Include archived or inactive plant records. Defaults to false.",
+              "type": "boolean"
             },
             "limit": {
+              "description": "Maximum targets to return (1–100). Defaults to 50.",
               "type": "integer",
               "minimum": 1,
-              "maximum": 100,
-              "description": "Maximum targets to return (1\u2013100). Defaults to 50."
+              "maximum": 100
             }
           },
           "required": [
             "growId"
-          ],
-          "additionalProperties": false,
-          "$schema": "http://json-schema.org/draft-07/schema#"
+          ]
         },
         "outputSchema": null
       },
@@ -148,6 +147,7 @@
           "openWorldHint": false
         },
         "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
           "properties": {
             "targetType": {
@@ -161,21 +161,20 @@
             "targetId": {
               "type": "string",
               "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
               "description": "Owned tent or plant id to review."
             },
             "lookbackHours": {
+              "description": "Bounded history window in hours (24–168). Defaults to 72.",
               "type": "integer",
               "minimum": 24,
-              "maximum": 168,
-              "description": "Bounded history window in hours (24\u2013168). Defaults to 72."
+              "maximum": 168
             }
           },
           "required": [
             "targetType",
             "targetId"
-          ],
-          "additionalProperties": false,
-          "$schema": "http://json-schema.org/draft-07/schema#"
+          ]
         },
         "outputSchema": null
       }

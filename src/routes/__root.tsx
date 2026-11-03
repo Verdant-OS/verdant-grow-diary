@@ -34,6 +34,7 @@ import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdent
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { initErrorReporter, reportErrorWhenReady } from "@/lib/errorReporter";
 import { renderErrorPage } from "@/lib/error-page";
+import { RootDocumentHeadRules } from "@/lib/rootDocumentHeadRules";
 import appCss from "@/styles.css?url";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
 import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
@@ -77,7 +78,7 @@ export interface RootRouteContext {
 }
 
 export const Route = createRootRouteWithContext<RootRouteContext>()({
-  head: () => ({
+  head: ({ matches }) => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1.0, viewport-fit=cover" },
@@ -89,7 +90,9 @@ export const Route = createRootRouteWithContext<RootRouteContext>()({
       },
       { title: SITE_NAME },
       { name: "description", content: SITE_DESCRIPTION },
-      { property: "og:url", content: SITE_URL },
+      ...(RootDocumentHeadRules.omitInheritedOpenGraphUrl(matches)
+        ? []
+        : [{ property: "og:url", content: SITE_URL }]),
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: SITE_NAME },
       { property: "og:title", content: SITE_NAME },

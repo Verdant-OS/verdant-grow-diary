@@ -1,8 +1,0 @@
-# One finding only: the public PostHog client ingestion key (phc_ prefix,
-# project 545866) added to .env on cursor/posthog-public-client-key-f411
-# (PR #2776, commit ec40d0c1c0893191cf5498ac825fc02dc6deb95d, .env line 5,
-# rule generic-api-key). Lovable builds from .env, so that public key is
-# committed there. secret-scan.yml loads this file from the base branch
-# via --gitleaks-ignore-path. A phx_ personal key, a service-role JWT, a
-# Stripe key, or this same value on any other line or commit still fails.
-ec40d0c1c0893191cf5498ac825fc02dc6deb95d:.env:generic-api-key:5

@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CsvTimelineEnvironmentChip } from "@/components/CsvTimelineEnvironmentChip";
 import { Button } from "@/components/ui/button";
+import { tentDetailPath } from "@/lib/routes";
 import {
   CsvTimelineSnapshotList,
   type CsvSensorReadingRow,
@@ -215,7 +216,7 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
       {timeline.omitted.map((item) => (
         <p key={item.tentId} className="text-xs text-muted-foreground">
           <a
-            href={`/tents/${item.tentId}#imported-history`}
+            href={`${tentDetailPath(item.tentId)}#imported-history`}
             data-testid="timeline-csv-more-readings"
           >
             {item.count} more CSV readings in Sensors

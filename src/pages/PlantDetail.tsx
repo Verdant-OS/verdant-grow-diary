@@ -381,7 +381,7 @@ export default function PlantDetail() {
   const diaryLightboxItems = useMemo(
     () =>
       buildTimelinePhotoLightboxList(
-        photoStrip.display.rows.flatMap((row) => {
+        (photoStrip.display.rows ?? []).flatMap((row) => {
           if (typeof row.id !== "string" || row.id.length === 0) return [];
           const details =
             row.details && typeof row.details === "object"

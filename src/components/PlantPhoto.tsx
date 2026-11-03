@@ -39,17 +39,31 @@ export default function PlantPhoto({
 }: Props) {
   const resolved = usePlantProfilePhotoSource(src);
   const fallbackUrl = typeof fallbackSrc === "string" && fallbackSrc.trim() ? fallbackSrc : null;
-  const displayUrl = resolved.displayUrl || fallbackUrl;
+  const signedUrl = resolved.displayUrl;
+  if (!signedUrl && fallbackUrl) {
+    return (
+      <PlantPhotoView
+        src={fallbackUrl}
+        alt={alt}
+        className={className}
+        iconClassName={iconClassName}
+        caption={caption}
+        ctaLabel={ctaLabel}
+        testId={testId}
+        onOpen={onOpen ? () => onOpen(fallbackUrl) : undefined}
+      />
+    );
+  }
   return (
     <PlantPhotoView
-      src={displayUrl}
+      src={resolved.displayUrl}
       alt={alt}
       className={className}
       iconClassName={iconClassName}
       caption={caption}
       ctaLabel={ctaLabel}
       testId={testId}
-      onOpen={onOpen && displayUrl ? () => onOpen(displayUrl) : undefined}
+      onOpen={onOpen && signedUrl ? () => onOpen(signedUrl) : undefined}
     />
   );
 }

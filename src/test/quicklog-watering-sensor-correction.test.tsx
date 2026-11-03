@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   rpc: vi.fn(async () => ({
@@ -35,6 +35,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { correctionValuesForTimelineAction } from "@/lib/quick-log/quickLogRevisionRules";
 
 const READINGS = [
@@ -85,6 +86,10 @@ function openDialog(props: Record<string, unknown>) {
 }
 
 describe("Correct dialog for a watering log with readings", () => {
+  beforeEach(() => {
+    saveTemperatureUnitPreference("celsius");
+  });
+
   it("shows volume and readings prefilled and submits both in one RPC call", async () => {
     mocks.rpc.mockClear();
     openDialog({

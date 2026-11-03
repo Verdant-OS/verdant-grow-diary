@@ -1,3 +1,4 @@
+import { GrowerTimeLabel } from "@/lib/growerTimeLabel";
 import type { QuickLogTimelineEntry } from "@/lib/quickLogTimelineGroupingViewModel";
 
 export const QUICK_LOG_GROUPED_TIMELINE_FILTERS = [
@@ -93,20 +94,7 @@ export function quickLogActionLabel(kind: "water" | "note"): string {
 /** Viewer-local label with the zone named, e.g. "Oct 21, 2026, 10:53 AM CDT". */
 export function formatQuickLogOccurredAt(iso: string | null | undefined): string {
   if (typeof iso !== "string" || iso.length === 0) return "";
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return iso;
-  try {
-    return new Intl.DateTimeFormat("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "numeric",
-      minute: "2-digit",
-      timeZoneName: "short",
-    }).format(new Date(ms));
-  } catch {
-    return iso;
-  }
+  return GrowerTimeLabel.formatAbsolute(iso, { day: "2-digit", includeZone: true }) ?? iso;
 }
 
 export function quickLogSourceAccessibleLabel(sourceLabel: string): string {

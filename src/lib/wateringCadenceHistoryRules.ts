@@ -6,6 +6,8 @@
  * No I/O, no React, no device control.
  */
 
+import { GrowerTimeLabel } from "@/lib/growerTimeLabel";
+
 export const WATERING_CADENCE_HISTORY_TITLE = "Watering history";
 export const WATERING_CADENCE_HISTORY_CAVEAT =
   "History only — intervals are arithmetic from recorded waterings, not a schedule or recommendation." as const;
@@ -117,24 +119,16 @@ export function formatWateringCadenceRelative(occurredMs: number, nowMs: number)
   return `${core} ago`;
 }
 
-const ABSOLUTE_LABEL_FORMAT: Intl.DateTimeFormatOptions = {
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  timeZoneName: "short",
-};
-
-/** Local wall-clock label with the zone named, e.g. "Sep 24, 4:26 AM EDT". */
+/** Local wall-clock label with the zone named, e.g. "Sep 24, 4:26 AM CDT". */
 export function formatWateringCadenceAbsolute(iso: string, timeZone?: string): string {
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return iso;
-  try {
-    return date.toLocaleString("en-US", { ...ABSOLUTE_LABEL_FORMAT, timeZone });
-  } catch {
-    // Unknown zone name: fall back to the viewer's zone rather than UTC.
-    return date.toLocaleString("en-US", ABSOLUTE_LABEL_FORMAT);
-  }
+  return (
+    GrowerTimeLabel.formatAbsolute(iso, {
+      includeYear: false,
+      day: "numeric",
+      includeZone: true,
+      timeZone,
+    }) ?? iso
+  );
 }
 
 interface NormalizedWatering {

@@ -32,6 +32,8 @@ interface PhotoHistoryPanelProps {
   className?: string;
   /** Notifies the owner (e.g. Timeline local state) after a correction/retraction. */
   onEntryChanged?: () => void;
+  /** Opens the shared timeline photo viewer on this diary entry. */
+  onOpenPhoto?: (entryId: string) => void;
 }
 
 function fmtDate(iso: string | null, fallbackLabel: string): string {
@@ -57,17 +59,34 @@ function Card({
   correctionCount,
   currentNote,
   onEntryChanged,
+  onOpenPhoto,
 }: {
   row: PhotoHistoryRow;
   integrityHandle?: QuickLogEntryHandleRef | null;
   correctionCount?: number;
   currentNote?: string | null;
   onEntryChanged?: () => void;
+  onOpenPhoto?: (entryId: string) => void;
 }) {
   return (
     <li className="rounded-xl border border-border/40 bg-card/40 overflow-hidden animate-fade-in">
       <div className="relative aspect-square bg-secondary/30">
-        {row.photoUrl ? (
+        {row.photoUrl && onOpenPhoto ? (
+          <button
+            type="button"
+            onClick={() => onOpenPhoto(row.id)}
+            aria-label={`Open photo: ${row.caption || "Grow photo"}`}
+            data-testid="photo-history-open"
+            className="absolute inset-0 focus:outline-hidden focus:ring-2 focus:ring-primary/60"
+          >
+            <img
+              src={row.photoUrl}
+              alt={row.caption || "Grow photo"}
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          </button>
+        ) : row.photoUrl ? (
           <img
             src={row.photoUrl}
             alt={row.caption || "Grow photo"}
@@ -135,6 +154,7 @@ export default function PhotoHistoryPanel({
   limit = 24,
   className,
   onEntryChanged,
+  onOpenPhoto,
 }: PhotoHistoryPanelProps) {
   const rows = useMemo(() => {
     // Mirror Timeline's normalization convention: lift `details.event_type`
@@ -228,6 +248,7 @@ export default function PhotoHistoryPanel({
                 correctionCount={revisionBadgesReady ? (badge?.correctionCount ?? 0) : 0}
                 currentNote={rawNoteById.get(r.id) ?? null}
                 onEntryChanged={onEntryChanged}
+                onOpenPhoto={onOpenPhoto}
               />
             );
           })}

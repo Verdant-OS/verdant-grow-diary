@@ -258,7 +258,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
     fireEvent.click(screen.getByTestId("qlv2-save-retry"));
     await waitFor(() =>
       expect(toastSuccess).toHaveBeenCalledWith(
-        "Log saved",
+        "Log saved · Plant 1 (Tent 1)",
         expect.objectContaining({
           action: expect.objectContaining({
             label: QUICK_LOG_TIMELINE_CTA_LABEL,

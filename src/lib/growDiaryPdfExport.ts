@@ -19,6 +19,7 @@
  *  - Does not render raw payloads, tokens, secrets, or internal IDs.
  */
 
+import { GrowerTimeLabel } from "@/lib/growerTimeLabel";
 import type { CountValue } from "@/lib/growStatus";
 import type { RecentItem } from "@/lib/growStatus";
 import { resolveSensorSourceDisplayCanon } from "@/lib/sensorSourceDisplayCanon";
@@ -106,15 +107,7 @@ function pad(n: number): string {
 }
 
 function zoneLabel(d: Date): string {
-  try {
-    const short = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
-      .formatToParts(d)
-      .find((part) => part.type === "timeZoneName")?.value;
-    if (short && short.trim()) return short;
-  } catch {
-    /* fall through to a fixed label */
-  }
-  return "local";
+  return GrowerTimeLabel.zoneAbbreviation(d);
 }
 
 function localDate(d: Date): string {

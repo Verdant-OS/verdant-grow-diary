@@ -349,7 +349,7 @@ async function expectOriginalWaterAndRetry(original: Record<string, unknown>) {
   expect(screen.getByLabelText("Volume (ml)")).toBeDisabled();
   expect(screen.getByLabelText("Note (optional)")).toHaveValue("Original plant watering evidence");
   expect(screen.getByLabelText("Choose plant or tent for this Quick Log")).toHaveTextContent(
-    "Plant · Plant 1",
+    "Plant 1 (Tent 1)",
   );
   expect(screen.getByLabelText("Choose plant or tent for this Quick Log")).toBeDisabled();
   expect(rpcMock).toHaveBeenCalledTimes(1);
@@ -464,7 +464,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
     expect(screen.getByLabelText("Volume (ml)")).toHaveValue("");
     expect(screen.getByLabelText("Note (optional)")).toHaveValue("");
     expect(screen.getByLabelText("Choose plant or tent for this Quick Log")).toHaveTextContent(
-      "Plant · Plant 2",
+      "Plant 2 (Tent 1)",
     );
     expect(rpcMock).toHaveBeenCalledTimes(1);
     other.unmount();
@@ -638,7 +638,7 @@ describe("QuickLogV2Sheet — structured watering", () => {
     const valid = renderSheet("plant:33333333-3333-4333-8333-333333333333", "water");
     expect(screen.getByTestId("qlv2-watering-form")).toBeInTheDocument();
     expect(screen.getByLabelText("Choose plant or tent for this Quick Log")).toHaveTextContent(
-      "Plant · Plant 1",
+      "Plant 1 (Tent 1)",
     );
     expect(screen.getByTestId("qlv2-target-panel")).toHaveAttribute("data-scope", "plant");
     valid.unmount();
@@ -755,10 +755,13 @@ describe("QuickLogV2Sheet — structured watering", () => {
     clickSave();
 
     await waitFor(() =>
-      expect(toastSuccess).toHaveBeenCalledWith("Watering logged.", expect.anything()),
+      expect(toastSuccess).toHaveBeenCalledWith(
+        "Watering logged. · Plant 1 (Tent 1)",
+        expect.anything(),
+      ),
     );
     expect(await screen.findByTestId("qlv2-post-save")).toBeInTheDocument();
-    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(created).toEqual([
       expect.objectContaining({
         growEventId: "water-event-1",
@@ -1429,7 +1432,10 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(screen.queryByTestId("qlv2-watering-retry-lock")).not.toBeInTheDocument();
     expect(screen.queryByTestId("qlv2-save-retry")).not.toBeInTheDocument();
     expect(storageRemove).not.toHaveBeenCalled();
-    expect(toastSuccess).toHaveBeenCalledWith("Watering logged.", expect.anything());
+    expect(toastSuccess).toHaveBeenCalledWith(
+      "Watering logged. · Plant 1 (Tent 1)",
+      expect.anything(),
+    );
   });
 
   it("waits for a slow video check before locking and saving Water", async () => {

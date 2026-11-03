@@ -1,2 +1,15 @@
 [extend]
 useDefault = true
+
+# Public PostHog client ingestion key (phc_ prefix) committed in .env for
+# Lovable builds. PR #2776. Scoped to generic-api-key.
+# condition AND is required: the default is OR, and a path-only match would
+# ignore every secret in .env. The pattern is the exact key from that .env
+# line, not a phc_ class. Commit SHA is not part of the match.
+[[allowlists]]
+description = "Exact public PostHog phc_ client key on .env only."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "match"
+paths = ['''^\.env$''']
+regexes = ['''phc_o592rhgW9HDW4mks6VJP5zmZeLb5mJSSYrBfZkfGfUNA''']

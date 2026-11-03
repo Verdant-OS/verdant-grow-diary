@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### DASHBOARD-DAILY-CHECK-SHARED-RETRY
+
+```text
+TASK DASHBOARD-DAILY-CHECK-SHARED-RETRY  priority: other  status: OPEN
+goal: One "Try again" on a Dashboard Daily Grow Check surface also retries the other Daily Grow Check surface's reads.
+why: Live audit 2026-11-03 finding 6. One Try again recovered the Daily Grow Check summary and environment data, but "Today's Grow Checks" still said observations could not be loaded. The summary card reads 200-row sensor windows per tent, shared with Dashboard sensor history. The panel reads its own 500-row windows. Both use retry: false, so each Try again refetched only its own reads.
+branch: claude/dashboard-grow-checks-retry
+base: verdant-grow-diary
+checkout: git fetch origin claude/dashboard-grow-checks-retry verdant-grow-diary && git switch claude/dashboard-grow-checks-retry
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub
+state: implementation and tests committed.
+current_step: PR open; CI and review pending.
+next_action: Grok review at the exact head; merge on Grok APPROVE plus 35/35 required green (Matthew, 2026-11-03).
+post_merge_check: after Publish, the failure cannot be forced live safely; covered by src/test/dashboard-daily-check-shared-retry.test.tsx. NOT_MEASURED on production.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: The summary card dispatches verdant:daily-check-retry rather than taking a QueryClient, because three existing test files render it without a provider. The panel listens and calls retryDailyCheckEvidence, which invalidates the diary_entries and sensor_readings prefixes with cancelRefetch false. A read already in flight is not restarted. The backend cause of the original failure is NOT_MEASURED.
+tried_and_rejected: useQueryClient in DailyGrowCheckStatusCard (8 failures in 3 existing test files with no provider).
+commands: bunx vitest run src/test/dashboard-daily-check-shared-retry.test.tsx --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/lib/dailyCheckRefreshRules.ts; src/components/DailyGrowCheckStatusCard.tsx; src/components/DashboardDailyGrowCheckPanel.tsx; src/test/dashboard-daily-check-shared-retry.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: Founder layout decision, deferred: whether to merge the two Daily Grow Check error cards into one. Also deferred: whether Dashboard sensor-history Try again should also retry the panel.
+gotchas: commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify).
+links: none
+artifacts: none
+reviewer_seat: Grok (verdant-ultra-bot)
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 16:51 CT, by Claude
+```
+
 ### AI-DOCTOR-READINESS-SUMMARY-IMPL
 
 ```text

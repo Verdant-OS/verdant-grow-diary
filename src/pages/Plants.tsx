@@ -45,8 +45,8 @@ import {
   filterVisiblePlants,
   getArchivedPlantLabel,
   shouldShowArchivedToggle,
-  isArchivedPlant,
-  isMergedPlant,
+  isActivePlant,
+  withGrowArchiveVisibility,
 } from "@/lib/archivedPlantVisibilityRules";
 import { buildTentGrowIndex } from "@/lib/growAttributionRules";
 import {
@@ -108,6 +108,7 @@ export default function Plants() {
   const navigate = useNavigate();
   const {
     grows,
+    archivedGrows = [],
     loading: growsLoading = false,
     error: growsError = null,
     refresh: refreshGrows,
@@ -262,10 +263,10 @@ export default function Plants() {
     ? filterPlantsByGrow(allPlants, UNASSIGNED_GROW_FILTER_ID, tentGrowById)
     : allPlants;
 
-  const hasArchived = shouldShowArchivedToggle(growScopedPlants);
-  const archivedCount = growScopedPlants.filter(
-    (p) => isArchivedPlant(p) || isMergedPlant(p),
-  ).length;
+  const archivedGrowIds = new Set((archivedGrows ?? []).map((grow) => grow.id));
+  const plantsForList = withGrowArchiveVisibility(growScopedPlants, archivedGrowIds);
+  const hasArchived = shouldShowArchivedToggle(plantsForList);
+  const archivedCount = plantsForList.filter((p) => !isActivePlant(p)).length;
 
   // Filter chips — counts MUST match what the grid will render under the
   // currently-applied archived + search filters (AUD-005). Tent buckets
@@ -273,7 +274,7 @@ export default function Plants() {
   // uses, so chip totals and visible card counts always agree. Built
   // before the tent selection is reconciled so the "No tent" sentinel
   // chip is a valid selection exactly while it is rendered.
-  const filterEntries = buildPlantsTentFilterChips(growScopedPlants, tents, {
+  const filterEntries = buildPlantsTentFilterChips(plantsForList, tents, {
     showArchived,
     search,
   });
@@ -285,7 +286,7 @@ export default function Plants() {
   // Pipeline: archived visibility → grow scope (query or unassigned bucket,
   // already applied above) → tent chip → plant search. Each step is
   // independent and labeled in the UI.
-  const visibleAfterArchive = filterVisiblePlants(growScopedPlants, { showArchived });
+  const visibleAfterArchive = filterVisiblePlants(plantsForList, { showArchived });
   const visibleAfterTent = filterPlantsByTentChip(visibleAfterArchive, effectiveTentFilter);
   const filtered = filterPlantsBySearch(visibleAfterTent, search, tents);
 

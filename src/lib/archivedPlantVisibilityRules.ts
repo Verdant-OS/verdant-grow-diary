@@ -19,6 +19,9 @@ export interface ArchivedPlantLike {
   is_archived?: boolean | null;
   lastNote?: string | null;
   last_note?: string | null;
+  /** True when the plant's grow is archived. The plant row itself may still be active. */
+  growArchived?: boolean | null;
+  growId?: string | null;
 }
 
 const MERGE_MARKER_RE = /Merged into ([0-9a-f-]{36})/i;
@@ -47,11 +50,32 @@ export function isMergedPlant(p: ArchivedPlantLike | null | undefined): boolean 
   return MERGE_MARKER_RE.test(readLastNote(p));
 }
 
+export function isGrowArchivedPlant(p: ArchivedPlantLike | null | undefined): boolean {
+  if (!p) return false;
+  return p.growArchived === true;
+}
+
 export function isActivePlant(p: ArchivedPlantLike | null | undefined): boolean {
   if (!p) return false;
   if (isArchivedPlant(p)) return false;
   if (isMergedPlant(p)) return false;
+  if (isGrowArchivedPlant(p)) return false;
   return true;
+}
+
+export function withGrowArchiveVisibility<T extends ArchivedPlantLike>(
+  plants: readonly T[],
+  archivedGrowIds: ReadonlySet<string>,
+  options: { tentGrowArchived?: boolean } = {},
+): T[] {
+  return plants.map((plant) => {
+    const growId = plant.growId;
+    const growArchived =
+      options.tentGrowArchived === true ||
+      plant.growArchived === true ||
+      (typeof growId === "string" && archivedGrowIds.has(growId));
+    return growArchived ? { ...plant, growArchived: true } : plant;
+  });
 }
 
 export function filterActivePlants<T extends ArchivedPlantLike>(plants: readonly T[]): T[] {
@@ -75,7 +99,7 @@ export function getActivePlantCount(plants: readonly ArchivedPlantLike[]): numbe
 }
 
 export function shouldShowArchivedToggle(plants: readonly ArchivedPlantLike[]): boolean {
-  return plants.some((p) => isArchivedPlant(p) || isMergedPlant(p));
+  return plants.some((p) => !isActivePlant(p));
 }
 
 export type ArchivedPlantLabelKind = "active" | "archived" | "merged";
@@ -99,11 +123,11 @@ export function getArchivedPlantLabel(p: ArchivedPlantLike | null | undefined): 
       verbose: "Merged into another plant",
     };
   }
-  if (archived) {
+  if (archived || isGrowArchivedPlant(p)) {
     return {
       kind: "archived",
       label: "Archived",
-      verbose: "Archived plant",
+      verbose: isGrowArchivedPlant(p) ? "Plant in an archived grow" : "Archived plant",
     };
   }
   return { kind: "active", label: "", verbose: "" };

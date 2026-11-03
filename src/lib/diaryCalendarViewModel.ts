@@ -12,6 +12,7 @@
  *  - Only emits a small, vetted display surface (label, plant_name, note
  *    snippet) — never the raw details object.
  */
+import { DeletedPlantDisplayRules } from "@/lib/plantLifecycleWriteRules";
 import {
   buildEcCompensationPreview,
   type EcCompensationPreviewModel,
@@ -178,6 +179,8 @@ export interface DiaryCalendarRawEntry {
   eventType?: string | null;
   note?: string | null;
   details?: unknown;
+  /** Plant id kept on the diary row after the plant itself is deleted. */
+  plant_id?: string | null;
 }
 
 export interface DiaryCalendarEvent {
@@ -561,7 +564,7 @@ export function buildDiaryCalendarViewModel(
       label: DIARY_CALENDAR_KIND_LABEL[kind],
       occurredAt: iso,
       dateKey: dateKeyUtc(iso),
-      plantName: safePlantName(raw.details),
+      plantName: DeletedPlantDisplayRules.nameOrDeleted(raw.plant_id, safePlantName(raw.details)),
       stage: safeCalendarStage(raw.stage),
       noteSnippet,
       details: buildEventDetails(kind, raw, noteSnippet, tempUnit),

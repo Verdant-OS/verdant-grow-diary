@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### RETIRE-PR2702-STRIPE-EDGE-PATH
+
+```text
+TASK RETIRE-PR2702-STRIPE-EDGE-PATH  priority: P2  status: OPEN
+goal: remove the PR #2702 / issue #2669 Stripe test-mode Edge Function lane (create-checkout-session, stripe-webhook, migration 20261101180000, its rules, mirror copies, tests, pgTAP workflow, docs and config entries) in one PR
+why: Matthew decided 2026-11-03 that Lovable's payments integration owns Stripe (route /api/public/payments/webhook, public.subscriptions.billing_provider); he answered "Yes" on 2026-11-03 ~13:16 CT to removing #2702 as a second Stripe writer for the same table. Migration 20261101180000 was never applied (source claim: its header and CURRENT_STATE) and its CHECK constraint conflicts with the live Lovable row shape.
+branch: claude/retire-pr2702-stripe-edge-path
+base: verdant-grow-diary
+checkout: git fetch origin claude/retire-pr2702-stripe-edge-path verdant-grow-diary && git switch claude/retire-pr2702-stripe-edge-path && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED at the time of this block (draft PR to be opened right after this push)
+head_sha: f93b4c5247792eeb5cc7549a4ea82d90c82f4f65 is the removal commit (pushed 2026-11-03 ~19:30 UTC, base ac10d68ef281b2b9e01d77dea17da63869a0a6a1); the commit carrying this block follows it
+state: pushed draft
+current_step: open draft PR; request independent exact-head review
+next_action: open the draft PR against verdant-grow-diary, then wait for 35/35 required checks at the head
+post_merge_check: on the merged deploy tip, `git ls-tree -r --name-only origin/verdant-grow-diary | grep -cE "create-checkout-session|stripe-webhook/|20261101180000|stripeWebhook|stripeCheckoutSession|stripeTestModeCatalog"` returns 0, and `node scripts/sync-edge-shared.mjs --check` passes
+active_writer: Claude session_017UoYKxCwUMi8bpS1ph7KLn
+decisions: remove whole, not partially: no other source file imports these modules (git grep on ac10d68e); Lovable restore at lovable-sync-1793724974 f0680d3d imports none of them. Keep src/test/core-link-form-census-rules.test.ts unchanged: it classifies the edge-function NAME create-checkout-session as mutating, which stays true and is not part of #2702. Never-applied migration file deletion is deliberate (a published but unapplied migration that conflicts with the live schema); the published-migration integrity gate may flag it and the reviewer must decide.
+tried_and_rejected: none
+commands: node scripts/sync-edge-shared.mjs --check; NODE_OPTIONS=--max-old-space-size=4096 bun run typecheck; bunx vitest run <tests referencing stripe|supabase/migrations|supabase/functions|.github/workflows|.env.example>
+files_touched: 28 files deleted (git show --stat f93b4c52); .env.example; scripts/required-money-migrations.mjs; supabase/config.toml; supabase/functions/_shared/lib/.sync-manifest.json
+files_remaining: none known
+blockers: (1) money/migration gate: Matthew's yes at the exact head SHA before queueing; (2) published-migration integrity gate may reject deleting supabase/migrations/20261101180000_stripe_test_mode_subscription_sink.sql (AGENTS.md section 5 says merged migrations are permanent) - owner decision whether to keep the file inert instead
+open_questions: keep or delete the never-applied migration file under AGENTS.md section 5
+gotchas: local results: typecheck exit 0; mirror check OK 107 files; 400 related test files -> 392 passed, 2 skipped, 6 failed (local-Postgres *-db suites, same failure on base ac10d68e: "BLOCKED: run as a non-root Unix user with PostgreSQL server tools")
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/new/claude/retire-pr2702-stripe-edge-path
+artifacts: none beyond the branch
+reviewer_seat: NOT_MEASURED (eligible non-contributing reviewer per OWNERSHIP.md 4.3)
+reviewer_sha: none
+session_state: Claude session_017UoYKxCwUMi8bpS1ph7KLn; pending human decision: migration-file deletion vs AGENTS.md section 5
+claimed_by: Claude session_017UoYKxCwUMi8bpS1ph7KLn, 2026-11-03 13:35 CT
+owner: Claude session_017UoYKxCwUMi8bpS1ph7KLn
+last_updated: 2026-11-03 13:35 CT, by Claude
+```
+
 ### PHOTO-VIEWER-CAPTION-TILES
 
 ```text

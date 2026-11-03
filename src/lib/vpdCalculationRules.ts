@@ -60,7 +60,7 @@ export function saturationVaporPressureKpa(tempC: number): number {
  * Numeric VPD from temperature and humidity.
  *
  * `kpa` rejects temperature outside [-40, 80] °C. That guard is for display
- * derivation (`deriveVpd`). Ingest calls `calculateVPD`, which uses
+ * derivation (`deriveVpd` and `calculateVPD`). Ingest calls
  * `withoutTempRange`, so a stored reading outside that band is unchanged.
  */
 export class VpdFromTempRh {

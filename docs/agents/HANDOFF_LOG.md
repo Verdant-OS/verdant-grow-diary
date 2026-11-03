@@ -69,40 +69,6 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### PLANT-OVERVIEW-TENT-READINGS-COPY
-
-```text
-TASK PLANT-OVERVIEW-TENT-READINGS-COPY  priority: other  status: OPEN
-goal: D2 from spec #2809: the Plant Detail overview's What's Missing prompt says "No plant snapshot. Tent readings are used in AI review." when the plant has no snapshot but its tent has a current reading.
-why: Live audit 2026-11-03 finding 3; the overview contradicted the AI review section.
-branch: claude/plant-overview-tent-readings-copy
-base: verdant-grow-diary
-checkout: git fetch origin claude/plant-overview-tent-readings-copy verdant-grow-diary && git switch claude/plant-overview-tent-readings-copy
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2812
-head_sha: f5bb606681c2b3574a0f4aa752d8929683a26f1c (Grok's merge of the base into the branch; re-read on GitHub before any current-head claim)
-state: ready for review; Grok (verdant-ultra-bot) APPROVED at f5bb606; 35 required checks running there. Matthew: merge when green (2026-11-03).
-current_step: waiting on required CI at f5bb606.
-next_action: when all 35 required contexts pass at the exact head, enqueue squash pinned to that head.
-post_merge_check: after Publish, a plant with no plant snapshot whose tent has a current reading shows "No plant snapshot" on https://verdantgrowdiary.com with the fixture account. NOT_MEASURED until live /version.json reports the merge SHA.
-active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
-decisions: tent read reuses the AI Doctor readiness windows; loading or failed reads keep the plant-diary wording.
-tried_and_rejected: importing aiDoctor modules into the panel (trips the harvest-watch no-AI scan); the read lives in useTentCurrentReadingsPresence.
-commands: bunx vitest run src/test/plant-detail-whats-missing-tent-readings.test.tsx --reporter=dot
-files_touched: src/lib/plantDetailWhatsMissing.ts; src/hooks/useTentCurrentReadingsPresence.ts; src/components/PlantDetailWhatsMissing.tsx; src/pages/PlantDetail.tsx; src/test/plant-detail-whats-missing-tent-readings.test.tsx
-files_remaining: none
-blockers: none
-open_questions: none
-gotchas: this block was first committed on the PR branch (5927065); the base merge at f5bb606 resolved the HANDOFF_LOG conflict to the base side and dropped it, so it is restored here.
-links: docs/specs/ai-doctor-readiness-single-summary.md section 10
-artifacts: none
-reviewer_seat: Grok (verdant-ultra-bot)
-reviewer_sha: f5bb606681c2b3574a0f4aa752d8929683a26f1c APPROVED
-session_state: no production access
-claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
-owner: Claude
-last_updated: 2026-11-03, by Claude
-```
-
 ### QUICK-LOG-WATER-VOLUME-UNITS-SPEC
 
 ```text
@@ -1411,6 +1377,41 @@ last_updated: 2026-10-29 18:40 UTC, by Claude (pr link and ready state recorded)
 
 ## Closed
 
+### PLANT-OVERVIEW-TENT-READINGS-COPY
+
+```text
+TASK PLANT-OVERVIEW-TENT-READINGS-COPY  priority: other  status: CLOSED
+goal: D2 from spec #2809: the Plant Detail overview's What's Missing prompt says "No plant snapshot. Tent readings are used in AI review." when the plant has no snapshot but its tent has a current reading.
+why: Live audit 2026-11-03 finding 3; the overview contradicted the AI review section.
+branch: claude/plant-overview-tent-readings-copy
+base: verdant-grow-diary
+checkout: None; closed (merged). Historical branch: claude/plant-overview-tent-readings-copy
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2812 (merged)
+head_sha: 69a8cbf1f5eb6eaede7d2b7cb33baf750146e282 (final PR head; Bugbot fix keyed tent readings by tent)
+state: CLOSED (merged). Squash-merged through the merge queue on 2026-11-03 at 21:51 UTC; all 35 required checks passed at the final head.
+current_step: none; closed
+next_action: None; closed. post_merge_check below stays with this owner; a live failure reopens it.
+post_merge_check: after Publish, a plant with no plant snapshot whose tent has a current reading shows "No plant snapshot" on https://verdantgrowdiary.com with the fixture account. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: none; branch retired after merge
+decisions: tent read reuses the AI Doctor readiness windows; loading or failed reads keep the plant-diary wording.
+tried_and_rejected: importing aiDoctor modules into the panel (trips the harvest-watch no-AI scan); the read lives in useTentCurrentReadingsPresence.
+commands: bunx vitest run src/test/plant-detail-whats-missing-tent-readings.test.tsx --reporter=dot
+files_touched: src/lib/plantDetailWhatsMissing.ts; src/hooks/useTentCurrentReadingsPresence.ts; src/components/PlantDetailWhatsMissing.tsx; src/pages/PlantDetail.tsx; src/test/plant-detail-whats-missing-tent-readings.test.tsx; src/test/plant-detail-whats-missing-tent-switch.test.tsx
+files_remaining: none
+blockers: none
+open_questions: none
+gotchas: the base merge at f5bb606 resolved the HANDOFF_LOG conflict to the base side and dropped this block; it was restored in #2813.
+links: docs/specs/ai-doctor-readiness-single-summary.md section 10
+artifacts: none
+reviewer_seat: Grok (verdant-ultra-bot)
+reviewer_sha: 69a8cbf1f5eb6eaede7d2b7cb33baf750146e282, APPROVE by verdant-ultra-bot (Grok); earlier approvals at 5927065 and f5bb606 were dismissed by later pushes
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03, by Claude
+closure: merged through the merge queue (squash) on 2026-11-03
+```
+
 ### AI-DOCTOR-READINESS-SUMMARY-IMPL
 
 ```text
@@ -1421,7 +1422,7 @@ branch: claude/ai-doctor-readiness-summary (Matthew chose a separate branch, 202
 base: verdant-grow-diary
 checkout: git fetch origin claude/ai-doctor-readiness-summary verdant-grow-diary && git switch claude/ai-doctor-readiness-summary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2810 (merged)
-head_sha: round-1 commit acb836e3bdc136586aca11543209283c93518701; this block's commit follows it, so read the current head on GitHub
+head_sha: 89f4952fa36542b15bd397d718023a25308d636a (final PR head)
 state: CLOSED (merged). #2810 squash-merged through the merge queue as 7ca284b9490cb5a6c30a7cc356b967eb62d4f58a on 2026-11-03 at 20:44 UTC.
 current_step: none; closed
 next_action: None; closed. post_merge_check below stays with this owner; a live failure reopens it.
@@ -1438,7 +1439,7 @@ gotchas: the pre-commit full-project tsc runs out of memory at the default heap;
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2809
 artifacts: none
 reviewer_seat: Grok (verdant-ultra-bot), independent of this Claude session
-reviewer_sha: see PR #2810 review record (approval at the final head before merge)
+reviewer_sha: 89f4952fa36542b15bd397d718023a25308d636a, APPROVE by verdant-ultra-bot (Grok) 2026-11-03 20:38 UTC (an earlier approval at c3a0ae2 was dismissed by the next push)
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 closure: merged as 7ca284b9490cb5a6c30a7cc356b967eb62d4f58a (#2810)

@@ -68,8 +68,10 @@ must convert by hand today, which invites typos that the 10,000 ml warning will 
   "Saves as … ml." line under R6, and the label reads `Runoff (gal)` / `Runoff (L)` / `Runoff (ml)`.
 - **R10. Labelled data stays labelled.** The unit control is an explicit, visible choice. No unit
   is inferred from the number typed. Invalid text is never coerced to a valid volume.
-- **R11. Draft and retry.** A draft or retry keeps both the typed text and its entry unit, so
-  restoring a draft never reinterprets "1" typed in gallons as 1 ml.
+- **R11. Draft and retry.** A pending-save recovery or retry is rebuilt from the frozen canonical
+  payload, so it keeps the stored ml amount exactly and shows it in the current entry unit
+  (3,785 ml shows as `1` gal). The original typed text is not restored, and a gallon entry is never
+  reinterpreted as ml. Retries stay bound to the canonical payload; no display metadata is stored.
 - **R12. Copy is data.** Labels, the "Saves as" line and messages live in a constants module with
   exact-string tests, per repo convention.
 
@@ -139,7 +141,8 @@ Component and payload (`src/test/quick-log-water-volume-units-ui.test.tsx`):
     `3.5 gal` or the unit to `L`.
 11. Prefill of 1,893 ml shown as `0.5 gal`; saving unedited sends `volume_ml: 1893`; editing to `0.5`
     by hand sends `1893` too, and editing to `0.6` sends `2271`.
-12. Draft restore keeps `volumeEntryUnit` and text (a gallon draft never restores as ml).
+12. A restored record keeps its stored ml and shows it in the current unit: 3,785 ml shows `1` gal
+    and saves `volume_ml: 3785`.
 13. Existing water-volume suites stay green unchanged: `quick-log-water-volume-text-bound`,
     `-save-parser-parity`, `-warning`, `-warning-ui`, `-warning-boundaries`. Any pin renegotiation
     is declared in the PR with `scripts/scorer-lock.mjs`.
@@ -157,12 +160,16 @@ Each new test must be shown failing before the change (RED count in the PR body)
 
 - New: `src/lib/quickLogWaterVolumeUnitRules.ts`, `src/constants/quickLogWaterVolumeUnitCopy.ts`,
   the two test files above.
-- Edit: `src/lib/quickLogWateringFormViewModel.ts` (state fields, empty state),
-  `src/components/QuickLogWateringForm.tsx` (unit control, "Saves as" lines, preset switch to ml, runoff),
-  `src/lib/quickLogWateringFormViewModel.ts` runoff parse (convert runoff text before its bound),
+- Edit: `src/lib/quickLogWateringFormViewModel.ts` (optional entry-unit fields; choosing a unit
+  alone leaves the form pristine),
+  `src/components/QuickLogWateringForm.tsx` (unit control, "Saves as" lines, runoff; presets are
+  ml amounts, so only an ml entry shows one selected and a tap stores canonical ml with no typed
+  text; the remembered unit updates on every choice so a form reset keeps it),
   new `src/lib/waterVolumeEntryUnitPreference.ts` (R13 storage, modelled on `temperatureUnitPreference.ts`),
-  `src/components/QuickLogV2Sheet.tsx` (pass entry unit to the warning label only),
-  `src/lib/wateringVolumeDefaultsViewModel.ts` (R8 prefill).
+  `src/components/QuickLogV2Sheet.tsx` (the last-watering prefill sets `volumeMl` and clears
+  `volumeEntryText` together, so a cleared field never sits over a saveable hidden value).
+  The form keeps `volumeMl` and `runoffMl` canonical on every keystroke, so the payload builders,
+  the review model and `wateringVolumeDefaultsViewModel.ts` need no change.
 - Untouched: both payload builders' ml logic, the RPC, `quickLogWaterVolumeWarningRules.ts` gates,
   migrations, Edge functions, Timeline readback.
 

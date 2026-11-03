@@ -79,10 +79,10 @@ branch: cursor/photo-viewer-caption-tiles-1ba3
 base: verdant-grow-diary
 checkout: git fetch origin cursor/photo-viewer-caption-tiles-1ba3 verdant-grow-diary && git switch cursor/photo-viewer-caption-tiles-1ba3
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2805
-head_sha: 410407c055349e67857bb57334d4dcfce6aef2d7
-state: pushed; CI not yet read
-current_step: caption class, tile buttons, and plant-page lightbox wiring
-next_action: confirm required CI at the head. Do not merge, enqueue, or request review.
+head_sha: 71024e9d10201391d3143617911b3644b280916c
+state: pushed; required CI re-running after the null-safe plant photo wiring
+current_step: caption class, tile buttons, plant lightbox, and null-safe hero open
+next_action: confirm required CI at the pushed head. Do not merge, enqueue, or request review.
 post_merge_check: after Publish, open a photo from a plant Recent Photos tile and confirm the viewer caption is the note or a local time, never a raw ISO. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Grok cloud agent on this branch
 decisions: TimelinePhotoLightboxCaption.fromItem is the only caption path. Tiles are buttons. Focus returns to the opener when the viewer unmounts. Alt text still includes the raw entry instant because src/test/timeline-photo-lightbox-rules.test.ts is scorer-locked and pins that string.
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: no production writes; auto-merge off
 claimed_by: Grok, 2026-11-03
 owner: Grok
-last_updated: 2026-11-02 22:55 CT, by Grok
+last_updated: 2026-11-02 23:20 CT, by Grok
 ```
 
 ### POSTHOG-PUBLIC-CLIENT-KEY

@@ -13,7 +13,6 @@ import type { QuickLogMaturityEvidenceFormState } from "./quickLogMaturityEviden
 import { buildManualSensorProvenance } from "./manualSensorProvenanceRules";
 import { withQuickLogNoteMarker } from "./quickLogActivityRules";
 import { assessWaterVolumeText } from "./quickLogWaterVolumeWarningRules";
-import { tempFFromC } from "./temperatureUnits";
 
 export interface QuickLogV2SavePayload {
   p_target_type: "tent" | "plant";
@@ -65,57 +64,6 @@ export interface BuildQuickLogV2PayloadInput {
 
 export type BuildResult =
   { ok: true; payload: QuickLogV2SavePayload } | { ok: false; reason: string };
-
-function climateSnapshotDetails(
-  temperatureC: number | null,
-  humidityPct: number | null,
-  vpdKpa: number | null,
-): Record<string, unknown> | null {
-  if (temperatureC === null && humidityPct === null && vpdKpa === null) return null;
-  const sensor: Record<string, unknown> = { source: "manual" };
-  const manual: Record<string, unknown> = { source: "manual" };
-  if (temperatureC !== null) {
-    sensor.temp = temperatureC;
-    sensor.temp_c = temperatureC;
-    const tempF = tempFFromC(temperatureC);
-    if (tempF !== null) manual.temp_f = tempF;
-  }
-  if (humidityPct !== null) {
-    sensor.rh = humidityPct;
-    manual.humidity_percent = humidityPct;
-  }
-  if (vpdKpa !== null) sensor.vpd = vpdKpa;
-  return {
-    sensor_snapshot: sensor,
-    ...(Object.keys(manual).length > 1 ? { manual_sensor_snapshot: manual } : {}),
-  };
-}
-
-function isDetailsRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-function mergeClimateOntoDetails(
-  details: Record<string, unknown> | null | undefined,
-  climate: Record<string, unknown> | null,
-): Record<string, unknown> | null | undefined {
-  if (!climate) return details;
-  const base = { ...(details ?? {}) };
-  const existingSensor = isDetailsRecord(base.sensor_snapshot) ? base.sensor_snapshot : {};
-  const existingManual = isDetailsRecord(base.manual_sensor_snapshot)
-    ? base.manual_sensor_snapshot
-    : {};
-  const manualClimate = climate.manual_sensor_snapshot;
-  const manual = isDetailsRecord(manualClimate)
-    ? { ...existingManual, ...manualClimate }
-    : existingManual;
-  return {
-    ...base,
-    manual_provenance: buildManualSensorProvenance(),
-    sensor_snapshot: { ...existingSensor, ...(climate.sensor_snapshot as Record<string, unknown>) },
-    ...(Object.keys(manual).length > 0 ? { manual_sensor_snapshot: manual } : {}),
-  };
-}
 
 function parseOptionalNumber(raw: string): number | null | "invalid" {
   const trimmed = raw?.trim?.() ?? "";
@@ -196,11 +144,12 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
     return { ok: false, reason: "empty_content" };
   }
 
-  // The RPC also writes an environment sibling. The diary mirror is what
-  // Timeline classification, Recent quick logs, and the tent Sensor Snapshot
-  // card read, so the same numbers have to live on the companion.
-  const climate = climateSnapshotDetails(t, h, v);
-  const measuredDetails = mergeClimateOntoDetails(input.details, climate);
+  // Metadata belongs to the existing diary companion. Do not duplicate the
+  // measurements: the RPC already creates their environment event sibling.
+  const measuredDetails =
+    t !== null || h !== null || v !== null
+      ? { ...input.details, manual_provenance: buildManualSensorProvenance() }
+      : input.details;
   // A new note carries the note marker so saved entries can tell it from an
   // issue. Legacy environment-check envelopes keep their own identity.
   const details =

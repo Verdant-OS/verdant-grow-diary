@@ -45,8 +45,6 @@ describe("quickLogV2SavePayload", () => {
         transport: "manual",
         confidence: null,
       },
-      sensor_snapshot: { source: "manual", temp: 25, temp_c: 25 },
-      manual_sensor_snapshot: { source: "manual", temp_f: 77 },
     });
     expect(details).toEqual({ event_type: "note", plant_id: "p1", tags: ["inspection"] });
     expect(result.payload.p_idempotency_key).toBe("quicklog-v2-test-key-0001");
@@ -96,8 +94,6 @@ describe("quickLogV2SavePayload", () => {
         transport: "manual",
         confidence: null,
       },
-      sensor_snapshot: { source: "manual", rh: 0 },
-      manual_sensor_snapshot: { source: "manual", humidity_percent: 0 },
     });
     expect(details).toEqual({ manual_provenance: { source: "live", confidence: 1 } });
   });
@@ -128,7 +124,6 @@ describe("quickLogV2SavePayload", () => {
         transport: "manual",
         confidence: null,
       },
-      sensor_snapshot: { source: "manual", vpd: 1.1 },
     });
   });
 
@@ -144,8 +139,6 @@ describe("quickLogV2SavePayload", () => {
         transport: "manual",
         confidence: null,
       },
-      sensor_snapshot: { source: "manual", rh: 55 },
-      manual_sensor_snapshot: { source: "manual", humidity_percent: 55 },
     });
   });
 
@@ -161,8 +154,6 @@ describe("quickLogV2SavePayload", () => {
         transport: "manual",
         confidence: null,
       },
-      sensor_snapshot: { source: "manual", temp: 24.5, temp_c: 24.5 },
-      manual_sensor_snapshot: { source: "manual", temp_f: 76.1 },
     });
   });
 

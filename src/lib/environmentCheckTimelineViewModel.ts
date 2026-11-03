@@ -122,8 +122,9 @@ export function resolveEffectiveQuickLogCareType(
 
   // A new note carries the note marker. Its unstamped mirror still says
   // event_type "quick_log", so the marker is read before that wrapper type.
-  // A note that also saved a sensor snapshot is a Measurement: the marker
-  // stays for the Notes filter, and the badge follows the reading.
+  // Timeline attaches the environment sibling onto this display row. A note
+  // that then carries a reading is a Measurement. The persisted companion
+  // does not copy that sibling.
   if (!hasEnvironmentEnvelope && hasQuickLogNoteMarker(details)) {
     return snapshotDetailsHaveReading(details) ? "measurement" : "note";
   }

@@ -42,7 +42,7 @@ function formatCapturedAt(iso: string | null): string {
   }
 }
 
-function badgeClass(truth: EcowittTentSnapshotV0MetricView["truthSource"]): string {
+function badgeClass(truth: EcowittTentSnapshotV0MetricView["truthSource"] | "mixed"): string {
   switch (truth) {
     case "live":
       return "border-primary/40 text-foreground";
@@ -54,10 +54,13 @@ function badgeClass(truth: EcowittTentSnapshotV0MetricView["truthSource"]): stri
       return "border-amber-500/40 text-amber-700 dark:text-amber-300";
     case "manual":
     case "csv":
-      return "border-border text-muted-foreground";
+    case "mixed":
     case "none":
-    default:
       return "border-border text-muted-foreground";
+    default: {
+      const unreachable: never = truth;
+      return unreachable;
+    }
   }
 }
 

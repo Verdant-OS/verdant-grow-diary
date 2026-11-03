@@ -51,7 +51,7 @@ export interface EcowittTentSnapshotV0ViewModel {
   hasAnyReading: boolean;
   bridgeQuiet: boolean;
   quietMessage: string | null;
-  overallTruthSource: EcowittTentSnapshotV0TruthSource | "none";
+  overallTruthSource: EcowittTentSnapshotV0TruthSource | "mixed" | "none";
   overallBadgeLabel: string;
   latestCapturedAt: string | null;
   metrics: EcowittTentSnapshotV0MetricView[];
@@ -224,7 +224,7 @@ function buildSparkline(
 function overallTruth(
   metrics: EcowittTentSnapshotV0MetricView[],
   bridgeQuiet: boolean,
-): EcowittTentSnapshotV0TruthSource | "none" {
+): EcowittTentSnapshotV0TruthSource | "mixed" | "none" {
   if (bridgeQuiet) return "none";
   const truths = metrics
     .map((m) => m.truthSource)
@@ -234,6 +234,7 @@ function overallTruth(
   if (truths.some((t) => t === "demo")) return "demo";
   if (truths.some((t) => t === "stale")) return "stale";
   if (truths.every((t) => t === "live")) return "live";
+  if (truths.some((t) => t === "live") && truths.some((t) => t === "manual")) return "mixed";
   if (truths.some((t) => t === "manual")) return "manual";
   if (truths.some((t) => t === "csv")) return "csv";
   return truths[0] ?? "none";

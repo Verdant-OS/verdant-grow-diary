@@ -56,18 +56,10 @@ describe("canonical manual provenance across entry paths", () => {
     });
   });
 
-  it("persists the same metadata on Quick Log Note and the diary snapshot", () => {
+  it("persists the same metadata on Quick Log Note without a second snapshot", () => {
     const payload = quickLog();
     expect(payload.p_details?.manual_provenance).toEqual(CANONICAL);
-    expect(payload.p_details?.manual_sensor_snapshot).toMatchObject({
-      source: "manual",
-      temp_f: 77,
-    });
-    expect(payload.p_details?.sensor_snapshot).toMatchObject({
-      source: "manual",
-      temp: 25,
-      temp_c: 25,
-    });
+    expect(payload.p_details).not.toHaveProperty("manual_sensor_snapshot");
     expect(payload.p_temperature_c).toBe(25);
   });
 

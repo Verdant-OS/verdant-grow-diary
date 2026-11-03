@@ -954,7 +954,11 @@ export function mapCultivarDatabaseSnapshot(
       slug !== undefined ? findCultivarBySlug(slug)?.verificationStatus : undefined;
     const verificationStatus = read.oneOf(
       "verification_status",
-      bundledStatus && bundledStatus !== "sample" ? [bundledStatus] : VERIFICATION_STATUSES,
+      bundledStatus === undefined
+        ? (["sample", "reviewed", "verified"] as const)
+        : bundledStatus === "sample"
+          ? VERIFICATION_STATUSES
+          : [bundledStatus],
     );
     const dataOriginRaw = read.oneOf("data_origin", Object.keys(DATA_ORIGINS));
     const lastVerifiedAt = read.timestamp("last_verified_at");
@@ -1299,8 +1303,8 @@ export function mapCultivarDatabaseSnapshot(
       terpeneClaims: claims.terpeneClaims,
       cannabinoidClaims: claims.cannabinoidClaims,
       publicationStatus,
-      verificationStatus,
-      dataOrigin: DATA_ORIGINS[dataOriginRaw],
+      verificationStatus: difficultyRaw == null ? "sample" : verificationStatus,
+      dataOrigin: difficultyRaw == null ? "sample" : DATA_ORIGINS[dataOriginRaw],
       lastVerifiedAt,
       guideVersion,
       contentSchemaVersion,
@@ -1316,6 +1320,13 @@ export function mapCultivarDatabaseSnapshot(
       dek: typeof row.dek === "string" ? row.dek : null,
       metaDescription: typeof row.meta_description === "string" ? row.meta_description : null,
     });
+    if (difficultyRaw == null) {
+      issues.push({
+        slug,
+        path: "cultivars.difficulty",
+        message: "null difficulty is unverified; the profile stays sample and noindex",
+      });
+    }
     sectionsBySlug[slug] = sections;
     sourcesBySlug[slug] = profileSources.map((item) => item.source);
     aliasRecordsBySlug[slug] = aliasRecords.map(({ alias, normalizedAlias, sourceKey }) => ({

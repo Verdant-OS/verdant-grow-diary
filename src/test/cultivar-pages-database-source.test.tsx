@@ -54,9 +54,17 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
+import {
+  createMemoryHistory,
+  createRootRouteWithContext,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router";
 import CultivarPage from "@/pages/CultivarPage";
 import CultivarsIndex from "@/pages/CultivarsIndex";
 import { resetPublishedCultivarSnapshotCache } from "@/hooks/usePublishedCultivars";
+import { Route as CultivarSlugRoute } from "@/routes/cultivars.$slug";
+import type { RootRouteContext } from "@/routes/__root";
 
 function seedDatabase(mutate?: (tables: Record<string, Record<string, unknown>[]>) => void) {
   const snapshot = structuredClone(
@@ -185,6 +193,17 @@ describe("cultivar pages — database source", () => {
   it("shows a noindex not-found page for an unknown slug in database mode", async () => {
     renderDetail("not-a-real-cultivar");
     await waitFor(() => expect(screen.getByTestId("cultivar-not-found")).toBeInTheDocument());
+    expect(screen.getByRole("heading", { name: "Cultivar not found" })).toBeInTheDocument();
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe(
+      "noindex, follow",
+    );
+    expect(document.querySelector('link[rel="canonical"]')).toBeNull();
+    expect(document.querySelector('meta[property="og:url"]')).toBeNull();
+    expect(screen.getByRole("link", { name: /strain reference library/i })).toHaveAttribute(
+      "href",
+      "/cultivars",
+    );
+    expect(await cultivarRouteStatus("/cultivars/not-a-real-cultivar")).toBe(404);
   });
 
   it("keeps index filtering, alias search, and punctuation normalization on database rows", async () => {
@@ -221,3 +240,22 @@ describe("cultivar pages — release flag off (default)", () => {
     expect(db.calls).toEqual([]);
   });
 });
+
+async function cultivarRouteStatus(path: string): Promise<number> {
+  const rootRoute = createRootRouteWithContext<RootRouteContext>()({ component: () => null });
+  const slugRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/cultivars/$slug",
+    loader: CultivarSlugRoute.options.loader,
+    notFoundComponent: CultivarSlugRoute.options.notFoundComponent,
+    component: () => null,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([slugRoute]),
+    context: { queryClient: new QueryClient() },
+    history: createMemoryHistory({ initialEntries: [path] }),
+    isServer: true,
+  });
+  await router.load();
+  return (await import("@tanstack/react-router/ssr/server")).getSsrStatus(router);
+}

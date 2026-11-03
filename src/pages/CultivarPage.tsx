@@ -45,6 +45,21 @@ function formatDate(value: string): string {
     : "Not recorded";
 }
 
+export function CultivarNotFound({ slug }: { slug?: string }) {
+  return (
+    <main data-testid="cultivar-not-found" className="min-h-screen bg-background px-4 py-16">
+      <h1 className="font-display text-3xl font-bold">Cultivar not found</h1>
+      <p className="mt-3 max-w-xl text-sm text-muted-foreground">
+        {slug ? `"${slug}" is not in the strain reference library.` : "No cultivar was requested."}{" "}
+        This page is not indexed.
+      </p>
+      <Link to="/cultivars" className="mt-6 inline-flex text-sm font-semibold text-primary">
+        Back to the strain reference library
+      </Link>
+    </main>
+  );
+}
+
 export default function CultivarPage() {
   const { slug } = useParams<{ slug: string }>();
   // V1.1: bundled library unless the default-off database read flag is on;
@@ -59,7 +74,6 @@ export default function CultivarPage() {
     ? buildCultivarSummaryRows(cultivar, formatDate(cultivar.lastVerifiedAt))
     : [];
   const faqItems = cultivar ? buildCultivarFaqItems(cultivar) : [];
-  const missingSlug = slug && !cultivar ? slug : undefined;
 
   usePageSeo({
     title: cultivar
@@ -69,8 +83,9 @@ export default function CultivarPage() {
       ? (cultivar.metaDescription ??
         `${cultivar.name} grow guide: lineage (${cultivar.lineage}), ${cultivar.flowerWeeks} flower, environment ranges by stage, and common issues home growers report.`)
       : "This cultivar reference is not in the library.",
-    path: cultivar ? `/cultivars/${cultivar.slug}` : `/cultivars/${missingSlug ?? "not-found"}`,
+    path: cultivar ? `/cultivars/${cultivar.slug}` : "/cultivars",
     noindex: cultivar ? !cultivarVerificationIsSearchIndexable(cultivar.verificationStatus) : true,
+    omitCanonical: !cultivar,
   });
 
   useEffect(() => {
@@ -126,20 +141,7 @@ export default function CultivarPage() {
   }, [cultivar, faqItems]);
 
   if (!cultivar) {
-    return (
-      <main data-testid="cultivar-not-found" className="min-h-screen bg-background px-4 py-16">
-        <h1 className="font-display text-3xl font-bold">Cultivar not found</h1>
-        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
-          {slug
-            ? `"${slug}" is not in the strain reference library.`
-            : "No cultivar was requested."}{" "}
-          This page is not indexed.
-        </p>
-        <Link to="/cultivars" className="mt-6 inline-flex text-sm font-semibold text-primary">
-          Back to the strain reference library
-        </Link>
-      </main>
-    );
+    return <CultivarNotFound slug={slug} />;
   }
 
   const diaryCta =

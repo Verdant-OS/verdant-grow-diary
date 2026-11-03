@@ -45,6 +45,11 @@ export interface PageSeo {
   ogType?: "website" | "article";
   /** When true, emit <meta name="robots" content="noindex, follow">. */
   noindex?: boolean;
+  /**
+   * Not-found pages must not mint a canonical or og:url for an arbitrary slug.
+   * When true, this hook writes neither tag.
+   */
+  omitCanonical?: boolean;
 }
 
 function upsertMeta(selector: string, attr: "name" | "property", key: string, content: string) {
@@ -86,6 +91,7 @@ export function usePageSeo(seo: PageSeo): void {
     ogImage,
     ogType = "website",
     noindex = false,
+    omitCanonical = false,
   } = seo;
   const routeImageRef = useRef<{ path: string; image: string | null } | null>(null);
 
@@ -114,7 +120,13 @@ export function usePageSeo(seo: PageSeo): void {
 
     document.title = title;
     upsertMeta('meta[name="description"]', "name", "description", description);
-    upsertLink("canonical", url);
+    if (omitCanonical) {
+      const canonical = document.head.querySelector('link[rel="canonical"]');
+      if (canonical?.hasAttribute(OWNED_ATTR)) canonical.remove();
+      document.head.querySelector('meta[property="og:url"]')?.remove();
+    } else {
+      upsertLink("canonical", url);
+    }
     upsertMeta(
       'meta[name="robots"]',
       "name",
@@ -124,7 +136,9 @@ export function usePageSeo(seo: PageSeo): void {
 
     upsertMeta('meta[property="og:title"]', "property", "og:title", title);
     upsertMeta('meta[property="og:description"]', "property", "og:description", description);
-    upsertMeta('meta[property="og:url"]', "property", "og:url", url);
+    if (!omitCanonical) {
+      upsertMeta('meta[property="og:url"]', "property", "og:url", url);
+    }
     upsertMeta('meta[property="og:image"]', "property", "og:image", resolvedOgImage);
     upsertMeta('meta[property="og:site_name"]', "property", "og:site_name", SITE_NAME);
     upsertMeta('meta[property="og:type"]', "property", "og:type", ogType);
@@ -169,5 +183,5 @@ export function usePageSeo(seo: PageSeo): void {
       upsertMeta('meta[name="twitter:image"]', "name", "twitter:image", DEFAULT_OG_IMAGE);
       void prevTitle;
     };
-  }, [title, description, path, canonicalPath, ogImage, ogType, noindex]);
+  }, [title, description, path, canonicalPath, ogImage, ogType, noindex, omitCanonical]);
 }

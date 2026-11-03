@@ -28,7 +28,7 @@ export class CultivarVerifiedProfileRules {
   static diaryCta(cultivar: VerdantCultivarProfile): { label: string; href: string } {
     return {
       label: `Start your ${cultivar.name} diary`,
-      href: `https://verdantgrowdiary.com/auth?mode=signup&utm_source=organic_guide&utm_medium=owned&utm_campaign=search_to_first_value&utm_content=cultivar-${cultivar.slug}`,
+      href: `/auth?mode=signup&utm_source=organic_guide&utm_medium=owned&utm_campaign=search_to_first_value&utm_content=cultivar-${cultivar.slug}`,
     };
   }
 }

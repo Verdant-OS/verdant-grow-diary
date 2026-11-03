@@ -81,11 +81,11 @@ checkout: git fetch origin claude/retire-pr2702-stripe-edge-path verdant-grow-di
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2811 (draft)
 head_sha: f93b4c5247792eeb5cc7549a4ea82d90c82f4f65 is the removal commit (pushed 2026-11-03 ~19:30 UTC, base ac10d68ef281b2b9e01d77dea17da63869a0a6a1); the commit carrying this block follows it
 state: pushed draft
-current_step: draft PR open; waiting for required checks
-next_action: read the 35 required checks at the current head of #2811; when 35/35 green, request one independent exact-head review from an eligible non-contributing seat
+current_step: taken over 2026-11-03 by Claude session_017UoYKvcvohNxhmW342Lieo at Matthew's instruction ("yes, take over #2811"); merged origin/verdant-grow-diary to clear the HANDOFF_LOG.md conflict that made the PR dirty and skipped 33 of 35 required checks at d2fa70e84efda27e7fc0c0698da34535b6377902
+next_action: read the 35 required checks at the current head of #2811; when 35/35 green, request one independent exact-head review from an eligible seat that is neither session_017UoYKxCwUMi8bpS1ph7KLn nor session_017UoYKvcvohNxhmW342Lieo
 post_merge_check: on the merged deploy tip, `git ls-tree -r --name-only origin/verdant-grow-diary | grep -cE "create-checkout-session|stripe-webhook/|20261101180000|stripeWebhook|stripeCheckoutSession|stripeTestModeCatalog"` returns 0, and `node scripts/sync-edge-shared.mjs --check` passes
-active_writer: Claude session_017UoYKxCwUMi8bpS1ph7KLn
-decisions: migration 20261101180000 file and its scripts/required-money-migrations.mjs filename-firewall entry are KEPT byte-identical: AGENTS.md section 5 makes merged migrations permanent and forbids deleting or no-oping them; it stays unapplied and must never be applied (its CHECK conflicts with the live Lovable row shape). Remove the rest whole, not partially: no other source file imports these modules (git grep on ac10d68e); Lovable restore at lovable-sync-1793724974 f0680d3d imports none of them. Keep src/test/core-link-form-census-rules.test.ts unchanged: it classifies the edge-function NAME create-checkout-session as mutating, which stays true and is not part of #2702. 
+active_writer: Claude session_017UoYKvcvohNxhmW342Lieo (took over from session_017UoYKxCwUMi8bpS1ph7KLn, which stops pushing)
+decisions: migration 20261101180000 file and its scripts/required-money-migrations.mjs filename-firewall entry are KEPT byte-identical: AGENTS.md section 5 makes merged migrations permanent and forbids deleting or no-oping them; it stays unapplied and must never be applied (its CHECK conflicts with the live Lovable row shape). Remove the rest whole, not partially: no other source file imports these modules (git grep on ac10d68e); Lovable restore at lovable-sync-1793724974 f0680d3d imports none of them. Keep src/test/core-link-form-census-rules.test.ts unchanged: it classifies the edge-function NAME create-checkout-session as mutating, which stays true and is not part of #2702.
 tried_and_rejected: none
 commands: node scripts/sync-edge-shared.mjs --check; NODE_OPTIONS=--max-old-space-size=4096 bun run typecheck; bunx vitest run <tests referencing stripe|supabase/migrations|supabase/functions|.github/workflows|.env.example>
 files_touched: 27 files deleted (migration file restored in the follow-up commit); .env.example; supabase/config.toml; supabase/functions/_shared/lib/.sync-manifest.json
@@ -97,10 +97,44 @@ links: https://github.com/Verdant-OS/verdant-grow-diary/pull/new/claude/retire-p
 artifacts: none beyond the branch
 reviewer_seat: NOT_MEASURED (eligible non-contributing reviewer per OWNERSHIP.md 4.3)
 reviewer_sha: none
-session_state: Claude session_017UoYKxCwUMi8bpS1ph7KLn; no paused workflows
-claimed_by: Claude session_017UoYKxCwUMi8bpS1ph7KLn, 2026-11-03 13:35 CT
-owner: Claude session_017UoYKxCwUMi8bpS1ph7KLn
-last_updated: 2026-11-03 13:35 CT, by Claude
+session_state: Claude session_017UoYKvcvohNxhmW342Lieo holds the branch; previous holder session_017UoYKxCwUMi8bpS1ph7KLn; both are contributors and ineligible for independent acceptance; no paused workflows
+claimed_by: Claude session_017UoYKvcvohNxhmW342Lieo, 2026-11-03 (takeover)
+owner: Claude session_017UoYKvcvohNxhmW342Lieo
+last_updated: 2026-11-03, by Claude session_017UoYKvcvohNxhmW342Lieo (takeover + base merge)
+```
+
+### AI-DOCTOR-READINESS-SUMMARY-IMPL
+
+```text
+TASK AI-DOCTOR-READINESS-SUMMARY-IMPL  priority: other  status: OPEN
+goal: Implement the one-summary AI Doctor readiness card on Plant Detail per docs/specs/ai-doctor-readiness-single-summary.md (spec PR #2809).
+why: Live audit 2026-11-03 finding 3. Plant Detail shows readiness from six rule sets that can disagree.
+branch: claude/ai-doctor-readiness-summary (Matthew chose a separate branch, 2026-11-03)
+base: verdant-grow-diary
+checkout: git fetch origin claude/ai-doctor-readiness-summary verdant-grow-diary && git switch claude/ai-doctor-readiness-summary
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: round-1 commit acb836e3bdc136586aca11543209283c93518701; this block's commit follows it, so read the current head on GitHub
+state: rounds 1, 2a and 2b committed: rules, optional signal props on F/A/C, container section, Plant Detail layout. Draft PR, awaiting CI and independent review.
+current_step: draft PR open; CI running.
+next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ). Signed-in visual check of Plant Detail is NOT_MEASURED (needs fixture credentials).
+post_merge_check: after Publish, open a plant's AI review on https://verdantgrowdiary.com with the fixture account. Exactly one readiness verdict is visible before a review starts. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: D1 keep local preview collapsed; D2 overview copy is a later slice; D3 C stays visible with its pre-start confidence line hidden on Plant Detail.
+tried_and_rejected: hiding C in the disclosure (it owns the Start review control).
+commands: bunx vitest run src/test/ai-doctor-readiness-summary-rules.test.ts --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/lib/aiDoctorReadinessSummaryRules.ts; src/constants/aiDoctorReadinessSummaryCopy.ts; src/components/AiDoctorReadinessSummary.tsx; src/components/PlantDetailAiDoctorReadinessSection.tsx; src/components/PlantDetailAiDoctorReadiness.tsx; src/components/AiDoctorContextReadinessPanel.tsx; src/components/PlantDetailAiDoctorContextReadinessMount.tsx; src/components/PlantDetailAiDoctorLiveReview.tsx; src/pages/PlantDetail.tsx; src/test/ai-doctor-readiness-summary-rules.test.ts; src/test/ai-doctor-readiness-signal-props.test.tsx; src/test/ai-doctor-live-review-readiness-signal.test.tsx; src/test/ai-doctor-readiness-summary-section.test.tsx; src/test/plant-detail-information-architecture.test.ts (3 structure pins renegotiated); docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: none
+gotchas: the pre-commit full-project tsc runs out of memory at the default heap; commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify). Prettier runs on staged .md files.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2809
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 13:40 CT, by Claude
 ```
 
 ### PHOTO-VIEWER-CAPTION-TILES
@@ -174,6 +208,36 @@ last_updated: 2026-11-02 20:40 CT, by Grok
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text
+TASK QUICK-LOG-TARGET-SAVE  priority: P1  status: OPEN
+goal: One draft PR for Quick Log target selection, one save, optional reading time, one time-label class, and correction temperature units.
+why: Issues 2778, 2779, 2780, 2781, and part of 2706. A tent open was resolving to the sole or recent plant, and a successful save left the sheet open.
+branch: cursor/quick-log-target-save-1baf
+base: verdant-grow-diary
+checkout: git fetch origin cursor/quick-log-target-save-1baf verdant-grow-diary && git switch cursor/quick-log-target-save-1baf
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2793 ready
+head_sha: d6b9abb71 is the implementation; 504ecc08c stamps this block; the pin-fix commit is the child of 504ecc08c. Read origin/cursor/quick-log-target-save-1baf for the exact head. This line cannot name that child.
+state: ready PR 2793, no auto-merge
+current_step: three CI pins updated after measured tap counts; required CI recheck follows the pin-fix push
+next_action: keep the PR draft until required checks are green at the exact head and Moonbow routes review
+post_merge_check: bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx
+active_writer: Grok cloud agent on cursor/quick-log-target-save-1baf
+decisions: tent context is never rewritten to a plant; last-used target applies only when the route has no tent or plant; success closes the sheet and names the target in the toast; reading time is sheet state wired to occurredAt; GrowerTimeLabel is the shared formatter; correction temperature displays the grower unit and converts once to Celsius on save
+tried_and_rejected: leaving the sole-plant pins unchanged would keep the bug
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx src/test/quick-log-v2-rules.test.ts src/test/quick-log-route-target-rules.test.ts src/test/mobile-quick-log-single-fab.test.ts src/test/app-shell-mobile-quick-log-routing.test.tsx src/test/quick-log-v2-sheet-watering.test.tsx src/test/quick-log-v2-sheet-feeding.test.tsx src/test/quick-log-v2-refresh-sheet.test.tsx src/test/quick-log-timeline-cta-integration.test.tsx
+files_touched: src/components/AppShell.tsx src/components/QuickLogEntryIntegrityControls.tsx src/components/QuickLogV2Sheet.tsx src/pages/TentDetail.tsx src/lib/quickLogV2Rules.ts src/lib/quickLogRouteTargetRules.ts src/lib/growerTimeLabel.ts src/lib/quickLogReadingTime.ts src/lib/timelineEntryTimestampFormat.ts src/lib/quickLogGroupedTimelineFilterViewModel.ts src/lib/quickLogSnapshotStripAdapter.ts src/lib/wateringCadenceHistoryRules.ts src/lib/growDiaryPdfExport.ts and the renegotiated tests named in the PR
+files_remaining: none for this slice
+blockers: none for repository work. Moonbow routes review and merge. No production write.
+open_questions: none
+gotchas: scorer pins that encoded sole-plant launch and a stay-open sheet were renegotiated in the same change. .claude/scorer-unlock.json is local only.
+links: issues 2778 2779 2780 2781 2706
+artifacts: src/test/quick-log-target-save-reading-time.test.tsx
+reviewer_seat: not requested
+reviewer_sha: none
+session_state: Grok implementation session
+claimed_by: Grok 2026-11-02
+owner: Grok
+last_updated: 2026-11-02 21:36 CT, by Grok
+
 TASK CREATE-DIALOG-DISABLED-REASON  priority: P2  status: OPEN
 goal: disabled primary buttons in New grow, New tent, and New plant state their reason, and each name field has a visible label that is its accessible name.
 why: Issue 3 (FA-F01, FA-F02, FA-F05). Cheeko approved building only (2026-10-31). Create tent and Create plant were disabled with no description, and the name fields were announced as their placeholders.

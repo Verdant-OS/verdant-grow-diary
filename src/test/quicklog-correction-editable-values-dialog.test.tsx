@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   rpc: vi.fn(async () => ({
@@ -35,6 +35,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import QuickLogEntryIntegrityControls from "@/components/QuickLogEntryIntegrityControls";
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 function openDialog(props: Record<string, unknown>) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -51,6 +52,10 @@ function openDialog(props: Record<string, unknown>) {
 }
 
 describe("Correct this Quick Log entry dialog", () => {
+  beforeEach(() => {
+    saveTemperatureUnitPreference("celsius");
+  });
+
   it("shows a volume field for a watering entry and submits the new volume with Wrong value", async () => {
     openDialog({ correctionValues: { kind: "watering", volumeMl: 500 } });
     expect(screen.getByTestId("quicklog-correct-reason-wrong_value")).toBeTruthy();

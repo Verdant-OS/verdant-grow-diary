@@ -33,12 +33,12 @@ export interface CheckoutTrustCopyInput {
 }
 
 export const CHECKOUT_MECHANISM_FAQ_ANSWER =
-  "Verdant currently opens Paddle's sandbox for checkout testing only. Sandbox checkout cannot create a real charge. This page can never charge you or grant access by itself; sandbox entitlements require server-side verification and remain test data, not proof of a paid production plan. Live checkout is intentionally disabled, so outside a successful sandbox test nothing is charged.";
+  "Verdant currently opens Stripe test mode for checkout testing only. Test-mode checkout cannot create a real charge. This page can never charge you or grant access by itself; test entitlements require server-side verification and remain test data, not proof of a paid production plan. Live checkout is intentionally disabled, so outside a successful test nothing is charged.";
 
 const SANDBOX_COPY: CheckoutTrustCopy = Object.freeze({
   state: "sandbox",
-  label: "Paddle sandbox — Test only",
-  summary: "No real charges can be made. This app uses Paddle's sandbox for checkout testing.",
+  label: "Stripe test mode — Test only",
+  summary: "No real charges can be made. This app uses Stripe test mode for checkout testing.",
   faqQuestion: "Is checkout live?",
   faqAnswer: CHECKOUT_MECHANISM_FAQ_ANSWER,
   canCreateLiveCharge: false,
@@ -46,18 +46,18 @@ const SANDBOX_COPY: CheckoutTrustCopy = Object.freeze({
 
 /** Answer shown when live checkout is open on a production hostname. */
 export const LIVE_CHECKOUT_FAQ_ANSWER =
-  "Yes. Checkout runs on Paddle, which processes the payment and shows the full price, tax and renewal terms before you confirm. Paid access starts only after Paddle confirms the payment to Verdant's server.";
+  "Yes. Checkout runs on Stripe, which processes the payment and shows the full price, tax and renewal terms before you confirm. Paid access starts only after Stripe confirms the payment to Verdant's server.";
 
 const LIVE_COPY: CheckoutTrustCopy = Object.freeze({
   state: "live",
-  label: "Secure checkout by Paddle",
-  summary: "Paddle processes your payment. You see the exact price and tax before you pay.",
+  label: "Secure checkout by Stripe",
+  summary: "Stripe processes your payment. You see the exact price and tax before you pay.",
   faqQuestion: "Is checkout live?",
   faqAnswer: LIVE_CHECKOUT_FAQ_ANSWER,
   canCreateLiveCharge: true,
 });
 
-/** Live checkout failed as a whole (for example Paddle.js did not load). */
+/** Live checkout failed as a whole (for example Stripe.js did not load). */
 const LIVE_FAILED_COPY: CheckoutTrustCopy = Object.freeze({
   state: "unavailable",
   label: "Checkout unavailable right now",
@@ -103,7 +103,7 @@ const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
 
 /**
  * Build truthful buyer-facing checkout copy from the same environment decision
- * that gates the Paddle overlay. Unknown values fail closed; a runtime failure
+ * that gates the checkout overlay. Unknown values fail closed; a runtime failure
  * replaces sandbox copy with unavailable copy but never hides that live
  * checkout can still charge.
  */

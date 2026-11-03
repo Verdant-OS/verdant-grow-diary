@@ -722,8 +722,8 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     targetKeyword: "import grow controller csv",
     introHeading: "Quick answer",
     intro:
-      "Yes. Verdant imports the CSV you export from your AC Infinity or Spider Farmer app, free. Open Sensors → Import historical data, pick the file, check the preview and import. Verdant reads the time, temperature, humidity, VPD and CO₂ columns, asks whether temperatures are °F or °C when the header and the values still don't say, and keeps every reading at its original time, labeled as CSV, never as live data.",
-    modifiedOn: "2026-11-03",
+      "Yes. Verdant imports the CSV you export from your AC Infinity or Spider Farmer app, free. Open Sensors → Import historical data, pick the file, check the preview and import. Verdant reads the time, temperature, humidity, VPD and CO₂ columns. The temperature unit comes from the column header. If the header doesn't name it, Verdant asks This is °F or This is °C only when every sampled temperature is from 0 to 45. A sample above 45 is treated as °F with no question. Any other range is treated as °C with no question. Every reading stays at its original time, labeled as CSV, never as live data.",
+    modifiedOn: "2026-11-02",
     howTo: {
       name: "How to import a grow controller CSV",
       steps: [
@@ -776,30 +776,45 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
             ["Date / time", "The reading's original time"],
             ["Temperature", "Air temperature, shown in your saved temperature unit"],
             ["Humidity", "Relative humidity, %"],
-            ["VPD", "VPD, kPa (calculated if missing, see below)"],
-            ["CO₂", "CO₂, ppm"],
+            [
+              "VPD",
+              "0 to 10 kPa kept from the file; otherwise dropped, then calculated from temperature and humidity when both exist. That result is calculated, not measured",
+            ],
+            ["CO₂", "CO₂, ppm. A value outside 0 to 10,000 is dropped and the row is kept"],
+            [
+              "PPFD / PAR",
+              "PPFD from a PPFD, PAR, or photosynthetic column, 0 to 2,500. Outside that range the value is dropped and the row is kept",
+            ],
           ],
         },
         continuations: [
           {
             heading: "Temperatures and °F",
-            body: "Verdant works out the temperature unit from the column header, then from the values. If it still can't tell, it asks you: This is °F or This is °C. Pick the one your app exported. Imported history then shows in the temperature unit saved in your settings.",
+            body: "Verdant reads the temperature unit from the column header. If the header doesn't name it, the prompt (This is °F or This is °C) appears only when every sampled temperature is from 0 to 45. If any sampled value is above 45, Verdant uses °F and does not ask. Otherwise it uses °C and does not ask. Imported history then shows in the temperature unit saved in your settings.",
           },
         ],
       },
       {
         heading: "VPD",
-        body: "If your export has a VPD column, Verdant keeps it. If it doesn't, Verdant calculates VPD from that row's temperature and humidity. Compare the result against the bands on the VPD chart.",
+        body: "A VPD number from 0 to 10 kPa is kept as the value from your file. A missing VPD, a VPD that isn't a number, or a VPD outside 0 to 10 kPa is dropped, and only that value. When that row still has temperature and humidity, Verdant calculates VPD from them. The recalculated VPD is calculated, not measured. Compare it with the bands on the VPD chart.",
         bodyLink: { label: "VPD chart", href: "/vpd-chart" },
         continuations: [
           {
             heading: "Why some rows get skipped",
-            body: "Verdant doesn't quietly fix bad readings. It skips the whole row instead of clamping a value when that value is outside a believable range:",
+            body: "Some values change without a prompt. Humidity above 0 and up to 1 is multiplied by 100. A file VPD outside 0 to 10 kPa is not kept; when the row still has temperature and humidity, Verdant stores a calculated VPD instead, and that VPD is calculated, not measured. PPFD or PAR outside 0 to 2,500 is dropped and the row is kept. CO₂ outside 0 to 10,000 ppm is dropped and the row is kept. The whole row is skipped when temperature, after the unit is applied, is below -40 °C or above 80 °C (that is below -40 °F or above 176 °F when the file is Fahrenheit), or when humidity is below 0 or above 100. A temperature or humidity that isn't a number also skips the row, and so does a missing or unreadable time.",
             bullets: [
-              { text: "temperature below -40 °F or above 176 °F" },
-              { text: "humidity that isn't a valid percentage" },
-              { text: "VPD outside 0 to 10 kPa" },
-              { text: "CO₂ outside 0 to 10,000 ppm" },
+              {
+                text: "Out-of-range temperature (below -40 °C or above 80 °C after the unit is applied) skips the row.",
+              },
+              {
+                text: "Humidity below 0 or above 100 skips the row. Humidity above 0 and up to 1 is multiplied by 100 and the row is kept.",
+              },
+              {
+                text: "An out-of-range file VPD is replaced by the calculated VPD when temperature and humidity are present. That stored VPD is calculated, not measured.",
+              },
+              {
+                text: "Out-of-range PPFD or PAR (outside 0 to 2,500) is dropped and the row is kept.",
+              },
             ],
             closing:
               "The preview shows what will be saved before anything is written. A cluster of skipped rows usually means a sensor dropped out or the wrong unit was picked; re-import and choose the other unit.",
@@ -837,7 +852,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Which CSV files can Verdant import?",
         answer:
-          "CSV exports from AC Infinity and Spider Farmer apps, and other environment CSVs with time plus temperature, humidity, VPD or CO₂ columns. Files can be up to 25 MB.",
+          "CSV exports from AC Infinity and Spider Farmer apps, and other environment CSVs with time plus temperature, humidity, VPD, CO₂, or PPFD/PAR columns. A PPFD, PAR, or photosynthetic header is read as PPFD. Files can be up to 25 MB.",
       },
       {
         question: "Where is CSV import in Verdant?",
@@ -850,7 +865,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Does Verdant convert Celsius to Fahrenheit?",
         answer:
-          "Yes. If the file's unit isn't clear, Verdant asks whether it's °F or °C, then shows imported temperatures in the temperature unit saved in your settings.",
+          "Verdant asks This is °F or This is °C only when the header doesn't name the unit and every sampled temperature is from 0 to 45. A sample above 45 is treated as °F with no question. Any other range is treated as °C with no question. Imported temperatures then show in the temperature unit saved in your settings.",
       },
       {
         question: "Can I import data from more than one controller?",

@@ -547,6 +547,14 @@ export default function GuidePage() {
   );
 }
 
+function citationHostIsExternal(href: string): boolean {
+  try {
+    return new URL(href).hostname !== "verdantgrowdiary.com";
+  } catch {
+    return true;
+  }
+}
+
 function GuideHref({
   href,
   label,
@@ -566,7 +574,7 @@ function GuideHref({
       </Link>
     );
   }
-  const externalCitation = allowCitation && !href.includes("verdantgrowdiary.com");
+  const externalCitation = allowCitation && citationHostIsExternal(href);
   return (
     <a
       href={href}

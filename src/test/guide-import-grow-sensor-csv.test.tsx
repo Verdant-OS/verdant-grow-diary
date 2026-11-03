@@ -92,7 +92,7 @@ describe("/guides/import-grow-sensor-csv", () => {
     ]);
     expect(page["@id"]).toBe(`${CANONICAL}#webpage`);
     expect(page.url).toBe(CANONICAL);
-    expect(page.dateModified).toBe("2026-11-03");
+    expect(page.dateModified).toBe("2026-11-02");
 
     for (const node of [howTo, faq, crumbs, page]) {
       const result = validateJsonLdObject(node, { file: PATH, index: 0, path: "$" });

@@ -59,11 +59,22 @@ export class CultivarSlugRouteRules {
   private static knownSlugs(): Promise<CatalogRead> {
     if (catalogPromise) return catalogPromise;
     let shared: Promise<CatalogRead>;
-    shared = CultivarSlugRouteRules.readKnownSlugs().finally(() => {
-      setTimeout(() => {
+    shared = CultivarSlugRouteRules.readKnownSlugs().then(
+      (read) => {
+        if (!read.ok) {
+          if (catalogPromise === shared) catalogPromise = null;
+          return read;
+        }
+        setTimeout(() => {
+          if (catalogPromise === shared) catalogPromise = null;
+        }, 0);
+        return read;
+      },
+      (error: unknown) => {
         if (catalogPromise === shared) catalogPromise = null;
-      }, 0);
-    });
+        throw error;
+      },
+    );
     catalogPromise = shared;
     return shared;
   }

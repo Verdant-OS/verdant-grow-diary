@@ -64,7 +64,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       commitIngest: async (input) => {
         events.push(`commit:${input.capturedAt}:${input.passkeySha256}`);
         inserted = input.rows;
-        return { ok: true };
+        return { ok: true, stored: input.rows.length, reason: "stored" };
       },
       tentChannels: channels(),
     };
@@ -111,7 +111,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       commitIngest: async () => {
         events.push("commit");
         if (failInsert) return { ok: false, reason: "store_failed" };
-        return { ok: true };
+        return { ok: true, stored: 4, reason: "stored" };
       },
       tentChannels: channels(),
     };
@@ -184,7 +184,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       },
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ accepted: true, stored: 0, reason: "stored" });
+    expect(await response.json()).toEqual({ accepted: false, stored: 0, reason: "duplicate" });
     expect(events).toEqual(["commit", "duplicate"]);
   });
 
@@ -200,7 +200,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         sha256Hex,
         lookupClaim: async () => claim(null),
         entitlement: async () => "allowed",
-        commitIngest: async () => ({ ok: true }),
+        commitIngest: async () => ({ ok: true, stored: 0, reason: "stored" }),
         tentChannels: async () => ({ ok: false }),
       },
     );
@@ -222,7 +222,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       entitlement: async () => "allowed",
       commitIngest: async () => {
         inserts += 1;
-        return { ok: true };
+        return { ok: true, stored: 1, reason: "stored" };
       },
       tentChannels: channels(),
     };

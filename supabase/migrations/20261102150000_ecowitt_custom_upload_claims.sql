@@ -1,6 +1,7 @@
 -- EcoWitt customized-upload claim links for one tent.
--- This file is not applied here. Authenticated owners may read their rows
--- and call the owner RPCs. Gateway ingest writes with the service role.
+-- This file is not applied here. Authenticated owners may read non-secret
+-- columns and call the owner RPCs. token_sha256 and passkey_sha256 stay off
+-- that grant. Gateway ingest writes with the service role.
 -- No anon grants. The raw claim token and the gateway secret are not columns.
 
 CREATE TABLE public.ecowitt_custom_upload_claims (
@@ -55,8 +56,19 @@ CREATE POLICY ecowitt_custom_upload_claims_service_write
   WITH CHECK (user_id IS NOT NULL);
 
 REVOKE ALL ON TABLE public.ecowitt_custom_upload_claims FROM PUBLIC, anon, authenticated, service_role;
-GRANT SELECT ON TABLE public.ecowitt_custom_upload_claims TO authenticated, service_role;
-GRANT INSERT, UPDATE, DELETE ON TABLE public.ecowitt_custom_upload_claims TO service_role;
+GRANT SELECT (
+  id,
+  user_id,
+  tent_id,
+  stationtype,
+  bound_at,
+  interval_seconds,
+  revoked_at,
+  created_at,
+  last_received_at,
+  last_captured_at
+) ON TABLE public.ecowitt_custom_upload_claims TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.ecowitt_custom_upload_claims TO service_role;
 
 CREATE OR REPLACE FUNCTION public.create_ecowitt_custom_upload_claim(p_tent_id uuid)
 RETURNS TABLE (claim_id uuid, upload_token text)
@@ -207,7 +219,6 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.reserve_ecowitt_custom_upload_receipt(uuid, timestamptz, timestamptz)
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.reserve_ecowitt_custom_upload_receipt(uuid, timestamptz, timestamptz) TO service_role;
 
 -- First unbound packet wins. A second passkey does not replace it.
 CREATE OR REPLACE FUNCTION public.bind_ecowitt_custom_upload_claim(
@@ -246,12 +257,12 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.bind_ecowitt_custom_upload_claim(uuid, text, text, timestamptz)
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.bind_ecowitt_custom_upload_claim(uuid, text, text, timestamptz)
-  TO service_role;
 
 -- Recheck, reserve, first-sender bind, and reading insert commit together.
--- A rejection returns before any write. An insert error raises, so the
--- receipt and bind roll back with it.
+-- A rejection returns before any write. An insert error other than a unique
+-- clash raises, so the receipt and bind roll back with it. One metric that
+-- already exists is skipped. If every metric clashes, the function raises
+-- 23505 and the receipt rolls back. A mix returns partial:<stored>.
 CREATE OR REPLACE FUNCTION public.commit_ecowitt_custom_upload_ingest(
   p_claim_id uuid,
   p_received_at timestamptz,
@@ -275,6 +286,8 @@ DECLARE
   v_passkey text;
   v_gap_ms integer;
   v_elem jsonb;
+  v_stored integer := 0;
+  v_submitted integer;
 BEGIN
   IF p_claim_id IS NULL OR p_received_at IS NULL OR p_captured_at IS NULL THEN
     RETURN 'claim_not_found';
@@ -330,6 +343,7 @@ BEGIN
   WHERE id = p_claim_id
     AND revoked_at IS NULL;
 
+  v_submitted := jsonb_array_length(p_readings);
   FOR v_elem IN SELECT value FROM jsonb_array_elements(p_readings)
   LOOP
     IF v_elem->>'metric' NOT IN (
@@ -341,21 +355,34 @@ BEGIN
     IF v_elem->>'quality' NOT IN ('ok', 'degraded', 'stale', 'invalid') THEN
       RAISE EXCEPTION 'invalid sensor quality';
     END IF;
-    INSERT INTO public.sensor_readings (
-      user_id, tent_id, source, metric, value, quality, captured_at, ts, raw_payload
-    ) VALUES (
-      v_user,
-      v_tent,
-      'live',
-      v_elem->>'metric',
-      (v_elem->>'value')::numeric,
-      v_elem->>'quality',
-      p_captured_at,
-      p_captured_at,
-      COALESCE(v_elem->'raw_payload', '{}'::jsonb)
-    );
+    BEGIN
+      INSERT INTO public.sensor_readings (
+        user_id, tent_id, source, metric, value, quality, captured_at, ts, raw_payload
+      ) VALUES (
+        v_user,
+        v_tent,
+        'live',
+        v_elem->>'metric',
+        (v_elem->>'value')::numeric,
+        v_elem->>'quality',
+        p_captured_at,
+        p_captured_at,
+        COALESCE(v_elem->'raw_payload', '{}'::jsonb)
+      );
+      v_stored := v_stored + 1;
+    EXCEPTION
+      WHEN unique_violation THEN
+        NULL;
+    END;
   END LOOP;
 
+  IF v_stored = 0 THEN
+    RAISE EXCEPTION 'sensor reading already stored'
+      USING ERRCODE = '23505';
+  END IF;
+  IF v_stored < v_submitted THEN
+    RETURN 'partial:' || v_stored::text;
+  END IF;
   RETURN 'ok';
 END;
 $function$;

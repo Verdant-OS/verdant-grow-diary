@@ -79,10 +79,10 @@ branch: ultra/2717-ecowitt-live-ingest
 base: verdant-grow-diary
 checkout: git fetch origin ultra/2717-ecowitt-live-ingest verdant-grow-diary && git switch ultra/2717-ecowitt-live-ingest
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2732
-head_sha: read git rev-parse HEAD after the atomic commit push
+head_sha: read git rev-parse HEAD after the raw_payload and partial-store push
 state: pushed, not a draft
-current_step: commit_ecowitt_custom_upload_ingest rechecks the claim, reserves the receipt, binds the first sender, and inserts readings in one transaction. A rejection stores zero rows. An insert error rolls the reserve back and the handler returns 503. A 23505 is reason duplicate and HTTP 200 with zero new rows. Suspect 0% RH is flagged and left out of the mean. Rotate clears the passkey binding.
-next_action: wait for required CI at the new head. Do not merge. Do not apply the migration or deploy the edge function. Cheeko's own-words yes is still required at the final head.
+current_step: planner rows map to raw_payload before commit. A full unique clash raises 23505, rolls the receipt back, and the handler returns stored 0 reason duplicate. A mixed clash stores the other metrics and returns partial. Owner SELECT cannot read token or passkey hashes. Reserve and bind have no service_role EXECUTE. pgTAP installs validate_sensor_reading.
+next_action: wait for required CI at the new head. Do not merge. Do not apply the migration or deploy the edge function. Cheeko's own-words yes must name supabase/functions/ecowitt-ingest/index.ts and handler_e2e_test.ts at the final head.
 post_merge_check: after a separate authorized apply and Publish, a GW1200B POST stores the tent's configured air channel, not the gateway indoor sensor. NOT_MEASURED until then.
 active_writer: Grok cloud session assigned 2026-11-02 to push this branch
 decisions: empty maybeSingle (data null, error null) is no open claim. A present row still goes through readOpenClaim, and a non-object still fails closed as malformed_response. No new migration. Do not edit config.toml, do not deploy, do not mark ready.
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: no production writes; PR stays draft
 claimed_by: Grok, 2026-11-02
 owner: Grok (takeover from Team Ultra by explicit assignment)
-last_updated: 2026-11-03 01:00 UTC, by Grok
+last_updated: 2026-11-03 01:40 UTC, by Grok
 ```
 
 ### CREATE-DIALOG-DISABLED-REASON

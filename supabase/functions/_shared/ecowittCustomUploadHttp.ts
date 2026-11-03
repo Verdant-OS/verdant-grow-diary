@@ -5,7 +5,9 @@
  * store nothing. Reserve, first-sender bind, and the reading insert are one
  * commit. A rejection from that commit stores zero rows and returns the
  * uniform rejection. An insert failure rolls the reserve back and is HTTP 503.
- * A unique-index replay (23505) is HTTP 200 with zero new rows. The body is
+ * A unique-index replay of every metric (23505) is HTTP 200, stored 0, reason
+ * duplicate. A packet that stores some metrics and skips the ones already
+ * present is HTTP 200, reason partial, with the stored count. The body is
  * never logged. PASSKEY and the claim token are hashed and then dropped.
  * Persistence, tent channel config, and the entitlement lookup are injected ports.
  */
@@ -33,7 +35,7 @@ export interface EcowittCustomUploadPorts {
     readonly stationtype: string;
     readonly rows: readonly EcowittCustomUploadStoredReading[];
   }): Promise<
-    | { ok: true }
+    | { ok: true; stored: number; reason: "stored" | "partial" }
     | {
         ok: false;
         reason:
@@ -279,14 +281,14 @@ export async function handleEcowittCustomUploadRequest(
   });
   if (!committed.ok && committed.reason === "duplicate") {
     console.warn("[ecowitt-custom-upload] duplicate_reading_replay", { rows: plan.rows.length });
-    return jsonResponse({ accepted: true, reason: "stored" }, 0);
+    return jsonResponse({ accepted: false, reason: "duplicate" }, 0);
   }
   if (!committed.ok && committed.reason === "store_failed") {
     console.error("[ecowitt-custom-upload] insert_failed", { rows: plan.rows.length });
     return jsonResponse({ accepted: false, reason: "store_failed" }, 0, 503);
   }
   if (!committed.ok) return jsonResponse({ accepted: false, reason: committed.reason }, 0);
-  return jsonResponse(plan, plan.rows.length);
+  return jsonResponse({ accepted: true, reason: committed.reason }, committed.stored);
 }
 
 function findPasskey(fields: Readonly<Record<string, string>>): string | null {

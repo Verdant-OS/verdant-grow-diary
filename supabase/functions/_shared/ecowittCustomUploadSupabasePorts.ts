@@ -6,8 +6,9 @@
  * end-to-end storage is unproven. `requireLiveSensorEntitlement` runs before
  * commit. commitIngest calls commit_ecowitt_custom_upload_ingest, which
  * rechecks the claim, reserves the receipt, binds the first sender, and
- * inserts readings in one transaction. A Postgres 23505 from a direct
- * service-role insert is reason "duplicate" so the replay 200 is reachable.
+ * inserts readings in one transaction. A Postgres 23505 means every row
+ * collided, so the receipt rolls back and the response is duplicate with
+ * stored 0. partial:<n> keeps the rows that did not collide.
  * This module does not read a client-supplied user id from the gateway body.
  */
 import { requireLiveSensorEntitlement } from "./liveSensorEntitlementGate.ts";
@@ -49,6 +50,55 @@ export type EcowittReserveReceipt =
       readonly reason:
         "rate_limited" | "duplicate_captured_at" | "claim_not_found" | "store_failed";
     };
+
+export function ecowittCustomUploadReadingsRpcPayload(
+  rows: readonly EcowittCustomUploadStoredReading[],
+): ReadonlyArray<{
+  readonly metric: EcowittCustomUploadStoredReading["metric"];
+  readonly value: number;
+  readonly quality: EcowittCustomUploadStoredReading["quality"];
+  readonly raw_payload: EcowittCustomUploadStoredReading["rawPayload"];
+}> {
+  return rows.map((row) => ({
+    metric: row.metric,
+    value: row.value,
+    quality: row.quality,
+    raw_payload: row.rawPayload,
+  }));
+}
+
+export type EcowittCommitResult =
+  | { readonly ok: true; readonly stored: number; readonly reason: "stored" | "partial" }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "duplicate"
+        | "store_failed"
+        | "rate_limited"
+        | "duplicate_captured_at"
+        | "claim_not_found"
+        | "passkey_mismatch";
+    };
+
+export function readEcowittCommitResult(data: unknown, submitted: number): EcowittCommitResult {
+  const value = Array.isArray(data) ? data[0] : data;
+  if (value === "ok") return { ok: true, stored: submitted, reason: "stored" };
+  if (typeof value === "string" && value.startsWith("partial:")) {
+    const stored = Number(value.slice("partial:".length));
+    if (Number.isInteger(stored) && stored > 0 && stored < submitted) {
+      return { ok: true, stored, reason: "partial" };
+    }
+  }
+  if (
+    value === "rate_limited" ||
+    value === "duplicate_captured_at" ||
+    value === "claim_not_found" ||
+    value === "passkey_mismatch"
+  ) {
+    return { ok: false, reason: value };
+  }
+  return { ok: false, reason: "store_failed" };
+}
 
 export function readEcowittReserveReceipt(data: unknown): EcowittReserveReceipt {
   const value = Array.isArray(data) ? data[0] : data;
@@ -115,7 +165,7 @@ export interface EcowittCustomUploadServiceRole {
       readonly p_captured_at: string;
       readonly p_passkey_sha256: string;
       readonly p_stationtype: string;
-      readonly p_readings: readonly EcowittCustomUploadStoredReading[];
+      readonly p_readings: ReturnType<typeof ecowittCustomUploadReadingsRpcPayload>;
     },
   ): Promise<{
     readonly data: unknown;
@@ -159,24 +209,14 @@ export async function handleEcowittCustomUploadWithEntitlement(
         p_captured_at: input.capturedAt,
         p_passkey_sha256: input.passkeySha256,
         p_stationtype: input.stationtype,
-        p_readings: input.rows,
+        p_readings: ecowittCustomUploadReadingsRpcPayload(input.rows),
       });
       if (error) {
         const classified = classifyEcowittReadingInsertError(error);
         if (classified === "duplicate") return { ok: false, reason: "duplicate" };
         return { ok: false, reason: "store_failed" };
       }
-      const value = Array.isArray(data) ? data[0] : data;
-      if (value === "ok") return { ok: true };
-      if (
-        value === "rate_limited" ||
-        value === "duplicate_captured_at" ||
-        value === "claim_not_found" ||
-        value === "passkey_mismatch"
-      ) {
-        return { ok: false, reason: value };
-      }
-      return { ok: false, reason: "store_failed" };
+      return readEcowittCommitResult(data, input.rows.length);
     },
     tentChannels: (tentId) => deps.serviceRole.tentChannels(tentId),
   };

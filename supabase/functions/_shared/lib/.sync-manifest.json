@@ -38,7 +38,7 @@
     "src/lib/cost/costDomains.ts": "82daceb032691fb45696f7f5ea9c5b2b6ce6b35b93276ba5fad0ca0e3c6ba673",
     "src/lib/cost/index.ts": "092f062d4b8d4bae292d1dc6d62007ac47df5723fc04227230969e0e714e9d00",
     "src/lib/cost/promptTokenEstimator.ts": "b01a591e28439060fe679678a15e93169a25fc73ead028998d5d96558fd08bc0",
-    "src/lib/creditPackEligibility.ts": "3e6c8dff42a5fdc9057a6259412e6ef981ce475451faddafc4dece8e622b5ce5",
+    "src/lib/creditPackEligibility.ts": "4c5f0ae25cf19f6d27906274fa9b55783aea3db053f7a6d5a350c72b049df700",
     "src/lib/diaryEntryRules.ts": "66c7a6951e9935344dd67e8a9540c7fd43447435b69bf069af3e22f6e9d3b6ae",
     "src/lib/earlyStageAiDoctorContextRules.ts": "e6084e202877530b0c76569712c587c883fbb943099939a36ca8acdfbda3b532",
     "src/lib/earlyStageQuickLogRules.ts": "00155ca8d3cba5e737c37d212d6ab1f957f349a8bfd229a44df5c712f08d1e18",

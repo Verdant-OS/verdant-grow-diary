@@ -13,14 +13,14 @@ A grower on Plant Detail → AI review needs one answer: **can I use this contex
 missing, and what should I do next?** Today the section answers six times, from six rule
 sets, and the answers can disagree on the same screen.
 
-| #   | Surface (mounted in `src/pages/PlantDetail.tsx` ~L1028–1068)                 | Rule source                                                                                                                                                                  | Vocabulary shown                                                                                                                                                            |
-| --- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F   | `PlantDetailAiDoctorReadiness` (first card in the section, ~L1028)           | `src/lib/plantDetailAiDoctorReadiness.ts` (`AiDoctorReadinessLevel`)                                                                                                         | "AI Doctor readiness" heading; uppercase Ready/Partial/Empty badge; its own loading and sensor-error-with-retry states. This is the likely source of the audit's "PARTIAL". |
-| A   | `PlantDetailAiDoctorContextReadinessMount` → `AiDoctorContextReadinessPanel` | `src/lib/aiDoctorReadinessViewModel.ts` (`classifyState` via `assessContextStrength`)                                                                                        | 5 states incl. "Ready for cautious check-in"; 3 confidence classes; a local "Preview only — not saved." result with confidence band and an action-suggestion preview        |
-| B   | `PlantDetailTimelineEvidenceReadinessLaunch`                                 | `src/lib/timelineEvidenceReadinessViewModel.ts`                                                                                                                              | timeline evidence readiness                                                                                                                                                 |
-| C   | `PlantDetailAiDoctorLiveReview` (run gate)                                   | `src/lib/aiDoctorContextRules.ts` `evaluateAiDoctorContext` (strong/partial/insufficient) + `src/lib/aiDoctorReviewEligibilityRules.ts` (blocked/standard/historical_review) | "Context is partial — review may have limited confidence." / "Context is strong enough for a cautious review."                                                              |
-| D   | `PlantDetailAiDoctorContextPanel`                                            | `src/lib/aiDoctorContextReadStateRules.ts` + `READINESS_STYLES[result.readiness]`                                                                                            | strong/partial/insufficient badge                                                                                                                                           |
-| E   | Overview `SensorSnapshotCard`                                                | `src/components/SensorSnapshotCard.tsx:80`                                                                                                                                   | "No sensor snapshot available."                                                                                                                                             |
+| #   | Surface (mounted in `src/pages/PlantDetail.tsx` ~L1028–1068)                                  | Rule source                                                                                                                                                                  | Vocabulary shown                                                                                                                                                            |
+| --- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F   | `PlantDetailAiDoctorReadiness` (first card in the section, ~L1028)                            | `src/lib/plantDetailAiDoctorReadiness.ts` (`AiDoctorReadinessLevel`)                                                                                                         | "AI Doctor readiness" heading; uppercase Ready/Partial/Empty badge; its own loading and sensor-error-with-retry states. This is the likely source of the audit's "PARTIAL". |
+| A   | `PlantDetailAiDoctorContextReadinessMount` → `AiDoctorContextReadinessPanel`                  | `src/lib/aiDoctorReadinessViewModel.ts` (`classifyState` via `assessContextStrength`)                                                                                        | 5 states incl. "Ready for cautious check-in"; 3 confidence classes; a local "Preview only — not saved." result with confidence band and an action-suggestion preview        |
+| B   | `PlantDetailTimelineEvidenceReadinessLaunch`                                                  | `src/lib/timelineEvidenceReadinessViewModel.ts`                                                                                                                              | timeline evidence readiness                                                                                                                                                 |
+| C   | `PlantDetailAiDoctorLiveReview` (run gate)                                                    | `src/lib/aiDoctorContextRules.ts` `evaluateAiDoctorContext` (strong/partial/insufficient) + `src/lib/aiDoctorReviewEligibilityRules.ts` (blocked/standard/historical_review) | "Context is partial — review may have limited confidence." / "Context is strong enough for a cautious review."                                                              |
+| D   | `PlantDetailAiDoctorContextPanel`                                                             | `src/lib/aiDoctorContextReadStateRules.ts` + `READINESS_STYLES[result.readiness]`                                                                                            | strong/partial/insufficient badge                                                                                                                                           |
+| E   | Overview `PlantDetailWhatsMissing` (corrected in §10; first draft named `SensorSnapshotCard`) | `src/lib/plantDetailWhatsMissing.ts` prompt `no_sensor_snapshot`                                                                                                             | "No sensor snapshot" — "This check uses the plant diary only and does not include the tent's Recent Sensor Readings."                                                       |
 
 Measured disagreements (`established fact`, source-level):
 
@@ -202,3 +202,34 @@ implementation slice starts from a base that includes it. #2807, #2802, #2799, #
 `NOT_MEASURED`: the file lists of #2782, #2775, #2757, #2752, #2751, #2744, #2743, #2741 and
 #2732 (fetch timed out); their titles are cultivar, CSV, MQTT, EcoWitt, dashboard-mobile and
 onboarding work. Re-check all open PRs before the implementation branch is cut.
+
+## 10. Addendum: D2 overview copy (2026-11-03)
+
+**Correction.** Surface E is `PlantDetailWhatsMissing` on the Plant Detail overview, not
+`SensorSnapshotCard`, which Plant Detail does not mount (`established fact`: `src/pages/PlantDetail.tsx`
+mounts `PlantDetailWhatsMissing`; its `no_sensor_snapshot` prompt carries the plant-diary-only
+wording the audit quoted).
+
+**Rule.** `buildPlantDetailWhatsMissing` gains an optional input
+`tentCurrentReadings: "present" | "absent" | "unknown" | null` (default treated as unknown). When the
+`no_sensor_snapshot` prompt applies and the value is `present`, the prompt reads
+**"No plant snapshot"** / **"Tent readings are used in AI review."** (D2, founder-approved copy). In every
+other case the existing copy is unchanged. The prompt's position and its "Add manual sensor snapshot"
+action are unchanged.
+
+**Source of `present`.** `useTentCurrentReadingsPresence(tentId)` reads the assigned tent with the same
+two windows as surface F (`AI_DOCTOR_CURRENT_SENSOR_ROW_CAP` with `AI_DOCTOR_CURRENT_SENSOR_SOURCES` and
+`AI_DOCTOR_MANUAL_SENSOR_SOURCES`), so the cache is shared when both are mounted. `present` means
+`buildAiDoctorCurrentSensorSnapshot` returns a snapshot from those rows; `absent` means both reads
+succeeded with none. Loading, `error` or `refresh_error` is `unknown`. Without a valid tent id no read
+happens. The hook lives outside the panel so the panel itself never references AI modules (the
+existing harvest-watch safety scan keeps that fence).
+
+**Acceptance tests (D2).**
+
+1. `present` ⇒ the new title and description; `absent`, `unknown`, null and undefined ⇒ the existing copy.
+2. The add-snapshot action is kept with the new copy; no sensor prompt when the plant has its own snapshot.
+3. Deterministic; input not mutated.
+4. Component: a current tent reading shows the new copy; loading, error and refresh_error keep the
+   existing copy; no tent read without a valid tent id; reads use F's exact windows.
+5. RED before the change, counted in the PR body.

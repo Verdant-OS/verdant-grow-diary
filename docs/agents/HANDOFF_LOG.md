@@ -82,7 +82,7 @@ pr: read the URL from GitHub after push (draft)
 head_sha: read git rev-parse origin/claude/new-session-5qygai after the push
 state: pushed draft, docs only
 current_step: spec written at docs/specs/ai-doctor-readiness-single-summary.md
-next_action: founder answers D1 and D2 in spec section 4; then an independent docs review at the exact head. Implementation is a separate later slice and branch.
+next_action: request an independent docs review at the exact head of the draft PR. Implementation is a separate later slice and branch, after #2805.
 post_merge_check: NOT_APPLICABLE (docs only; no runtime change)
 active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
 decisions: verdict is worst-of run gate, context readiness and view-model state; the run gate stays authoritative and unchanged; existing panels move into a collapsed disclosure, none deleted; no new queries.
@@ -90,7 +90,7 @@ tried_and_rejected: replacing the run gate rules with a unified rule set (change
 commands: none beyond docs safety; no code changed
 files_touched: docs/specs/ai-doctor-readiness-single-summary.md; docs/agents/HANDOFF_LOG.md
 files_remaining: none for this slice
-blockers: founder decisions D1, D2
+blockers: none; Matthew decided D1 (keep local preview, collapsed) and D2 (overview tent-readings copy, separate later slice) on 2026-11-03
 open_questions: whether surface B (timeline evidence readiness) produced the audit's "Strong" label; NOT_MEASURED
 gotchas: PR #2805 also changes src/pages/PlantDetail.tsx; the implementation slice should follow it. Do not commit the audit screenshots (private account data).
 links: none yet
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access, no writes outside the repo, no GitHub comments
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-03 13:20 CT, by Claude
+last_updated: 2026-11-03 13:40 CT, by Claude
 ```
 
 ### POSTHOG-PUBLIC-CLIENT-KEY

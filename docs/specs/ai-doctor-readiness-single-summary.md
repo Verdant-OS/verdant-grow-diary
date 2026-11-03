@@ -83,14 +83,16 @@ Rows are evaluated in order; first match wins. A null or unrecognised input neve
 Next step: the first missing item from R6, as one plain action ("Add a manual tent reading",
 "Log the last watering"). When `ready`, the next step is the existing Start review control.
 
-## 4. Decisions needed (founder)
+## 4. Founder decisions (Matthew, 2026-11-03)
 
-D1. **Local preview in A.** Keep it inside the collapsed provenance (recommended), or remove
-it from Plant Detail in a later slice. This spec keeps it, collapsed.
+D1. **Local preview in A: keep, collapsed.** The local "Preview only — not saved." result and
+its action-suggestion preview stay inside the collapsed "How this was decided" disclosure,
+unchanged. They are not removed.
 
-D2. **Overview card E.** Recommended later slice: when the plant has no plant-level snapshot
-but its tent has readings, say "No plant snapshot. Tent readings are used in AI review." Not in
-this slice.
+D2. **Overview card E: approved as a separate later slice.** When the plant has no plant-level
+snapshot but its assigned tent has readings, the overview says "No plant snapshot. Tent
+readings are used in AI review." It is not in the implementation slice of §6; it gets its own
+spec addendum, tests and PR.
 
 ## 5. Out of scope
 

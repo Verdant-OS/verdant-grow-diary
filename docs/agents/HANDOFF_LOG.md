@@ -80,8 +80,8 @@ base: verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2820
 head_sha: read the current head on GitHub
 state: pushed draft
-current_step: items 1, 7, 8, restore, 12 (spec + held migration PR #2828 on claude/profiles-time-zone-migration), 17, 18, 21 done; item 14 spec docs/specs/quick-log-structured-sensor-readings.md (reading time, air temp/RH/VPD and F/C already exist; soil temp, soil EC, VWC, CO2, PPFD missing from Quick Log)
-next_action: founder picks item-14 option (A: extend manual_sensor_snapshot, no schema; or a shortcut to the existing manual reading card) and approves #2828 when ready
+current_step: item 14 Option A chosen by founder. Spec corrected to existing metric names (soil_temp_c, soil_moisture_pct, soil_ec_ms_cm, co2_ppm, ppfd) and validators; pure rules src/lib/quickLogStructuredReadingRules.ts + tests landed. UI wiring NOT started: blocked on the read-only production check in spec section 3 step 2 (live quicklog_save_manual_pre_logged_at body vs source; CURRENT_STATE delegate md5 mismatch ef7bdf19)
+next_action: owner runs the two read-only SQL lines in docs/specs/quick-log-structured-sensor-readings.md section 3 step 2 on production; if the live body keeps details keys, wire the five fields into QuickLogV2Sheet's reading section per spec
 post_merge_check: on verdantgrowdiary.com, the fixture plant page shows "Grow: <name>" and Timeline Recent Quick Logs rows show "Plant: ... · Tent: ..."
 active_writer: Claude session claude/new-session-azpsz3
 decisions: no migration/RLS/auth edits (held); items 2,4,5,6 fixed by #2794; item 3 not reproduced (in-flight guard + idempotency key; duplicates 6.5 h apart); item 7 fixed by f2d6ca2; names never guessed (unknown id reads "name unavailable")
@@ -98,7 +98,7 @@ reviewer_sha: none yet
 session_state: one self check-in armed (send_later) for PR #2820 CI
 claimed_by: Claude, 2026-11-03 16:45 CT
 owner: Claude
-last_updated: 2026-11-03 18:50 CT, by Claude
+last_updated: 2026-11-03 19:05 CT, by Claude
 ```
 
 ### QUICK-LOG-WATER-VOLUME-UNITS-SPEC

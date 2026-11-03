@@ -36,15 +36,29 @@ another form. Confirm on the fixture account before closing item 13.
 1. **Fields.** Add to Quick Log's existing "Reading" section (collapsed by default, so a plain note
    stays one tap): soil temp (°F/°C per preference), water content (% VWC), soil EC (mS/cm, with
    the existing EC unit choice), CO2 (ppm), PPFD (µmol/m²/s). Air temp/RH/VPD stay where they are.
-2. **Storage.** Send them inside `p_details.manual_sensor_snapshot` with canonical keys and units:
-   `soil_temp_c`, `vwc_percent`, `soil_ec_ms_cm`, `co2_ppm`, `ppfd_umol`, plus `captured_at` (the
-   resolved reading time) and `source: "manual"`. Old rows without these keys read as "not
-   recorded". No RPC signature change. Re-verify that the live RPC keeps unknown snapshot keys
-   (read-only check) before building. If it strips them, this becomes Option B.
-3. **Rules module.** `src/lib/quickLogStructuredReadingRules.ts`: parse, range-check (reuse
-   `sensorQuality.ts` where it has a rule: soil EC ≥ 50 or < 0 is suspicious, `established fact`
-   L102–110; **proposed, needs review:** VWC outside 0–100, CO2 outside 0–5000, PPFD outside
-   0–2500), convert °F→°C once, and build the snapshot object. Deterministic, null-safe, no clock.
+2. **Storage.** Send them inside `p_details.manual_sensor_snapshot` using the codebase's
+   **existing** canonical metric names (`established fact`, `src/lib/sensorTruthRules.ts`
+   `classifyManualMetric` and `src/lib/sensorSnapshot.ts`): `soil_temp_c`, `soil_moisture_pct`
+   (VWC), `soil_ec_ms_cm`, `co2_ppm`, `ppfd`, plus `captured_at` (the resolved reading time) and
+   `source: "manual"`. Do not invent new names: `classifyManualMetric` returns VALID for unknown
+   metric names (its `default` branch), so a typo would silently skip validation. Old rows without
+   these keys read as "not recorded". No RPC signature change.
+   - `established fact` (source): `quicklog_save_manual` → `quicklog_save_manual_pre_logged_at`
+     keeps every `p_details` key except `user_id`, `grow_id`, `tent_id`, `plant_id`, `auth_uid`,
+     `auth.uid` (`supabase/migrations/20260818010000_quicklog_manual_delegate_forward_repair.sql`
+     ~L765–776; outer wrapper `20261013180000_*` only adds `logged_at`).
+   - `BLOCKED` (live): CURRENT_STATE records a production event-delegate md5 mismatch
+     (`ef7bdf19`), so the live body may differ from source. Read-only check for the owner, run on
+     production before building the UI:
+     `select md5(pg_get_functiondef('public.quicklog_save_manual_pre_logged_at'::regproc));` and
+     `select pg_get_functiondef('public.quicklog_save_manual_pre_logged_at'::regproc) ~ $$- 'auth.uid'$$;`
+     If the live body filters `manual_sensor_snapshot` keys, this becomes Option B.
+3. **Rules module.** `src/lib/quickLogStructuredReadingRules.ts`: parse each field, convert
+   °F→°C once for soil temp, classify with the existing validators (`classifyManualMetric` for
+   `soil_temp_c`, `soil_moisture_pct`, `soil_ec_ms_cm` — including its unit-mismatch chip for EC ≥
+   50 — and `co2_ppm`; `isPpfdValid` for `ppfd`), and build the snapshot object. Invalid values are
+   kept as entered and flagged with the validator's chip, never dropped or shown as healthy.
+   Deterministic, null-safe, no clock.
 4. **Display.** Timeline/Recent Quick Logs chips (`ManualReadingsChips`) show the new values with
    units and a "Manual" source label; suspicious values show "check value", never a healthy state.
 5. **Corrections.** Out of scope for the first slice: new keys are read-only after save until a

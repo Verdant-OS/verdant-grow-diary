@@ -72,6 +72,36 @@ active checkout has the branch open; inspect worktree ownership before selecting
 ### AI-DOCTOR-READINESS-SUMMARY-IMPL
 
 ```text
+TASK GROWER-BUGS-2026-11-03  priority: P2  status: OPEN
+goal: triage the 21-item grower bug brief (Nov 1-3, 2026 tent walks) against the deploy branch; fix only what is still broken in source
+why: real grower reports from production; several were already fixed by #2794 (merged 2026-11-03 03:50 UTC) and must not be re-implemented
+branch: claude/new-session-azpsz3
+base: verdant-grow-diary
+pr: NOT_MEASURED (opened after this block)
+head_sha: see PR
+state: pushed draft
+current_step: slice 1 = regression test pinning tent/plant-name escaping in the grow diary export scope badge (item 1)
+next_action: founder picks the next slice from the PR triage table; items 13/14 need schema, 1 (server-side bounds) needs a migration — both held for Matthew
+post_merge_check: NOT_APPLICABLE (test-only)
+active_writer: Claude session claude/new-session-azpsz3
+decisions: no migration/RLS/auth edits (held); items 2,4,5,6 already fixed by #2794 at HEAD (14/14 tests pass); item 3 not reproduced (both Quick Log paths guard in-flight + idempotency key; duplicate notes are 6.5 h apart)
+tried_and_rejected: editing grow-diary-pdf-export-source-and-escape.test.ts (scorer-lock); new test file instead
+commands: bunx vitest run src/test/tent-name-markup-export-escape.test.ts --reporter=dot
+files_touched: src/test/tent-name-markup-export-escape.test.ts, docs/agents/HANDOFF_LOG.md
+files_remaining: per founder choice
+blockers: live /version.json probe blocked by session egress hook (live SHA NOT_MEASURED); no production DB/Worker log access
+open_questions: is #2794 live? which P1/P2 slice next?
+gotchas: #2817 (pickers active-grow spec) overlaps items 6 and 15
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2794
+reviewer_seat: eligible non-contributing reviewer per OWNERSHIP.md 4.3
+reviewer_sha: none yet
+session_state: none
+claimed_by: Claude, 2026-11-03 16:45 CT
+owner: Claude
+last_updated: 2026-11-03 16:45 CT, by Claude
+```
+
+```text
 TASK AI-DOCTOR-READINESS-SUMMARY-IMPL  priority: other  status: OPEN
 goal: Implement the one-summary AI Doctor readiness card on Plant Detail per docs/specs/ai-doctor-readiness-single-summary.md (spec PR #2809).
 why: Live audit 2026-11-03 finding 3. Plant Detail shows readiness from six rule sets that can disagree.

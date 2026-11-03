@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link } from "@/lib/react-router-compat";
+import { Link, useNavigate } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/store/auth";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -35,7 +36,7 @@ import { toast } from "sonner";
 import EditPlantDialog from "@/components/EditPlantDialog";
 import AssignTentDialog from "@/components/AssignTentDialog";
 import PlantMergeDialog from "@/components/PlantMergeDialog";
-import { plantDetailPath } from "@/lib/routes";
+import { plantDetailPath, plantsPath } from "@/lib/routes";
 
 import {
   buildArchivePlantPayload,
@@ -43,7 +44,7 @@ import {
   buildRestorePlantPayload,
   resolvePlantArchiveMenuAction,
 } from "@/lib/plantTentRelationshipRules";
-import { PlantLifecycleWriteRules } from "@/lib/plantLifecycleWriteRules";
+import { PlantLifecycleWriteRules, type PlantDeleteClient } from "@/lib/plantLifecycleWriteRules";
 
 interface Plant {
   id: string;
@@ -80,6 +81,8 @@ interface Props {
  */
 export default function PlantCardActionsMenu({ plant, variant = "menu", hideView = false }: Props) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
@@ -145,8 +148,17 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
   }
 
   async function deletePlant() {
+    if (!user?.id) {
+      toast.error("Plant was not deleted. Sign in and try again.");
+      setConfirmDelete(false);
+      return;
+    }
     setBusy(true);
-    const result = await PlantLifecycleWriteRules.deleteOwnedPlant(supabase, plant.id);
+    const result = await PlantLifecycleWriteRules.deleteOwnedPlant(
+      supabase as unknown as PlantDeleteClient,
+      plant.id,
+      user.id,
+    );
     setBusy(false);
     setConfirmDelete(false);
     if (!PlantLifecycleWriteRules.rowWasWritten(result)) {
@@ -160,6 +172,7 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
     }
     toast.success("Plant deleted");
     invalidate();
+    if (variant === "row") navigate(plantsPath());
   }
 
   const confirmDialogs = (
@@ -237,9 +250,7 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {plant.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the plant. Logs and photos that the database already cascades or unlinks
-              are updated with it. If the database refuses, the plant stays and you will see the
-              error.
+              {PlantLifecycleWriteRules.DELETE_CONFIRM_COPY}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

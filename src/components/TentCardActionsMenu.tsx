@@ -26,7 +26,11 @@ import { toast } from "sonner";
 import EditTentDialog from "@/components/EditTentDialog";
 import { tentDetailPath } from "@/lib/routes";
 
-import { buildArchiveTentPayload, evaluateTentDeleteGuard } from "@/lib/tentManagementRules";
+import {
+  buildArchiveTentPayload,
+  evaluateTentDeleteGuard,
+  TentDeleteWriteRules,
+} from "@/lib/tentManagementRules";
 
 interface TentInput {
   id: string;
@@ -108,27 +112,24 @@ export default function TentCardActionsMenu({
       return;
     }
     setBusy(true);
+    const deleted = await supabase.from("tents").delete().eq("id", tent.id).select("id");
+    if (!TentDeleteWriteRules.unassignAfterConfirmedDelete(deleted)) {
+      setBusy(false);
+      setConfirmDelete(false);
+      toast.error(deleted.error?.message ?? "Tent was not deleted. It may no longer be yours.");
+      return;
+    }
     const detached = await supabase
       .from("plants")
       .update({ tent_id: null })
       .eq("tent_id", tent.id)
-      .eq("is_archived", true)
+      .or(TentDeleteWriteRules.UNASSIGN_OR_FILTER)
       .select("id");
-    if (detached.error) {
-      setBusy(false);
-      setConfirmDelete(false);
-      toast.error(detached.error.message);
-      return;
-    }
-    const deleted = await supabase.from("tents").delete().eq("id", tent.id).select("id");
     setBusy(false);
     setConfirmDelete(false);
-    if (deleted.error) {
-      toast.error(deleted.error.message);
-      return;
-    }
-    if (!deleted.data || deleted.data.length === 0) {
-      toast.error("Tent was not deleted. It may no longer be yours.");
+    if (detached.error) {
+      toast.error(detached.error.message);
+      invalidate();
       return;
     }
     toast.success("Tent deleted. Archived plants were kept and unassigned from this tent.");

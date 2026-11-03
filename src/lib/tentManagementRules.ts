@@ -1,3 +1,9 @@
+import {
+  isArchivedPlant,
+  isMergedPlant,
+  type ArchivedPlantLike,
+} from "@/lib/archivedPlantVisibilityRules";
+
 /**
  * Pure helpers for Tent management UX.
  *
@@ -270,4 +276,22 @@ export function evaluateTentDeleteGuard(input: TentDeleteGuardInput): TentDelete
 
 export function buildArchiveTentPayload(): { is_archived: true } {
   return { is_archived: true };
+}
+
+/**
+ * Archived rows and legacy merged rows (merge marker in the note, archive
+ * flag still false) do not block tent delete. Active plants do.
+ */
+export function countsAsNonBlockingTentPlant(plant: ArchivedPlantLike): boolean {
+  return isArchivedPlant(plant) || isMergedPlant(plant);
+}
+
+/** Plant rows released only after the tent delete itself matched a row. */
+export class TentDeleteWriteRules {
+  static readonly UNASSIGN_OR_FILTER = "is_archived.eq.true,last_note.ilike.*Merged into *";
+
+  static unassignAfterConfirmedDelete(result: { error?: unknown; data?: unknown }): boolean {
+    if (result.error) return false;
+    return Array.isArray(result.data) && result.data.length > 0;
+  }
 }

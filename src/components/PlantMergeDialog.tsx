@@ -389,10 +389,34 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
         className="glass max-w-lg"
         data-testid="plant-merge-dialog"
         onInteractOutside={(event) => {
-          if (confirmExecute || confirmArchive) event.preventDefault();
+          if (
+            PlantLifecycleWriteRules.holdMergeDialog({
+              confirming: confirmExecute || confirmArchive,
+              busy,
+            })
+          ) {
+            event.preventDefault();
+          }
         }}
         onPointerDownOutside={(event) => {
-          if (confirmExecute || confirmArchive) event.preventDefault();
+          if (
+            PlantLifecycleWriteRules.holdMergeDialog({
+              confirming: confirmExecute || confirmArchive,
+              busy,
+            })
+          ) {
+            event.preventDefault();
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          if (
+            PlantLifecycleWriteRules.holdMergeDialog({
+              confirming: confirmExecute || confirmArchive,
+              busy,
+            })
+          ) {
+            event.preventDefault();
+          }
         }}
       >
         <DialogHeader>

@@ -65,7 +65,10 @@ import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData
 import { useGrows } from "@/store/grows";
 import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { buildTentSensorChartSeries, buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
-import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
+import {
+  countsAsNonBlockingTentPlant,
+  resolveVerifiedAssignedPlantCount,
+} from "@/lib/tentManagementRules";
 import { buildTentPlantListReadView } from "@/lib/tentPlantListReadStateRules";
 import {
   convertCelsiusForDisplay,
@@ -342,9 +345,8 @@ export default function TentDetail() {
   // separately so they can be unassigned, and both counts fail closed while
   // the plant query is not current.
   const assignedPlantCount = resolveVerifiedAssignedPlantCount(allPlantsQuery);
-  const archivedAssignedPlantCount = resolveVerifiedAssignedPlantCount(
-    allPlantsQuery,
-    (plant) => plant.isArchived === true,
+  const archivedAssignedPlantCount = resolveVerifiedAssignedPlantCount(allPlantsQuery, (plant) =>
+    countsAsNonBlockingTentPlant(plant),
   );
   const archivedGrowIds = new Set((archivedGrows ?? []).map((grow) => grow.id));
   const visibilityPlants = withGrowArchiveVisibility(allPlants, archivedGrowIds, {

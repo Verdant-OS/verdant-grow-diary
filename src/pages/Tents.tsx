@@ -28,7 +28,10 @@ import { tentDetailPath, tentsPath } from "@/lib/routes";
 import { isUuid } from "@/lib/isUuid";
 import { loadTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { formatTentLightStatus } from "@/lib/lightScheduleFormat";
-import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
+import {
+  countsAsNonBlockingTentPlant,
+  resolveVerifiedAssignedPlantCount,
+} from "@/lib/tentManagementRules";
 import { formatTentHeaderDescription } from "@/lib/tentDetailBlankFieldRules";
 import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { classifyRequestedGrowScopeState } from "@/lib/growScopeAsyncStateRules";
@@ -602,7 +605,7 @@ export default function Tents() {
                 );
                 const archivedAssignedPlantCount = resolveVerifiedAssignedPlantCount(
                   assignmentPlantsQuery,
-                  (plant) => plant.tentId === t.id && plant.isArchived === true,
+                  (plant) => plant.tentId === t.id && countsAsNonBlockingTentPlant(plant),
                 );
                 // Stage for the environment strip, resolved like Tent Detail
                 // and the Sensors page: the tent's grow row, the tent, and the

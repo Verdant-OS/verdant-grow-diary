@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   deleteResult: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
+  eqs: [] as string[],
 }));
 
 vi.mock("sonner", () => ({
@@ -32,12 +33,24 @@ vi.mock("@/components/PlantMergeDialog", () => ({
   default: ({ trigger }: { trigger: React.ReactNode }) => <>{trigger}</>,
 }));
 
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "user-1" }, loading: false }),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
       update: () => ({ eq: async () => ({ error: null }) }),
       delete: () => ({
-        eq: () => ({ select: () => mocks.deleteResult() }),
+        eq: (column: string, value: string) => {
+          mocks.eqs.push(`${column}:${value}`);
+          return {
+            eq: (column2: string, value2: string) => {
+              mocks.eqs.push(`${column2}:${value2}`);
+              return { select: () => mocks.deleteResult() };
+            },
+          };
+        },
       }),
     }),
   },
@@ -53,6 +66,13 @@ vi.mock("@tanstack/react-query", async () => {
 });
 
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
+import { PlantLifecycleWriteRules } from "@/lib/plantLifecycleWriteRules";
+import { useLocation } from "@/lib/react-router-compat";
+
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="location-path">{location.pathname}</span>;
+}
 
 const plant = {
   id: "plant-1",
@@ -72,7 +92,8 @@ function renderMenu() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/plants/plant-1"]}>
+        <LocationProbe />
         <PlantCardActionsMenu plant={plant} variant="row" />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -84,6 +105,7 @@ describe("Delete Plant", () => {
     mocks.deleteResult.mockReset();
     mocks.toastSuccess.mockReset();
     mocks.toastError.mockReset();
+    mocks.eqs.length = 0;
   });
 
   it("confirms before deleting and toasts when the plant is removed", async () => {
@@ -93,9 +115,28 @@ describe("Delete Plant", () => {
     expect(screen.queryByTestId("confirm-delete-plant")).toBeNull();
     await user.click(screen.getByTestId("plant-detail-delete-plant"));
     const dialog = await screen.findByTestId("confirm-delete-plant");
+    expect(dialog).toHaveTextContent(PlantLifecycleWriteRules.DELETE_CONFIRM_COPY);
     expect(mocks.deleteResult).not.toHaveBeenCalled();
     await user.click(within(dialog).getByTestId("confirm-delete-plant-submit"));
     await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledWith("Plant deleted"));
+    expect(mocks.eqs).toEqual(["id:plant-1", "user_id:user-1"]);
+    await waitFor(() => expect(screen.getByTestId("location-path")).toHaveTextContent("/plants"));
+  });
+
+  it("treats a zero-row delete as a failure and stays on the plant page", async () => {
+    mocks.deleteResult.mockResolvedValue({ data: [], error: null });
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByTestId("plant-detail-delete-plant"));
+    const dialog = await screen.findByTestId("confirm-delete-plant");
+    await user.click(within(dialog).getByTestId("confirm-delete-plant-submit"));
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Plant was not deleted. Linked records may still reference it.",
+      ),
+    );
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+    expect(screen.getByTestId("location-path")).toHaveTextContent("/plants/plant-1");
   });
 
   it("shows the database error when delete is refused", async () => {

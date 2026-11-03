@@ -15,6 +15,8 @@ function formatMetricValue(metric: TonightMetricView): string {
   switch (metric.state) {
     case "missing":
       return COPY.missing;
+    case "not_computed":
+      return "—";
     case "unavailable":
       return COPY.unavailable;
     case "loading":

@@ -34,6 +34,22 @@ import {
   resolveMobileQuickLogTarget,
   resolvePlantQuickLogRouteTarget,
 } from "@/lib/quickLogRouteTargetRules";
+import { QuickLogLaunchTarget } from "@/lib/quickLogV2Rules";
+import {
+  buildRecentTargetStorageKey,
+  parseRecentTargetRecord,
+} from "@/lib/quickLogRecentTargetSuggestion";
+
+function readLastUsedQuickLogKey(userId: string | null): string | null {
+  const storageKey = buildRecentTargetStorageKey(userId);
+  if (!storageKey || typeof window === "undefined") return null;
+  try {
+    const record = parseRecentTargetRecord(window.localStorage.getItem(storageKey));
+    return record ? `plant:${record.plantId}` : null;
+  } catch {
+    return null;
+  }
+}
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
 import {
   QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS,
@@ -141,7 +157,11 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // intent) may still open legacy when they need activity-type flows.
   const openGrowerQuickLog = useCallback(() => {
     const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
-    const launchTargetKey = mobileQuickLogTarget ?? (routePlantId ? `plant:${routePlantId}` : null);
+    const contextKey = mobileQuickLogTarget ?? (routePlantId ? `plant:${routePlantId}` : null);
+    const launchTargetKey = QuickLogLaunchTarget.resolve({
+      contextKey,
+      lastUsedKey: contextKey ? null : readLastUsedQuickLogKey(user?.id ?? null),
+    });
 
     // Close and remount-reset legacy Quick Log in the same state transition
     // before opening V2, so two modal focus locks can never remain active.
@@ -151,7 +171,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     setStructuredOpenIntent(null);
     setMobileLaunchTargetKey(launchTargetKey);
     setOpenScopedLog(true);
-  }, [location.pathname, mobileQuickLogTarget]);
+  }, [location.pathname, mobileQuickLogTarget, user?.id]);
 
   // This shell lives inside the route-level Suspense boundary. Tracking here
   // waits for server-auth revalidation and the paid entitlement read as well

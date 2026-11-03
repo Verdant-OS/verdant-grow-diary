@@ -117,6 +117,21 @@ vi.mock("sonner", () => ({
   },
 }));
 
+function savedViewDiaryAction(): { label: string; onClick: () => void } | undefined {
+  const opts = toastSuccess.mock.calls.at(-1)?.[1] as
+    { action?: { label: string; onClick: () => void } } | undefined;
+  return opts?.action;
+}
+
+/** The toast is the only View diary control. The in-sheet button is gone. */
+function openSavedDiary() {
+  expect(screen.queryByRole("button", { name: "View diary" })).not.toBeInTheDocument();
+  expect(screen.queryByTestId("quick-log-post-save-view")).not.toBeInTheDocument();
+  const action = savedViewDiaryAction();
+  expect(action?.label).toBe("View diary");
+  action?.onClick();
+}
+
 const originalNote = "Original note";
 type StoredNote = {
   id: string;
@@ -1169,7 +1184,7 @@ describe("durable unresolved Note recovery", () => {
       confirmedEventId,
     ]);
 
-    fireEvent.click(screen.getByTestId("quick-log-post-save-view"));
+    openSavedDiary();
     expect(navigationMock).toHaveBeenCalledTimes(1);
     expect(navigationMock.mock.calls[0][0].href).toContain(
       "tentId=88888888-8888-4888-8888-888888888888",
@@ -1211,7 +1226,7 @@ describe("durable unresolved Note recovery", () => {
       "eq",
       confirmedEventId,
     ]);
-    fireEvent.click(screen.getByTestId("quick-log-post-save-view"));
+    openSavedDiary();
     expect(navigationMock).toHaveBeenCalledTimes(1);
     expect(navigationMock.mock.calls[0][0].href).not.toContain("tentId=");
     expect(rpcMock.mock.calls[1][1]).toEqual(rpcMock.mock.calls[0][1]);
@@ -1242,7 +1257,9 @@ describe("durable unresolved Note recovery", () => {
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
     expect(photoEntryMock).not.toHaveBeenCalled();
     expect(videoEntryMock).not.toHaveBeenCalled();
-    expect(screen.getByTestId("quick-log-post-save-view")).toBeDisabled();
+    expect(screen.queryByTestId("quick-log-post-save-view")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View diary" })).not.toBeInTheDocument();
+    expect(savedViewDiaryAction()).toBeUndefined();
     expect(navigationMock).not.toHaveBeenCalled();
     expect(rpcMock.mock.calls[1][1]).toEqual(rpcMock.mock.calls[0][1]);
     expect(committed.size).toBe(1);
@@ -1285,7 +1302,7 @@ describe("durable unresolved Note recovery", () => {
       confirmedEventId,
     ]);
 
-    fireEvent.click(screen.getByTestId("quick-log-post-save-view"));
+    openSavedDiary();
     expect(navigationMock).toHaveBeenCalledTimes(1);
     expect(navigationMock.mock.calls[0][0].href).toContain(
       "tentId=55555555-5555-4555-8555-555555555555",
@@ -1932,14 +1949,12 @@ describe("post-save card preserves authoritative null targets", () => {
       );
       expect(screen.queryByTestId("qlv2-save")).not.toBeInTheDocument();
       expect(saveConfirmed).toHaveBeenCalledTimes(1);
-      const view = screen.getByTestId("quick-log-post-save-view");
+      expect(screen.queryByTestId("quick-log-post-save-view")).not.toBeInTheDocument();
       if (persistedGrowId === null) {
-        expect(view).toBeDisabled();
-        fireEvent.click(view);
+        expect(savedViewDiaryAction()).toBeUndefined();
         expect(navigationMock).not.toHaveBeenCalled();
       } else {
-        expect(view).toBeEnabled();
-        fireEvent.click(view);
+        openSavedDiary();
         expect(navigationMock).toHaveBeenCalledTimes(1);
         expect(navigationMock.mock.calls[0][0].href).toBe(
           `/timeline?growId=${persistedGrowId}#timeline-entry-${confirmedEventId}`,

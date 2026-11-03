@@ -65,7 +65,7 @@ describe("Tonight tent calculated VPD — mixed-source provenance", () => {
     expect(vpd.state).toBe("unavailable");
   });
 
-  it("skips a newer mixed-source same-time pair for an older compatible pair", () => {
+  it("does not walk back to an older compatible pair when the latest capture mixes sources", () => {
     const vpd = vpdOf([
       row("temperature_c", 24, "live", 3),
       row("humidity_pct", 55, "manual", 3),
@@ -73,25 +73,25 @@ describe("Tonight tent calculated VPD — mixed-source provenance", () => {
       row("humidity_pct", 60, "manual", 20),
     ]);
     expect(vpd).toMatchObject({
-      state: "value",
-      source: "manual",
-      value: calculateVpdKpa({ tempC: 22, rhPercent: 60 }),
-      capturedAt: minutesAgo(20),
-      calculated: true,
+      state: "unavailable",
+      source: null,
+      value: null,
+      capturedAt: null,
+      calculated: false,
     });
   });
 
-  it("labels a live pair stale when one input aged past the live window", () => {
+  it("does not calculate VPD from live temperature and RH captured at different times", () => {
     const staleMinutes = LIVE_CURRENT_STATE_STALE_MS / 60_000 + 5;
     const vpd = vpdOf([
       row("temperature_c", 24, "live", staleMinutes),
       row("humidity_pct", 55, "live", 1),
     ]);
     expect(vpd).toMatchObject({
-      state: "value",
-      source: "stale",
-      value: calculateVpdKpa({ tempC: 24, rhPercent: 55 }),
-      calculated: true,
+      state: "not_computed",
+      source: null,
+      value: null,
+      calculated: false,
     });
   });
 });

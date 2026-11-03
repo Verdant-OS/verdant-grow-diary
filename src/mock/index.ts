@@ -80,6 +80,11 @@ export interface SensorReading {
    * always populate it so compatibility zeroes can never become evidence.
    */
   observedMetrics?: SensorReadingMetricKey[];
+  /**
+   * Chart-only marker. `calculated` is VPD derived from temperature and
+   * humidity, never a measured `vpd` observation. Export drops these rows.
+   */
+  vpdPointKind?: "recorded" | "calculated";
   /** Provenance label. Demo data must always carry "demo". */
   source: SensorReadingSource;
   /**

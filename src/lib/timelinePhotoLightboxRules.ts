@@ -8,6 +8,8 @@
  * or token-bearing fields.
  */
 
+import { formatTimelineEntryTimestamp } from "@/lib/timelineEntryTimestampFormat";
+
 export interface TimelinePhotoSourceRow {
   id: string;
   photo_url: string | null | undefined;
@@ -24,6 +26,21 @@ export interface TimelinePhotoLightboxItem {
   note: string;
   stage: string | null;
   plantName: string | null;
+}
+
+/**
+ * One caption for every photo viewer. A note wins. A blank note uses the
+ * same local-time clock as the timeline entry card. Raw ISO never leaves
+ * this path.
+ */
+export class TimelinePhotoLightboxCaption {
+  static fromItem(
+    item: Pick<TimelinePhotoLightboxItem, "note" | "entryAt"> | null | undefined,
+  ): string {
+    const note = typeof item?.note === "string" ? item.note.trim() : "";
+    if (note.length > 0) return note;
+    return formatTimelineEntryTimestamp(item?.entryAt ?? null);
+  }
 }
 
 // Defense-in-depth: refuse to surface any URL that smells like an

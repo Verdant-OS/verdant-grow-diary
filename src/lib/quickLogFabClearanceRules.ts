@@ -106,6 +106,23 @@ export function mobileShellToastBottomOffset(): string {
 }
 
 /**
+ * Bottom padding for `#main-content` on every signed-in AppShell page.
+ * An id selector beats a shorter `pb-*` utility on that same element.
+ * Below 768px the length is `mobileQuickLogContentClearanceRem` (FAB offset,
+ * height, and gap). From 768px it is the desktop FAB clearance.
+ */
+export function mainContentFabClearanceCss(): string {
+  const mobile = mobileQuickLogContentClearanceRem();
+  const desktop = desktopQuickLogContentClearanceRem();
+  return [
+    `#main-content{padding-bottom:calc(${mobile}rem + env(safe-area-inset-bottom))}`,
+    "@media (min-width:768px){",
+    `#main-content{padding-bottom:calc(${desktop}rem + env(safe-area-inset-bottom))}`,
+    "}",
+  ].join("");
+}
+
+/**
  * Document-level CSS injected only while `AppShell` (bottom nav) is mounted.
  * The media queries keep `md+` and, by absence of the tag, public routes on
  * the library default toast position.

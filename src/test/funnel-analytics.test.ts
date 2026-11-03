@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+// @vitest-environment-options {"url":"https://verdantgrowdiary.com/"}
+// GA only collects on the production host (#2693), so these run there.
 /**
  * funnelAnalytics — module unit tests.
  *
@@ -30,6 +33,9 @@ describe("event name contract", () => {
       "grow_created",
       "tent_created",
       "plant_created",
+      "onboarding_back",
+      "onboarding_restart",
+      "onboarding_skip",
       "quick_log_saved",
       "csv_history_onboarding_ready",
       "csv_import_started",

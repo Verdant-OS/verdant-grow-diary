@@ -4,6 +4,7 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  ComposedChart,
   LineChart,
   Line,
   XAxis,
@@ -98,13 +99,35 @@ export default function SensorChart({
         metric === "temp" && typeof raw === "number"
           ? convertCelsiusForDisplay(raw, temperatureUnit)
           : raw;
-      return { ts: r.ts, value: typeof v === "number" && Number.isFinite(v) ? v : null };
+      const finite = typeof v === "number" && Number.isFinite(v) ? v : null;
+      const calculated = r.vpdPointKind === "calculated";
+      return {
+        ts: r.ts,
+        value: finite,
+        recorded: calculated ? null : finite,
+        calculated: calculated ? finite : null,
+      };
     });
   }, [filteredData, metric, temperatureUnit]);
   const plottedPointCount = useMemo(
     () => chartData.filter((point) => point.value !== null).length,
     [chartData],
   );
+  const recordedPointCount = useMemo(
+    () => chartData.filter((point) => point.recorded !== null).length,
+    [chartData],
+  );
+  const calculatedPointCount = useMemo(
+    () => chartData.filter((point) => point.calculated !== null).length,
+    [chartData],
+  );
+  const legendCountsCalculatedSeparately = metric === "vpd" && calculatedPointCount > 0;
+  const legendPointCount = legendCountsCalculatedSeparately
+    ? recordedPointCount
+    : plottedPointCount;
+  const legendPointLabel = legendCountsCalculatedSeparately
+    ? `${legendPointCount} recorded ${legendPointCount === 1 ? "point" : "points"}`
+    : `${legendPointCount} ${legendPointCount === 1 ? "point" : "points"}`;
 
   const handleExport = () => {
     if (exportDisabled) return;
@@ -120,9 +143,14 @@ export default function SensorChart({
     downloadTextFile(csv, filename);
   };
 
-  const Comp = (variant === "area" ? AreaChart : LineChart) as React.ComponentType<
-    React.ComponentProps<typeof AreaChart>
-  >;
+  // Area ignores dots on a series that is null around an isolated point, so a
+  // measured VPD between two calculated rows never paints. Those charts use
+  // lines, which draw a dot for every finite recorded value. Charts with no
+  // calculated points stay on AreaChart so existing chart mocks still apply.
+  const splitVpdSeries = metric === "vpd" && calculatedPointCount > 0;
+  const Comp = (
+    splitVpdSeries ? ComposedChart : variant === "area" ? AreaChart : LineChart
+  ) as React.ComponentType<React.ComponentProps<typeof AreaChart>>;
   const Series = (variant === "area" ? Area : Line) as React.ComponentType<
     React.ComponentProps<typeof Area>
   >;
@@ -140,8 +168,21 @@ export default function SensorChart({
               className="inline-block h-2 w-2 rounded-full"
               style={{ background: axisMeta.color }}
             />
-            {legendLabel} · {plottedPointCount} {plottedPointCount === 1 ? "point" : "points"}
+            {legendLabel} · {legendPointLabel}
           </span>
+          {legendCountsCalculatedSeparately && (
+            <span
+              data-testid="sensor-chart-calculated-legend"
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
+              <span
+                aria-hidden="true"
+                className="inline-block h-0 w-4 border-t border-dashed"
+                style={{ borderColor: axisMeta.color }}
+              />
+              {calculatedPointCount} calculated from temp + RH
+            </span>
+          )}
           {!hideExportButton && (
             <button
               type="button"
@@ -233,19 +274,60 @@ export default function SensorChart({
               fontSize: 12,
             }}
             labelFormatter={(v) => formatChartTooltipTimestamp(v as string)}
-            formatter={(v: number) => [
+            formatter={(v: number, name: string) => [
               formatSensorChartTooltipValue(v, metric, temperatureUnit),
-              legendLabel,
+              name === "calculated" ? "calculated from temp + RH" : legendLabel,
             ]}
           />
-          <Series
-            type="monotone"
-            dataKey="value"
-            stroke={axisMeta.color}
-            strokeWidth={2}
-            fill={`url(#${id})`}
-            dot={false}
-          />
+          {splitVpdSeries && (
+            <Line
+              type="monotone"
+              dataKey="recorded"
+              name="recorded"
+              stroke={axisMeta.color}
+              strokeWidth={2}
+              dot={{ r: 3, fill: axisMeta.color, stroke: axisMeta.color }}
+              activeDot={{ r: 4 }}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          )}
+          {splitVpdSeries && (
+            <Line
+              type="monotone"
+              dataKey="calculated"
+              name="calculated"
+              stroke={axisMeta.color}
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              connectNulls={false}
+              dot={{ r: 3, fill: "transparent", stroke: axisMeta.color, strokeWidth: 2 }}
+              activeDot={false}
+              isAnimationActive={false}
+            />
+          )}
+          {!splitVpdSeries && metric === "vpd" && (
+            <Series
+              type="monotone"
+              dataKey="recorded"
+              name="recorded"
+              stroke={axisMeta.color}
+              strokeWidth={2}
+              fill={`url(#${id})`}
+              dot={false}
+              connectNulls={false}
+            />
+          )}
+          {!splitVpdSeries && metric !== "vpd" && (
+            <Series
+              type="monotone"
+              dataKey="value"
+              stroke={axisMeta.color}
+              strokeWidth={2}
+              fill={`url(#${id})`}
+              dot={false}
+            />
+          )}
         </Comp>
       </ResponsiveContainer>
     </div>

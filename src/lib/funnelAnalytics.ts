@@ -26,14 +26,20 @@
  *    can subscribe without touching the call sites.
  */
 
-import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
+import { isGoogleAnalyticsCollectionHost } from "@/lib/googleAnalyticsHost";
 import { enforceFunnelEventSchema } from "@/lib/funnelEventSchema";
+import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
 
 export const FUNNEL_EVENTS = [
   "signup",
   "grow_created",
   "tent_created",
   "plant_created",
+  // Onboarding navigation. These sit with setup, before either activation
+  // branch. surface is "onboarding" or "start_room" — never an id.
+  "onboarding_back",
+  "onboarding_restart",
+  "onboarding_skip",
   "quick_log_saved",
   "csv_history_onboarding_ready",
   "csv_import_started",
@@ -166,7 +172,9 @@ export function trackFunnelEvent(name: FunnelEventName, params?: FunnelEventPara
   const safe = enforceFunnelEventSchema(name, globallySafe);
   try {
     const g = (window as { gtag?: (...args: unknown[]) => void }).gtag;
-    if (typeof g === "function") g("event", name, safe);
+    if (typeof g === "function" && isGoogleAnalyticsCollectionHost(window.location.hostname)) {
+      g("event", name, safe);
+    }
   } catch {
     // Analytics must never break the product.
   }

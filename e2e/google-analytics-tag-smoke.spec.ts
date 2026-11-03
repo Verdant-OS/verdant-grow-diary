@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { grantAnalyticsConsent, waitForAnalyticsClientReady } from "./utils/analyticsConsent";
+import { pointSpecAtGoogleAnalyticsCollectionHost } from "./utils/googleAnalyticsCollectionHost";
+
+pointSpecAtGoogleAnalyticsCollectionHost(5192);
 
 /**
  * Lightweight smoke: load the app once and confirm the GA4 tag is actually in

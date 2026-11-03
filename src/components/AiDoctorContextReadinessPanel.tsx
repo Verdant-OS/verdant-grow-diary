@@ -8,7 +8,8 @@
  *  - Demo / stale / invalid data is shown honestly — never as live.
  *  - Preview output is clearly labeled "Preview only — not saved."
  */
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import type { ReadinessASignal } from "@/lib/aiDoctorReadinessSummaryRules";
 import { CheckCircle2, AlertTriangle, Info, Database, Beaker } from "lucide-react";
 import {
   buildAiDoctorReadinessView,
@@ -47,6 +48,8 @@ export interface AiDoctorContextReadinessPanelProps {
   onRetryAlerts?: () => void;
   className?: string;
   quickActions?: AiDoctorReadinessQuickActions;
+  /** Optional: reports the readiness view state to a parent readiness summary. */
+  onReadinessSignal?: (signal: ReadinessASignal) => void;
 }
 
 const OPEN_ALERTS_STATUS_COPY = {
@@ -178,6 +181,7 @@ export default function AiDoctorContextReadinessPanel({
   onRetryAlerts,
   className,
   quickActions,
+  onReadinessSignal,
 }: AiDoctorContextReadinessPanelProps) {
   const view = useMemo(
     () =>
@@ -188,6 +192,9 @@ export default function AiDoctorContextReadinessPanel({
     [context, openAlertsCount, openAlertsStatus],
   );
   const style = STATE_STYLES[view.state];
+  useEffect(() => {
+    onReadinessSignal?.({ view: view.state });
+  }, [onReadinessSignal, view.state]);
 
   const currentSnapshotQuality = useMemo(() => {
     const snapshotInput = deriveCurrentSnapshotFromAiDoctorContext(context);

@@ -117,14 +117,22 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
 
   async function archivePlant() {
     setBusy(true);
-    const { error } = await supabase
+    // select("id") so a zero-row update (no match, or refused by row-level
+    // security) is reported as a failure instead of a false "Plant archived".
+    const archived = await supabase
       .from("plants")
       .update(buildArchivePlantPayload(plant.id) as never)
-      .eq("id", plant.id);
+      .eq("id", plant.id)
+      .select("id");
     setBusy(false);
     setConfirmArchive(false);
-    if (error) {
-      toast.error(error.message);
+    if (!PlantLifecycleWriteRules.rowWasWritten(archived)) {
+      toast.error(
+        PlantLifecycleWriteRules.failureMessage(
+          archived,
+          "Plant was not archived. Nothing changed.",
+        ),
+      );
       return;
     }
     toast.success("Plant archived");

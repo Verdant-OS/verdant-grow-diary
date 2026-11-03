@@ -80,14 +80,14 @@ base: verdant-grow-diary
 pr: NOT_MEASURED (opened after this block)
 head_sha: see PR
 state: pushed draft
-current_step: slice 1 = regression test pinning tent/plant-name escaping in the grow diary export scope badge (item 1)
+current_step: slice 1 (item 1 export escaping test) pushed; slice 2 (items 7+8): 7 not reproduced at HEAD (fixed by f2d6ca2/#2794, page tests pass); 8 happy path toasts, but a zero-row archive falsely toasted success -> fixed with select(id)+rowWasWritten
 next_action: founder picks the next slice from the PR triage table; items 13/14 need schema, 1 (server-side bounds) needs a migration — both held for Matthew
 post_merge_check: NOT_APPLICABLE (test-only)
 active_writer: Claude session claude/new-session-azpsz3
 decisions: no migration/RLS/auth edits (held); items 2,4,5,6 already fixed by #2794 at HEAD (14/14 tests pass); item 3 not reproduced (both Quick Log paths guard in-flight + idempotency key; duplicate notes are 6.5 h apart)
 tried_and_rejected: editing grow-diary-pdf-export-source-and-escape.test.ts (scorer-lock); new test file instead
 commands: bunx vitest run src/test/tent-name-markup-export-escape.test.ts --reporter=dot
-files_touched: src/test/tent-name-markup-export-escape.test.ts, docs/agents/HANDOFF_LOG.md
+files_touched: src/test/tent-name-markup-export-escape.test.ts, src/components/PlantCardActionsMenu.tsx, src/test/plant-archive-outcome-toast.test.tsx, docs/agents/HANDOFF_LOG.md
 files_remaining: per founder choice
 blockers: live /version.json probe blocked by session egress hook (live SHA NOT_MEASURED); no production DB/Worker log access
 open_questions: is #2794 live? which P1/P2 slice next?
@@ -98,7 +98,7 @@ reviewer_sha: none yet
 session_state: none
 claimed_by: Claude, 2026-11-03 16:45 CT
 owner: Claude
-last_updated: 2026-11-03 16:45 CT, by Claude
+last_updated: 2026-11-03 17:10 CT, by Claude
 ```
 
 ```text

@@ -33,6 +33,8 @@ function row(overrides: Partial<SensorReadingRow> = {}): SensorReadingRow {
     created_at: FRESH,
     raw_payload: null,
     ...overrides,
+    notes: overrides.notes ?? null,
+    unit_unconfirmed: overrides.unit_unconfirmed ?? false,
   };
 }
 

@@ -14,6 +14,10 @@ const RECAP = readFileSync(
   "utf8",
 );
 const STATUS = readFileSync(resolve(ROOT, "src/components/PlantQuickStatusStrip.tsx"), "utf8");
+const AI_SECTION = readFileSync(
+  resolve(ROOT, "src/components/PlantDetailAiDoctorReadinessSection.tsx"),
+  "utf8",
+);
 const ACTIVE_PAGE = PAGE.slice(
   PAGE.indexOf("const ageDays"),
   PAGE.indexOf("function ArchivedPlantBanner"),
@@ -107,7 +111,10 @@ function canRenderTestId(sources: string[], testId: string): boolean {
     for (const match of source.matchAll(/data-testid=\{`([^`]+)`\}/g)) {
       // Split on the interpolations, escape the literal chunks, and let each
       // `${…}` stand for one test-id segment.
-      const pattern = match[1].split(/\$\{[^}]*\}/).map(escapeRegExp).join("[a-z0-9-]+");
+      const pattern = match[1]
+        .split(/\$\{[^}]*\}/)
+        .map(escapeRegExp)
+        .join("[a-z0-9-]+");
       if (new RegExp(`^${pattern}$`).test(testId)) return true;
     }
   }
@@ -146,19 +153,29 @@ describe("Plant Detail information architecture", () => {
       "PlantDetailHarvestEvidenceReportMount",
       "PlantRelativeTimelineSection",
       "PlantDetailAskDoctorHelper",
+      "PlantDetailAiDoctorReadinessSection",
+      "PlantAiDoctorSessionsPanel",
+    ]) {
+      expect(countComponent(ACTIVE_PAGE, component), component).toBe(1);
+    }
+    // The AI review surfaces mount once, inside the readiness section
+    // (docs/specs/ai-doctor-readiness-single-summary.md R7-R7c).
+    for (const component of [
+      "AiDoctorReadinessSummary",
       "PlantDetailAiDoctorReadiness",
       "PlantDetailAiDoctorContextReadinessMount",
       "PlantDetailTimelineEvidenceReadinessLaunch",
       "PlantDetailAiDoctorLiveReview",
       "PlantDetailAiDoctorContextPanel",
-      "PlantAiDoctorSessionsPanel",
     ]) {
-      expect(countComponent(ACTIVE_PAGE, component), component).toBe(1);
+      expect(countComponent(ACTIVE_PAGE, component), component).toBe(0);
+      expect(countComponent(AI_SECTION, component), component).toBe(1);
     }
   });
 
   it("mounts one real AI review action without legacy preview launchers", () => {
-    expect(countComponent(ACTIVE_PAGE, "PlantDetailAiDoctorLiveReview")).toBe(1);
+    expect(countComponent(ACTIVE_PAGE, "PlantDetailAiDoctorReadinessSection")).toBe(1);
+    expect(countComponent(AI_SECTION, "PlantDetailAiDoctorLiveReview")).toBe(1);
     for (const component of [
       "PlantDetailDoctorContextPreview",
       "PlantDetailAiDoctorReadinessGate",
@@ -205,9 +222,10 @@ describe("Plant Detail information architecture", () => {
 
     expect(anchorStart).toBeGreaterThan(-1);
     expect(anchorEnd).toBeGreaterThan(anchorStart);
-    expect(countComponent(anchorSource, "PlantDetailAiDoctorReadiness")).toBe(1);
-    expect(countComponent(anchorSource, "PlantDetailAiDoctorContextReadinessMount")).toBe(1);
-    expect(countComponent(anchorSource, "PlantDetailAiDoctorLiveReview")).toBe(1);
+    expect(countComponent(anchorSource, "PlantDetailAiDoctorReadinessSection")).toBe(1);
+    expect(countComponent(AI_SECTION, "PlantDetailAiDoctorReadiness")).toBe(1);
+    expect(countComponent(AI_SECTION, "PlantDetailAiDoctorContextReadinessMount")).toBe(1);
+    expect(countComponent(AI_SECTION, "PlantDetailAiDoctorLiveReview")).toBe(1);
   });
 
   it("keeps essentials ahead of disclosures and recap -> response -> harvest source order", () => {

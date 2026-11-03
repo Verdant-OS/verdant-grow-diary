@@ -99,19 +99,19 @@ describe("Tonight tent calculated VPD — newer temperature/RH than stored VPD (
     expect(newer).toMatchObject({ value: 0.9, calculated: false });
   });
 
-  it("keeps the stored VPD when the newer temperature and RH are not one capture", () => {
+  it("withholds a stored VPD when a newer temperature and RH are not one capture", () => {
     const vpd = vpdOf([
       storedVpd,
       rowAt("temperature_c", fToC(80), "manual", minutesAgo(1)),
       rowAt("humidity_pct", 50, "manual", minutesAgo(2)),
     ]);
-    expect(vpd).toMatchObject({ value: 0.9, calculated: false });
+    expect(vpd).toMatchObject({ state: "not_computed", value: null, calculated: false });
   });
 
   it("never uses an older same-capture pair beside newer unpaired displayed inputs", () => {
     // History: stored VPD 3h ago; a paired 70°F/60% capture 1h ago; then newer
-    // temperature and RH at different times. The card shows the newest temp/RH,
-    // so a VPD calculated from the older pair must not replace the stored one.
+    // temperature and RH at different times. The latest climate cohort has
+    // neither a pair nor a stored VPD, so the card shows no VPD.
     const pairAt = minutesAgo(60);
     const vpd = vpdOf([
       storedVpd,
@@ -121,7 +121,8 @@ describe("Tonight tent calculated VPD — newer temperature/RH than stored VPD (
       rowAt("humidity_pct", 50, "manual", minutesAgo(1)),
     ]);
     expect(vpd.value).not.toBe(calculateVpdKpa({ tempC: fToC(70), rhPercent: 60 }));
-    expect(vpd).toMatchObject({ value: 0.9, calculated: false });
+    expect(vpd.value).not.toBe(0.9);
+    expect(vpd).toMatchObject({ state: "not_computed", value: null, calculated: false });
   });
 
   it("overrides with a live pair that aged past the live window (shown as stale)", () => {

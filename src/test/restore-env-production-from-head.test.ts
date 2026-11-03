@@ -202,3 +202,25 @@ describe("prebuild wires restore first (compose with later verify)", () => {
     );
   });
 });
+
+describe("restoreEnvProductionFromHead without a git repository", () => {
+  it("keeps the on-disk file and classifies it", async () => {
+    const mod = await import("../../scripts/restore-env-production-from-head.mjs");
+    const r = mod.restoreEnvProductionFromHead({
+      rootDir: "/x",
+      gitShow: () => ({ ok: false, reason: "git_repository_absent" }),
+      readOnDisk: () => "VITE_PAYMENTS_CLIENT_TOKEN=test_abc\n",
+      writeFile: () => { throw new Error("must not write"); },
+    });
+    expect(r).toEqual({ ok: true, tokenClass: "test_", source: "disk" });
+  });
+  it("fails closed when no git and no file", async () => {
+    const mod = await import("../../scripts/restore-env-production-from-head.mjs");
+    const r = mod.restoreEnvProductionFromHead({
+      rootDir: "/x",
+      gitShow: () => ({ ok: false, reason: "git_repository_absent" }),
+      readOnDisk: () => null,
+    });
+    expect(r).toEqual({ ok: false, reason: "env_production_missing_no_git" });
+  });
+});

@@ -19,7 +19,7 @@
  * Fail closed when HEAD has no `.env.production`, or when git is unavailable.
  * Never invents a file. Stdout reports token CLASS only (never token bytes).
  */
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
@@ -101,6 +101,9 @@ export function gitShowHeadEnvProduction(rootDir, relPath = ENV_PRODUCTION_REL_P
   }
   if (shown.status !== 0) {
     const errText = Buffer.isBuffer(shown.stderr) ? shown.stderr.toString("utf8") : "";
+    if (/not a git repository/iu.test(errText)) {
+      return { ok: false, reason: "git_repository_absent" };
+    }
     if (
       /does not exist|exists on disk|pathspec|fatal: path ['"]/iu.test(errText) ||
       shown.status === 128
@@ -135,15 +138,36 @@ export function gitShowHeadEnvProduction(rootDir, relPath = ENV_PRODUCTION_REL_P
  * }} [options]
  * @returns {{ ok: true, tokenClass: string } | { ok: false, reason: string }}
  */
+function defaultReadOnDisk(absolutePath) {
+  try {
+    if (!existsSync(absolutePath)) return null;
+    return readFileSync(absolutePath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
 export function restoreEnvProductionFromHead({
   rootDir = process.cwd(),
   gitShow = gitShowHeadEnvProduction,
+  readOnDisk = defaultReadOnDisk,
   writeFile = (absolutePath, content) => {
     writeFileSync(absolutePath, content, "utf8");
   },
 } = {}) {
   const shown = gitShow(rootDir, ENV_PRODUCTION_REL_PATH);
-  if (!shown.ok) return shown;
+  if (!shown.ok) {
+    // Publish builders may ship a source snapshot without `.git`. With no
+    // repository there is no HEAD to restore from; keep the on-disk file
+    // untouched (never invent one) and let the next guard classify it.
+    if (shown.reason === "git_repository_absent") {
+      const absolutePath = resolve(rootDir, ENV_PRODUCTION_REL_PATH);
+      const onDisk = readOnDisk(absolutePath);
+      if (onDisk === null) return { ok: false, reason: "env_production_missing_no_git" };
+      return { ok: true, tokenClass: classifyPaymentsClientTokenClass(onDisk), source: "disk" };
+    }
+    return shown;
+  }
 
   try {
     writeFile(resolve(rootDir, ENV_PRODUCTION_REL_PATH), shown.content);
@@ -163,7 +187,9 @@ function main() {
     return;
   }
   console.log(
-    `[restore-env-production] restored .env.production from HEAD; token class=${result.tokenClass}`,
+    result.source === "disk"
+      ? `[restore-env-production] no git repository; kept on-disk .env.production; token class=${result.tokenClass}`
+      : `[restore-env-production] restored .env.production from HEAD; token class=${result.tokenClass}`,
   );
 }
 

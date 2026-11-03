@@ -51,6 +51,7 @@ export interface GuideContinuation {
   readonly body?: string;
   /** Links `label` where it appears inside `body`. */
   readonly bodyLink?: GuideAnchor;
+  readonly bullets?: ReadonlyArray<GuideBullet>;
   readonly steps?: ReadonlyArray<string>;
   readonly closing?: string;
   /** Links `label` where it appears inside `closing`. */
@@ -58,11 +59,25 @@ export interface GuideContinuation {
   readonly cta?: GuideAnchor;
 }
 
+export interface GuideBullet {
+  readonly text: string;
+  /** Links `label` where it appears inside `text`. */
+  readonly link?: GuideAnchor;
+}
+
+export interface GuideColumnTable {
+  readonly ariaLabel: string;
+  readonly headers: readonly [string, string];
+  readonly rows: ReadonlyArray<readonly [string, string]>;
+}
+
 export interface GuideSection {
   readonly heading: string;
   readonly body: string;
   /** Optional in-app internal links surfaced under the section body. */
   readonly links?: ReadonlyArray<GuideSectionLink>;
+  readonly bullets?: ReadonlyArray<GuideBullet>;
+  readonly columnTable?: GuideColumnTable;
   /** Links `label` where it appears inside `body`. */
   readonly bodyLink?: GuideAnchor;
   readonly steps?: ReadonlyArray<string>;
@@ -140,6 +155,11 @@ export interface SeoGuidePage {
   readonly modifiedOn?: string;
   /** Optional shared comparison table rendered accessibly below the introduction. */
   readonly referenceTable?: SymptomReferenceTableData;
+  /** Ordered steps mirrored into HowTo JSON-LD. Text must match the visible list. */
+  readonly howTo?: {
+    readonly name: string;
+    readonly steps: ReadonlyArray<string>;
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -232,6 +252,14 @@ const SPIDER_FARMER_CSV_IMPORT_CTA_HREF =
   "https://verdantgrowdiary.com/auth?mode=signup&utm_source=organic_guide&utm_medium=owned&utm_campaign=search_to_first_value&utm_content=spider-farmer-data-logging";
 
 const CSV_IMPORT_CTA_LABEL = "Import your first CSV free";
+
+const IMPORT_GROW_SENSOR_CSV_CTA_HREF =
+  "https://verdantgrowdiary.com/auth?mode=signup&utm_source=organic_guide&utm_medium=owned&utm_campaign=search_to_first_value&utm_content=import-grow-sensor-csv";
+
+const IMPORT_GROW_SENSOR_CSV_LINK: GuideAnchor = {
+  label: "import grow sensor CSV",
+  href: "/guides/import-grow-sensor-csv",
+};
 
 export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   {
@@ -560,6 +588,14 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         ],
         closing:
           "This works on the Free plan with no upgrade step. AC Infinity and Spider Farmer files both import, including into the same account.",
+        continuations: [
+          {
+            heading: "How the file is read",
+            headingLevel: 3,
+            body: "Columns, temperature units, VPD and skipped rows are covered in the import grow sensor CSV guide.",
+            bodyLink: IMPORT_GROW_SENSOR_CSV_LINK,
+          },
+        ],
       },
       {
         heading: "What happens to the readings",
@@ -651,6 +687,12 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
             },
             cta: { label: CSV_IMPORT_CTA_LABEL, href: SPIDER_FARMER_CSV_IMPORT_CTA_HREF },
           },
+          {
+            heading: "How the file is read",
+            headingLevel: 3,
+            body: "Columns, temperature units, VPD and skipped rows are covered in the import grow sensor CSV guide.",
+            bodyLink: IMPORT_GROW_SENSOR_CSV_LINK,
+          },
         ],
       },
       {
@@ -670,6 +712,166 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     related: ["ac-infinity-data-logging", "grow-room-vpd-tracker"],
+  },
+  {
+    slug: "import-grow-sensor-csv",
+    title: "Import AC Infinity & Spider Farmer CSV Logs Free | Verdant",
+    h1: "Is there an app that imports AC Infinity or Spider Farmer CSV sensor logs?",
+    description:
+      "Import your grow controller's CSV sensor history into a free grow diary. Which columns map, °F handling, VPD, file limits and fixes for skipped rows.",
+    targetKeyword: "import grow controller csv",
+    introHeading: "Quick answer",
+    intro:
+      "Yes. Verdant imports the CSV you export from your AC Infinity or Spider Farmer app, free. Open Sensors → Import historical data, pick the file, check the preview and import. Verdant reads the time, temperature, humidity, VPD and CO₂ columns, asks whether temperatures are °F or °C when the header and the values still don't say, and keeps every reading at its original time, labeled as CSV, never as live data.",
+    modifiedOn: "2026-11-03",
+    howTo: {
+      name: "How to import a grow controller CSV",
+      steps: [
+        "Export a CSV from your AC Infinity or Spider Farmer app.",
+        "In Verdant, open Sensors and choose Import historical data (it's on mobile too).",
+        "Choose your CSV, confirm the temperature unit if asked, check the preview, then import.",
+      ],
+    },
+    sections: [
+      {
+        heading: "Before you start",
+        body: "",
+        bullets: [
+          {
+            text: "Export from your controller app. Both AC Infinity and Spider Farmer apps can export history as CSV. Spider Farmer says its app keeps up to four months of environment history and exports it from the app's settings (Spider Farmer GGS FAQ).",
+            link: {
+              label: "Spider Farmer GGS FAQ",
+              href: "https://www.spider-farmer.com/ggs-faq/",
+            },
+          },
+          {
+            text: "One file per controller. Each import maps to one tent, so export each controller separately.",
+          },
+          {
+            text: "Keep it under 25 MB. That's the importer's file limit. If a long, high-frequency export is bigger, export a shorter span or a longer interval.",
+          },
+          {
+            text: "Don't edit the file first. The importer works from the column headers your app writes.",
+          },
+        ],
+      },
+      {
+        heading: "How to import it",
+        body: "",
+        steps: [
+          "Export a CSV from your AC Infinity or Spider Farmer app.",
+          "In Verdant, open Sensors and choose Import historical data (it's on mobile too).",
+          "Choose your CSV, confirm the temperature unit if asked, check the preview, then import.",
+        ],
+        closing: "CSV import is on the Free plan. There's no upgrade step.",
+        closingLink: { label: "Free plan", href: "/pricing" },
+      },
+      {
+        heading: "What the importer reads",
+        body: "When you import grow controller csv history, columns Verdant doesn't use are ignored. A row needs at least one usable reading to be kept.",
+        columnTable: {
+          ariaLabel: "CSV columns the importer reads",
+          headers: ["Column in your file", "What Verdant stores"],
+          rows: [
+            ["Date / time", "The reading's original time"],
+            ["Temperature", "Air temperature, shown in your saved temperature unit"],
+            ["Humidity", "Relative humidity, %"],
+            ["VPD", "VPD, kPa (calculated if missing, see below)"],
+            ["CO₂", "CO₂, ppm"],
+          ],
+        },
+        continuations: [
+          {
+            heading: "Temperatures and °F",
+            body: "Verdant works out the temperature unit from the column header, then from the values. If it still can't tell, it asks you: This is °F or This is °C. Pick the one your app exported. Imported history then shows in the temperature unit saved in your settings.",
+          },
+        ],
+      },
+      {
+        heading: "VPD",
+        body: "If your export has a VPD column, Verdant keeps it. If it doesn't, Verdant calculates VPD from that row's temperature and humidity. Compare the result against the bands on the VPD chart.",
+        bodyLink: { label: "VPD chart", href: "/vpd-chart" },
+        continuations: [
+          {
+            heading: "Why some rows get skipped",
+            body: "Verdant doesn't quietly fix bad readings. It skips the whole row instead of clamping a value when that value is outside a believable range:",
+            bullets: [
+              { text: "temperature below -40 °F or above 176 °F" },
+              { text: "humidity that isn't a valid percentage" },
+              { text: "VPD outside 0 to 10 kPa" },
+              { text: "CO₂ outside 0 to 10,000 ppm" },
+            ],
+            closing:
+              "The preview shows what will be saved before anything is written. A cluster of skipped rows usually means a sensor dropped out or the wrong unit was picked; re-import and choose the other unit.",
+          },
+        ],
+      },
+      {
+        heading: "What you get after import",
+        body: "",
+        bullets: [
+          {
+            text: "Tent history. Readings appear in the tent's sensor history, so a diary note on day 34 can be read against the conditions before it.",
+          },
+          {
+            text: "Quick Log context. Quick Log entries can carry the nearest sensor snapshot, so a watering note gets its temp, RH and VPD without retyping.",
+          },
+          {
+            text: "Honest labels. Every imported reading is labeled CSV. Verdant keeps live, manual, CSV, demo, stale and invalid data apart (sensor truth).",
+            link: { label: "sensor truth", href: "/guides/sensor-truth-grow-room" },
+          },
+        ],
+        continuations: [
+          {
+            heading: "What it doesn't do",
+            body: "Verdant isn't a controller. Importing a CSV doesn't change fan speeds, lights or vents, and nothing in Verdant sends a command to your devices.",
+          },
+        ],
+      },
+    ],
+    faq: [
+      {
+        question: "Is CSV sensor import free?",
+        answer: "Yes. CSV sensor import is included on Verdant's Free plan.",
+      },
+      {
+        question: "Which CSV files can Verdant import?",
+        answer:
+          "CSV exports from AC Infinity and Spider Farmer apps, and other environment CSVs with time plus temperature, humidity, VPD or CO₂ columns. Files can be up to 25 MB.",
+      },
+      {
+        question: "Where is CSV import in Verdant?",
+        answer: 'On the Sensors page, under "Import historical data".',
+      },
+      {
+        question: "Will imported readings show up as live data?",
+        answer: "No. Each reading keeps its original time and is labeled as CSV, never live.",
+      },
+      {
+        question: "Does Verdant convert Celsius to Fahrenheit?",
+        answer:
+          "Yes. If the file's unit isn't clear, Verdant asks whether it's °F or °C, then shows imported temperatures in the temperature unit saved in your settings.",
+      },
+      {
+        question: "Can I import data from more than one controller?",
+        answer:
+          "Yes. Import one CSV per controller; each import maps to one tent, and AC Infinity and Spider Farmer files can live in the same account.",
+      },
+    ],
+    faqFooter: {
+      lead: "Keep reading:",
+      links: [
+        {
+          label: "AC Infinity data logging into a grow diary",
+          href: "/guides/ac-infinity-data-logging",
+        },
+        { label: "Spider Farmer data logging", href: "/guides/spider-farmer-data-logging" },
+        { label: "Grow room VPD tracker", href: "/guides/grow-room-vpd-tracker" },
+        { label: "Hardware integrations", href: "/hardware-integrations" },
+      ],
+      cta: { label: "Import your first CSV free →", href: IMPORT_GROW_SENSOR_CSV_CTA_HREF },
+    },
+    related: ["ac-infinity-data-logging", "spider-farmer-data-logging", "grow-room-vpd-tracker"],
   },
   {
     slug: "sensor-truth-grow-room",

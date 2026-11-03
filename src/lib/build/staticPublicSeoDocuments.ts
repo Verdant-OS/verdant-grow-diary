@@ -53,6 +53,7 @@ import {
   buildBreadcrumbListJsonLd,
   buildCultivarCollectionJsonLd,
   buildFaqPageJsonLd,
+  buildHowToJsonLd,
   buildWebPageJsonLd,
 } from "../seoStructuredData";
 import {
@@ -67,7 +68,11 @@ import {
 } from "../publicGrowGuideArticles";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "./siteSoftwareApplicationJsonLd";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
-import { isPublicGuideHref, splitAroundAnchor } from "../guidePublicCopyViewModel";
+import {
+  isGuideCitationHref,
+  isPublicGuideHref,
+  splitAroundAnchor,
+} from "../guidePublicCopyViewModel";
 
 export const VERDANT_SITE_ORIGIN = "https://verdantgrowdiary.com";
 const DEFAULT_OG_IMAGE = `${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png`;
@@ -125,18 +130,28 @@ function buildStaticGuideQuickLogStarterHref(guideSlug: string): string {
  * so crawlers that do not execute the application bundle still receive the
  * guide's real heading, evidence-first sections, FAQs, and internal links.
  */
-function renderStaticGuideAnchor(anchor: GuideAnchor): string {
-  if (!isPublicGuideHref(anchor.href)) return escapeStaticHtml(anchor.label);
-  return `<a href="${escapeStaticHtml(anchor.href)}">${escapeStaticHtml(anchor.label)}</a>`;
+function renderStaticGuideAnchor(anchor: GuideAnchor, allowCitation = false): string {
+  const allowed = allowCitation ? isGuideCitationHref(anchor.href) : isPublicGuideHref(anchor.href);
+  if (!allowed) return escapeStaticHtml(anchor.label);
+  const external = anchor.href.startsWith("https://");
+  const rel = external ? ' rel="noopener noreferrer"' : "";
+  return `<a href="${escapeStaticHtml(anchor.href)}"${rel}>${escapeStaticHtml(anchor.label)}</a>`;
 }
 
-function renderStaticLinkedText(text: string, anchor: GuideAnchor | undefined): string {
+function renderStaticLinkedText(
+  text: string,
+  anchor: GuideAnchor | undefined,
+  allowCitation = false,
+): string {
   const parts = splitAroundAnchor(text, anchor);
   if (parts.kind === "plain") return escapeStaticHtml(text);
-  return `${escapeStaticHtml(parts.before)}${renderStaticGuideAnchor({
-    label: parts.label,
-    href: parts.href,
-  })}${escapeStaticHtml(parts.after)}`;
+  return `${escapeStaticHtml(parts.before)}${renderStaticGuideAnchor(
+    {
+      label: parts.label,
+      href: parts.href,
+    },
+    allowCitation,
+  )}${escapeStaticHtml(parts.after)}`;
 }
 
 function renderStaticGuideBlock(block: {
@@ -149,6 +164,12 @@ function renderStaticGuideBlock(block: {
   closingLink?: GuideAnchor;
   cta?: GuideAnchor;
   links?: ReadonlyArray<GuideSectionLink>;
+  bullets?: ReadonlyArray<{ text: string; link?: GuideAnchor }>;
+  columnTable?: {
+    ariaLabel: string;
+    headers: readonly [string, string];
+    rows: ReadonlyArray<readonly [string, string]>;
+  };
 }): string {
   const tag = block.headingLevel === 3 ? "h3" : "h2";
   const links = (block.links ?? [])
@@ -161,9 +182,29 @@ function renderStaticGuideBlock(block: {
     block.steps && block.steps.length > 0
       ? `<ol>${block.steps.map((step) => `<li>${escapeStaticHtml(step)}</li>`).join("")}</ol>`
       : "";
+  const bullets =
+    block.bullets && block.bullets.length > 0
+      ? `<ul>${block.bullets
+          .map(
+            (bullet) => `<li>${renderStaticLinkedText(bullet.text, bullet.link, true)}</li>`,
+          )
+          .join("")}</ul>`
+      : "";
+  const columnTable = block.columnTable
+    ? `<table aria-label="${escapeStaticHtml(block.columnTable.ariaLabel)}"><thead><tr>${block.columnTable.headers
+        .map((header) => `<th scope="col">${escapeStaticHtml(header)}</th>`)
+        .join("")}</tr></thead><tbody>${block.columnTable.rows
+        .map(
+          (row) =>
+            `<tr><th scope="row">${escapeStaticHtml(row[0])}</th><td>${escapeStaticHtml(row[1])}</td></tr>`,
+        )
+        .join("")}</tbody></table>`
+    : "";
   return [
     `<section><${tag}>${escapeStaticHtml(block.heading)}</${tag}>`,
     block.body && block.body.trim() ? `<p>${renderStaticLinkedText(block.body, block.bodyLink)}</p>` : "",
+    bullets,
+    columnTable,
     steps,
     block.closing && block.closing.trim()
       ? `<p>${renderStaticLinkedText(block.closing, block.closingLink)}</p>`
@@ -415,6 +456,7 @@ function buildStaticWebPageJsonLd(metadata: {
   readonly title: string;
   readonly description: string;
   readonly url: string;
+  readonly dateModified?: string;
 }) {
   return buildWebPageJsonLd({ ...metadata, siteUrl: VERDANT_SITE_ORIGIN });
 }
@@ -434,12 +476,21 @@ function buildStaticGuideJsonLd(guide: (typeof VERDANT_SEO_GUIDES)[number]) {
         siteUrl: VERDANT_SITE_ORIGIN,
       })
     : null;
+  const howTo = guide.howTo
+    ? buildHowToJsonLd({ url, name: guide.howTo.name, steps: guide.howTo.steps })
+    : null;
   return [
-    buildStaticWebPageJsonLd({ title: guide.title, description: guide.description, url }),
+    buildStaticWebPageJsonLd({
+      title: guide.title,
+      description: guide.description,
+      url,
+      dateModified: guide.publishedOn ? undefined : guide.modifiedOn,
+    }),
     buildFaqPageJsonLd({ pageUrl: url, questions: guide.faq }),
     buildBreadcrumbListJsonLd({
       items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url }],
     }),
+    ...(howTo ? [howTo] : []),
     ...(article ? [article] : []),
   ];
 }

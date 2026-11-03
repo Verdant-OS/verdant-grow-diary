@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### IMPORT-GROW-SENSOR-CSV-GUIDE
+
+```text
+TASK IMPORT-GROW-SENSOR-CSV-GUIDE  priority: other  status: OPEN
+goal: Public guide /guides/import-grow-sensor-csv, brand-neutral importer reference, with two-way links to the AC Infinity and Spider Farmer export guides.
+why: Search-to-first-value page for how the CSV importer reads columns, units, VPD, the 25 MB limit, and skipped rows.
+branch: cursor/import-grow-sensor-csv-guide-40fe
+base: verdant-grow-diary
+checkout: git fetch origin cursor/import-grow-sensor-csv-guide-40fe verdant-grow-diary && git switch cursor/import-grow-sensor-csv-guide-40fe
+pr: see GitHub after push
+head_sha: read git rev-parse HEAD after the guide commit
+state: local until pushed
+current_step: page, sitemap, JSON-LD, tests, and screenshots
+next_action: confirm required CI at the pushed head; do not auto-merge or enqueue
+post_merge_check: after Publish, GET https://verdantgrowdiary.com/guides/import-grow-sensor-csv and confirm HTTP 200, the self-canonical, and the three import steps. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Grok cloud agent
+decisions: copy follows the draft except where csvParser.ts and EnvironmentCsvImportModal.tsx disagree (saved temperature unit; a bad value skips the whole row; unit prompt only after header and values fail). HowTo is a new known JSON-LD type. Breadcrumb label stays "Grower Guides".
+tried_and_rejected: leaving temperatures as always °F. ImportedSensorHistoryPanel follows the saved preference.
+commands: bunx vitest run src/test/guide-import-grow-sensor-csv.test.tsx --reporter=dot
+files_touched: src/constants/verdantSeoContent.ts; src/pages/GuidePage.tsx; src/lib/seoStructuredData.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/guidePublicCopyViewModel.ts; public/sitemap.xml; scripts/validate-jsonld-rich-results.mjs; src/test/guide-import-grow-sensor-csv.test.tsx; src/test/verdant-seo-guides.test.ts; src/test/verdant-seo-sitemap-robots.test.ts; src/test/verdant-guides-glossary-head-invariants.test.ts
+files_remaining: none
+blockers: none for repository work
+open_questions: none
+gotchas: scorer pins were renegotiated for the new slug, sitemap URL, HowTo schema set, and HowTo validator. Do not enqueue.
+links: draft uploads import-grow-sensor-csv and 2026-11-02 brief
+artifacts: screenshots live on the PR, not in the branch
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production writes
+claimed_by: Grok, 2026-11-03
+owner: Grok
+last_updated: 2026-11-02 19:16 CT, by Grok
+```
+
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text

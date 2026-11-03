@@ -22,6 +22,7 @@ export interface WebPageJsonLd {
     readonly "@type": "WebSite";
     readonly "@id": string;
   };
+  readonly dateModified?: string;
 }
 
 /** Build one route-owned WebPage identity for static output and hydration. */
@@ -30,11 +31,13 @@ export function buildWebPageJsonLd({
   description,
   url,
   siteUrl,
+  dateModified,
 }: {
   title: string;
   description: string;
   url: string;
   siteUrl: string;
+  dateModified?: string;
 }): WebPageJsonLd {
   if (!title.trim()) throw new Error("buildWebPageJsonLd: title required");
   if (!description.trim()) throw new Error("buildWebPageJsonLd: description required");
@@ -43,6 +46,9 @@ export function buildWebPageJsonLd({
   }
   if (!/^https?:\/\//i.test(siteUrl)) {
     throw new Error(`buildWebPageJsonLd: siteUrl must be absolute (got "${siteUrl}")`);
+  }
+  if (dateModified && !/^\d{4}-\d{2}-\d{2}/.test(dateModified)) {
+    throw new Error(`buildWebPageJsonLd: dateModified must be ISO-8601 (got "${dateModified}")`);
   }
   const normalizedSiteUrl = siteUrl.replace(/\/$/, "");
   return {
@@ -56,6 +62,49 @@ export function buildWebPageJsonLd({
       "@type": "WebSite",
       "@id": `${normalizedSiteUrl}/#website`,
     },
+    ...(dateModified ? { dateModified } : {}),
+  };
+}
+
+export interface HowToJsonLd {
+  readonly "@context": "https://schema.org";
+  readonly "@type": "HowTo";
+  readonly "@id": string;
+  readonly name: string;
+  readonly step: ReadonlyArray<{
+    readonly "@type": "HowToStep";
+    readonly position: number;
+    readonly name: string;
+    readonly text: string;
+  }>;
+}
+
+/** Visible ordered steps only. Step text must match the rendered list. */
+export function buildHowToJsonLd({
+  url,
+  name,
+  steps,
+}: {
+  url: string;
+  name: string;
+  steps: ReadonlyArray<string>;
+}): HowToJsonLd {
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error(`buildHowToJsonLd: url must be absolute (got "${url}")`);
+  }
+  if (!name.trim()) throw new Error("buildHowToJsonLd: name required");
+  if (steps.length === 0) throw new Error("buildHowToJsonLd: steps required");
+  return {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "@id": `${url}#howto`,
+    name,
+    step: steps.map((text, index) => ({
+      "@type": "HowToStep",
+      position: index + 1,
+      name: text,
+      text,
+    })),
   };
 }
 

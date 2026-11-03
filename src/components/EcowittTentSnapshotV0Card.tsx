@@ -9,6 +9,7 @@
  */
 import { useMemo } from "react";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import type { SensorReading } from "@/mock";
 import { buildEcowittTentSnapshotV0ViewModel } from "@/lib/ecowittTentSnapshotV0ViewModel";
 import type { EcowittTentSnapshotV0MetricView } from "@/lib/ecowittTentSnapshotV0ViewModel";
 import {
@@ -23,6 +24,11 @@ export interface EcowittTentSnapshotV0CardProps {
   className?: string;
   /** Injected clock for deterministic tests. */
   now?: Date;
+  /**
+   * Quick Log manual climate for this tent. A newer manual temperature or
+   * humidity replaces that metric on the card and stays labeled manual.
+   */
+  manualReadings?: readonly SensorReading[] | null;
 }
 
 function formatCapturedAt(iso: string | null): string {
@@ -100,8 +106,52 @@ function MetricSparkline({
   );
 }
 
+export function manualClimateAsSnapshotRows(
+  readings: readonly SensorReading[] | null | undefined,
+  tentId: string | null,
+): Array<{
+  source: string;
+  ts: string;
+  metric: string;
+  value: number;
+  tent_id: string | null;
+}> {
+  const rows: Array<{
+    source: string;
+    ts: string;
+    metric: string;
+    value: number;
+    tent_id: string | null;
+  }> = [];
+  for (const reading of readings ?? []) {
+    if (!reading || reading.source === "demo") continue;
+    if (tentId && reading.tentId !== tentId) continue;
+    const observed = reading.observedMetrics;
+    const allow = (metric: "temp" | "rh") => !observed || observed.includes(metric);
+    if (allow("temp") && Number.isFinite(reading.temp)) {
+      rows.push({
+        source: "manual",
+        ts: reading.ts,
+        metric: "temperature_c",
+        value: reading.temp,
+        tent_id: reading.tentId,
+      });
+    }
+    if (allow("rh") && Number.isFinite(reading.rh)) {
+      rows.push({
+        source: "manual",
+        ts: reading.ts,
+        metric: "humidity_pct",
+        value: reading.rh,
+        tent_id: reading.tentId,
+      });
+    }
+  }
+  return rows;
+}
+
 export function EcowittTentSnapshotV0Card(props: EcowittTentSnapshotV0CardProps) {
-  const { tentId, className, now } = props;
+  const { tentId, className, now, manualReadings } = props;
   // Oversample so 24h history can populate sparklines for ~60s EcoWitt cadence.
   const readingsQuery = useSensorReadings(tentId ?? null, 1500);
   const temperatureUnit = useTemperatureUnitPreference();
@@ -109,11 +159,17 @@ export function EcowittTentSnapshotV0Card(props: EcowittTentSnapshotV0CardProps)
 
   const vm = useMemo(
     () =>
-      buildEcowittTentSnapshotV0ViewModel(readingsQuery.data ?? [], {
-        tentId: tentId ?? null,
-        now,
-      }),
-    [readingsQuery.data, tentId, now],
+      buildEcowittTentSnapshotV0ViewModel(
+        [
+          ...(readingsQuery.data ?? []),
+          ...manualClimateAsSnapshotRows(manualReadings, tentId ?? null),
+        ],
+        {
+          tentId: tentId ?? null,
+          now,
+        },
+      ),
+    [readingsQuery.data, manualReadings, tentId, now],
   );
 
   return (

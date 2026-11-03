@@ -57,13 +57,14 @@ describe("mobile Quick Log — single FAB", () => {
     // Header and FAB share openGrowerQuickLog — same QuickLogV2Sheet entry.
     const openHandler =
       APP_SHELL.match(
-        /const openGrowerQuickLog = useCallback\(\(\) => \{([\s\S]*?)\}, \[location\.pathname, mobileQuickLogTarget\]\);/,
+        /const openGrowerQuickLog = useCallback\(\(\) => \{([\s\S]*?)\}, \[location\.pathname, mobileQuickLogTarget, user\?\.id\]\);/,
       )?.[1] ?? "";
     expect(openHandler).not.toBe("");
     expect(APP_SHELL).toMatch(
       /onClick=\{openGrowerQuickLog\}[\s\S]{0,200}data-testid="mobile-quick-log-fab"/,
     );
     expect(openHandler).toContain("resolvePlantQuickLogRouteTarget(location.pathname)");
+    expect(openHandler).toContain("QuickLogLaunchTarget.resolve");
     expect(openHandler).toMatch(
       /mobileQuickLogTarget \?\? \(routePlantId \? `plant:\$\{routePlantId\}` : null\)/,
     );

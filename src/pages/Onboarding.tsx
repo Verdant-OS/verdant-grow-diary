@@ -14,6 +14,7 @@
 //    persisting a preference.
 //  - "Change later" copy points to Settings.
 import { useEffect, useRef, useState } from "react";
+import { OnboardingRestartDialog } from "@/components/OnboardingRestartDialog";
 import { useNavigate, Navigate, Link, useSearchParams } from "@/lib/react-router-compat";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/store/auth";
@@ -28,6 +29,8 @@ import {
 } from "@/lib/startScreenPreferences";
 import { shouldPreferStartYourRoom } from "@/lib/startYourRoomRules";
 import { Sprout } from "lucide-react";
+import { OnboardingFlowControls } from "@/lib/onboardingFlowControls";
+import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 
 export const ONBOARDING_GROWS_LOADING_COPY = "Loading your grows…";
 import {
@@ -85,6 +88,8 @@ export default function Onboarding() {
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
   const [choice, setChoice] = useState<StartScreenChoice>(DEFAULT_START_SCREEN);
+  const [restartOpen, setRestartOpen] = useState(false);
+  const { createOutcomeUnknown } = useHierarchyCreateOutcomeRecovery({ ownerId: user?.id });
   const [starterBusy, setStarterBusy] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [starterRetrying, setStarterRetrying] = useState(false);
@@ -100,6 +105,11 @@ export default function Onboarding() {
     // keyboard users can tab directly into the radiogroup.
     headingRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setChoice(OnboardingFlowControls.readStartScreenChoice(user.id));
+  }, [user?.id]);
 
   if (loading) return null;
   if (growsLoading) {
@@ -169,6 +179,17 @@ export default function Onboarding() {
   function go(c: StartScreenChoice, save: boolean) {
     if (save && user) setStartScreenChoice(user.id, c);
     nav(routeForStartScreen(c), { replace: true });
+  }
+
+  function confirmRestart() {
+    if (!user || createOutcomeUnknown || OnboardingFlowControls.createOutcomeUnknown(user.id)) {
+      setRestartOpen(false);
+      return;
+    }
+    OnboardingFlowControls.clearFlowAnswers(user.id);
+    setChoice(DEFAULT_START_SCREEN);
+    setRestartOpen(false);
+    trackFunnelEvent("onboarding_restart", { surface: "onboarding" });
   }
 
   async function handleStarterSetup(next: "quick_log" | "csv_history") {
@@ -246,7 +267,9 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-10">
+    <div
+      className={`flex flex-col items-center px-6 py-10 ${OnboardingFlowControls.mobilePrimaryClearanceClass}`}
+    >
       <div className="w-full max-w-md glass rounded-2xl p-6">
         {preferRoom && !csvHistoryIntent ? (
           <div
@@ -314,7 +337,10 @@ export default function Onboarding() {
                 name="start-screen"
                 value={opt.key}
                 checked={choice === opt.key}
-                onChange={() => setChoice(opt.key)}
+                onChange={() => {
+                  setChoice(opt.key);
+                  if (user) OnboardingFlowControls.rememberStartScreenChoice(user.id, opt.key);
+                }}
                 className="mt-1"
                 aria-describedby={`start-screen-${opt.key}-desc`}
               />
@@ -339,8 +365,24 @@ export default function Onboarding() {
         </fieldset>
 
         <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-          <Button variant="ghost" onClick={() => go(DEFAULT_START_SCREEN, false)}>
-            Skip for now
+          <Button
+            type="button"
+            variant="ghost"
+            data-testid="onboarding-restart"
+            disabled={starterBusy || createOutcomeUnknown}
+            onClick={() => setRestartOpen(true)}
+          >
+            {OnboardingFlowControls.restartLabel}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              trackFunnelEvent("onboarding_skip", { surface: "onboarding" });
+              go(DEFAULT_START_SCREEN, false);
+            }}
+          >
+            {OnboardingFlowControls.skipLabel}
           </Button>
           <Button
             onClick={() => go(choice, true)}
@@ -349,6 +391,11 @@ export default function Onboarding() {
             Continue
           </Button>
         </div>
+        <OnboardingRestartDialog
+          open={restartOpen}
+          onOpenChange={setRestartOpen}
+          onConfirm={confirmRestart}
+        />
 
         {csvHistoryIntent ? (
           <section

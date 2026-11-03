@@ -23,6 +23,13 @@ import {
   type QuickLogHistoryRow,
 } from "@/lib/quickLogHistoryRules";
 import { getEventType } from "@/lib/diary";
+import { TimelineQuickLogEnvironmentSnapshotReadback } from "@/lib/timelineQuickLogEnvironmentSnapshotReadback";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import {
+  convertCelsiusForDisplay,
+  getTemperatureUnitSymbol,
+  type TemperatureUnitPreference,
+} from "@/lib/temperatureUnitPreference";
 import {
   formatTimelineEntryTimestamp,
   TIMELINE_ENTRY_UNKNOWN_TIME,
@@ -153,14 +160,39 @@ function countRows(
   return rows.reduce((total, row) => total + (predicate(row) ? 1 : 0), 0);
 }
 
+function formatHistoryClimate(
+  climate: NonNullable<QuickLogHistoryRow["climate"]>,
+  unit: TemperatureUnitPreference,
+): string {
+  const parts: string[] = [];
+  if (typeof climate.tempC === "number") {
+    const shown = convertCelsiusForDisplay(climate.tempC, unit);
+    if (shown !== null) parts.push(`${shown.toFixed(1)}${getTemperatureUnitSymbol(unit)}`);
+  }
+  if (typeof climate.rh === "number") parts.push(`${climate.rh}% RH`);
+  if (typeof climate.vpd === "number") parts.push(`VPD ${climate.vpd}`);
+  return parts.join(" · ");
+}
+
 function buildRecentDiaryPdfInput(
   rawEntries: NormalizeDiaryInput["rawEntries"],
   limit: number,
+  temperatureUnit: TemperatureUnitPreference,
 ): BuildGrowDiaryReportInput {
   const lifted = liftEntries(rawEntries);
   const normalized = normalizeDiaryEntries({ rawEntries: lifted });
   const allRows = buildRecentQuickLogActivity(normalized, Number.MAX_SAFE_INTEGER);
   const recentRows = allRows.slice(0, Math.max(0, limit));
+  const detailsById = new Map<string, unknown>();
+  for (const raw of lifted) {
+    const id = typeof raw.id === "string" ? raw.id : "";
+    if (id) detailsById.set(id, raw.details);
+  }
+  const readingLine = (id: string) =>
+    TimelineQuickLogEnvironmentSnapshotReadback.pdfReadingLine(
+      detailsById.get(id),
+      temperatureUnit,
+    );
 
   return {
     grow: { name: "Diary Summary" },
@@ -169,11 +201,16 @@ function buildRecentDiaryPdfInput(
       watering: countRows(allRows, (row) => row.eventType === "watering"),
       feeding: countRows(allRows, (row) => row.eventType === "feeding"),
       photo: countRows(allRows, (row) => !!row.photoUrl),
+      // Diary rows in this export that display an attached manual Quick Log
+      // snapshot (temperature, humidity, or VPD). Not a count of
+      // environment_events, live telemetry, or sensor_readings.
+      sensorSnapshots: allRows.reduce((total, row) => total + (readingLine(row.id) ? 1 : 0), 0),
     },
     recent: recentRows.map((row) => {
       const et = getEventType(row.eventType);
       const details = [
         row.noteBody,
+        readingLine(row.id),
         row.photoUrl ? "Photo attached" : null,
         row.manualHandheld ? "Manual handheld readings included" : null,
       ].filter((v): v is string => !!v && v.length > 0);
@@ -241,7 +278,12 @@ function Row({
   correctionCount?: number;
   onEntryChanged?: () => void;
 }) {
-  const et = getEventType(row.eventType);
+  const temperatureUnit = useTemperatureUnitPreference();
+  const et = getEventType(
+    row.climate && (row.eventType === "note" || row.eventType === "observation")
+      ? "measurement"
+      : row.eventType,
+  );
   const Icon = et.icon;
   return (
     <li
@@ -308,6 +350,11 @@ function Row({
         </div>
       )}
 
+      {row.climate ? (
+        <p className="mt-2 text-sm text-foreground/90" data-testid="quicklog-history-climate">
+          {formatHistoryClimate(row.climate, temperatureUnit)}
+        </p>
+      ) : null}
       {row.noteBody ? (
         <div
           className="rounded-lg bg-background/30 p-2"
@@ -452,8 +499,11 @@ export function RecentQuickLogActivityPanel({
   onEntryChanged?: () => void;
 }) {
   const emptyCopy = quickLogRecentEmptyCopy(dateFiltered);
+  const temperatureUnit = useTemperatureUnitPreference();
   const handleExport = () => {
-    const result = exportGrowDiaryReportAsPdf(buildRecentDiaryPdfInput(rawEntries, limit));
+    const result = exportGrowDiaryReportAsPdf(
+      buildRecentDiaryPdfInput(rawEntries, limit, temperatureUnit),
+    );
     if (result === "unavailable") {
       toast.error("Couldn't open the diary PDF export window. Check popup blockers and try again.");
     } else {

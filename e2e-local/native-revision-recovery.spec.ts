@@ -26,7 +26,7 @@ async function createNoteThroughBrowser(
   await page
     .getByTestId("qlv2-target-content")
     .getByRole("option", {
-      name: "Plant · " + f.primary.plantName,
+      name: f.primary.plantName + " (" + f.primary.tentName + ")",
       exact: true,
     })
     .click();
@@ -40,8 +40,8 @@ async function createNoteThroughBrowser(
   const response = await reply;
   expect(response.ok()).toBe(true);
   const receipt = acceptedReceipt(await response.json());
-  await expect(page.getByTestId("qlv2-post-save")).toBeVisible();
-  await page.getByTestId("quick-log-post-save-view").click();
+  await expect(page.getByRole("button", { name: "View diary" })).toBeVisible();
+  await page.getByRole("button", { name: "View diary" }).click();
   await expect(page).toHaveURL(
     (url) => url.pathname === "/timeline" && url.searchParams.get("plantId") === f.primary.plantId,
   );

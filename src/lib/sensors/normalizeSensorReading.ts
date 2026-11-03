@@ -13,7 +13,7 @@
  *    top-level source becomes "stale" unless "invalid" or "demo".
  *  - Invalid wins over stale. Demo stays demo.
  */
-import { calculateVPD } from "./calculateVPD";
+import { VpdFromTempRh } from "@/lib/vpdCalculationRules";
 
 export type SensorTruthSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
@@ -211,7 +211,7 @@ export function normalizeSensorReading(
   if (vpd && vpd.value >= 0 && vpd.value <= 6) {
     metrics.vpd_kpa = round2(vpd.value);
   } else if (metrics.temperature_c !== null && metrics.humidity_pct !== null) {
-    metrics.vpd_kpa = calculateVPD(metrics.temperature_c, metrics.humidity_pct);
+    metrics.vpd_kpa = VpdFromTempRh.withoutTempRange(metrics.temperature_c, metrics.humidity_pct);
   }
 
   // CO2

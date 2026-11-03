@@ -13,12 +13,13 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SensorReadingRow } from "@/lib/db";
 import { AI_DOCTOR_CSV_HISTORY_SOURCES } from "@/lib/aiDoctorCsvHistoryContextRules";
 import { buildPrivateSensorQueryKey } from "@/lib/growDataQueryKeyRules";
+import { TimelineBoundedRead } from "@/lib/timelineBoundedRead";
 import { useAuth } from "@/store/auth";
 
 export const IMPORTED_SENSOR_HISTORY_QUERY_LIMIT = 200;
 
 export const IMPORTED_SENSOR_HISTORY_SELECT =
-  "id,tent_id,source,metric,value,quality,ts,captured_at,created_at,raw_payload" as const;
+  "id,tent_id,source,metric,value,quality,ts,captured_at,created_at,source_app:raw_payload->>source_app,csv_import:raw_payload->>csv_import,suspicious:raw_payload->>suspicious,suspicious_flags:raw_payload->suspicious_flags" as const;
 
 export type ImportedSensorHistoryRow = Pick<
   SensorReadingRow,
@@ -60,7 +61,13 @@ export async function fetchImportedSensorHistory(
 
   if (error) throw error;
   if (!Array.isArray(data)) throw new Error("Imported sensor history response unavailable");
-  return data as ImportedSensorHistoryRow[];
+  return (data as unknown as Record<string, unknown>[]).map((row) => {
+    const payload =
+      row.raw_payload && typeof row.raw_payload === "object"
+        ? row.raw_payload
+        : TimelineBoundedRead.importedHistoryPayloadOrNull(row);
+    return { ...row, raw_payload: payload } as ImportedSensorHistoryRow;
+  });
 }
 
 export function useImportedSensorHistory(

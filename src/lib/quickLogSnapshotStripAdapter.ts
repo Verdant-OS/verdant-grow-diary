@@ -13,6 +13,7 @@
  *    it for some future input shape, we defensively collapse to invalid
  *    so the UI never shows an unsupported variant.
  */
+import { GrowerTimeLabel } from "@/lib/growerTimeLabel";
 import {
   classifyAuditRow,
   type Classification,
@@ -190,17 +191,7 @@ function actionFor(
  * Example: "Oct 21, 2026, 3:29 PM CDT".
  */
 export function formatCapturedAtAbsolute(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return null;
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  }).format(new Date(ms));
+  return GrowerTimeLabel.formatAbsolute(iso, { day: "numeric", includeZone: true });
 }
 
 function formatAge(capturedMs: number, nowMs: number): string {

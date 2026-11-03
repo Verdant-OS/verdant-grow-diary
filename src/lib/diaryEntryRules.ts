@@ -349,7 +349,8 @@ function normalizeSensorSnapshot(
   };
   const out = {
     at,
-    temp: num("temp"),
+    // Quick Log readback stores Celsius as `temp_c` and omits `temp`.
+    temp: num("temp") ?? num("temp_c"),
     rh: num("rh"),
     vpd: num("vpd"),
     co2: num("co2"),

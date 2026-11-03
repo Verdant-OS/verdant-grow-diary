@@ -50,12 +50,7 @@ import { isSensorHashAnchorMounted } from "@/lib/sensorHashAnchorRules";
 import { readSensorsPlantRouteIntent } from "@/lib/sensorRoutePlantIntentRules";
 import { SENSOR_SOURCES_PARAM, parseSensorSourcesParam } from "@/lib/sensorSourceUrlRules";
 import { classifySensorMetricState, type SensorMetricKey } from "@/lib/sensorMetricStateRules";
-import {
-  deriveVpd,
-  formatVpdKpa,
-  VPD_DERIVED_NOTE,
-  VPD_ROUNDING_NOTE,
-} from "@/lib/vpdCalculationRules";
+import { formatVpdKpa, VPD_DERIVED_NOTE, VPD_ROUNDING_NOTE } from "@/lib/vpdCalculationRules";
 import SensorSourceLegendCompact from "@/components/SensorSourceLegendCompact";
 import { buildSoilMoistureReadingViewModel } from "@/lib/soilMoistureReadingViewModel";
 import EcowittBridgeTroubleshootingPanel from "@/components/EcowittBridgeTroubleshootingPanel";
@@ -76,6 +71,7 @@ import {
   readSensorsTentRouteIntent,
   resolveSensorsTentRouteSelection,
 } from "@/lib/sensorRouteTentIntentRules";
+import { LatestVpdReadingSelection } from "@/lib/latestVpdReadingSelection";
 import {
   classifySensorReadingTrust,
   indexSensorReadingsByObservedMetric,
@@ -326,21 +322,32 @@ export default function Sensors() {
     // A failed refresh keeps the cached stages (React Query retains data).
     plants: plantsQuery.data ?? null,
   });
-  const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
   const [previousVpdInputs, setPreviousVpdInputs] = useState<LatestTrustedVpdInputs | null>(null);
   const latestTrustedVpdInputs = useMemo(
     () => selectSensorVpdDisplayEvidence(filtered, previousVpdInputs),
     [filtered, previousVpdInputs],
   );
-  const derivedVpdKpa = useMemo(() => {
-    if (latestObservedVpd !== null || !latestTrustedVpdInputs) return null;
-    const derived = deriveVpd({
-      temperature: latestTrustedVpdInputs.temperatureC,
-      humidity: latestTrustedVpdInputs.humidityPct,
-      temperatureUnit: "C",
-    });
-    return derived.kind === "derived" ? derived.vpdKpa : null;
-  }, [latestObservedVpd, latestTrustedVpdInputs]);
+  const storedVpdReading = vpdStabilityReadings[0] ?? null;
+  const storedVpdKpa = readObservedSensorMetric(storedVpdReading, "vpd");
+  const storedCapturedAtMs = Date.parse(storedVpdReading?.capturedAt || storedVpdReading?.ts || "");
+  const pairTempC = latestTrustedVpdInputs?.temperatureC ?? null;
+  const pairRh = latestTrustedVpdInputs?.humidityPct ?? null;
+  const pairCapturedAtMs = latestTrustedVpdInputs
+    ? Date.parse(latestTrustedVpdInputs.reading.capturedAt || latestTrustedVpdInputs.reading.ts)
+    : null;
+  const vpdChoice = useMemo(
+    () =>
+      LatestVpdReadingSelection.choose({
+        storedVpdKpa,
+        storedCapturedAtMs,
+        pairTempC,
+        pairRh,
+        pairCapturedAtMs,
+      }),
+    [storedVpdKpa, storedCapturedAtMs, pairTempC, pairRh, pairCapturedAtMs],
+  );
+  const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
+  const derivedVpdKpa = vpdChoice.kind === "derived" ? vpdChoice.vpdKpa : null;
   // Remember inputs only while their derived estimate is on screen; an
   // observed VPD must never seed a later stale derivation.
   useEffect(() => {
@@ -541,9 +548,17 @@ export default function Sensors() {
           // Resolve each metric from its own latest actual observation. A
           // newer sparse temperature snapshot must not erase or relabel an
           // older soil observation, and compatibility zeroes are never read.
-          const metricReadings = readingsByMetric[m.key];
-          const latestMetricReading = metricReadings[0] ?? null;
+          const metricReadings =
+            m.key === "vpd"
+              ? LatestVpdReadingSelection.historyForChart(readingsByMetric.vpd, filtered)
+              : readingsByMetric[m.key];
+          const recordedLatest = readingsByMetric[m.key][0] ?? null;
+          const latestMetricReading =
+            m.key === "vpd" && vpdChoice.kind === "derived"
+              ? (latestTrustedVpdInputs?.reading ?? recordedLatest)
+              : recordedLatest;
           const rawValue = readObservedSensorMetric(latestMetricReading, m.key);
+          const chosenVpd = vpdChoice.kind === "none" ? null : vpdChoice.vpdKpa;
           const metricEvidenceReading =
             latestMetricReading ??
             (m.key === "vpd" ? (latestTrustedVpdInputs?.reading ?? null) : null);
@@ -553,23 +568,14 @@ export default function Sensors() {
             metricEvidenceReading
               ? {
                   source: metricSource,
-                  value: rawValue ?? derivedVpdKpa,
+                  value: m.key === "vpd" ? chosenVpd : rawValue,
                   timestamp: metricEvidenceReading.ts,
                 }
               : { source: null, value: null, timestamp: null },
             { now: nowMs },
           );
-          // Derive VPD from temp + RH when no VPD value is present.
-          let value: number | null | undefined = rawValue;
-          let isDerived = false;
-          if (
-            m.key === "vpd" &&
-            (value == null || !Number.isFinite(value as number)) &&
-            derivedVpdKpa !== null
-          ) {
-            value = derivedVpdKpa;
-            isDerived = true;
-          }
+          const value: number | null | undefined = m.key === "vpd" ? chosenVpd : rawValue;
+          const isDerived = m.key === "vpd" && vpdChoice.kind === "derived";
           // Recent values for soil stuck-at-bound detection (newest 3).
           const recentValues = m.key === "soil" ? recentSoilValues : undefined;
           const state = classifySensorMetricState({
@@ -719,7 +725,7 @@ export default function Sensors() {
                 >
                   {unresolvedManualMetric || (isDerived && manualHistoryIncomplete)
                     ? manualHistoryMessage
-                    : isDerived && state.kind === "derived"
+                    : isDerived && state.tone !== "caution"
                       ? "No recorded VPD history to chart yet. The value below is calculated from temperature and humidity."
                       : state.message}
                 </p>

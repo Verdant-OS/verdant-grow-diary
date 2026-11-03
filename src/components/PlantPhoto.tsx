@@ -15,6 +15,7 @@ interface Props {
   caption?: string;
   ctaLabel?: string | null;
   testId?: string;
+  onOpen?: (displayUrl: string) => void;
 }
 
 /**
@@ -34,31 +35,21 @@ export default function PlantPhoto({
   caption,
   ctaLabel,
   testId,
+  onOpen,
 }: Props) {
   const resolved = usePlantProfilePhotoSource(src);
   const fallbackUrl = typeof fallbackSrc === "string" && fallbackSrc.trim() ? fallbackSrc : null;
-  if (!resolved.displayUrl && fallbackUrl) {
-    return (
-      <PlantPhotoView
-        src={fallbackUrl}
-        alt={alt}
-        className={className}
-        iconClassName={iconClassName}
-        caption={caption}
-        ctaLabel={ctaLabel}
-        testId={testId}
-      />
-    );
-  }
+  const displayUrl = resolved.displayUrl || fallbackUrl;
   return (
     <PlantPhotoView
-      src={resolved.displayUrl}
+      src={displayUrl}
       alt={alt}
       className={className}
       iconClassName={iconClassName}
       caption={caption}
       ctaLabel={ctaLabel}
       testId={testId}
+      onOpen={onOpen && displayUrl ? () => onOpen(displayUrl) : undefined}
     />
   );
 }

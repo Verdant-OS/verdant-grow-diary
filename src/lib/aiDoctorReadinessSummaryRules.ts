@@ -226,3 +226,28 @@ export function buildAiDoctorReadinessSummary(
   if (ctx === "strong" && view === "ready") return summary(8, "ready", H.ready, startReview);
   return summary(9, "limited", H.limited, firstMissing ?? startReview);
 }
+
+/** Signal reported by F (`PlantDetailAiDoctorReadiness`): current-sensor read state. */
+export interface ReadinessFSignal {
+  loading: boolean;
+  readError: boolean;
+  retry: () => void;
+}
+
+/** Signal reported by A (`AiDoctorContextReadinessPanel`); null when the panel did not render. */
+export interface ReadinessASignal {
+  view: AiDoctorReadinessState | null;
+}
+
+/** Signal reported by C (`PlantDetailAiDoctorLiveReview`). C never reports read_error; F owns that. */
+export interface ReadinessCSignal {
+  hold: "none" | "pending" | "recovery";
+  gate: AiDoctorReviewMode | null;
+  ctx: AiDoctorContextReadiness | null;
+  missing: readonly string[];
+  sensor: {
+    source: ReadinessSensorSource | null;
+    capturedAt: string | null;
+    stale: boolean | null;
+  } | null;
+}

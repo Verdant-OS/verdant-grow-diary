@@ -8,7 +8,8 @@
  *  - Sensor data comes from manual logs already on file; never fabricated.
  *  - Compilation failures degrade to a safe fallback, never crash the page.
  */
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
+import type { ReadinessASignal } from "@/lib/aiDoctorReadinessSummaryRules";
 import { Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
@@ -55,6 +56,8 @@ export interface PlantDetailAiDoctorContextReadinessMountProps {
    * value to surface.
    */
   potSize?: string | null;
+  /** Optional: reports the readiness view state; `{ view: null }` when no panel renders. */
+  onReadinessSignal?: (signal: ReadinessASignal) => void;
 }
 
 /** Stable empty identity so tent-unscoped plants do not recompile context every render. */
@@ -83,6 +86,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
   medium,
   potSize,
   plantType,
+  onReadinessSignal,
 }: PlantDetailAiDoctorContextReadinessMountProps) {
   const recentActivity = usePlantRecentActivity(plantId);
   const manualLogs = usePlantManualSensorLogs(plantId);
@@ -222,6 +226,11 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     );
   }, [plantId, plantName, growId, tentId]);
 
+  const panelRendered = !!plantId && !hasReadError && !isLoading && !built.error && !!built.context;
+  useEffect(() => {
+    if (!panelRendered) onReadinessSignal?.({ view: null });
+  }, [onReadinessSignal, panelRendered]);
+
   if (!plantId) {
     return (
       <FallbackShell
@@ -290,6 +299,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
       </p>
       <AiDoctorContextReadinessPanel
         context={built.context}
+        onReadinessSignal={onReadinessSignal}
         // The readiness panel renders this under "Open alerts", so it must be
         // the strictly-open count over the UNCAPPED set — the hook's rows
         // include acknowledged alerts and are truncated for display.

@@ -27,6 +27,21 @@ function readCanonicalProductionEnv(rootDir) {
   }
 }
 
+const STRIPE_LIVE_TOKEN = /^pk_live_[A-Za-z0-9]{20,255}$/;
+
+/** Accepts exactly one well-formed live Stripe publishable key; test keys are refused. */
+function resolveCanonicalStripeLiveToken(text) {
+  const values = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith(`${TOKEN_NAME}=`))
+    .map((line) => line.slice(TOKEN_NAME.length + 1).trim().replace(/^"(.*)"$/, "$1"));
+  if (values.length !== 1 || !STRIPE_LIVE_TOKEN.test(values[0])) {
+    return fixedFailure("canonical_stripe_token_invalid");
+  }
+  return { ok: true, token: values[0] };
+}
+
 function resolveEffectiveProductionToken(token) {
   if (typeof token !== "string") {
     return fixedFailure("effective_paddle_token_invalid");
@@ -92,6 +107,17 @@ async function loadEffectiveProductionEnv(rootDir) {
 async function verifyPaddleProductionClientToken(rootDir = process.cwd()) {
   const rawEnv = readCanonicalProductionEnv(rootDir);
   if (!rawEnv.ok) return rawEnv;
+
+  const stripeLive = resolveCanonicalStripeLiveToken(rawEnv.text);
+  if (stripeLive.ok) {
+    // Owner-approved 2026-11-03: production may ship live Stripe checkout.
+    const effectiveEnv = await loadEffectiveProductionEnv(rootDir);
+    if (!effectiveEnv.ok) return effectiveEnv;
+    if (effectiveEnv.env[TOKEN_NAME] !== stripeLive.token) {
+      return fixedFailure("effective_stripe_token_mismatch");
+    }
+    return { ok: true };
+  }
 
   const canonical = resolveCanonicalPaddleProductionToken(rawEnv.text);
   if (!canonical.ok) return fixedFailure(canonical.reason);

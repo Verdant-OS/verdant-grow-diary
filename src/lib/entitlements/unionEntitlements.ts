@@ -18,7 +18,11 @@ import type { BillingSubscriptionRow, PlanId } from "./types";
 import { subscriptionGrantsAccess } from "../paddleSubscriptionAccessRules";
 
 export type EntitlementSource =
-  "free" | "byo_paddle" | "lovable_paddle_subscription" | "lovable_paddle_lifetime";
+  | "free"
+  | "byo_paddle"
+  | "lovable_paddle_subscription"
+  | "lovable_paddle_lifetime"
+  | "lovable_stripe_subscription";
 
 export interface PickStrongestResult {
   row: BillingSubscriptionRow | null;

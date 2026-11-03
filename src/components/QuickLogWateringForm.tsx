@@ -1,10 +1,37 @@
 /** Presenter-only structured Water form for Quick Log V2. */
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { type QuickLogWateringFormState } from "@/lib/quickLogWateringFormViewModel";
-import { assessLargeWaterAmount } from "@/lib/quickLogWaterVolumeWarningRules";
+import {
+  assessLargeWaterAmount,
+  assessWaterVolumeText,
+  LARGE_WATER_AMOUNT_HARD_MAX_ML,
+} from "@/lib/quickLogWaterVolumeWarningRules";
+import {
+  maxInWaterEntryUnit,
+  runoffSavesAsMlAmount,
+  savesAsMlAmount,
+  waterEntryDisplayText,
+  waterEntryToCanonicalMlText,
+  WATER_ENTRY_UNITS,
+  type WaterEntryUnit,
+} from "@/lib/quickLogWaterVolumeUnitRules";
+import {
+  loadWaterVolumeEntryUnit,
+  saveWaterVolumeEntryUnit,
+} from "@/lib/waterVolumeEntryUnitPreference";
+import {
+  largeWaterUnitMessage,
+  runoffFieldLabel,
+  savesAsMlCopy,
+  WATER_ENTRY_UNIT_GROUP_LABEL,
+  WATER_ENTRY_UNIT_LABELS,
+  waterVolumeFieldLabel,
+  waterVolumeTooLargeCopy,
+} from "@/constants/quickLogWaterVolumeUnitCopy";
 import {
   applyWateringVolumePreset,
   isWateringVolumePresetSelected,
@@ -84,6 +111,11 @@ export default function QuickLogWateringForm({
   onConfirmLargeWater,
 }: Props) {
   const temperatureUnit = useTemperatureUnitPreference();
+  // D1 b: the remembered unit seeds an untouched form; the form's own unit wins once set.
+  const [rememberedUnit] = useState<WaterEntryUnit>(loadWaterVolumeEntryUnit);
+  const unit: WaterEntryUnit = value.volumeEntryUnit ?? rememberedUnit;
+  const volumeText = waterEntryDisplayText(value.volumeEntryText, value.volumeMl, unit);
+  const runoffText = waterEntryDisplayText(value.runoffEntryText, value.runoffMl, unit);
   // Display-side canonicalization only: the write seam converts from the
   // raw typed value itself (QuickLogV2Sheet), never from this derived copy,
   // so no value is ever converted twice. Uses the entry-pinned unit (when
@@ -123,35 +155,105 @@ export default function QuickLogWateringForm({
     unit: "ml",
     confirmedKey: confirmedLargeWaterKey,
   });
+  const savedVolumeMl = unit === "ml" ? null : savesAsMlAmount(value.volumeMl);
+  const savedRunoffMl = unit === "ml" ? null : runoffSavesAsMlAmount(value.runoffMl);
+  const largeWaterMessage =
+    largeWater.message && savedVolumeMl
+      ? largeWaterUnitMessage(volumeText, unit, savedVolumeMl)
+      : largeWater.message;
+  const shownVolumeError =
+    unit !== "ml" && assessWaterVolumeText(value.volumeMl).status === "too_large"
+      ? waterVolumeTooLargeCopy(maxInWaterEntryUnit(LARGE_WATER_AMOUNT_HARD_MAX_ML, unit), unit)
+      : volumeError;
+
+  // Typed text is reinterpreted in the chosen unit (the grower names the unit they
+  // poured in); an amount that was never typed (prefill, restore) keeps its ml.
+  const chooseUnit = (next: WaterEntryUnit) => {
+    saveWaterVolumeEntryUnit(next);
+    onChange({
+      ...value,
+      volumeEntryUnit: next,
+      volumeMl:
+        value.volumeEntryText === undefined
+          ? value.volumeMl
+          : waterEntryToCanonicalMlText(value.volumeEntryText, next),
+      runoffMl:
+        value.runoffEntryText === undefined
+          ? value.runoffMl
+          : waterEntryToCanonicalMlText(value.runoffEntryText, next),
+    });
+  };
+  const setVolumeText = (text: string) =>
+    onChange({
+      ...value,
+      volumeEntryUnit: unit,
+      volumeEntryText: text,
+      volumeMl: waterEntryToCanonicalMlText(text, unit),
+    });
+  const setRunoffText = (text: string) =>
+    onChange({
+      ...value,
+      volumeEntryUnit: unit,
+      runoffEntryText: text,
+      runoffMl: waterEntryToCanonicalMlText(text, unit),
+    });
 
   return (
     <div className="space-y-4" data-testid="qlv2-watering-form">
       <div>
-        <Label htmlFor="qlv2-volume">Volume (ml)</Label>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label htmlFor="qlv2-volume">{waterVolumeFieldLabel(unit)}</Label>
+          <div
+            className="flex gap-1"
+            role="group"
+            aria-label={WATER_ENTRY_UNIT_GROUP_LABEL}
+            data-testid="qlv2-volume-unit"
+          >
+            {WATER_ENTRY_UNITS.map((option) => (
+              <Button
+                key={option}
+                type="button"
+                size="sm"
+                variant={option === unit ? "default" : "outline"}
+                aria-pressed={option === unit}
+                disabled={disabled}
+                data-testid={`qlv2-volume-unit-${option}`}
+                onClick={() => chooseUnit(option)}
+              >
+                {WATER_ENTRY_UNIT_LABELS[option]}
+              </Button>
+            ))}
+          </div>
+        </div>
         <Input
           id="qlv2-volume"
           inputMode="decimal"
-          value={value.volumeMl}
+          value={volumeText}
           disabled={disabled}
-          aria-invalid={Boolean(volumeError) || largeWater.needsConfirmation || undefined}
+          aria-invalid={Boolean(shownVolumeError) || largeWater.needsConfirmation || undefined}
           aria-describedby={
-            volumeError
+            shownVolumeError
               ? "qlv2-volume-help qlv2-volume-presets-help qlv2-volume-error"
-              : largeWater.message
+              : largeWaterMessage
                 ? "qlv2-volume-help qlv2-volume-presets-help qlv2-large-water-warning"
                 : "qlv2-volume-help qlv2-volume-presets-help"
           }
-          onChange={(event) => setField("volumeMl", event.target.value)}
+          onChange={(event) => setVolumeText(event.target.value)}
           placeholder="e.g. 500"
         />
-        {largeWater.message ? (
+        {savedVolumeMl ? (
+          <p data-testid="qlv2-volume-saves-as" className="mt-1 text-xs text-muted-foreground">
+            {savesAsMlCopy(savedVolumeMl)}
+          </p>
+        ) : null}
+        {largeWaterMessage ? (
           <div
             id="qlv2-large-water-warning"
             role="status"
             data-testid="qlv2-large-water-warning"
             className="mt-2 space-y-2 rounded-md border border-border/60 bg-secondary/20 p-2"
           >
-            <p className="text-sm text-foreground">{largeWater.message}</p>
+            <p className="text-sm text-foreground">{largeWaterMessage}</p>
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -176,14 +278,14 @@ export default function QuickLogWateringForm({
             </div>
           </div>
         ) : null}
-        {volumeError ? (
+        {shownVolumeError ? (
           <p
             id="qlv2-volume-error"
             data-testid="qlv2-volume-error"
             className="mt-1 text-sm text-destructive"
             role="alert"
           >
-            {volumeError}
+            {shownVolumeError}
           </p>
         ) : null}
         <div
@@ -203,12 +305,18 @@ export default function QuickLogWateringForm({
                 aria-pressed={selected}
                 disabled={disabled}
                 data-testid={`qlv2-volume-preset-${preset.ml}`}
-                onClick={() =>
+                onClick={() => {
+                  // D3 b: presets are ml amounts, so choosing one switches the entry to ml
+                  // (without changing the remembered unit). Runoff keeps its ml amount.
+                  const nextMl = applyWateringVolumePreset(value.volumeMl, preset);
                   onChange({
                     ...value,
-                    volumeMl: applyWateringVolumePreset(value.volumeMl, preset),
-                  })
-                }
+                    volumeEntryUnit: "ml",
+                    volumeEntryText: nextMl,
+                    volumeMl: nextMl,
+                    runoffEntryText: undefined,
+                  });
+                }}
               >
                 {preset.label}
               </Button>
@@ -290,14 +398,19 @@ export default function QuickLogWateringForm({
             />
           </div>
           <div>
-            <Label htmlFor="qlv2-water-runoff-ml">Runoff (ml)</Label>
+            <Label htmlFor="qlv2-water-runoff-ml">{runoffFieldLabel(unit)}</Label>
             <Input
               id="qlv2-water-runoff-ml"
               inputMode="decimal"
-              value={value.runoffMl}
+              value={runoffText}
               disabled={disabled}
-              onChange={(event) => setField("runoffMl", event.target.value)}
+              onChange={(event) => setRunoffText(event.target.value)}
             />
+            {savedRunoffMl ? (
+              <p data-testid="qlv2-runoff-saves-as" className="mt-1 text-xs text-muted-foreground">
+                {savesAsMlCopy(savedRunoffMl)}
+              </p>
+            ) : null}
           </div>
           <div>
             <Label htmlFor="qlv2-water-runoff-ph">Runoff pH</Label>

@@ -7,6 +7,8 @@
  * response supply the truth. Reference pages never create alerts or actions.
  */
 
+import { CultivarVerifiedProfileRules } from "@/lib/cultivarVerifiedProfileRules";
+
 export const CULTIVAR_GUIDE_SECTION_KEYS = [
   "overview",
   "germination",
@@ -54,6 +56,24 @@ export interface CultivarSource {
     | "verdant_editorial";
   retrievedAt: string;
   licenseNotes: string;
+  /** Seed-shop and retailer citations stay `nofollow`. `unlinked` is cited in text only. */
+  linkPolicy?: "nofollow" | "unlinked";
+}
+
+export interface CultivarLineageClaim {
+  claim: string;
+  source: string;
+  date: string;
+}
+
+export interface CultivarSameNameLine {
+  name: string;
+  breeder: string;
+  lineage: string;
+  seedType: string;
+  relation: string;
+  source: string;
+  date: string;
 }
 
 export interface CultivarReportedTendency {
@@ -147,10 +167,12 @@ export interface VerdantCultivarProfile {
   breeder: string | null;
   lineage: string;
   intro: string;
+  dek: string | null;
+  metaDescription: string | null;
   lifeCycle: CultivarLifeCycle;
   seedExpression: CultivarSeedExpression;
   marketClassification: CultivarMarketClassification;
-  difficulty: CultivarDifficulty;
+  difficulty: CultivarDifficulty | null;
   heightCategory: CultivarHeightCategory;
   flowerWeeks: string;
   floweringDaysMin: number | null;
@@ -177,6 +199,10 @@ export interface VerdantCultivarProfile {
   guideOverlays: Partial<Record<CultivarGuideSectionKey, CultivarGuideSectionOverlay>>;
   phenoHuntFocus: readonly string[];
   samplePhenos: readonly CultivarSamplePheno[];
+  lineageClaims: readonly CultivarLineageClaim[];
+  sameNameLines: readonly CultivarSameNameLine[];
+  sameNameNote: string | null;
+  editorialFaq: readonly { question: string; answer: string }[] | null;
 }
 
 const RETRIEVED_AT = "2026-07-22T00:00:00.000Z";
@@ -199,13 +225,14 @@ const source = (
   url: string,
   sourceType: CultivarSource["sourceType"],
   licenseNotes: string,
+  retrievedAt: string = RETRIEVED_AT,
 ): CultivarSource => ({
   key,
   title,
   publisher,
   url,
   sourceType,
-  retrievedAt: RETRIEVED_AT,
+  retrievedAt,
   licenseNotes,
 });
 
@@ -475,12 +502,13 @@ function terpeneClaim(
   rank: number,
   aromaDescriptors: readonly string[],
   sourceKey: string,
+  valuePct?: number,
 ): CultivarTerpeneClaim {
   return {
     terpene,
     rank,
-    valueMinPct: null,
-    valueMaxPct: null,
+    valueMinPct: valuePct ?? null,
+    valueMaxPct: valuePct ?? null,
     aromaDescriptors,
     confidence: "medium",
     sourceKey,
@@ -517,17 +545,19 @@ function cannabinoidClaim(
   ];
 }
 
-interface ProfileSeed {
+export interface ProfileSeed {
   slug: string;
   name: string;
   aliases: readonly string[];
   breeder: string | null;
   lineage: string;
   intro: string;
+  dek?: string | null;
+  metaDescription?: string | null;
   lifeCycle: CultivarLifeCycle;
   seedExpression: CultivarSeedExpression;
   marketClassification: CultivarMarketClassification;
-  difficulty: CultivarDifficulty;
+  difficulty: CultivarDifficulty | null;
   heightCategory: CultivarHeightCategory;
   flowerWeeks: string;
   floweringDays: readonly [number | null, number | null];
@@ -535,10 +565,19 @@ interface ProfileSeed {
   thc: readonly [number | null, number | null];
   chemotype: CultivarChemotype;
   sourceKey: string;
-  terpenes: readonly { name: string; aromas: readonly string[] }[];
+  sourceKeys?: readonly string[];
+  verificationStatus?: CultivarVerificationStatus;
+  dataOrigin?: CultivarDataOrigin;
+  lastVerifiedAt?: string;
+  terpenes: readonly { name: string; aromas: readonly string[]; valuePct?: number }[];
+  terpeneSourceKey?: string;
   tendencies: Partial<Record<CultivarGuideSectionKey, readonly string[]>>;
   phenoHuntFocus: readonly string[];
   sampleAromas: readonly [string, string];
+  lineageClaims?: readonly CultivarLineageClaim[];
+  sameNameLines?: readonly CultivarSameNameLine[];
+  sameNameNote?: string | null;
+  editorialFaq?: readonly { question: string; answer: string }[] | null;
 }
 
 const PROFILE_SEEDS: readonly ProfileSeed[] = [
@@ -1021,19 +1060,35 @@ function buildProfile(seed: ProfileSeed): VerdantCultivarProfile {
     chemotype: seed.chemotype,
     dominantTerpenes: seed.terpenes.map((item) => item.name),
     terpeneClaims: seed.terpenes.map((item, index) =>
-      terpeneClaim(item.name, index + 1, item.aromas, seed.sourceKey),
+      terpeneClaim(
+        item.name,
+        index + 1,
+        item.aromas,
+        seed.terpeneSourceKey ?? seed.sourceKey,
+        item.valuePct,
+      ),
     ),
     cannabinoidClaims: cannabinoidClaim(seed.thc[0], seed.thc[1], seed.sourceKey),
     publicationStatus: "published",
-    verificationStatus: "sample",
-    dataOrigin: "sample",
-    lastVerifiedAt: LAST_VERIFIED_AT,
+    verificationStatus: seed.verificationStatus ?? "sample",
+    dataOrigin: seed.dataOrigin ?? "sample",
+    lastVerifiedAt: seed.lastVerifiedAt ?? LAST_VERIFIED_AT,
     guideVersion: 1,
     contentSchemaVersion: 1,
-    sourceKeys: [seed.sourceKey, ...COMMON_SOURCE_KEYS],
+    sourceKeys: [...(seed.sourceKeys ?? [seed.sourceKey]), ...COMMON_SOURCE_KEYS],
     guideOverlays: overlays,
     phenoHuntFocus: seed.phenoHuntFocus,
-    samplePhenos: samplePhenos(seed.name, seed.sampleAromas),
+    samplePhenos: CultivarVerifiedProfileRules.suppressesSamplePhenos(
+      seed.verificationStatus ?? "sample",
+    )
+      ? []
+      : samplePhenos(seed.name, seed.sampleAromas),
+    lineageClaims: seed.lineageClaims ?? [],
+    sameNameLines: seed.sameNameLines ?? [],
+    sameNameNote: seed.sameNameNote ?? null,
+    editorialFaq: seed.editorialFaq ?? null,
+    dek: seed.dek ?? null,
+    metaDescription: seed.metaDescription ?? null,
   };
 }
 

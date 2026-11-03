@@ -57,6 +57,45 @@ export function saturationVaporPressureKpa(tempC: number): number {
 }
 
 /**
+ * Numeric VPD from temperature and humidity.
+ *
+ * `kpa` rejects temperature outside [-40, 80] °C. That guard is for display
+ * derivation (`deriveVpd` and `calculateVPD`). Ingest calls
+ * `withoutTempRange`, so a stored reading outside that band is unchanged.
+ */
+export class VpdFromTempRh {
+  static readonly minTempC = -40;
+  static readonly maxTempC = 80;
+
+  static kpa(tempC: number | null | undefined, rhPct: number | null | undefined): number | null {
+    return VpdFromTempRh.compute(tempC, rhPct, true);
+  }
+
+  static withoutTempRange(
+    tempC: number | null | undefined,
+    rhPct: number | null | undefined,
+  ): number | null {
+    return VpdFromTempRh.compute(tempC, rhPct, false);
+  }
+
+  private static compute(
+    tempC: number | null | undefined,
+    rhPct: number | null | undefined,
+    enforceTempRange: boolean,
+  ): number | null {
+    if (typeof tempC !== "number" || !Number.isFinite(tempC)) return null;
+    if (typeof rhPct !== "number" || !Number.isFinite(rhPct)) return null;
+    if (rhPct < 0 || rhPct > 100) return null;
+    if (enforceTempRange && (tempC < VpdFromTempRh.minTempC || tempC > VpdFromTempRh.maxTempC)) {
+      return null;
+    }
+    const vpd = saturationVaporPressureKpa(tempC) * (1 - rhPct / 100);
+    if (!Number.isFinite(vpd)) return null;
+    return Math.round(Math.max(0, vpd) * 100) / 100;
+  }
+}
+
+/**
  * Derive VPD from temperature + RH. Returns a structured state so the UI
  * can render calm "needs inputs" copy instead of a red "Unavailable" badge.
  */
@@ -76,16 +115,13 @@ export function deriveVpd(input: VpdInput): VpdState {
   }
   const tempC =
     temperatureUnit === "F" ? fahrenheitToCelsius(temperature as number) : (temperature as number);
-  if (tempC < -40 || tempC > 80) {
+  const vpdKpa = VpdFromTempRh.kpa(tempC, rh);
+  if (vpdKpa === null) {
     return { kind: "invalid", reason: "invalid_temperature" };
   }
-  const svp = saturationVaporPressureKpa(tempC);
-  const vpd = svp * (1 - rh / 100);
-  // Guard against -0/NaN edge cases.
-  const safe = Number.isFinite(vpd) ? Math.max(0, vpd) : 0;
   return {
     kind: "derived",
-    vpdKpa: +safe.toFixed(2),
+    vpdKpa,
     tempC: +tempC.toFixed(2),
     humidity: rh,
   };

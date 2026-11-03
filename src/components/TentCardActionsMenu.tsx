@@ -26,7 +26,11 @@ import { toast } from "sonner";
 import EditTentDialog from "@/components/EditTentDialog";
 import { tentDetailPath } from "@/lib/routes";
 
-import { buildArchiveTentPayload, evaluateTentDeleteGuard } from "@/lib/tentManagementRules";
+import {
+  buildArchiveTentPayload,
+  evaluateTentDeleteGuard,
+  TentDeleteWriteRules,
+} from "@/lib/tentManagementRules";
 
 interface TentInput {
   id: string;
@@ -40,6 +44,7 @@ interface TentInput {
 interface Props {
   tent: TentInput;
   assignedPlantCount: number | null;
+  archivedAssignedPlantCount?: number | null;
   /** When true, hide the View Tent action (e.g. already on Tent Detail). */
   hideView?: boolean;
   variant?: "menu" | "row";
@@ -57,6 +62,7 @@ interface Props {
 export default function TentCardActionsMenu({
   tent,
   assignedPlantCount,
+  archivedAssignedPlantCount = null,
   hideView = false,
   variant = "menu",
   onRetryAssignments,
@@ -68,6 +74,7 @@ export default function TentCardActionsMenu({
   const guard = evaluateTentDeleteGuard({
     tentId: tent.id,
     assignedPlantCount,
+    archivedAssignedPlantCount,
     archiveSupported: true,
   });
 
@@ -105,14 +112,27 @@ export default function TentCardActionsMenu({
       return;
     }
     setBusy(true);
-    const { error } = await supabase.from("tents").delete().eq("id", tent.id);
-    setBusy(false);
-    setConfirmDelete(false);
-    if (error) {
-      toast.error(error.message);
+    const deleted = await supabase.from("tents").delete().eq("id", tent.id).select("id");
+    if (!TentDeleteWriteRules.unassignAfterConfirmedDelete(deleted)) {
+      setBusy(false);
+      setConfirmDelete(false);
+      toast.error(deleted.error?.message ?? "Tent was not deleted. It may no longer be yours.");
       return;
     }
-    toast.success("Tent deleted");
+    const detached = await supabase
+      .from("plants")
+      .update({ tent_id: null })
+      .eq("tent_id", tent.id)
+      .or(TentDeleteWriteRules.UNASSIGN_OR_FILTER)
+      .select("id");
+    setBusy(false);
+    setConfirmDelete(false);
+    if (detached.error) {
+      toast.error(detached.error.message);
+      invalidate();
+      return;
+    }
+    toast.success("Tent deleted. Archived plants were kept and unassigned from this tent.");
     invalidate();
   }
 
@@ -146,7 +166,8 @@ export default function TentCardActionsMenu({
             <AlertDialogTitle>Delete {tent.name}?</AlertDialogTitle>
             <AlertDialogDescription>
               {guard.canDelete
-                ? "This permanently removes the tent record. Plants, logs, photos, and sensor history are not deleted."
+                ? (guard.reason ??
+                  "This permanently removes the tent record. Active plants must already be gone. Logs, photos, and sensor history are not deleted.")
                 : guard.reason}
             </AlertDialogDescription>
           </AlertDialogHeader>

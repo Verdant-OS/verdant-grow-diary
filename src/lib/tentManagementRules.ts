@@ -1,3 +1,9 @@
+import {
+  isArchivedPlant,
+  isMergedPlant,
+  type ArchivedPlantLike,
+} from "@/lib/archivedPlantVisibilityRules";
+
 /**
  * Pure helpers for Tent management UX.
  *
@@ -174,6 +180,8 @@ export interface TentDeleteGuardInput {
   /** Null means the assignment query has not produced trustworthy current data. */
   assignedPlantCount: number | null;
   archiveSupported?: boolean;
+  /** Archived plants still linked to the tent. They do not block delete. */
+  archivedAssignedPlantCount?: number | null;
 }
 
 export interface PlantAssignmentQueryLike<T> {
@@ -233,7 +241,12 @@ export function evaluateTentDeleteGuard(input: TentDeleteGuardInput): TentDelete
       recommendedAction: "retry_plant_count",
     };
   }
-  if (input.assignedPlantCount > 0) {
+  const archivedLeft = input.archivedAssignedPlantCount ?? 0;
+  const blockingCount =
+    archivedLeft > 0
+      ? Math.max(0, input.assignedPlantCount - archivedLeft)
+      : input.assignedPlantCount;
+  if (blockingCount > 0) {
     return {
       canDelete: false,
       canArchive: false,
@@ -241,22 +254,44 @@ export function evaluateTentDeleteGuard(input: TentDeleteGuardInput): TentDelete
       recommendedAction: "move_plants_first",
     };
   }
+  const archivedNote =
+    archivedLeft > 0
+      ? "Archived plants stay in your account and are unassigned from this tent. They are not deleted."
+      : null;
   if (archiveSupported) {
     return {
       canDelete: true,
       canArchive: true,
-      reason: null,
+      reason: archivedNote,
       recommendedAction: "archive",
     };
   }
   return {
     canDelete: true,
     canArchive: false,
-    reason: null,
+    reason: archivedNote,
     recommendedAction: "delete",
   };
 }
 
 export function buildArchiveTentPayload(): { is_archived: true } {
   return { is_archived: true };
+}
+
+/**
+ * Archived rows and legacy merged rows (merge marker in the note, archive
+ * flag still false) do not block tent delete. Active plants do.
+ */
+export function countsAsNonBlockingTentPlant(plant: ArchivedPlantLike): boolean {
+  return isArchivedPlant(plant) || isMergedPlant(plant);
+}
+
+/** Plant rows released only after the tent delete itself matched a row. */
+export class TentDeleteWriteRules {
+  static readonly UNASSIGN_OR_FILTER = "is_archived.eq.true,last_note.ilike.*Merged into *";
+
+  static unassignAfterConfirmedDelete(result: { error?: unknown; data?: unknown }): boolean {
+    if (result.error) return false;
+    return Array.isArray(result.data) && result.data.length > 0;
+  }
 }

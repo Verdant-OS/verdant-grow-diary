@@ -24,6 +24,7 @@ import {
   type CsvSensorReadingRow,
   type CsvTimelineSnapshot,
 } from "@/lib/environmentCsvTimelineContextViewModel";
+import { TimelineBoundedRead } from "@/lib/timelineBoundedRead";
 
 export interface TimelineDiaryLike {
   id: string;
@@ -34,16 +35,21 @@ export interface TimelineDiaryLike {
 export interface TimelineCsvContextPanelProps {
   growId: string | null | undefined;
   entries: readonly TimelineDiaryLike[];
+  /** Banner and older-page controls. Chips still render when this is false. */
+  showChrome?: boolean;
 }
 
 export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
-  const { growId, entries } = props;
+  const { growId, entries, showChrome = true } = props;
   const [readState, setReadState] = useState<{
     scopeKey: string;
     rows: CsvSensorReadingRow[];
     status: "loading" | "success" | "error";
   } | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [csvHasOlder, setCsvHasOlder] = useState(false);
+  const [olderError, setOlderError] = useState(false);
 
   const tentIds = useMemo(() => {
     const s = new Set<string>();
@@ -80,19 +86,44 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
       try {
         const { data, error } = await supabase
           .from("sensor_readings")
-          .select("id,tent_id,source,metric,value,captured_at,raw_payload")
+          .select(TimelineBoundedRead.csvSelect)
           .eq("source", "csv")
           .in("tent_id", scopedTentIds)
           .order("captured_at", { ascending: false })
-          .limit(2000);
+          .order("id", { ascending: false })
+          .limit(TimelineBoundedRead.csvPageSize);
 
         if (cancelled || request !== latestRequest) return;
         if (error) throw error;
         if (!Array.isArray(data))
           throw new Error("CSV environment context response is not a list.");
+        const page = (data as Record<string, unknown>[]).map((row) =>
+          TimelineBoundedRead.shapeCsvRow(row),
+        );
+        let hasOlder = false;
+        if (page.length === TimelineBoundedRead.csvPageSize) {
+          const cursor = page[page.length - 1];
+          const captured = cursor?.captured_at;
+          const id = cursor?.id;
+          if (typeof captured === "string" && captured.length > 0 && typeof id === "string" && id) {
+            const probe = await supabase
+              .from("sensor_readings")
+              .select(TimelineBoundedRead.csvSelect)
+              .eq("source", "csv")
+              .in("tent_id", scopedTentIds)
+              .or(TimelineBoundedRead.csvOlderKeyset(captured, id))
+              .order("captured_at", { ascending: false })
+              .order("id", { ascending: false })
+              .limit(1);
+            if (cancelled || request !== latestRequest) return;
+            if (probe.error) throw probe.error;
+            hasOlder = Array.isArray(probe.data) && probe.data.length > 0;
+          }
+        }
+        setCsvHasOlder(hasOlder);
         setReadState({
           scopeKey,
-          rows: data as CsvSensorReadingRow[],
+          rows: page,
           status: "success",
         });
       } catch {
@@ -116,12 +147,53 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
     };
   }, [growId, tentIdsKey, scopeKey, retryAttempt]);
 
-  const timeline = useMemo(() => {
-    const cards: { id: string; snapshot: CsvTimelineSnapshot }[] = [];
-    const omitted: { tentId: string; count: number }[] = [];
-    if (!growId) return { cards, omitted };
-    const seen = new Set<string>();
-    const windowMs = 45 * 60_000;
+  const cursor = rows.length > 0 ? rows[rows.length - 1] : null;
+  const cursorCapturedAt =
+    cursor && typeof cursor.captured_at === "string" && cursor.captured_at.length > 0
+      ? cursor.captured_at
+      : null;
+  const cursorId =
+    cursor && typeof cursor.id === "string" && cursor.id.length > 0 ? cursor.id : null;
+
+  async function loadOlderCsv() {
+    if (!growId || !cursorCapturedAt || !cursorId || loadingOlder) return;
+    setLoadingOlder(true);
+    setOlderError(false);
+    try {
+      const scopedTentIds = JSON.parse(tentIdsKey) as string[];
+      const { data, error } = await supabase
+        .from("sensor_readings")
+        .select(TimelineBoundedRead.csvSelect)
+        .eq("source", "csv")
+        .in("tent_id", scopedTentIds)
+        .or(TimelineBoundedRead.csvOlderKeyset(cursorCapturedAt, cursorId))
+        .order("captured_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(TimelineBoundedRead.csvOlderFetchLimit);
+      if (error || !Array.isArray(data)) throw error ?? new Error("CSV page unavailable");
+      const fetched = (data as Record<string, unknown>[]).map((row) =>
+        TimelineBoundedRead.shapeCsvRow(row),
+      );
+      const hasAnother = fetched.length > TimelineBoundedRead.csvPageSize;
+      const page = hasAnother ? fetched.slice(0, TimelineBoundedRead.csvPageSize) : fetched;
+      setCsvHasOlder(hasAnother);
+      setReadState((previous) => {
+        const current = previous?.scopeKey === scopeKey ? previous.rows : rows;
+        const seen = new Set(current.map((row) => row.id).filter(Boolean));
+        const extra = page.filter((row) => !row.id || !seen.has(row.id));
+        return { scopeKey, rows: [...current, ...extra], status: "success" };
+      });
+    } catch {
+      setOlderError(true);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
+
+  const matchedByEntry = useMemo(() => {
+    const out = new Map<string, CsvTimelineContextEntry>();
+    if (!growId || entries.length === 0) return out;
+    // Run view-model per-tent (scope contract is per-tent).
     for (const tentId of tentIds) {
       const windowed = CsvTimelineSnapshotList.window({
         sensorReadings: rows,
@@ -181,9 +253,17 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
   const snapshots = timeline.cards;
 
   if (!growId || tentIds.length === 0) return null;
-  if (readStatus === "success" && snapshots.length === 0) return null;
+  if (readStatus === "success" && matchedByEntry.size === 0 && !csvHasOlder) return null;
 
-  const hasCachedMatches = snapshots.length > 0;
+  const hasCachedMatches = matchedByEntry.size > 0;
+  const chips = [...matchedByEntry.values()].map((c) => (
+    <CsvTimelineEnvironmentChip
+      key={c.diaryEntryId}
+      diaryEntryId={c.diaryEntryId}
+      snapshot={c.snapshot}
+    />
+  ));
+  if (!showChrome) return <>{chips}</>;
 
   return (
     <section data-testid="timeline-csv-context-panel" className="mt-4 space-y-2">
@@ -222,19 +302,33 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
           </Button>
         </div>
       ) : null}
-      {snapshots.map((c) => (
-        <CsvTimelineEnvironmentChip key={c.id} diaryEntryId={c.id} snapshot={c.snapshot} />
-      ))}
-      {timeline.omitted.map((item) => (
-        <p key={item.tentId} className="text-xs text-muted-foreground">
-          <Link
-            to={`${tentDetailPath(item.tentId)}#imported-history`}
-            data-testid="timeline-csv-more-readings"
+      {olderError ? (
+        <div role="alert" className="space-y-2 text-xs text-muted-foreground">
+          <p>Older CSV context could not be loaded.</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid="timeline-csv-load-older-retry"
+            onClick={() => void loadOlderCsv()}
           >
-            {csvOmittedSnapshotCopy(item.count)}
-          </Link>
-        </p>
-      ))}
+            Retry older CSV context
+          </Button>
+        </div>
+      ) : null}
+      {csvHasOlder ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="timeline-csv-load-older"
+          disabled={loadingOlder}
+          onClick={() => void loadOlderCsv()}
+        >
+          {loadingOlder ? "Loading older CSV context…" : "Load older CSV context"}
+        </Button>
+      ) : null}
+      {chips}
     </section>
   );
 }

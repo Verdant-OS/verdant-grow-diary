@@ -174,6 +174,7 @@ vi.mock("@/components/SymptomEvidenceChecklistCard", () => ({ default: () => nul
 vi.mock("@/components/TimelineLightingGuideCard", () => ({ default: () => null }));
 
 import Timeline from "@/pages/Timeline";
+import { saveTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 
 const ROOT_ID = "11111111-1111-4111-8111-111111111111";
 const ROOT_CREATED_AT = "2026-07-15T12:00:00.512Z";
@@ -255,6 +256,7 @@ describe("Timeline first-page linked roots", () => {
       return { data: [], error: null };
     });
 
+    saveTemperatureUnitPreference("celsius");
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={client}>

@@ -21,9 +21,15 @@ import {
   findGuideBySlug,
   VERDANT_SEO_GUIDES,
   type GuideAnchor,
+  type GuideBullet,
+  type GuideColumnTable,
   type GuideSectionLink,
 } from "@/constants/verdantSeoContent";
-import { isPublicGuideHref, splitAroundAnchor } from "@/lib/guidePublicCopyViewModel";
+import {
+  isGuideCitationHref,
+  isPublicGuideHref,
+  splitAroundAnchor,
+} from "@/lib/guidePublicCopyViewModel";
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
 import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
 import {
@@ -233,6 +239,8 @@ export default function GuidePage() {
                 closingLink={section.closingLink}
                 cta={section.cta}
                 links={section.links}
+                bullets={section.bullets}
+                columnTable={section.columnTable}
               />
               {section.continuations?.map((block) => (
                 <GuideCopyBlockView
@@ -245,6 +253,7 @@ export default function GuidePage() {
                   closing={block.closing}
                   closingLink={block.closingLink}
                   cta={block.cta}
+                  bullets={block.bullets}
                 />
               ))}
             </Fragment>
@@ -538,9 +547,26 @@ export default function GuidePage() {
   );
 }
 
-function GuideHref({ href, label }: { href: string; label: string }) {
+function citationHostIsExternal(href: string): boolean {
+  try {
+    return new URL(href).hostname !== "verdantgrowdiary.com";
+  } catch {
+    return true;
+  }
+}
+
+function GuideHref({
+  href,
+  label,
+  allowCitation = false,
+}: {
+  href: string;
+  label: string;
+  allowCitation?: boolean;
+}) {
   const className = "text-primary underline underline-offset-4 hover:text-primary/80";
-  if (!isPublicGuideHref(href)) return <span>{label}</span>;
+  const allowed = allowCitation ? isGuideCitationHref(href) : isPublicGuideHref(href);
+  if (!allowed) return <span>{label}</span>;
   if (href.startsWith("/")) {
     return (
       <Link to={href} className={className}>
@@ -548,26 +574,42 @@ function GuideHref({ href, label }: { href: string; label: string }) {
       </Link>
     );
   }
+  const externalCitation = allowCitation && citationHostIsExternal(href);
   return (
-    <a href={href} className={className}>
+    <a
+      href={href}
+      className={className}
+      {...(externalCitation ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    >
       {label}
     </a>
   );
 }
 
-function GuideLinkedParagraph({ text, anchor }: { text: string; anchor?: GuideAnchor }) {
+function GuideLinkedInline({
+  text,
+  anchor,
+  allowCitation = false,
+}: {
+  text: string;
+  anchor?: GuideAnchor;
+  allowCitation?: boolean;
+}) {
   const parts = splitAroundAnchor(text, anchor);
+  if (parts.kind === "plain") return <>{parts.text}</>;
+  return (
+    <>
+      {parts.before}
+      <GuideHref href={parts.href} label={parts.label} allowCitation={allowCitation} />
+      {parts.after}
+    </>
+  );
+}
+
+function GuideLinkedParagraph({ text, anchor }: { text: string; anchor?: GuideAnchor }) {
   return (
     <p className="mt-3 text-base text-foreground/90">
-      {parts.kind === "plain" ? (
-        parts.text
-      ) : (
-        <>
-          {parts.before}
-          <GuideHref href={parts.href} label={parts.label} />
-          {parts.after}
-        </>
-      )}
+      <GuideLinkedInline text={text} anchor={anchor} />
     </p>
   );
 }
@@ -582,6 +624,8 @@ function GuideCopyBlockView({
   closingLink,
   cta,
   links,
+  bullets,
+  columnTable,
 }: {
   heading: string;
   headingLevel?: 2 | 3;
@@ -592,6 +636,8 @@ function GuideCopyBlockView({
   closingLink?: GuideAnchor;
   cta?: GuideAnchor;
   links?: ReadonlyArray<GuideSectionLink>;
+  bullets?: ReadonlyArray<GuideBullet>;
+  columnTable?: GuideColumnTable;
 }) {
   const HeadingTag = headingLevel === 3 ? "h3" : "h2";
   const headingClass =
@@ -602,6 +648,43 @@ function GuideCopyBlockView({
     <section>
       <HeadingTag className={headingClass}>{heading}</HeadingTag>
       {body && body.trim() ? <GuideLinkedParagraph text={body} anchor={bodyLink} /> : null}
+      {bullets && bullets.length > 0 ? (
+        <ul className="mt-3 list-disc space-y-2 pl-5 text-base text-foreground/90">
+          {bullets.map((bullet) => (
+            <li key={bullet.text}>
+              <GuideLinkedInline text={bullet.text} anchor={bullet.link} allowCitation />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {columnTable ? (
+        <div className="mt-4 max-w-full overflow-x-auto">
+          <table
+            aria-label={columnTable.ariaLabel}
+            className="w-full min-w-[280px] border-collapse text-left text-sm"
+          >
+            <thead>
+              <tr>
+                {columnTable.headers.map((header) => (
+                  <th key={header} scope="col" className="border-b border-border px-3 py-2">
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {columnTable.rows.map((row) => (
+                <tr key={row[0]}>
+                  <th scope="row" className="border-b border-border/60 px-3 py-2 font-medium">
+                    {row[0]}
+                  </th>
+                  <td className="border-b border-border/60 px-3 py-2">{row[1]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
       {steps && steps.length > 0 ? (
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-base text-foreground/90">
           {steps.map((step) => (

@@ -51,6 +51,7 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "grow-room-vpd-tracker",
   "ac-infinity-data-logging",
   "spider-farmer-data-logging",
+  "import-grow-sensor-csv",
   "sensor-truth-grow-room",
   "ai-grow-doctor",
   "cannabis-plant-care",
@@ -137,8 +138,8 @@ describe("Verdant grower guide FAQ (/guides)", () => {
   });
 });
 
-describe("Verdant SEO guide pages (28)", () => {
-  it("defines exactly the twenty-eight expected slugs, in order", () => {
+describe("Verdant SEO guide pages (29)", () => {
+  it("defines exactly the twenty-nine expected slugs, in order", () => {
     expect(VERDANT_GUIDE_SLUGS).toEqual(EXPECTED_SLUGS);
   });
 

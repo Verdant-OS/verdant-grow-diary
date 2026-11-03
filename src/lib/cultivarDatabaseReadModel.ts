@@ -952,14 +952,21 @@ export function mapCultivarDatabaseSnapshot(
     const chemotype = read.oneOf("chemotype", CHEMOTYPES);
     const bundledStatus =
       slug !== undefined ? findCultivarBySlug(slug)?.verificationStatus : undefined;
-    const verificationStatus = read.oneOf(
-      "verification_status",
-      bundledStatus === undefined
-        ? (["sample", "reviewed", "verified"] as const)
-        : bundledStatus === "sample"
-          ? VERIFICATION_STATUSES
-          : [bundledStatus],
-    );
+    // A row with no bundled profile cannot upgrade evidence. reviewed and
+    // verified claims are kept as sample instead of being rejected or indexed.
+    const claimedVerification = row.verification_status;
+    const verificationStatus =
+      bundledStatus === undefined &&
+      (claimedVerification === "sample" ||
+        claimedVerification === "reviewed" ||
+        claimedVerification === "verified")
+        ? ("sample" as const)
+        : read.oneOf(
+            "verification_status",
+            bundledStatus === undefined || bundledStatus === "sample"
+              ? VERIFICATION_STATUSES
+              : [bundledStatus],
+          );
     const dataOriginRaw = read.oneOf("data_origin", Object.keys(DATA_ORIGINS));
     const lastVerifiedAt = read.timestamp("last_verified_at");
     const flowerWeeks = read.text("flowering_window_label");
@@ -1303,8 +1310,12 @@ export function mapCultivarDatabaseSnapshot(
       terpeneClaims: claims.terpeneClaims,
       cannabinoidClaims: claims.cannabinoidClaims,
       publicationStatus,
-      verificationStatus: difficultyRaw == null ? "sample" : verificationStatus,
-      dataOrigin: difficultyRaw == null ? "sample" : DATA_ORIGINS[dataOriginRaw],
+      verificationStatus:
+        difficultyRaw == null || bundledStatus === undefined ? "sample" : verificationStatus,
+      dataOrigin:
+        difficultyRaw == null || bundledStatus === undefined
+          ? "sample"
+          : DATA_ORIGINS[dataOriginRaw],
       lastVerifiedAt,
       guideVersion,
       contentSchemaVersion,

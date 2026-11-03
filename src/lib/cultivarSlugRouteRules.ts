@@ -18,7 +18,15 @@ import { staticRouteHead, type StaticRouteHead } from "@/lib/build/staticRouteHe
 export type CultivarSlugDecision =
   | { status: "found"; slug: string; profile: VerdantCultivarProfile | null }
   | { status: "redirect"; slug: string }
-  | { status: "missing" };
+  | { status: "missing" }
+  | { status: "unavailable"; slug: string };
+
+type KnownSlug = { slug: string; profile: VerdantCultivarProfile | null };
+
+type CatalogRead = { ok: boolean; known: readonly KnownSlug[] };
+
+/** One snapshot read shared by the loader and head for this turn. */
+let catalogPromise: Promise<CatalogRead> | null = null;
 
 export class CultivarSlugRouteRules {
   /** Exact slug, else a case-insensitive redirect to the stored lowercase slug. */
@@ -34,25 +42,50 @@ export class CultivarSlugRouteRules {
     return { status: "missing" };
   }
 
+  /** Drop the shared snapshot so the next request reads again. */
+  static resetRequestCache(): void {
+    catalogPromise = null;
+  }
+
   static async decide(slug: string | undefined): Promise<CultivarSlugDecision> {
-    const known: { slug: string; profile: VerdantCultivarProfile | null }[] = VERDANT_CULTIVARS.map(
-      (profile) => ({ slug: profile.slug, profile: null }),
-    );
-    if (featureFlags.cultivarDatabaseReadsEnabled) {
-      const snapshot = await fetchPublishedCultivarSnapshot(
-        supabase as unknown as CultivarReferenceReadClient,
-      );
-      if (snapshot.ok) {
-        const mapped = mapCultivarDatabaseSnapshot(snapshot.snapshot);
-        for (const profile of mapped.catalog.profiles) {
-          if (profile.publicationStatus !== "published") continue;
-          const index = known.findIndex((entry) => entry.slug === profile.slug);
-          if (index >= 0) known[index] = { slug: profile.slug, profile };
-          else known.push({ slug: profile.slug, profile });
-        }
-      }
+    const read = await CultivarSlugRouteRules.knownSlugs();
+    const decision = CultivarSlugRouteRules.fromKnown(slug, read.known);
+    if (!read.ok && decision.status === "missing") {
+      return { status: "unavailable", slug: slug ?? "" };
     }
-    return CultivarSlugRouteRules.fromKnown(slug, known);
+    return decision;
+  }
+
+  private static knownSlugs(): Promise<CatalogRead> {
+    if (catalogPromise) return catalogPromise;
+    let shared: Promise<CatalogRead>;
+    shared = CultivarSlugRouteRules.readKnownSlugs().finally(() => {
+      setTimeout(() => {
+        if (catalogPromise === shared) catalogPromise = null;
+      }, 0);
+    });
+    catalogPromise = shared;
+    return shared;
+  }
+
+  private static async readKnownSlugs(): Promise<CatalogRead> {
+    const known: KnownSlug[] = VERDANT_CULTIVARS.map((profile) => ({
+      slug: profile.slug,
+      profile: null,
+    }));
+    if (!featureFlags.cultivarDatabaseReadsEnabled) return { ok: true, known };
+    const snapshot = await fetchPublishedCultivarSnapshot(
+      supabase as unknown as CultivarReferenceReadClient,
+    );
+    if (!snapshot.ok) return { ok: false, known };
+    const mapped = mapCultivarDatabaseSnapshot(snapshot.snapshot);
+    for (const profile of mapped.catalog.profiles) {
+      if (profile.publicationStatus !== "published") continue;
+      const index = known.findIndex((entry) => entry.slug === profile.slug);
+      if (index >= 0) known[index] = { slug: profile.slug, profile };
+      else known.push({ slug: profile.slug, profile });
+    }
+    return { ok: true, known };
   }
 
   static notFoundHead(): StaticRouteHead {
@@ -68,6 +101,16 @@ export class CultivarSlugRouteRules {
 
   static headFor(decision: CultivarSlugDecision): StaticRouteHead {
     if (decision.status === "redirect") return { meta: [], links: [], scripts: [] };
+    if (decision.status === "unavailable") {
+      return {
+        meta: [
+          { title: "Cultivar reference unavailable | Verdant" },
+          { name: "robots", content: "noindex, nofollow" },
+        ],
+        links: [],
+        scripts: [],
+      };
+    }
     if (decision.status === "missing") return CultivarSlugRouteRules.notFoundHead();
     if (VERDANT_CULTIVAR_SLUGS.includes(decision.slug)) {
       return staticRouteHead(`/cultivars/${decision.slug}`);

@@ -7,10 +7,22 @@ export const Route = createFileRoute("/cultivars/$slug")({
   loader: async ({ params }) => {
     const decision = await CultivarSlugRouteRules.decide(params.slug);
     if (decision.status === "redirect") {
-      throw redirect({ href: `/cultivars/${decision.slug}`, replace: true });
+      throw redirect({
+        href: `/cultivars/${decision.slug}`,
+        replace: true,
+        statusCode: 308,
+      });
+    }
+    if (decision.status === "unavailable") {
+      throw redirect({
+        href: `/cultivars/${params.slug}`,
+        statusCode: 503,
+        reloadDocument: true,
+        headers: { "cache-control": "no-store", "retry-after": "30" },
+      });
     }
     if (decision.status === "missing") throw notFound();
-    return { slug: decision.slug };
+    return { slug: decision.slug, profile: decision.profile };
   },
   head: async ({ params }) => {
     const decision = await CultivarSlugRouteRules.decide(params.slug);
@@ -33,5 +45,6 @@ function CultivarSlugNotFound() {
 }
 
 function RouteComponent() {
-  return <CultivarPage />;
+  const { profile } = Route.useLoaderData();
+  return <CultivarPage routeProfile={profile} />;
 }

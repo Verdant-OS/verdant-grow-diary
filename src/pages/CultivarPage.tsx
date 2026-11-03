@@ -17,6 +17,7 @@ import {
   formatVerificationStatus,
   type CultivarGuideSectionKey,
 } from "@/constants/verdantCultivars";
+import type { VerdantCultivarProfile } from "@/constants/strainReferenceLibrary";
 import { cultivarReferenceSourceNotice } from "@/constants/cultivarReferenceSourceCopy";
 import { VERDANT_SITE_ORIGIN } from "@/constants/verdantSeoContent";
 import {
@@ -60,14 +61,20 @@ export function CultivarNotFound({ slug }: { slug?: string }) {
   );
 }
 
-export default function CultivarPage() {
+export default function CultivarPage({
+  routeProfile = null,
+}: {
+  routeProfile?: VerdantCultivarProfile | null;
+} = {}) {
   const { slug } = useParams<{ slug: string }>();
   // V1.1: bundled library unless the default-off database read flag is on;
   // the resolved source state is explicit and never silent.
   const referenceSource = usePublishedCultivars();
   const { catalog } = referenceSource;
   const sourceNotice = cultivarReferenceSourceNotice(referenceSource.reason);
-  const cultivar = catalog.findBySlug(slug);
+  const fromCatalog = catalog.findBySlug(slug);
+  const cultivar =
+    fromCatalog ?? (routeProfile && routeProfile.slug === slug ? routeProfile : undefined);
   const sections = cultivar ? catalog.sectionsFor(cultivar) : [];
   const sources = cultivar ? catalog.sourcesFor(cultivar) : [];
   const summaryRows = cultivar

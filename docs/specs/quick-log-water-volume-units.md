@@ -1,6 +1,6 @@
 # Quick Log Water: enter volume in ml, L or gal
 
-Status: DRAFT spec, Claude. Founder decisions D1–D3 open (§8).
+Status: DRAFT spec, Claude. Founder decisions D1–D3 recorded 2026-11-03 (§8): D1 (b), D2 yes, D3 (b).
 Source finding: grower workflow audit 2026-11-03, finding 4 ("Water entry requires millilitres,
 with no gallon/litre toggle in the inspected form, despite existing journal notes using gallons").
 Deploy branch audited: `verdant-grow-diary` at `7ca284b9490cb5a6c30a7cc356b967eb62d4f58a` (#2810).
@@ -55,7 +55,17 @@ must convert by hand today, which invites typos that the 10,000 ml warning will 
 - **R8. Prefill keeps the stored value.** The last-watering prefill shows the stored ml converted
   into the entry unit for display (L to 3 decimals, gal to 2, trailing zeros dropped). If the grower
   saves without editing the prefill, the original stored ml is saved, not the rounded round trip.
-- **R9. Presets.** See D3. Whatever the choice, a selected preset saves its exact ml.
+- **R9. Presets (D3 b).** The six presets stay labelled in ml ("500 ml") in every entry unit.
+  Selecting one sets the entry unit to `ml` and the text to the preset's ml value, so it saves its
+  exact ml. This switch does not change the remembered default unit (R13).
+- **R13. Remembered unit (D1 b).** The default entry unit is `ml`. Choosing a unit with the unit
+  control stores it on this device under `verdant:waterVolumeEntryUnit` (opaque enum value only,
+  no ids, no amounts), and the next Water form opens in that unit. A missing, unreadable or unknown
+  stored value, or unavailable storage, falls back to `ml`. Only the unit control writes it.
+  It is a display preference: it never selects a grow, tent or plant, and never changes a saved row.
+- **R14. Runoff (D2 yes).** The same unit control governs `Runoff`. Runoff text converts with R4,
+  the existing 0–1,000,000 ml bound is applied to the converted value, it gets its own
+  "Saves as … ml." line under R6, and the label reads `Runoff (gal)` / `Runoff (L)` / `Runoff (ml)`.
 - **R10. Labelled data stays labelled.** The unit control is an explicit, visible choice. No unit
   is inferred from the number typed. Invalid text is never coerced to a valid volume.
 - **R11. Draft and retry.** A draft or retry keeps both the typed text and its entry unit, so
@@ -134,6 +144,13 @@ Component and payload (`src/test/quick-log-water-volume-units-ui.test.tsx`):
     `-save-parser-parity`, `-warning`, `-warning-ui`, `-warning-boundaries`. Any pin renegotiation
     is declared in the PR with `scripts/scorer-lock.mjs`.
 
+14. D1: choosing `gal` stores `gal`; a new form opens in `gal`; a stored `"quart"` or a throwing
+    `localStorage` opens in `ml`; selecting a preset does not overwrite the stored unit.
+15. D2: in `gal`, Runoff `0.25` saves `runoff_ml: 946`; in `L`, Runoff `1000.001` is rejected by
+    the existing bound (1,000,001 ml); Runoff blank saves no runoff, as today.
+16. D3: in `gal`, preset chips read `500 ml` … `2500 ml`; selecting `1000 ml` sets the unit to `ml`
+    and the text to `1000`, and saves `volume_ml: 1000`.
+
 Each new test must be shown failing before the change (RED count in the PR body).
 
 ## 7. File-level plan (implementation slice, not this PR)
@@ -141,13 +158,18 @@ Each new test must be shown failing before the change (RED count in the PR body)
 - New: `src/lib/quickLogWaterVolumeUnitRules.ts`, `src/constants/quickLogWaterVolumeUnitCopy.ts`,
   the two test files above.
 - Edit: `src/lib/quickLogWateringFormViewModel.ts` (state fields, empty state),
-  `src/components/QuickLogWateringForm.tsx` (unit control, "Saves as" line, preset labels, runoff per D2),
+  `src/components/QuickLogWateringForm.tsx` (unit control, "Saves as" lines, preset switch to ml, runoff),
+  `src/lib/quickLogWateringFormViewModel.ts` runoff parse (convert runoff text before its bound),
+  new `src/lib/waterVolumeEntryUnitPreference.ts` (R13 storage, modelled on `temperatureUnitPreference.ts`),
   `src/components/QuickLogV2Sheet.tsx` (pass entry unit to the warning label only),
   `src/lib/wateringVolumeDefaultsViewModel.ts` (R8 prefill).
 - Untouched: both payload builders' ml logic, the RPC, `quickLogWaterVolumeWarningRules.ts` gates,
   migrations, Edge functions, Timeline readback.
 
 ## 8. Founder decisions
+
+Recorded 2026-11-03 (Matthew): **D1 (b), D2 yes, D3 (b).** The options are kept below for the record.
+Claude's call inside D3 (b), open to change: selecting a preset does not overwrite the remembered unit.
 
 - **D1. Default unit.** (a) Always `ml`, the grower switches each time. (b) `ml` by default, and the
   last unit chosen is remembered on this device (localStorage, like the temperature preference).

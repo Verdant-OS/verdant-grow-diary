@@ -73,13 +73,13 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ```text
 TASK AI-DOCTOR-READINESS-SUMMARY-SPEC  priority: other  status: OPEN
-goal: Docs-only spec for one AI Doctor readiness summary on Plant Detail, with the existing five readiness surfaces kept in a collapsed provenance disclosure.
-why: Live read-only audit 2026-11-03 finding 3. Plant Detail shows readiness from five rule sets that can disagree (e.g. "Ready for cautious check-in" beside "Context is partial").
+goal: Docs-only spec for one AI Doctor readiness summary on Plant Detail, with the existing six readiness surfaces kept in a collapsed provenance disclosure.
+why: Live read-only audit 2026-11-03 finding 3. Plant Detail shows readiness from six rule sets that can disagree (e.g. "Ready for cautious check-in" beside "Context is partial").
 branch: claude/new-session-5qygai
 base: verdant-grow-diary
 checkout: git fetch origin claude/new-session-5qygai verdant-grow-diary && git switch claude/new-session-5qygai
-pr: read the URL from GitHub after push (draft)
-head_sha: read git rev-parse origin/claude/new-session-5qygai after the push
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2809 (draft)
+head_sha: checkpoint 5a5697024d388cc7ae33e948d8f54a4256792743 observed on origin 2026-11-03 18:31 UTC; this block's own commit follows it, so confirm the current head on the PR
 state: pushed draft, docs only
 current_step: spec written at docs/specs/ai-doctor-readiness-single-summary.md
 next_action: request an independent docs review at the exact head of the draft PR. Implementation is a separate later slice and branch, after #2805.
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access, no writes outside the repo, no GitHub comments
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-03 13:40 CT, by Claude
+last_updated: 2026-11-03 12:45 CT, by Claude (Copilot review findings 1-5 addressed)
 ```
 
 ### POSTHOG-PUBLIC-CLIENT-KEY

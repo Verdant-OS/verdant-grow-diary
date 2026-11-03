@@ -10,11 +10,12 @@ screen observations are `source claim` against an unknown build; the source fact
 ## 1. Problem
 
 A grower on Plant Detail → AI review needs one answer: **can I use this context, what is
-missing, and what should I do next?** Today the section answers five times, from five rule
+missing, and what should I do next?** Today the section answers six times, from six rule
 sets, and the answers can disagree on the same screen.
 
-| # | Surface (mounted in `src/pages/PlantDetail.tsx` ~L1035–1068) | Rule source | Vocabulary shown |
+| # | Surface (mounted in `src/pages/PlantDetail.tsx` ~L1028–1068) | Rule source | Vocabulary shown |
 | - | --- | --- | --- |
+| F | `PlantDetailAiDoctorReadiness` (first card in the section, ~L1028) | `src/lib/plantDetailAiDoctorReadiness.ts` (`AiDoctorReadinessLevel`) | "AI Doctor readiness" heading; uppercase Ready/Partial/Empty badge; its own loading and sensor-error-with-retry states. This is the likely source of the audit's "PARTIAL". |
 | A | `PlantDetailAiDoctorContextReadinessMount` → `AiDoctorContextReadinessPanel` | `src/lib/aiDoctorReadinessViewModel.ts` (`classifyState` via `assessContextStrength`) | 5 states incl. "Ready for cautious check-in"; 3 confidence classes; a local "Preview only — not saved." result with confidence band and an action-suggestion preview |
 | B | `PlantDetailTimelineEvidenceReadinessLaunch` | `src/lib/timelineEvidenceReadinessViewModel.ts` | timeline evidence readiness |
 | C | `PlantDetailAiDoctorLiveReview` (run gate) | `src/lib/aiDoctorContextRules.ts` `evaluateAiDoctorContext` (strong/partial/insufficient) + `src/lib/aiDoctorReviewEligibilityRules.ts` (blocked/standard/historical_review) | "Context is partial — review may have limited confidence." / "Context is strong enough for a cautious review." |
@@ -55,33 +56,52 @@ R5. The sensor-truth line names scope, source and age in one sentence, for examp
 R6. Missing items are ordered by cultivation priority: environment → root zone / watering →
 feeding → stage/profile → photo. At most three are shown; the rest are under provenance.
 
-R7. Existing panels A–D move into one collapsed **"How this was decided"** disclosure,
-unchanged in content. Nothing is deleted in this slice.
+R7. Existing panels A–D and F move into one collapsed **"How this was decided"** disclosure,
+unchanged in content. Nothing is deleted in this slice. Outside that disclosure, the summary is
+the only element that states a readiness verdict. F's sensor-error retry stays reachable: the
+summary surfaces a read failure itself (§3 row 2) and offers the same retry.
 
 R8. Pure and deterministic: a new `src/lib/aiDoctorReadinessSummaryRules.ts` consumes the
-**already-computed outputs** of A and C. No new hooks, queries, Supabase calls, model calls,
+**already-computed outputs** of A, C and F. No new hooks, queries, Supabase calls, model calls,
 credit use, alerts or Action Queue writes. `now` is injected; no `Date.now()`.
 
 R9. Copy lives in `src/constants/aiDoctorReadinessSummaryCopy.ts` (`as const`).
 
 ## 3. Verdict rules
 
-Inputs: `gate` = eligibility mode; `ctx` = C readiness; `view` = A state.
+Inputs, all already computed on the page:
 
-| Order | Condition | Verdict | Headline |
-| - | --- | --- | --- |
-| 1 | `gate === "blocked"` or `ctx === "insufficient"` | `not_ready` | "Not enough recent context to review yet." |
-| 2 | `view === "demo_only"` | `limited` | "Only demo sensor data. A review won't treat it as real readings." |
-| 3 | `view === "telemetry_limited"` | `limited` | "Sensor readings are stale or invalid. A review can run but can't rely on them." |
-| 4 | `gate === "historical_review"` | `limited` | "Review would use imported history only, not current readings." |
-| 5 | `ctx === "strong"` and `view === "ready"` | `ready` | "Ready for a cautious review." |
-| 6 | anything else, including null/unknown inputs | `limited` | "A review can run, with limited confidence." |
+- `hold`: C's start-blocking state. `pending` when current sensor reads are loading;
+  `recovery` when imported-history or root-zone recovery `blocksReview`
+  (`PlantDetailAiDoctorLiveReview.tsx` `sensorContextBlocked`, ~L274–275); `read_error` when
+  F or C reports a failed current-sensor read; otherwise `none`.
+- `gate`: eligibility mode from `evaluateAiDoctorReviewEligibility`. Note that it returns
+  `standard` exactly when `ctx` is partial or strong, and `historical_review` only when `ctx`
+  is insufficient and the imported-history path is allowed.
+- `ctx`: C readiness. `view`: A state.
 
-Rows are evaluated in order; first match wins. A null or unrecognised input never yields
-`ready`.
+| Order | Condition | Verdict | Headline | Next step |
+| - | --- | --- | --- | --- |
+| 1 | `hold === "pending"` | `checking` | "Checking the latest readings…" | none until resolved |
+| 2 | `hold === "read_error"` | `not_ready` | "Sensor readings couldn't be loaded." | the existing retry |
+| 3 | `hold === "recovery"` | `not_ready` | "Choose whether to include imported history first." | the existing recovery choice |
+| 4 | `gate === "historical_review"` | `limited` | "Review would use imported history only, not current readings." | Start review |
+| 5 | `gate !== "standard"` (blocked, null, unknown) or `ctx === "insufficient"` | `not_ready` | "Not enough recent context to review yet." | first missing item |
+| 6 | `view === "demo_only"` | `limited` | "Only demo sensor data. A review won't treat it as real readings." | first missing item |
+| 7 | `view === "telemetry_limited"` | `limited` | "Sensor readings are stale or invalid. A review can run but can't rely on them." | first missing item |
+| 8 | `gate === "standard"` and `ctx === "strong"` and `view === "ready"` | `ready` | "Ready for a cautious review." | Start review |
+| 9 | anything else | `limited` | "A review can run, with limited confidence." | first missing item |
 
-Next step: the first missing item from R6, as one plain action ("Add a manual tent reading",
-"Log the last watering"). When `ready`, the next step is the existing Start review control.
+Rows are evaluated in order; first match wins. `hold` rows come first because C will not
+start a review while any of them holds (R2). The historical row precedes the insufficient row
+because historical review is only ever offered with insufficient current context. A null or
+unrecognised `hold` is treated as `pending`; a null or unrecognised `gate` falls to row 5. No
+null or unrecognised input can reach row 8.
+
+`checking` is not a verdict: it renders no ready/limited wording and no Start control.
+
+"First missing item" is the first missing item from R6, as one plain action ("Add a manual
+tent reading", "Log the last watering").
 
 ## 4. Founder decisions (Matthew, 2026-11-03)
 
@@ -104,35 +124,44 @@ Timeline), and Quick Log.
 
 - New: `src/lib/aiDoctorReadinessSummaryRules.ts`, `src/constants/aiDoctorReadinessSummaryCopy.ts`,
   `src/components/AiDoctorReadinessSummary.tsx` (presenter only).
-- Change: `src/pages/PlantDetail.tsx` AI section: summary first, panels A–D inside one
-  disclosure. Lift the already-computed A view and C context/eligibility through props or a
-  shared memo; no duplicate hook calls.
+- Change: `src/pages/PlantDetail.tsx` AI section: summary first, panels A–D and F inside one
+  disclosure. Lift the already-computed A view, C context/eligibility/hold state and F read
+  state through props or a shared memo; no duplicate hook calls.
 - Tests: `src/test/ai-doctor-readiness-summary-rules.test.ts`,
   `src/test/ai-doctor-readiness-summary-plant-detail.test.tsx`.
 - Expected pin renegotiation (same commit, named in PR body): tests that assert panel order or
   visibility on Plant Detail, e.g. `ai-doctor-readiness-ui-v1-5.test.tsx`,
-  `plant-detail-ai-doctor-medium-pot-provenance.test.tsx`. Copy pins in A and C stay unchanged.
+  `plant-detail-ai-doctor-medium-pot-provenance.test.tsx`. Copy pins in A, C and F stay unchanged.
 
 ## 7. Acceptance tests
 
 1. Each row of §3 with the minimal input that reaches it; row order respected when several match.
-2. Never more optimistic than the gate: for every combination of `gate` × `ctx` × `view`
-   (3 × 3 × 5 = 45), `blocked` or `insufficient` ⇒ `not_ready`; `ready` only for row 5.
-3. Null, undefined and unknown strings for each input ⇒ not `ready`.
+2. Never more optimistic than the gate: for every combination of `hold` × `gate` × `ctx` ×
+   `view` (4 × 3 × 3 × 5 = 180): any `hold` other than `none` ⇒ `checking` or `not_ready`;
+   `gate === "historical_review"` with `hold === "none"` ⇒ `limited` (the allowed historical
+   path is preserved even though `ctx` is insufficient); `gate === "blocked"` with
+   `hold === "none"` ⇒ `not_ready`; `ready` only for row 8.
+3. Null, undefined and unknown strings for each input ⇒ not `ready`. In particular
+   `gate = null`, `ctx = "strong"`, `view = "ready"`, `hold = "none"` ⇒ `not_ready`.
 4. Demo, stale and invalid ⇒ never `ready`, and the sensor line shows the source label.
 5. Sensor line names scope, source and age; missing age renders "age unknown", never "now".
 6. Missing items: priority order per R6, max three, deterministic tie-break by code.
 7. Determinism: same inputs and `now` ⇒ deep-equal output across repeated calls.
-8. Plant Detail renders exactly one summary element before the disclosure; panels A–D render
-   inside it and are reachable by keyboard; the disclosure starts collapsed.
+8. Plant Detail renders exactly one summary element before the disclosure; panels A–D and F
+   render inside it and are reachable by keyboard; the disclosure starts collapsed. With the
+   disclosure collapsed, no other element in the AI review section exposes a readiness verdict
+   (no Ready/Partial/Empty/strong/partial badge or "Ready for…" text outside it).
 9. Safety fences: the rules module imports no React or Supabase, calls no clock, and the
    summary component triggers no fetch, model call, credit call or Action Queue write.
 10. Each new test shown RED before the change, count in the PR body.
+11. Read failure: when F's or C's current-sensor read fails, the summary shows row 2 and its
+    retry triggers the same refetch as F's existing retry.
 
 ## 8. Known unknowns
 
-- `NOT_MEASURED`: which production build the audit saw, and whether surface B also contributed
-  the audit's "Strong" sensor-context label. Confirm on the live build before implementation.
+- `NOT_MEASURED`: which production build the audit saw, and which surface showed the audit's
+  "Strong" sensor-context label (F's uppercase badge likely showed its "PARTIAL"). Confirm on
+  the live build before implementation.
 - `NOT_MEASURED`: mobile layout of the collapsed disclosure.
 - `missing evidence`: grower testing of the headline copy.
 
@@ -141,7 +170,7 @@ Timeline), and Quick Log.
 Open-PR file lists were diffed against their merge base for `PlantDetail.tsx`, `aiDoctor*`,
 `AiDoctor*` and `*readiness*`. Overlap: #2805 (photo viewer captions) changes
 `src/pages/PlantDetail.tsx`, outside the AI section; the implementation slice should wait for
-it to merge or rebase on it. #2807, #2802, #2799, #2795, #2794 and #2793 show no overlap.
+it to merge, then forward-merge the base (no rebase). #2807, #2802, #2799, #2795, #2794 and #2793 show no overlap.
 `NOT_MEASURED`: the file lists of #2782, #2775, #2757, #2752, #2751, #2744, #2743, #2741 and
 #2732 (fetch timed out); their titles are cultivar, CSV, MQTT, EcoWitt, dashboard-mobile and
 onboarding work. Re-check all open PRs before the implementation branch is cut.

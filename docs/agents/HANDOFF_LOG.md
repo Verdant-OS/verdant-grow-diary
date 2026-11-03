@@ -137,6 +137,40 @@ owner: Grok
 last_updated: 2026-11-02 23:20 CT, by Grok
 ```
 
+### GROW-SCOPED-PICKERS-SPEC
+
+```text
+TASK GROW-SCOPED-PICKERS-SPEC  priority: other  status: OPEN
+goal: Spec active-grow scoping for Sensors, Daily Check and global Quick Log pickers, no cross-grow tent fallback, and the Action Queue switcher naming the grow it filters by (docs/specs/grow-scoped-pickers.md).
+why: Live audit 2026-11-03 findings 1 and 10: pages opened tents from other grows; pickers list every tent in the account.
+branch: claude/grow-scoped-pickers-spec
+base: verdant-grow-diary
+checkout: git fetch origin claude/grow-scoped-pickers-spec verdant-grow-diary && git switch claude/grow-scoped-pickers-spec
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub (this block rides the first commit)
+state: spec drafted; founder decisions D1 (other grows), D2 (single-tent preselect), D3 (filter threshold) open.
+current_step: draft PR open.
+next_action: Matthew decides D1-D3 and names the reviewer.
+post_merge_check: docs only; none until the implementation slice.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: scope by the existing active grow (src/store/grows.tsx); no remembered tent/plant target (ban stays); Quick Log target rule unchanged, only ordering/grouping.
+tried_and_rejected: a remembered last-used tent (banned and test-pinned).
+commands: none (docs only)
+files_touched: docs/specs/grow-scoped-pickers.md; docs/agents/HANDOFF_LOG.md
+files_remaining: none for the spec slice
+blockers: none
+open_questions: D1, D2, D3 in spec section 7
+gotchas: Sensors and Daily Check read all account tents (useGrowTents()/useTents() with no grow); the fix scopes the list before any default is chosen.
+links: audit findings 1 and 10 (private upload, not committed)
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03, by Claude
+```
+
 ### POSTHOG-PUBLIC-CLIENT-KEY
 
 ```text

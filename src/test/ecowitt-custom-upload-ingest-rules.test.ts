@@ -225,7 +225,7 @@ describe("EcoWitt customized-upload ingest rules", () => {
     expect(unpaid.rows).toEqual([]);
   });
 
-  it("stores 0 and 100 percent as suspect and does not invent indoor air", () => {
+  it("stores 0 and 100 percent as degraded and does not invent indoor air", () => {
     const plan = planEcowittCustomUploadIngest(
       input({
         airChannels: [2],
@@ -240,9 +240,9 @@ describe("EcoWitt customized-upload ingest rules", () => {
     );
     expect(plan.accepted).toBe(true);
     expect(plan.rows.find((row) => row.metric === "temperature_c")?.quality).toBe("ok");
-    expect(plan.rows.find((row) => row.metric === "humidity_pct")?.quality).toBe("suspect");
+    expect(plan.rows.find((row) => row.metric === "humidity_pct")?.quality).toBe("degraded");
     expect(plan.rows.find((row) => row.metric === "humidity_pct")?.value).toBe(100);
-    expect(plan.rows.find((row) => row.metric === "soil_moisture_pct")?.quality).toBe("suspect");
+    expect(plan.rows.find((row) => row.metric === "soil_moisture_pct")?.quality).toBe("degraded");
     expect(plan.rows.find((row) => row.metric === "soil_moisture_pct")?.value).toBe(0);
     const indoorOnly = planEcowittCustomUploadIngest(
       input({

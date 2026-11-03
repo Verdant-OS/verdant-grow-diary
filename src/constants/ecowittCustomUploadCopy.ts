@@ -7,6 +7,7 @@ export const ECOWITT_CUSTOM_UPLOAD_COPY = {
   empty: "No live data",
   stale: "Stale",
   live: "Live",
+  edgeRail: "Degraded: humidity or soil is at 0 or 100.",
   indoorTemp: "Tent temperature",
   indoorRh: "Tent humidity",
   soil1: "Soil moisture 1",

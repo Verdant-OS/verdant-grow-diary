@@ -131,6 +131,7 @@ export interface EcowittStationCardModel {
   readonly emptyMessage: string | null;
   readonly freshness: "none" | "live" | "stale";
   readonly freshnessLabel: string | null;
+  readonly edgeNote: string | null;
   readonly indoorTempF: string | null;
   readonly indoorRh: string | null;
   readonly soil1: string | null;
@@ -175,7 +176,7 @@ function latestLive(
   for (const reading of readings) {
     if (reading.tentId !== tentId) continue;
     if (reading.source !== "live") continue;
-    if (reading.quality !== "ok") continue;
+    if (reading.quality !== "ok" && reading.quality !== "degraded") continue;
     if (reading.metric !== metric || !isLiveMetric(reading.metric)) continue;
     if (finiteReadingValue(reading.value) === null) continue;
     if (reading.capturedAt === null) continue;
@@ -249,6 +250,7 @@ export function buildEcowittCustomUploadStationCard(
       emptyMessage: ECOWITT_CUSTOM_UPLOAD_COPY.empty,
       freshness: "none",
       freshnessLabel: null,
+      edgeNote: null,
       indoorTempF: null,
       indoorRh: null,
       soil1: null,
@@ -272,6 +274,7 @@ export function buildEcowittCustomUploadStationCard(
       emptyMessage: ECOWITT_CUSTOM_UPLOAD_COPY.empty,
       freshness: "none",
       freshnessLabel: null,
+      edgeNote: null,
       indoorTempF: null,
       indoorRh: null,
       soil1: null,
@@ -296,6 +299,7 @@ export function buildEcowittCustomUploadStationCard(
       emptyMessage: ECOWITT_CUSTOM_UPLOAD_COPY.empty,
       freshness: "none",
       freshnessLabel: null,
+      edgeNote: null,
       indoorTempF: null,
       indoorRh: null,
       soil1: null,
@@ -311,6 +315,9 @@ export function buildEcowittCustomUploadStationCard(
     emptyMessage: null,
     freshness: stale ? "stale" : "live",
     freshnessLabel: stale ? ECOWITT_CUSTOM_UPLOAD_COPY.stale : ECOWITT_CUSTOM_UPLOAD_COPY.live,
+    edgeNote: present.some((reading) => reading.quality === "degraded")
+      ? ECOWITT_CUSTOM_UPLOAD_COPY.edgeRail
+      : null,
     indoorTempF: temp ? formatTempF(finiteReadingValue(temp.value) ?? Number.NaN) : null,
     indoorRh: humidity ? formatPercent(finiteReadingValue(humidity.value) ?? Number.NaN) : null,
     soil1: soil ? formatPercent(finiteReadingValue(soil.value) ?? Number.NaN) : null,

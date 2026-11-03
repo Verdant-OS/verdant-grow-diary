@@ -2,7 +2,9 @@
  * HTTP adapter for EcoWitt customized-upload ingest.
  *
  * Logical rejects stay HTTP 200 so a gateway does not retry-storm. An insert
- * failure or a tent-channel lookup failure is HTTP 503 and is logged. The
+ * failure before any row is durable, or a tent-channel lookup failure, is
+ * HTTP 503 and is logged. After rows are stored, receipt and bind failures
+ * stay HTTP 200. A unique-index replay is the same 200. The
  * body is never logged. PASSKEY and the claim token are hashed and then dropped.
  * Persistence, tent channel config, and the entitlement lookup are injected ports.
  */
@@ -42,7 +44,7 @@ export interface EcowittCustomUploadPorts {
   >;
   insertReadings(
     rows: readonly EcowittCustomUploadStoredReading[],
-  ): Promise<{ ok: true } | { ok: false }>;
+  ): Promise<{ ok: true } | { ok: false; reason?: "duplicate" | "failed" }>;
   tentChannels(
     tentId: string,
   ): Promise<
@@ -203,21 +205,23 @@ export async function handleEcowittCustomUploadRequest(
   if (!plan.accepted || claim === null) return jsonResponse(plan, 0);
 
   const inserted = await ports.insertReadings(plan.rows);
-  if (!inserted.ok) {
+  const duplicate = !inserted.ok && inserted.reason === "duplicate";
+  if (!inserted.ok && !duplicate) {
     console.error("[ecowitt-custom-upload] insert_failed", { rows: plan.rows.length });
     return jsonResponse({ accepted: false, reason: "store_failed" }, 0, 503);
+  }
+  if (duplicate) {
+    console.warn("[ecowitt-custom-upload] duplicate_reading_replay", {
+      rows: plan.rows.length,
+    });
   }
 
   const capturedAt = plan.rows[0]?.capturedAt ?? null;
   if (plan.touchReceivedAt !== null && capturedAt !== null) {
     const reserved = await ports.touchClaim(claim.id, plan.touchReceivedAt, capturedAt);
     if (!reserved.ok) {
-      if (reserved.reason === "store_failed" || reserved.reason === "claim_not_found") {
-        console.error("[ecowitt-custom-upload] receipt_reserve_failed", {
-          reason: reserved.reason,
-        });
-        return jsonResponse({ accepted: false, reason: "store_failed" }, plan.rows.length, 503);
-      }
+      // Readings are already durable. 503 would make the gateway post the
+      // same captured_at again and collide on sensor_readings_dedupe_uidx.
       console.warn("[ecowitt-custom-upload] receipt_not_reserved", { reason: reserved.reason });
     }
   }
@@ -230,8 +234,7 @@ export async function handleEcowittCustomUploadRequest(
       plan.touchReceivedAt ?? now.toISOString(),
     );
     if (!bound.ok) {
-      console.error("[ecowitt-custom-upload] bind_failed");
-      return jsonResponse({ accepted: false, reason: "store_failed" }, plan.rows.length, 503);
+      console.warn("[ecowitt-custom-upload] bind_not_applied");
     }
   }
   return jsonResponse(plan, plan.rows.length);

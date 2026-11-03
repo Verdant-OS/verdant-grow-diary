@@ -12,10 +12,11 @@
  * `sensor_readings_dedupe_uidx` is unique on (user, tent, source, metric,
  * captured_at), so this planner emits one row per metric: the mean of the
  * valid channels. Each channel's number and raw value stay on
- * `raw_payload.channels`. A humidity or soil reading at 0 or 100 is stored
- * with quality `suspect` (clone domes and dried coco are real), and it still
- * counts in the mean. `co2` stays on the claim tent. A missing metric is not
- * stored as a healthy zero.
+ * `raw_payload.channels`. A humidity or soil reading at 0 or 100 stays in the
+ * mean. The row quality is `degraded` (the `validate_sensor_reading` allow-list
+ * is ok/degraded/stale/invalid). The channel flag `suspect` records the rail
+ * so the card can say the value is real and not healthy. `co2` stays on the
+ * claim tent. A missing metric is not stored as a healthy zero.
  *
  * The claim token and PASSKEY never appear in stored rows or in the plan's
  * public fields. Callers hash them before planning.
@@ -66,7 +67,7 @@ export interface EcowittCustomUploadStoredReading {
   readonly source: "live";
   readonly metric: EcowittCustomUploadMetric;
   readonly value: number;
-  readonly quality: "ok" | "suspect";
+  readonly quality: "ok" | "degraded";
   readonly capturedAt: string;
   readonly receivedAt: string;
   readonly rawPayload: {
@@ -465,7 +466,7 @@ export function planEcowittCustomUploadIngest(
         metric,
         value: Math.round(mean * 100) / 100,
         quality: channels.some((channel) => channel.suspect)
-          ? ("suspect" as const)
+          ? ("degraded" as const)
           : ("ok" as const),
         capturedAt,
         receivedAt,

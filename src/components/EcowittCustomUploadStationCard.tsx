@@ -66,6 +66,15 @@ export function EcowittCustomUploadStationCard(props: EcowittCustomUploadStation
         </dl>
       )}
 
+      {model.edgeNote ? (
+        <p
+          data-testid="ecowitt-custom-upload-edge"
+          className="mt-2 text-[11px] text-muted-foreground"
+        >
+          {model.edgeNote}
+        </p>
+      ) : null}
+
       {model.lastReadingLabel ? (
         <p
           data-testid="ecowitt-custom-upload-last"

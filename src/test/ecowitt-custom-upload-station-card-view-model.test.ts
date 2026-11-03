@@ -142,6 +142,29 @@ describe("EcoWitt customized-upload station card view model", () => {
     expect(ECOWITT_CUSTOM_UPLOAD_COPY.indoorRh).toBe("Tent humidity");
   });
 
+  it("shows a degraded rail reading instead of hiding it", () => {
+    const model = buildEcowittCustomUploadStationCard({
+      tentId: TENT,
+      now: NOW,
+      lastReceivedAt: "2026-11-02T18:00:00.000Z",
+      claimState: "active",
+      justCreatedToken: null,
+      readings: [
+        {
+          tentId: TENT,
+          metric: "soil_moisture_pct",
+          value: 0,
+          source: "live",
+          quality: "degraded",
+          capturedAt: "2026-11-02T18:00:00.000Z",
+        },
+      ],
+    });
+    expect(model.emptyMessage).toBeNull();
+    expect(model.soil1).toBe("0 %");
+    expect(model.edgeNote).toBe(ECOWITT_CUSTOM_UPLOAD_COPY.edgeRail);
+  });
+
   it("hides create while the open-claim lookup is still pending", () => {
     const pending = buildEcowittCustomUploadStationCard({
       tentId: TENT,

@@ -167,8 +167,41 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         touchClaim: async () => ({ ok: false, reason: "store_failed" }),
       },
     );
-    expect(rpc.status).toBe(503);
-    expect(await rpc.json()).toMatchObject({ accepted: false, reason: "store_failed" });
+    expect(rpc.status).toBe(200);
+    expect(await rpc.json()).toMatchObject({ accepted: true, reason: "stored" });
+  });
+
+  it("returns 200 when a replay hits the unique reading key", async () => {
+    const events: string[] = [];
+    const response = await handleEcowittCustomUploadRequest(
+      new Request(`https://example.test/ew/${TOKEN}`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: formBody(),
+      }),
+      {
+        now: () => NOW,
+        sha256Hex,
+        lookupClaim: async () => claim(null),
+        entitlement: async () => "allowed",
+        bindClaim: async () => {
+          events.push("bind");
+          return { ok: false };
+        },
+        touchClaim: async () => {
+          events.push("touch");
+          return { ok: false, reason: "claim_not_found" };
+        },
+        insertReadings: async () => {
+          events.push("insert");
+          return { ok: false, reason: "duplicate" };
+        },
+        tentChannels: channels(),
+      },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ accepted: true, stored: expect.any(Number) });
+    expect(events).toEqual(["insert", "touch", "bind"]);
   });
 
   it("returns 503 when the tent channel lookup fails", async () => {

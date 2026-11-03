@@ -81,7 +81,7 @@ checkout: git fetch origin ultra/2717-ecowitt-live-ingest verdant-grow-diary && 
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2732
 head_sha: read git rev-parse HEAD after the Bugbot and protocol follow-up; previous remote head 3cd66995ee0728c176cddf91f15693d7c68352e7
 state: pushed draft
-current_step: One row per tent and metric (mean, raw channels kept). Insert runs before receipt reserve. Rotate returns a token only when UPDATE finds a row. Tent switch clears the loaded claim immediately. Create stays hidden until the open-claim read finishes. Live card accepts numeric strings and labels tent air. dateutc accepts '+' or space. -9999 is missing. Gateway 5xx retry is NOT_MEASURED.
+current_step: Rail humidity and soil store quality degraded (DB allow-list). After a durable insert, receipt or bind failure and a unique-index replay return 200. Insert failure before any row and tent-channel lookup failure stay 503.
 next_action: keep the PR draft. Required full-suite and lint jobs stay skipped until a non-author marks the PR ready. Do not apply the migration or deploy the edge function.
 post_merge_check: after a separate authorized apply and Publish, a GW1200B POST stores the tent's configured air channel, not the gateway indoor sensor. NOT_MEASURED until then.
 active_writer: Grok cloud session assigned 2026-11-02 to push this branch

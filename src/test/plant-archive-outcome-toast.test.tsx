@@ -127,3 +127,40 @@ describe("Archive Plant outcome", () => {
     expect(mocks.toastSuccess).not.toHaveBeenCalled();
   });
 });
+
+describe("Restore Plant outcome", () => {
+  beforeEach(() => {
+    mocks.updateResult.mockReset();
+    mocks.toastSuccess.mockReset();
+    mocks.toastError.mockReset();
+    mocks.updates.length = 0;
+  });
+
+  async function restoreFromRow() {
+    const user = userEvent.setup();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/plants/plant-1"]}>
+          <PlantCardActionsMenu plant={{ ...plant, isArchived: true }} variant="row" />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await user.click(screen.getByTestId("plant-detail-restore-plant"));
+    await user.click(await screen.findByTestId("confirm-restore-plant-submit"));
+  }
+
+  it("shows a success toast when the restore is confirmed by the database", async () => {
+    mocks.updateResult.mockReturnValue({ data: [{ id: "plant-1" }], error: null });
+    await restoreFromRow();
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledWith("Plant restored"));
+    expect(mocks.updates).toEqual([{ is_archived: false }]);
+  });
+
+  it("does not claim success when no row was restored", async () => {
+    mocks.updateResult.mockReturnValue({ data: [], error: null });
+    await restoreFromRow();
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledTimes(1));
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+  });
+});

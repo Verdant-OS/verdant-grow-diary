@@ -43,7 +43,9 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: vi.fn(() => ({
       update: vi.fn(() => ({
-        eq: mocks.updateEq,
+        // Restore/archive chain .select("id") to detect zero-row updates
+        // (renegotiated pin, founder-approved 2026-11-03).
+        eq: (...args: unknown[]) => ({ select: () => mocks.updateEq(...(args as [])) }),
       })),
     })),
   },

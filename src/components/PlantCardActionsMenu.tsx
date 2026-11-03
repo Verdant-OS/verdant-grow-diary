@@ -141,14 +141,21 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
 
   async function restorePlant() {
     setBusy(true);
-    const { error } = await supabase
+    // Same zero-row guard as archivePlant: never claim a restore that did not happen.
+    const restored = await supabase
       .from("plants")
       .update(buildRestorePlantPayload(plant.id) as never)
-      .eq("id", plant.id);
+      .eq("id", plant.id)
+      .select("id");
     setBusy(false);
     setConfirmRestore(false);
-    if (error) {
-      toast.error(error.message);
+    if (!PlantLifecycleWriteRules.rowWasWritten(restored)) {
+      toast.error(
+        PlantLifecycleWriteRules.failureMessage(
+          restored,
+          "Plant was not restored. Nothing changed.",
+        ),
+      );
       return;
     }
     toast.success("Plant restored");

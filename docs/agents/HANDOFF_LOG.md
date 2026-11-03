@@ -69,38 +69,72 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### CULTIVAR-SLUG-SSR-2777
+### AI-DOCTOR-READINESS-SUMMARY-IMPL
 
 ```text
-TASK CULTIVAR-SLUG-SSR-2777  priority: P2  status: OPEN
-goal: Unknown cultivar slugs omit og:url and canonical in server HTML, a catalog 503 renders a retryable page with no-store, and a failed catalog read is not reused.
-why: Issue #2777. Follow-up to merged #2758. The root document still emitted the site og:url, the 503 redirect had an empty body, and catalogPromise kept a failed read.
-branch: cursor/cultivar-slug-ssr-head-2777-1abc
+TASK AI-DOCTOR-READINESS-SUMMARY-IMPL  priority: other  status: OPEN
+goal: Implement the one-summary AI Doctor readiness card on Plant Detail per docs/specs/ai-doctor-readiness-single-summary.md (spec PR #2809).
+why: Live audit 2026-11-03 finding 3. Plant Detail shows readiness from six rule sets that can disagree.
+branch: claude/ai-doctor-readiness-summary (Matthew chose a separate branch, 2026-11-03)
 base: verdant-grow-diary
-checkout: git fetch origin cursor/cultivar-slug-ssr-head-2777-1abc verdant-grow-diary && git switch cursor/cultivar-slug-ssr-head-2777-1abc
-pr: draft; read the URL from GitHub after push
-head_sha: the commit that adds this block; read git rev-parse HEAD after checkout
-state: local until pushed; draft only
-current_step: implementation and targeted tests
-next_action: confirm the draft PR stays draft; do not mark ready, request review, or merge
-post_merge_check: after Publish, curl an unknown /cultivars slug on https://verdantgrowdiary.com and confirm the HTML has no og:url and no canonical. NOT_MEASURED until live /version.json reports the SHA.
+checkout: git fetch origin claude/ai-doctor-readiness-summary verdant-grow-diary && git switch claude/ai-doctor-readiness-summary
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: round-1 commit acb836e3bdc136586aca11543209283c93518701; this block's commit follows it, so read the current head on GitHub
+state: rounds 1, 2a and 2b committed: rules, optional signal props on F/A/C, container section, Plant Detail layout. Draft PR, awaiting CI and independent review.
+current_step: draft PR open; CI running.
+next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ). Signed-in visual check of Plant Detail is NOT_MEASURED (needs fixture credentials).
+post_merge_check: after Publish, open a plant's AI review on https://verdantgrowdiary.com with the fixture account. Exactly one readiness verdict is visible before a review starts. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: D1 keep local preview collapsed; D2 overview copy is a later slice; D3 C stays visible with its pre-start confidence line hidden on Plant Detail.
+tried_and_rejected: hiding C in the disclosure (it owns the Start review control).
+commands: bunx vitest run src/test/ai-doctor-readiness-summary-rules.test.ts --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/lib/aiDoctorReadinessSummaryRules.ts; src/constants/aiDoctorReadinessSummaryCopy.ts; src/components/AiDoctorReadinessSummary.tsx; src/components/PlantDetailAiDoctorReadinessSection.tsx; src/components/PlantDetailAiDoctorReadiness.tsx; src/components/AiDoctorContextReadinessPanel.tsx; src/components/PlantDetailAiDoctorContextReadinessMount.tsx; src/components/PlantDetailAiDoctorLiveReview.tsx; src/pages/PlantDetail.tsx; src/test/ai-doctor-readiness-summary-rules.test.ts; src/test/ai-doctor-readiness-signal-props.test.tsx; src/test/ai-doctor-live-review-readiness-signal.test.tsx; src/test/ai-doctor-readiness-summary-section.test.tsx; src/test/plant-detail-information-architecture.test.ts (3 structure pins renegotiated); docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: none
+gotchas: the pre-commit full-project tsc runs out of memory at the default heap; commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify). Prettier runs on staged .md files.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2809
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 13:40 CT, by Claude
+```
+
+### PHOTO-VIEWER-CAPTION-TILES
+
+```text
+TASK PHOTO-VIEWER-CAPTION-TILES  priority: P1  status: OPEN
+goal: Timeline photo viewer caption shows the entry note, or the timeline local-time formatter when the note is blank, and plant Recent Photos, the plant hero, and Timeline Photo history open that viewer.
+why: Issue #2804. The caption joined stage and the raw UTC ISO and ignored the note. Those three tiles were not controls.
+branch: cursor/photo-viewer-caption-tiles-1ba3
+base: verdant-grow-diary
+checkout: git fetch origin cursor/photo-viewer-caption-tiles-1ba3 verdant-grow-diary && git switch cursor/photo-viewer-caption-tiles-1ba3
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2805
+head_sha: 71024e9d10201391d3143617911b3644b280916c
+state: pushed; required CI re-running after the null-safe plant photo wiring
+current_step: caption class, tile buttons, plant lightbox, and null-safe hero open
+next_action: confirm required CI at the pushed head. Do not merge, enqueue, or request review.
+post_merge_check: after Publish, open a photo from a plant Recent Photos tile and confirm the viewer caption is the note or a local time, never a raw ISO. NOT_MEASURED until live /version.json reports the SHA.
 active_writer: Grok cloud agent on this branch
-decisions: RootDocumentHeadRules drops the inherited og:url when the cultivar match is notFound. ServiceUnavailablePage replaces a 503 redirect body. A failed catalog read clears catalogPromise before the next request.
-tried_and_rejected: editing src/test/cultivar-slug-route-status.test.tsx. It is scorer-locked, so the new cases live in new test files.
-commands: bunx vitest run src/test/cultivar-slug-ssr-followup.test.tsx src/test/cultivar-unavailable-page.test.ts src/test/cultivar-slug-route-status.test.tsx --reporter=dot
-files_touched: src/lib/cultivarSlugRouteRules.ts; src/lib/rootDocumentHeadRules.ts; src/lib/serviceUnavailablePage.ts; src/routes/__root.tsx; src/server.ts; src/test/cultivar-slug-ssr-followup.test.tsx; src/test/cultivar-unavailable-page.test.ts; docs/agents/HANDOFF_LOG.md
+decisions: TimelinePhotoLightboxCaption.fromItem is the only caption path. Tiles are buttons. Focus returns to the opener when the viewer unmounts. Alt text still includes the raw entry instant because src/test/timeline-photo-lightbox-rules.test.ts is scorer-locked and pins that string.
+tried_and_rejected: rewriting the locked alt assertion. The scorer lock refused the edit.
+commands: bunx vitest run src/test/timeline-photo-caption-and-open.test.tsx src/test/timeline-photo-lightbox-component.test.tsx src/test/timeline-photo-lightbox-rules.test.ts --reporter=dot
+files_touched: src/lib/timelinePhotoLightboxRules.ts; src/components/TimelinePhotoLightbox.tsx; src/components/PhotoHistoryPanel.tsx; src/components/PlantDetailPhotoStrip.tsx; src/components/PlantPhoto.tsx; src/components/PlantPhotoView.tsx; src/pages/PlantDetail.tsx; src/pages/Timeline.tsx; src/test/timeline-photo-caption-and-open.test.tsx; docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: none for repository work
 open_questions: none
-gotchas: a bundled slug stays found when the database read fails. The sticky-failure case is a database-only slug. Do not edit the locked cultivar route status test.
-links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2777
-artifacts: screenshots are local to the agent run, not this repo
-reviewer_seat: not requested; this draft does not ask for review
+gotchas: do not edit the locked alt-text test. Upload size warning is out of scope.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2804
+artifacts: local screenshots, not committed
+reviewer_seat: not requested; Moonbow routes review
 reviewer_sha: NOT_MEASURED
-session_state: no paused workflows; no production writes
+session_state: no production writes; auto-merge off
 claimed_by: Grok, 2026-11-03
 owner: Grok
-last_updated: 2026-11-02 20:55 CT, by Grok
+last_updated: 2026-11-02 23:20 CT, by Grok
 ```
 
 ### POSTHOG-PUBLIC-CLIENT-KEY
@@ -140,6 +174,36 @@ last_updated: 2026-11-02 20:40 CT, by Grok
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text
+TASK QUICK-LOG-TARGET-SAVE  priority: P1  status: OPEN
+goal: One draft PR for Quick Log target selection, one save, optional reading time, one time-label class, and correction temperature units.
+why: Issues 2778, 2779, 2780, 2781, and part of 2706. A tent open was resolving to the sole or recent plant, and a successful save left the sheet open.
+branch: cursor/quick-log-target-save-1baf
+base: verdant-grow-diary
+checkout: git fetch origin cursor/quick-log-target-save-1baf verdant-grow-diary && git switch cursor/quick-log-target-save-1baf
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2793 ready
+head_sha: d6b9abb71 is the implementation; 504ecc08c stamps this block; the pin-fix commit is the child of 504ecc08c. Read origin/cursor/quick-log-target-save-1baf for the exact head. This line cannot name that child.
+state: ready PR 2793, no auto-merge
+current_step: three CI pins updated after measured tap counts; required CI recheck follows the pin-fix push
+next_action: keep the PR draft until required checks are green at the exact head and Moonbow routes review
+post_merge_check: bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx
+active_writer: Grok cloud agent on cursor/quick-log-target-save-1baf
+decisions: tent context is never rewritten to a plant; last-used target applies only when the route has no tent or plant; success closes the sheet and names the target in the toast; reading time is sheet state wired to occurredAt; GrowerTimeLabel is the shared formatter; correction temperature displays the grower unit and converts once to Celsius on save
+tried_and_rejected: leaving the sole-plant pins unchanged would keep the bug
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx src/test/quick-log-v2-rules.test.ts src/test/quick-log-route-target-rules.test.ts src/test/mobile-quick-log-single-fab.test.ts src/test/app-shell-mobile-quick-log-routing.test.tsx src/test/quick-log-v2-sheet-watering.test.tsx src/test/quick-log-v2-sheet-feeding.test.tsx src/test/quick-log-v2-refresh-sheet.test.tsx src/test/quick-log-timeline-cta-integration.test.tsx
+files_touched: src/components/AppShell.tsx src/components/QuickLogEntryIntegrityControls.tsx src/components/QuickLogV2Sheet.tsx src/pages/TentDetail.tsx src/lib/quickLogV2Rules.ts src/lib/quickLogRouteTargetRules.ts src/lib/growerTimeLabel.ts src/lib/quickLogReadingTime.ts src/lib/timelineEntryTimestampFormat.ts src/lib/quickLogGroupedTimelineFilterViewModel.ts src/lib/quickLogSnapshotStripAdapter.ts src/lib/wateringCadenceHistoryRules.ts src/lib/growDiaryPdfExport.ts and the renegotiated tests named in the PR
+files_remaining: none for this slice
+blockers: none for repository work. Moonbow routes review and merge. No production write.
+open_questions: none
+gotchas: scorer pins that encoded sole-plant launch and a stay-open sheet were renegotiated in the same change. .claude/scorer-unlock.json is local only.
+links: issues 2778 2779 2780 2781 2706
+artifacts: src/test/quick-log-target-save-reading-time.test.tsx
+reviewer_seat: not requested
+reviewer_sha: none
+session_state: Grok implementation session
+claimed_by: Grok 2026-11-02
+owner: Grok
+last_updated: 2026-11-02 21:36 CT, by Grok
+
 TASK CREATE-DIALOG-DISABLED-REASON  priority: P2  status: OPEN
 goal: disabled primary buttons in New grow, New tent, and New plant state their reason, and each name field has a visible label that is its accessible name.
 why: Issue 3 (FA-F01, FA-F02, FA-F05). Cheeko approved building only (2026-10-31). Create tent and Create plant were disabled with no description, and the name fields were announced as their placeholders.

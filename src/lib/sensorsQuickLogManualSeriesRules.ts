@@ -185,16 +185,22 @@ export function collectSensorsQuickLogManualReadings(input: {
   const now = input.now ?? new Date();
   const out: SensorReading[] = [];
 
+  const siblingKeys = new Set<string>();
   for (const raw of input.growEvents ?? []) {
     if (!raw) continue;
     const env = rawRowToQuickLogEnvironmentRow(raw);
     const reading = sensorReadingFromQuickLogEnvironmentRow(env, now);
-    if (reading && reading.tentId === tentId) out.push(reading);
+    if (reading && reading.tentId === tentId) {
+      out.push(reading);
+      siblingKeys.add(captureKey(reading));
+    }
   }
 
   for (const row of input.diaryEntries ?? []) {
     const reading = sensorReadingFromQuickLogDiaryManual(row, tentId, now);
-    if (reading) out.push(reading);
+    // The environment sibling is the climate row. A diary mirror at the same
+    // tent and capture is the same save, so it must not become a second reading.
+    if (reading && !siblingKeys.has(captureKey(reading))) out.push(reading);
   }
 
   return out;

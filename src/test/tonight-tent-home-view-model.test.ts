@@ -321,7 +321,7 @@ describe("buildTonightTentMetrics — per-metric provenance", () => {
     expect(vpd.value).toBe(1.34);
   });
 
-  it("prefers a same-time temperature and RH pair over a newer unpaired reading", () => {
+  it("does not show an older same-time pair beside a newer unpaired temperature", () => {
     const together = minutesAgo(10);
     const metrics = buildTonightTentMetrics({
       rows: [
@@ -353,9 +353,10 @@ describe("buildTonightTentMetrics — per-metric provenance", () => {
     });
     const vpd = metrics.find((m) => m.key === "vpd")!;
     expect(vpd).toMatchObject({
-      state: "value",
-      value: calculateVpdKpa({ tempC: 25, rhPercent: 60 }),
-      capturedAt: together,
+      state: "not_computed",
+      value: null,
+      capturedAt: null,
+      calculated: false,
     });
   });
 

@@ -102,6 +102,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import {
+  QUICK_LOG_RETRY_READING_TIME_REFUSAL,
+  QuickLogReadingTime,
+} from "@/lib/quickLogReadingTime";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useInRouterContext, useNavigate } from "@/lib/react-router-compat";
 import {
@@ -132,6 +136,7 @@ import {
   EMPTY_QUICKLOG_V2_FORM,
   QUICK_LOG_V2_TARGET_FILTER_THRESHOLD,
   QUICK_LOG_V2_EMPTY_CONTENT_HELPER,
+  QuickLogLaunchTarget,
   isQuickLogV2CriticalContentMissing,
   type QuickLogV2FormState,
   type QuickLogV2Action,
@@ -236,7 +241,6 @@ import {
   quickLogSaveRequiresHistoryCheck,
 } from "@/lib/quickLogSaveErrorMessage";
 import {
-  QUICK_LOG_POST_SAVE_VIEW_LABEL,
   QUICK_LOG_POST_SAVE_ANOTHER_LABEL,
   QUICK_LOG_POST_SAVE_CLOSE_LABEL,
   QUICK_LOG_POST_SAVE_TITLE,
@@ -476,6 +480,21 @@ function QuickLogV2SheetForOwner({
     () => (plantsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[1]) ?? [],
     [plantsQ.data],
   );
+  const activePlantIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const plant of plants ?? []) {
+      if (plant && typeof plant.id === "string") ids.add(plant.id);
+    }
+    return ids;
+  }, [plants]);
+  useEffect(() => {
+    if (!plantsQ.data || submissionLockedRef.current) return;
+    setForm((prev) => {
+      if (!prev.selectedKey?.startsWith("plant:")) return prev;
+      if (QuickLogLaunchTarget.retainActivePlant(prev.selectedKey, activePlantIds)) return prev;
+      return { ...prev, selectedKey: null };
+    });
+  }, [plantsQ.data, activePlantIds]);
   const tents = useMemo(
     () => (tentsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[0]) ?? [],
     [tentsQ.data],
@@ -521,16 +540,33 @@ function QuickLogV2SheetForOwner({
       growEventId: scope.growEventId ?? null,
     });
     if (!nav) {
-      // Confirmed save without a verified grow cannot enable a Timeline CTA.
       toast.success(message);
+      onOpenChange(false);
       return;
     }
-    toast.success(message, {
+    const matched = options.find(
+      (option) => option.type === scope.targetType && option.id === scope.targetId,
+    );
+    const targetLabel =
+      scope.targetType && scope.targetId
+        ? formatQuickLogV2TargetOptionLabel(
+            {
+              type: scope.targetType,
+              id: scope.targetId,
+              label: matched?.label ?? (scope.targetType === "tent" ? "Tent" : "Plant"),
+              tentId: scope.tentId,
+              growId: scope.growId,
+            },
+            tentNameById,
+          )
+        : "the selected target";
+    toast.success(`${message} · ${targetLabel}`, {
       action: {
         label: QUICK_LOG_TIMELINE_CTA_LABEL,
         onClick: () => navigateToTimeline(nav.href, nav.hash, nav.path),
       },
     });
+    onOpenChange(false);
   }
 
   // Seed from open props on first paint so tent:/plant: defaultTargetKey is
@@ -554,6 +590,7 @@ function QuickLogV2SheetForOwner({
   // Type-to-filter for long Target lists. Reset on close/reopen so a prior
   // query cannot hide options on the next open.
   const [targetFilterQuery, setTargetFilterQuery] = useState("");
+  const [readingTimeLocal, setReadingTimeLocal] = useState("");
   // One-shot tent-scoped plant auto-select per open (sole plant / recent-in-tent).
   const [tentPlantAutoApplied, setTentPlantAutoApplied] = useState(false);
   const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(
@@ -690,9 +727,7 @@ function QuickLogV2SheetForOwner({
   // can slip a second save through. This ref locks the entry point
   // during the same tick.
   const saveInFlightRef = useRef(false);
-  const submitGuardRef = useRef<QuickLogSubmitGuardState>(
-    createQuickLogSubmitGuardState(),
-  );
+  const submitGuardRef = useRef<QuickLogSubmitGuardState>(createQuickLogSubmitGuardState());
   const observationDraftSuppressedRef = useRef(false);
   // True once this open restored or wrote the stored draft, so emptying the
   // form may forget it. Opening for another target never clears its draft.
@@ -815,6 +850,13 @@ function QuickLogV2SheetForOwner({
   );
 
   const options = tentScopedPartitions.ordered;
+  const tentNameById = useMemo(() => {
+    const names = new Map<string, string>();
+    for (const option of baseOptions) {
+      if (option.type === "tent" && option.label) names.set(option.id, option.label);
+    }
+    return names;
+  }, [baseOptions]);
 
   const filteredTargetOptions = useMemo(
     () => filterQuickLogV2TargetOptions(options, targetFilterQuery),
@@ -1319,6 +1361,7 @@ function QuickLogV2SheetForOwner({
       }
       setRecentSuggestionDismissed(false);
       setTargetFilterQuery("");
+      setReadingTimeLocal("");
       setTentPlantAutoApplied(false);
       resetPhotoSelection();
     } else {
@@ -2011,6 +2054,36 @@ function QuickLogV2SheetForOwner({
       setLocalError("Choose a plant or tent before saving.");
       return;
     }
+    const readingTime = QuickLogReadingTime.resolve(
+      readingTimeLocal,
+      Date.now(),
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+    );
+    if (!readingTime.ok) {
+      setLocalError(readingTime.message);
+      return;
+    }
+    const lockedOccurred = pendingManualSubmission
+      ? pendingManualSubmission.payload.p_occurred_at
+      : pendingFeedingSubmission
+        ? pendingFeedingSubmission.payload.occurred_at
+        : pendingWateringSubmission
+          ? pendingWateringSubmission.payload.occurred_at
+          : null;
+    const lockedIso =
+      typeof lockedOccurred === "string"
+        ? lockedOccurred
+        : lockedOccurred instanceof Date
+          ? lockedOccurred.toISOString()
+          : null;
+    const readingTimeEdited = readingTimeLocal.trim().length > 0;
+    if (pendingSubmission && lockedIso && readingTimeEdited && lockedIso !== readingTime.iso) {
+      setLocalError(QUICK_LOG_RETRY_READING_TIME_REFUSAL);
+      return;
+    }
+    if (pendingSubmission && lockedIso && !readingTimeEdited) {
+      readingTime.iso = lockedIso;
+    }
     const archivedSaveBlock = quickLogArchivedGrowActionBlock({
       growId: resolved.growId,
       action: pendingWateringSubmission
@@ -2084,7 +2157,7 @@ function QuickLogV2SheetForOwner({
         setLocalError(FEEDING_RECOVERY_UNAVAILABLE);
         return;
       }
-      const createdAt = new Date().toISOString();
+      const createdAt = readingTime.iso;
       const newPayload = { ...mapped.payload, occurred_at: createdAt };
       const exactFeedingSubmission = pendingFeedingSubmission ?? {
         recovery: {
@@ -2249,7 +2322,7 @@ function QuickLogV2SheetForOwner({
       return;
     }
 
-    const occurredAt = new Date().toISOString();
+    const occurredAt = readingTime.iso;
     let maturityDetails: Record<string, unknown> | null = null;
     if (!pendingSubmission) {
       const maturityEvidence = buildQuickLogMaturityEvidenceDetails({
@@ -3149,9 +3222,10 @@ function QuickLogV2SheetForOwner({
     // defaults flag below let the post-save recipe prefill apply again.
     setForm((prev) => ({
       ...EMPTY_QUICKLOG_V2_FORM,
-      selectedKey: prev.selectedKey,
+      selectedKey: defaultTargetKey ?? prev.selectedKey,
       action: prev.action,
     }));
+    setReadingTimeLocal("");
     setVisitMode("fast_check");
     manualTempEntryUnitRef.current = null;
     // Same reason as the open reset: "Log another" begins a new draft, and its
@@ -3209,21 +3283,6 @@ function QuickLogV2SheetForOwner({
     onOpenChange(false);
     const { navigation } = mismatchedReceipt;
     navigateToTimeline(navigation.href, navigation.hash, navigation.path);
-  }
-
-  function handleViewTimeline() {
-    if (!postSave) return;
-    const nav = buildQuickLogTimelineNavTarget({
-      growId: postSave.growId,
-      targetType: postSave.targetType,
-      targetId: postSave.targetId,
-      tentId: postSave.tentId,
-      plantId: postSave.targetType === "plant" ? postSave.targetId : null,
-      growEventId: postSave.growEventId,
-    });
-    if (!nav) return;
-    onOpenChange(false);
-    navigateToTimeline(nav.href, nav.hash, nav.path);
   }
 
   /**
@@ -3398,7 +3457,7 @@ function QuickLogV2SheetForOwner({
                         <SelectLabel>In this tent</SelectLabel>
                         {filteredInTentPlants.map((o) => (
                           <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
-                            {formatQuickLogV2TargetOptionLabel(o)}
+                            {formatQuickLogV2TargetOptionLabel(o, tentNameById)}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -3408,7 +3467,7 @@ function QuickLogV2SheetForOwner({
                         <SelectLabel>Other</SelectLabel>
                         {filteredOtherTargets.map((o) => (
                           <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
-                            {formatQuickLogV2TargetOptionLabel(o)}
+                            {formatQuickLogV2TargetOptionLabel(o, tentNameById)}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -3417,7 +3476,7 @@ function QuickLogV2SheetForOwner({
                 ) : (
                   filteredTargetOptions.map((o) => (
                     <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
-                      {formatQuickLogV2TargetOptionLabel(o)}
+                      {formatQuickLogV2TargetOptionLabel(o, tentNameById)}
                     </SelectItem>
                   ))
                 )}
@@ -3436,6 +3495,17 @@ function QuickLogV2SheetForOwner({
             <p id="qlv2-target-help" className="mt-1 text-sm text-muted-foreground">
               Choose where this log belongs.
             </p>
+            <label className="mt-3 block text-sm text-muted-foreground" htmlFor="qlv2-reading-time">
+              Reading time
+              <input
+                id="qlv2-reading-time"
+                type="datetime-local"
+                value={readingTimeLocal}
+                onChange={(event) => setReadingTimeLocal(event.target.value)}
+                data-testid="qlv2-reading-time"
+                className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm text-foreground"
+              />
+            </label>
             {selectedTargetMissing && (
               <p
                 className="mt-2 rounded-md border border-border/60 bg-secondary/20 p-2 text-sm text-muted-foreground"
@@ -4238,24 +4308,6 @@ function QuickLogV2SheetForOwner({
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Button
                     type="button"
-                    className="flex-1"
-                    onClick={handleViewTimeline}
-                    disabled={
-                      !buildQuickLogTimelineNavTarget({
-                        growId: postSave.growId,
-                        targetType: postSave.targetType,
-                        targetId: postSave.targetId,
-                        tentId: postSave.tentId,
-                        plantId: postSave.targetType === "plant" ? postSave.targetId : null,
-                        growEventId: postSave.growEventId,
-                      })
-                    }
-                    data-testid="quick-log-post-save-view"
-                  >
-                    {QUICK_LOG_POST_SAVE_VIEW_LABEL}
-                  </Button>
-                  <Button
-                    type="button"
                     variant="outline"
                     className="flex-1"
                     onClick={handleLogAnother}
@@ -4284,7 +4336,7 @@ function QuickLogV2SheetForOwner({
                 >
                   {saveHelper}
                 </p>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -4294,6 +4346,19 @@ function QuickLogV2SheetForOwner({
                   >
                     Cancel
                   </Button>
+                  <span
+                    className="max-w-[40%] truncate text-sm text-foreground"
+                    data-testid="qlv2-save-target"
+                  >
+                    {(() => {
+                      const chosen = options.find(
+                        (option) => `${option.type}:${option.id}` === form.selectedKey,
+                      );
+                      return chosen
+                        ? formatQuickLogV2TargetOptionLabel(chosen, tentNameById)
+                        : "Choose a tent or plant";
+                    })()}
+                  </span>
                   <Button
                     type="button"
                     className="flex-1"
@@ -4315,11 +4380,7 @@ function QuickLogV2SheetForOwner({
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"
                   >
-                    {saveBusy
-                      ? "Saving…"
-                      : retryPending
-                        ? "Retry exact record"
-                        : "Save"}
+                    {saveBusy ? "Saving…" : retryPending ? "Retry exact record" : "Save"}
                   </Button>
                 </div>
               </>

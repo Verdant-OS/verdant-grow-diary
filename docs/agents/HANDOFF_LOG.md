@@ -82,10 +82,10 @@ pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2809 (draft)
 head_sha: checkpoint 5a5697024d388cc7ae33e948d8f54a4256792743 observed on origin 2026-11-03 18:31 UTC; this block's own commit follows it, so confirm the current head on the PR
 state: pushed draft, docs only
 current_step: spec written at docs/specs/ai-doctor-readiness-single-summary.md
-next_action: request an independent docs review at the exact head of the draft PR. Implementation is a separate later slice and branch, after #2805.
+next_action: Codex independent review at the current head of #2809 (re-routed after the D3 amendment). Implementation is on branch claude/ai-doctor-readiness-summary (separate PR).
 post_merge_check: NOT_APPLICABLE (docs only; no runtime change)
 active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
-decisions: verdict is worst-of run gate, context readiness and view-model state; the run gate stays authoritative and unchanged; existing panels move into a collapsed disclosure, none deleted; no new queries.
+decisions: D3 (Matthew): C stays visible with its pre-start confidence line hidden on Plant Detail. verdict is worst-of run gate, context readiness and view-model state; the run gate stays authoritative and unchanged; existing panels move into a collapsed disclosure, none deleted; no new queries.
 tried_and_rejected: replacing the run gate rules with a unified rule set (changes AI Doctor behavior and pins; out of scope)
 commands: none beyond docs safety; no code changed
 files_touched: docs/specs/ai-doctor-readiness-single-summary.md; docs/agents/HANDOFF_LOG.md
@@ -95,12 +95,12 @@ open_questions: whether surface B (timeline evidence readiness) produced the aud
 gotchas: PR #2805 also changes src/pages/PlantDetail.tsx; the implementation slice should follow it. Do not commit the audit screenshots (private account data).
 links: none yet
 artifacts: docs/specs/ai-doctor-readiness-single-summary.md
-reviewer_seat: not requested
-reviewer_sha: NOT_MEASURED
-session_state: no production access, no writes outside the repo, no GitHub comments
+reviewer_seat: Codex, routed by Matthew 2026-11-03; the request at a71d322e7a135a5b4469cea4663712c437b93ef7 is superseded by this head
+reviewer_sha: NOT_MEASURED (no verdict yet)
+session_state: no production access; PR comments limited to review-thread replies and the [ROUTE] request
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-03 12:45 CT, by Claude (Copilot review findings 1-5 addressed)
+last_updated: 2026-11-03 13:05 CT, by Claude (D3 amendment)
 ```
 
 ### POSTHOG-PUBLIC-CLIENT-KEY

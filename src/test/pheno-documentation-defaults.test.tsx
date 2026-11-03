@@ -92,7 +92,9 @@ describe("PhenoDocumentationSections — rendering & persistence", () => {
 
     expect(screen.getByText(/saved on this device only/i)).toBeInTheDocument();
     expect(screen.getByText(/not saved to your Verdant account/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save on this device" })).toBeInTheDocument();
+    const save = screen.getByRole("button", { name: "Save draft on this device" });
+    // Audit finding 8: the device-only save is not styled like the account save.
+    expect(save.className).not.toMatch(/\bbg-primary\b/);
     cleanup();
   });
 

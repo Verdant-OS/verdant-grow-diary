@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CULTIVAR-SLUG-SSR-2777
+
+```text
+TASK CULTIVAR-SLUG-SSR-2777  priority: P2  status: OPEN
+goal: Unknown cultivar slugs omit og:url and canonical in server HTML, a catalog 503 renders a retryable page with no-store, and a failed catalog read is not reused.
+why: Issue #2777. Follow-up to merged #2758. The root document still emitted the site og:url, the 503 redirect had an empty body, and catalogPromise kept a failed read.
+branch: cursor/cultivar-slug-ssr-head-2777-1abc
+base: verdant-grow-diary
+checkout: git fetch origin cursor/cultivar-slug-ssr-head-2777-1abc verdant-grow-diary && git switch cursor/cultivar-slug-ssr-head-2777-1abc
+pr: draft; read the URL from GitHub after push
+head_sha: the commit that adds this block; read git rev-parse HEAD after checkout
+state: local until pushed; draft only
+current_step: implementation and targeted tests
+next_action: confirm the draft PR stays draft; do not mark ready, request review, or merge
+post_merge_check: after Publish, curl an unknown /cultivars slug on https://verdantgrowdiary.com and confirm the HTML has no og:url and no canonical. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Grok cloud agent on this branch
+decisions: RootDocumentHeadRules drops the inherited og:url when the cultivar match is notFound. ServiceUnavailablePage replaces a 503 redirect body. A failed catalog read clears catalogPromise before the next request.
+tried_and_rejected: editing src/test/cultivar-slug-route-status.test.tsx. It is scorer-locked, so the new cases live in new test files.
+commands: bunx vitest run src/test/cultivar-slug-ssr-followup.test.tsx src/test/cultivar-unavailable-page.test.ts src/test/cultivar-slug-route-status.test.tsx --reporter=dot
+files_touched: src/lib/cultivarSlugRouteRules.ts; src/lib/rootDocumentHeadRules.ts; src/lib/serviceUnavailablePage.ts; src/routes/__root.tsx; src/server.ts; src/test/cultivar-slug-ssr-followup.test.tsx; src/test/cultivar-unavailable-page.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work
+open_questions: none
+gotchas: a bundled slug stays found when the database read fails. The sticky-failure case is a database-only slug. Do not edit the locked cultivar route status test.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2777
+artifacts: screenshots are local to the agent run, not this repo
+reviewer_seat: not requested; this draft does not ask for review
+reviewer_sha: NOT_MEASURED
+session_state: no paused workflows; no production writes
+claimed_by: Grok, 2026-11-03
+owner: Grok
+last_updated: 2026-11-02 20:55 CT, by Grok
+```
+
 ### CREATE-DIALOG-DISABLED-REASON
 
 ```text

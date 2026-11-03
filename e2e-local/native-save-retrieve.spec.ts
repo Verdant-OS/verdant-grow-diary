@@ -465,6 +465,13 @@ test("real dated rows retain manual provenance beyond the dense live cap and sta
     ] as const) {
       await page.goto(plantUrl(f, scope));
       await page.getByTestId("plant-detail-disclosure-ai-trigger").click();
+      // The readiness card sits in the collapsed "How this was decided" disclosure
+      // (docs/specs/ai-doctor-readiness-single-summary.md R7); open it first.
+      const provenance = page.getByTestId("ai-doctor-readiness-provenance");
+      await expect(provenance).toBeAttached();
+      if ((await provenance.getAttribute("open")) === null) {
+        await provenance.locator("summary").click();
+      }
       const panel = page.getByTestId("plant-detail-ai-doctor-sensor-evidence-panel");
       await expect(panel).toBeVisible();
       await expect(panel).toHaveAttribute("data-status", manual ? "usable" : "stale");

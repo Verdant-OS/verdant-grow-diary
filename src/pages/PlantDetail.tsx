@@ -884,6 +884,7 @@ export default function PlantDetail() {
           growId={plant.growId ?? null}
           stage={plant.stage ?? null}
           hasPlantPhoto={!!plant.photo}
+          tentId={plant.tentId ?? null}
         />
         <PlantDetailRecentActivityRecap
           plantId={plant.id}

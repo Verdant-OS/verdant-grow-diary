@@ -179,6 +179,7 @@ describe("Guides + glossary SSR head matches global invariants", () => {
         .scripts.map((script) => JSON.parse(script.children)["@type"])
         .sort();
       const expected = ["BreadcrumbList", "FAQPage", "WebPage"];
+      if (guide.howTo) expected.push("HowTo");
       if (guide.publishedOn) expected.push("Article");
       expect(types).toEqual(expected.sort());
     },

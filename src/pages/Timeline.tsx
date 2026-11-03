@@ -131,6 +131,7 @@ import {
   TIMELINE_MANUAL_SENSOR_ROW_LIMIT,
   timelineManualSnapshotHistoryNotice,
 } from "@/lib/timelineManualSensorMeasurementRules";
+import { TimelineQuickLogEnvironmentSnapshotReadback } from "@/lib/timelineQuickLogEnvironmentSnapshotReadback";
 import { mergeLinkedGrowEventVolume } from "@/lib/timelineLinkedGrowEventVolumeRules";
 import {
   applyTimelineInitialSignedPhoto,
@@ -442,7 +443,7 @@ function entryKinds(e: Entry, diaryPhotoIds: ReadonlySet<string>): EventFilter[]
  */
 /** Timeline-only. The shared root-zone select stays unchanged for the other readers. */
 const TIMELINE_SENSOR_GROW_EVENT_SELECT =
-  "id,plant_id,event_type,source,occurred_at,created_at,environment_events(temperature_c,humidity_pct,vpd_kpa)";
+  "id,plant_id,tent_id,event_type,source,occurred_at,created_at,environment_events(temperature_c,humidity_pct,vpd_kpa)";
 const TIMELINE_LINKED_ROOT_SELECT = "id,created_at,event_type,source,plant_id,occurred_at";
 
 function linkedEnvironmentEventIds(diaryRows: ReadonlyArray<{ details?: unknown }>): string[] {
@@ -1030,10 +1031,11 @@ export default function Timeline() {
           if (!isCurrentRequest()) return;
           await loadLinkedRootSensorSiblings({
             growId: activeGrowId,
-            rootIds: findMissingLinkedGrowEventIds({
-              diaryEntries: diaryRows,
-              growEvents: nextGrowEvents,
-            }),
+            // Every linked root, including one already on this grow_events
+            // page. The page's environment list is the newest 100 rows, so
+            // the created_at sibling can be absent there. Roots on the page
+            // also omit created_at, which the exact-sibling join requires.
+            rootIds: linkedEnvironmentEventIds(diaryRows),
             isCurrent: isCurrentRequest,
             onRoots: (rows) =>
               setTimelineLinkedRoots((current) => {
@@ -1533,13 +1535,26 @@ export default function Timeline() {
     () =>
       dropBlankQuickLogPlaceholderRows(
         mergeTimelineMeasurementDisplayEntries(
-          enrichedEntries,
+          TimelineQuickLogEnvironmentSnapshotReadback.attach(enrichedEntries, [
+            ...timelineLinkedRoots,
+            ...timelineSensorEvents,
+            ...supplementalLinkedGrowEvents,
+            ...growEvents,
+          ]),
           manualSensorMeasurementEntries.map((entry) =>
             formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
           ),
         ),
       ),
-    [enrichedEntries, manualSensorMeasurementEntries, temperatureUnit],
+    [
+      enrichedEntries,
+      growEvents,
+      manualSensorMeasurementEntries,
+      supplementalLinkedGrowEvents,
+      temperatureUnit,
+      timelineLinkedRoots,
+      timelineSensorEvents,
+    ],
   );
 
   const requestedEntryId = parseTimelineEntryDetailId(

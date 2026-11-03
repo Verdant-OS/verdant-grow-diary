@@ -1,15 +1,24 @@
 /**
  * Read-side join for Quick Log tent manual snapshots.
  *
- * The save RPC stores temperature, humidity, and VPD on a sibling
- * environment event. Timeline and the diary PDF render the diary mirror,
- * which does not carry those metrics. This class attaches them for display.
+ * The save RPC stores temperature, humidity, and VPD on the manual
+ * environment row created in the same request as the linked observation or
+ * watering. Timeline and the diary PDF render the diary mirror, which does
+ * not carry those metrics. Readings attach only through that exact sibling
+ * (`sensorFromExactEnvironmentSibling`). A same tent and the same
+ * `occurred_at` are not enough: two backdated saves can share that instant.
+ * If the linked root or its sibling is not loaded, this class shows nothing.
  * It never writes and never invents a metric the sibling did not store.
  */
+import {
+  sensorFromExactEnvironmentSibling,
+  type TimelineEnvironmentSibling,
+} from "@/lib/quick-log/quickLogRevisionRules";
 import {
   buildTimelineCardSensorSnapshotViewModel,
   resolveTimelineCardSensorResolution,
 } from "@/lib/timelineSensorSnapshotViewModel";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { tempFFromC } from "@/lib/temperatureUnits";
 
 export type TimelineQuickLogDiaryReadbackRow = {
@@ -18,16 +27,6 @@ export type TimelineQuickLogDiaryReadbackRow = {
   tent_id?: string | null;
   entry_at?: string | null;
   details?: Record<string, unknown> | null;
-};
-
-export type TimelineQuickLogEnvironmentSibling = {
-  id: string;
-  plant_id?: string | null;
-  tent_id?: string | null;
-  event_type?: string | null;
-  source?: string | null;
-  occurred_at?: string | null;
-  environment_events?: unknown;
 };
 
 type SnapshotMetrics = {
@@ -39,79 +38,51 @@ type SnapshotMetrics = {
 export class TimelineQuickLogEnvironmentSnapshotReadback {
   static attach<T extends TimelineQuickLogDiaryReadbackRow>(
     rows: readonly T[],
-    siblings: readonly TimelineQuickLogEnvironmentSibling[],
+    events: readonly TimelineEnvironmentSibling[],
   ): T[] {
-    const pairs: Array<{ rowIndex: number; sibling: TimelineQuickLogEnvironmentSibling }> = [];
-    siblings.forEach((sibling) => {
-      if (!TimelineQuickLogEnvironmentSnapshotReadback.isManualEnvironment(sibling)) return;
-      if (!TimelineQuickLogEnvironmentSnapshotReadback.metrics(sibling)) return;
-      rows.forEach((row, rowIndex) => {
-        if (!TimelineQuickLogEnvironmentSnapshotReadback.matches(row, sibling)) return;
-        if (TimelineQuickLogEnvironmentSnapshotReadback.hasSnapshot(row.details)) return;
-        pairs.push({ rowIndex, sibling });
-      });
-    });
-
-    const rowsBySibling = new Map<string, Set<number>>();
-    const siblingsByRow = new Map<number, Set<string>>();
-    for (const pair of pairs) {
-      const rowSet = rowsBySibling.get(pair.sibling.id) ?? new Set<number>();
-      rowSet.add(pair.rowIndex);
-      rowsBySibling.set(pair.sibling.id, rowSet);
-      const siblingSet = siblingsByRow.get(pair.rowIndex) ?? new Set<string>();
-      siblingSet.add(pair.sibling.id);
-      siblingsByRow.set(pair.rowIndex, siblingSet);
-    }
-
-    const chosen = new Map<number, TimelineQuickLogEnvironmentSibling>();
-    for (const pair of pairs) {
-      if ((rowsBySibling.get(pair.sibling.id)?.size ?? 0) !== 1) continue;
-      if ((siblingsByRow.get(pair.rowIndex)?.size ?? 0) !== 1) continue;
-      chosen.set(pair.rowIndex, pair.sibling);
-    }
-
-    return rows.map((row, index) => {
-      const sibling = chosen.get(index);
-      if (!sibling) return row;
-      const metrics = TimelineQuickLogEnvironmentSnapshotReadback.metrics(sibling);
-      if (!metrics) return row;
+    return rows.map((row) => {
+      if (TimelineQuickLogEnvironmentSnapshotReadback.hasSnapshot(row.details)) return row;
+      const linkedId = TimelineQuickLogEnvironmentSnapshotReadback.linkedRootId(row.details);
+      if (!linkedId) return row;
+      const root = events.find(
+        (event) => event.id === linkedId && typeof event.created_at === "string",
+      );
+      if (!root) return row;
+      const sensor = sensorFromExactEnvironmentSibling(
+        root,
+        TimelineQuickLogEnvironmentSnapshotReadback.coerceMetricNumbers(events),
+      );
+      if (!sensor) return row;
+      const metrics: SnapshotMetrics = {
+        tempC: sensor.temperature_c ?? null,
+        rh: sensor.humidity_pct ?? null,
+        vpdKpa: sensor.vpd_kpa ?? null,
+      };
       const details = TimelineQuickLogEnvironmentSnapshotReadback.withSnapshot(
         row.details,
-        sibling.occurred_at ?? row.entry_at ?? null,
+        row.entry_at ?? null,
         metrics,
       );
       return { ...row, details };
     });
   }
 
-  static pdfReadingLine(details: unknown): string | null {
+  static pdfReadingLine(
+    details: unknown,
+    temperatureUnit: TemperatureUnitPreference = "fahrenheit",
+  ): string | null {
     if (!details || typeof details !== "object" || Array.isArray(details)) return null;
     const vm = buildTimelineCardSensorSnapshotViewModel(
       resolveTimelineCardSensorResolution(details as Record<string, unknown>),
-      { validateManualCompatibility: true, temperatureUnit: "fahrenheit" },
+      { validateManualCompatibility: true, temperatureUnit },
     );
     if (vm.sensorViewModel.kind !== "chips" || vm.sensorViewModel.chips.length === 0) return null;
     return vm.sensorViewModel.chips.map((chip) => `${chip.label} ${chip.display}`).join(", ");
   }
 
-  private static isManualEnvironment(sibling: TimelineQuickLogEnvironmentSibling): boolean {
-    const source = (sibling.source ?? "").trim().toLowerCase();
-    if (source !== "manual") return false;
-    const eventType = (sibling.event_type ?? "environment").trim().toLowerCase();
-    return eventType === "environment";
-  }
-
-  private static matches(
-    row: TimelineQuickLogDiaryReadbackRow,
-    sibling: TimelineQuickLogEnvironmentSibling,
-  ): boolean {
-    if (!row.tent_id || !sibling.tent_id || row.tent_id !== sibling.tent_id) return false;
-    const rowPlant = row.plant_id ?? null;
-    const siblingPlant = sibling.plant_id ?? null;
-    if (rowPlant !== siblingPlant) return false;
-    const rowMs = Date.parse(row.entry_at ?? "");
-    const siblingMs = Date.parse(sibling.occurred_at ?? "");
-    return Number.isFinite(rowMs) && rowMs === siblingMs;
+  private static linkedRootId(details: Record<string, unknown> | null | undefined): string | null {
+    const linked = details?.linked_grow_event_id;
+    return typeof linked === "string" && linked.length > 0 ? linked : null;
   }
 
   private static hasSnapshot(details: Record<string, unknown> | null | undefined): boolean {
@@ -122,16 +93,28 @@ export class TimelineQuickLogEnvironmentSnapshotReadback {
     );
   }
 
-  private static metrics(sibling: TimelineQuickLogEnvironmentSibling): SnapshotMetrics | null {
-    const children = TimelineQuickLogEnvironmentSnapshotReadback.children(
-      sibling.environment_events,
-    );
-    for (const child of children) {
-      const tempC = TimelineQuickLogEnvironmentSnapshotReadback.finite(child.temperature_c);
-      const rh = TimelineQuickLogEnvironmentSnapshotReadback.finite(child.humidity_pct);
-      const vpdKpa = TimelineQuickLogEnvironmentSnapshotReadback.finite(child.vpd_kpa);
-      if (tempC === null && rh === null && vpdKpa === null) continue;
-      return { tempC, rh, vpdKpa };
+  /** The exact-sibling helper accepts numbers only. Stored readings may be numeric strings. */
+  private static coerceMetricNumbers(
+    events: readonly TimelineEnvironmentSibling[],
+  ): TimelineEnvironmentSibling[] {
+    return events.map((event) => {
+      const raw = event.environment_events;
+      const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      const children = list.map((child) => ({
+        temperature_c: TimelineQuickLogEnvironmentSnapshotReadback.finite(child.temperature_c),
+        humidity_pct: TimelineQuickLogEnvironmentSnapshotReadback.finite(child.humidity_pct),
+        vpd_kpa: TimelineQuickLogEnvironmentSnapshotReadback.finite(child.vpd_kpa),
+      }));
+      if (Array.isArray(raw)) return { ...event, environment_events: children };
+      return { ...event, environment_events: children[0] ?? null };
+    });
+  }
+
+  private static finite(value: unknown): number | null {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
     }
     return null;
   }
@@ -145,7 +128,9 @@ export class TimelineQuickLogEnvironmentSnapshotReadback {
     if (ts) sensor.ts = ts;
     if (metrics.tempC !== null) sensor.temp_c = metrics.tempC;
     if (metrics.rh !== null) sensor.rh = metrics.rh;
-    if (metrics.vpdKpa !== null) sensor.vpd_kpa = metrics.vpdKpa;
+    // `vpd`, not `vpd_kpa`: the correction dialog treats `vpd_kpa` on
+    // sensor_snapshot as the saved reading and then skips the exact sibling.
+    if (metrics.vpdKpa !== null) sensor.vpd = metrics.vpdKpa;
 
     const manual: Record<string, unknown> = { source: "manual" };
     if (ts) manual.ts = ts;
@@ -159,24 +144,6 @@ export class TimelineQuickLogEnvironmentSnapshotReadback {
     next.sensor_snapshot = sensor;
     if ("temp_f" in manual || "humidity_percent" in manual) next.manual_sensor_snapshot = manual;
     return next;
-  }
-
-  private static children(raw: unknown): Record<string, unknown>[] {
-    if (Array.isArray(raw)) {
-      return raw.filter((item): item is Record<string, unknown> =>
-        TimelineQuickLogEnvironmentSnapshotReadback.isRecord(item),
-      );
-    }
-    return TimelineQuickLogEnvironmentSnapshotReadback.isRecord(raw) ? [raw] : [];
-  }
-
-  private static finite(value: unknown): number | null {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string" && value.trim() !== "") {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : null;
-    }
-    return null;
   }
 
   private static isRecord(value: unknown): value is Record<string, unknown> {

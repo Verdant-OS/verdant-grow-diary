@@ -23,8 +23,9 @@ import {
   type QuickLogHistoryRow,
 } from "@/lib/quickLogHistoryRules";
 import { getEventType } from "@/lib/diary";
-import { timelineEntryHasNoteText } from "@/lib/timelineChipCountRules";
 import { TimelineQuickLogEnvironmentSnapshotReadback } from "@/lib/timelineQuickLogEnvironmentSnapshotReadback";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import {
   formatTimelineEntryTimestamp,
   TIMELINE_ENTRY_UNKNOWN_TIME,
@@ -158,6 +159,7 @@ function countRows(
 function buildRecentDiaryPdfInput(
   rawEntries: NormalizeDiaryInput["rawEntries"],
   limit: number,
+  temperatureUnit: TemperatureUnitPreference,
 ): BuildGrowDiaryReportInput {
   const lifted = liftEntries(rawEntries);
   const normalized = normalizeDiaryEntries({ rawEntries: lifted });
@@ -169,7 +171,10 @@ function buildRecentDiaryPdfInput(
     if (id) detailsById.set(id, raw.details);
   }
   const readingLine = (id: string) =>
-    TimelineQuickLogEnvironmentSnapshotReadback.pdfReadingLine(detailsById.get(id));
+    TimelineQuickLogEnvironmentSnapshotReadback.pdfReadingLine(
+      detailsById.get(id),
+      temperatureUnit,
+    );
 
   return {
     grow: { name: "Diary Summary" },
@@ -178,12 +183,15 @@ function buildRecentDiaryPdfInput(
       watering: countRows(allRows, (row) => row.eventType === "watering"),
       feeding: countRows(allRows, (row) => row.eventType === "feeding"),
       photo: countRows(allRows, (row) => !!row.photoUrl),
+      // Diary rows in this export that display an attached manual Quick Log
+      // snapshot (temperature, humidity, or VPD). Not a count of
+      // environment_events, live telemetry, or sensor_readings.
       sensorSnapshots: allRows.reduce((total, row) => total + (readingLine(row.id) ? 1 : 0), 0),
     },
     recent: recentRows.map((row) => {
       const et = getEventType(row.eventType);
       const details = [
-        timelineEntryHasNoteText(row.noteBody) ? row.noteBody : null,
+        row.noteBody,
         readingLine(row.id),
         row.photoUrl ? "Photo attached" : null,
         row.manualHandheld ? "Manual handheld readings included" : null,
@@ -463,8 +471,11 @@ export function RecentQuickLogActivityPanel({
   onEntryChanged?: () => void;
 }) {
   const emptyCopy = quickLogRecentEmptyCopy(dateFiltered);
+  const temperatureUnit = useTemperatureUnitPreference();
   const handleExport = () => {
-    const result = exportGrowDiaryReportAsPdf(buildRecentDiaryPdfInput(rawEntries, limit));
+    const result = exportGrowDiaryReportAsPdf(
+      buildRecentDiaryPdfInput(rawEntries, limit, temperatureUnit),
+    );
     if (result === "unavailable") {
       toast.error("Couldn't open the diary PDF export window. Check popup blockers and try again.");
     } else {

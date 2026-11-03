@@ -12,8 +12,20 @@ import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 
 const TENT = "tent-1";
 const WHEN = "2026-11-02T18:00:00.000Z";
+const CREATED = "2026-11-02T18:00:00.512Z";
 const TEMP_C = fahrenheitToCelsius(76);
 const NOW = Date.parse(WHEN);
+
+function root(id: string, createdAt: string, eventType = "observation") {
+  return {
+    id,
+    event_type: eventType,
+    source: "manual",
+    plant_id: null,
+    occurred_at: WHEN,
+    created_at: createdAt,
+  };
+}
 
 function diary(overrides: Record<string, unknown> = {}) {
   return {
@@ -35,6 +47,7 @@ function sibling(overrides: Record<string, unknown> = {}) {
     event_type: "environment",
     source: "manual",
     occurred_at: WHEN,
+    created_at: CREATED,
     environment_events: {
       temperature_c: TEMP_C,
       humidity_pct: 55,
@@ -57,7 +70,10 @@ function chipsOf(details: Record<string, unknown> | null | undefined) {
 
 describe("TimelineQuickLogEnvironmentSnapshotReadback", () => {
   it("shows the tent Quick Log snapshot on the timeline card, as a measurement, and in the PDF", () => {
-    const [attached] = TimelineQuickLogEnvironmentSnapshotReadback.attach([diary()], [sibling()]);
+    const [attached] = TimelineQuickLogEnvironmentSnapshotReadback.attach(
+      [diary()],
+      [root("obs-1", CREATED), sibling()],
+    );
     expect(chipsOf(attached.details)).toEqual(expect.arrayContaining(["76°F", "55%", "1.38 kPa"]));
     expect(diaryEntryBelongsInTimelineMeasurements(attached, new Date(NOW))).toBe(true);
     const evidence = buildTimelineEvidenceDetailViewModel(
@@ -91,32 +107,64 @@ describe("TimelineQuickLogEnvironmentSnapshotReadback", () => {
   it("ignores a live sibling and does not invent a missing humidity", () => {
     const [live] = TimelineQuickLogEnvironmentSnapshotReadback.attach(
       [diary()],
-      [sibling({ source: "live" })],
+      [root("obs-1", CREATED), sibling({ source: "live" })],
     );
     expect(chipsOf(live.details)).toEqual([]);
 
     const [partial] = TimelineQuickLogEnvironmentSnapshotReadback.attach(
       [diary({ id: "diary-temp" })],
-      [sibling({ environment_events: [{ temperature_c: String(TEMP_C) }] })],
+      [
+        root("obs-1", CREATED),
+        sibling({ environment_events: [{ temperature_c: String(TEMP_C) }] }),
+      ],
     );
     const displays = chipsOf(partial.details);
     expect(displays).toContain("76°F");
     expect(displays.some((d) => d.includes("%"))).toBe(false);
   });
 
-  it("uses one environment event once and leaves an existing snapshot in place", () => {
-    const rows = TimelineQuickLogEnvironmentSnapshotReadback.attach(
-      [diary({ id: "a" }), diary({ id: "b" })],
-      [sibling()],
-    );
-    const attachedCount = rows.filter((row) => chipsOf(row.details).includes("76°F")).length;
-    expect(attachedCount).toBe(0);
-
-    const existing = { sensor_snapshot: { source: "manual", ts: WHEN, temp_c: 20, rh: 40 } };
+  it("leaves an existing snapshot in place and shows nothing when the linked root is absent", () => {
+    const existing = {
+      linked_grow_event_id: "obs-1",
+      sensor_snapshot: { source: "manual", ts: WHEN, temp_c: 20, rh: 40 },
+    };
     const [kept] = TimelineQuickLogEnvironmentSnapshotReadback.attach(
       [diary({ details: existing })],
-      [sibling()],
+      [root("obs-1", CREATED), sibling()],
     );
     expect(kept.details.sensor_snapshot).toEqual(existing.sensor_snapshot);
+
+    const [missingRoot] = TimelineQuickLogEnvironmentSnapshotReadback.attach(
+      [diary()],
+      [sibling()],
+    );
+    expect(chipsOf(missingRoot.details)).toEqual([]);
+  });
+
+  it("does not give a tied watering the other save's temperature and humidity", () => {
+    const wateringCreated = "2026-11-02T18:00:00.900Z";
+    const rows = TimelineQuickLogEnvironmentSnapshotReadback.attach(
+      [
+        diary({
+          id: "water",
+          note: "watered",
+          details: { linked_grow_event_id: "water-1", event_type: "watering" },
+        }),
+        diary(),
+      ],
+      [root("water-1", wateringCreated, "watering"), root("obs-1", CREATED), sibling()],
+    );
+    const watering = rows.find((row) => row.id === "water");
+    const observation = rows.find((row) => row.id === "diary-1");
+    expect(chipsOf(watering?.details)).toEqual([]);
+    expect(chipsOf(observation?.details)).toEqual(
+      expect.arrayContaining(["76°F", "55%", "1.38 kPa"]),
+    );
+    expect(
+      TimelineQuickLogEnvironmentSnapshotReadback.pdfReadingLine(watering?.details),
+    ).toBeNull();
+    expect(
+      TimelineQuickLogEnvironmentSnapshotReadback.pdfReadingLine(observation?.details, "celsius"),
+    ).toContain("°C");
   });
 });

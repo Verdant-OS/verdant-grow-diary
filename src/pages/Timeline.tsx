@@ -1031,10 +1031,11 @@ export default function Timeline() {
           if (!isCurrentRequest()) return;
           await loadLinkedRootSensorSiblings({
             growId: activeGrowId,
-            rootIds: findMissingLinkedGrowEventIds({
-              diaryEntries: diaryRows,
-              growEvents: nextGrowEvents,
-            }),
+            // Every linked root, including one already on this grow_events
+            // page. The page's environment list is the newest 100 rows, so
+            // the created_at sibling can be absent there. Roots on the page
+            // also omit created_at, which the exact-sibling join requires.
+            rootIds: linkedEnvironmentEventIds(diaryRows),
             isCurrent: isCurrentRequest,
             onRoots: (rows) =>
               setTimelineLinkedRoots((current) => {
@@ -1534,13 +1535,26 @@ export default function Timeline() {
     () =>
       dropBlankQuickLogPlaceholderRows(
         mergeTimelineMeasurementDisplayEntries(
-          TimelineQuickLogEnvironmentSnapshotReadback.attach(enrichedEntries, timelineSensorEvents),
+          TimelineQuickLogEnvironmentSnapshotReadback.attach(enrichedEntries, [
+            ...timelineLinkedRoots,
+            ...timelineSensorEvents,
+            ...supplementalLinkedGrowEvents,
+            ...growEvents,
+          ]),
           manualSensorMeasurementEntries.map((entry) =>
             formatTimelineManualSensorReceiptForUnit(entry, temperatureUnit),
           ),
         ),
       ),
-    [enrichedEntries, manualSensorMeasurementEntries, temperatureUnit, timelineSensorEvents],
+    [
+      enrichedEntries,
+      growEvents,
+      manualSensorMeasurementEntries,
+      supplementalLinkedGrowEvents,
+      temperatureUnit,
+      timelineLinkedRoots,
+      timelineSensorEvents,
+    ],
   );
 
   const requestedEntryId = parseTimelineEntryDetailId(

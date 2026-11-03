@@ -88,7 +88,7 @@ active_writer: Grok cloud agent
 decisions: copy follows the draft except where csvParser.ts and EnvironmentCsvImportModal.tsx disagree (saved temperature unit; a bad value skips the whole row; unit prompt only after header and values fail). HowTo is a new known JSON-LD type. Breadcrumb label stays "Grower Guides".
 tried_and_rejected: leaving temperatures as always °F. ImportedSensorHistoryPanel follows the saved preference.
 commands: bunx vitest run src/test/guide-import-grow-sensor-csv.test.tsx --reporter=dot
-files_touched: src/constants/verdantSeoContent.ts; src/pages/GuidePage.tsx; src/lib/seoStructuredData.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/guidePublicCopyViewModel.ts; public/sitemap.xml; scripts/validate-jsonld-rich-results.mjs; src/test/guide-import-grow-sensor-csv.test.tsx; src/test/verdant-seo-guides.test.ts; src/test/verdant-seo-sitemap-robots.test.ts; src/test/verdant-guides-glossary-head-invariants.test.ts; docs/knowledge-library/post-v1-public-route-cohorts.json; docs/seo/route-indexation-matrix.md
+files_touched: src/constants/verdantSeoContent.ts; src/pages/GuidePage.tsx; src/lib/seoStructuredData.ts; src/lib/build/staticPublicSeoDocuments.ts; src/lib/guidePublicCopyViewModel.ts; public/sitemap.xml; scripts/validate-jsonld-rich-results.mjs; src/test/guide-import-grow-sensor-csv.test.tsx; src/test/verdant-seo-guides.test.ts; src/test/verdant-seo-sitemap-robots.test.ts; src/test/verdant-guides-glossary-head-invariants.test.ts; docs/knowledge-library/post-v1-public-route-cohorts.json; docs/seo/route-indexation-matrix.md; scripts/knowledge/validate-roadmap.test.mjs
 files_remaining: none
 blockers: none for repository work
 open_questions: none

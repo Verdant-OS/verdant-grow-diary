@@ -81,7 +81,7 @@ checkout: git fetch origin cursor/posthog-public-client-key-f411 verdant-grow-di
 pr: read the URL from GitHub after push
 head_sha: read git rev-parse HEAD after the push
 state: implementation in this commit; merge waits on Cheeko's own-words yes at the exact head SHA
-current_step: public key, example wording, report-only CSP hosts, and a new consent startup test
+current_step: consent test waits on vi.dynamicImportSettled; committed env presence and per-directive CSP assertions added. Secret scan stays red until a separate base allowlist lands.
 next_action: confirm required CI is green at the head, then wait for Cheeko's yes at that SHA. Do not merge, enqueue, or publish.
 post_merge_check: after Publish, load https://verdantgrowdiary.com while signed out, grant analytics consent, and confirm a request to https://us.i.posthog.com. Before consent, that request must be absent. NOT_MEASURED until live /version.json reports this SHA.
 active_writer: Grok cloud agent on this branch

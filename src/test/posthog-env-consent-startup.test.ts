@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { __resetPostHogClientForTests, syncPostHogWithConsent } from "@/lib/posthogClient";
@@ -34,6 +36,15 @@ function setProductionHost() {
   });
 }
 
+function directive(csp: string, name: string): string {
+  return (
+    csp
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(`${name} `)) ?? ""
+  );
+}
+
 describe("PostHog startup from VITE_POSTHOG_KEY", () => {
   beforeEach(() => {
     __resetPostHogClientForTests();
@@ -61,13 +72,23 @@ describe("PostHog startup from VITE_POSTHOG_KEY", () => {
   it("stays off without consent even when the key is set", async () => {
     syncPostHogWithConsent("unset", { pathname: "/", search: "", hash: "" });
     syncPostHogWithConsent("denied", { pathname: "/", search: "", hash: "" });
-    await Promise.resolve();
+    await vi.dynamicImportSettled();
     expect(sdk.init).not.toHaveBeenCalled();
   });
 
-  it("lists the ingestion host and the SDK asset host on the report-only policy", () => {
+  it("keeps a non-empty public client key in the committed env file", () => {
+    const text = readFileSync(join(process.cwd(), ".env"), "utf8");
+    const line = text.split("\n").find((row) => row.startsWith("VITE_POSTHOG_KEY="));
+    const value = (line ?? "").slice("VITE_POSTHOG_KEY=".length).replaceAll('"', "").trim();
+    expect(Boolean(line) && value.startsWith("phc_") && value.length > "phc_".length).toBe(true);
+  });
+
+  it("lists the ingestion host on connect-src and the SDK asset host on script-src", () => {
     const csp = buildContentSecurityPolicyReportOnly();
-    expect(csp).toContain("https://us.i.posthog.com");
-    expect(csp).toContain("https://us-assets.i.posthog.com");
+    const connectSrc = directive(csp, "connect-src");
+    const scriptSrc = directive(csp, "script-src");
+    expect(connectSrc).toContain("https://us.i.posthog.com");
+    expect(connectSrc).toContain("https://us-assets.i.posthog.com");
+    expect(scriptSrc).toContain("https://us-assets.i.posthog.com");
   });
 });

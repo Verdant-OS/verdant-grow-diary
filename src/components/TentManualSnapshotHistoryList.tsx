@@ -155,6 +155,15 @@ export default function TentManualSnapshotHistoryList({
                 </div>
               )}
 
+              {e.rhNote ? (
+                <p
+                  className="mt-2 text-[11px] text-muted-foreground"
+                  data-testid="tent-manual-snapshot-history-rh-note"
+                >
+                  {e.rhNote}
+                </p>
+              ) : null}
+
               {e.invalidChips.length > 0 && (
                 <div
                   className="mt-2 flex flex-wrap items-center gap-1.5"

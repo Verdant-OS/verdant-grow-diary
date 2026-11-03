@@ -27,8 +27,16 @@ import {
   type ChangeContextSnapshot,
   type ChangeContextSuppressedDelta,
 } from "@/lib/manualSensorSnapshotChangeContextRules";
+import {
+  TYPICAL_AIR_TEMP_RANGE,
+  celsiusToFahrenheit,
+  temperatureInputUnitFromPreference,
+} from "@/lib/sensorInputUnitConversion";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+
+/** Shown when a manual snapshot has temperature and no humidity. */
+export const RH_MISSING_VPD_NOTE = "RH missing · VPD not computed";
 
 /** Deterministic display order for the per-snapshot metric chips. */
 export const HISTORY_METRIC_DISPLAY_ORDER: ChangeContextMetric[] = [
@@ -73,6 +81,11 @@ export interface ManualSnapshotHistoryEntry {
   deltas: ChangeContextDelta[];
   /** Deltas suppressed because either side failed realism guards. */
   suppressedDeltas: ChangeContextSuppressedDelta[];
+  /**
+   * Neutral note when humidity was not entered. Null when RH is present.
+   * Distinct from a destructive invalid chip.
+   */
+  rhNote: string | null;
 }
 
 function clampLimit(n: number | undefined): number {
@@ -128,6 +141,21 @@ function formatMetricChip(
 interface ChipsBreakdown {
   metrics: HistoryMetricChip[];
   invalidChips: HistoryInvalidChip[];
+  rhNote: string | null;
+}
+
+/**
+ * History-list temperature tag uses the manual form's own band
+ * (`TYPICAL_AIR_TEMP_RANGE`), not the wider sensor-truth band.
+ */
+function temperatureOutsideFormRange(
+  celsius: number,
+  temperatureUnit: TemperatureUnitPreference,
+): boolean {
+  const unit = temperatureInputUnitFromPreference(temperatureUnit);
+  const band = TYPICAL_AIR_TEMP_RANGE[unit];
+  const displayed = unit === "C" ? celsius : celsiusToFahrenheit(celsius);
+  return !Number.isFinite(displayed) || displayed < band.min || displayed > band.max;
 }
 
 function chipsFromSnapshot(
@@ -137,9 +165,21 @@ function chipsFromSnapshot(
   const metrics: HistoryMetricChip[] = [];
   const invalidChips: HistoryInvalidChip[] = [];
   const invalidKeys = new Set<ChangeContextMetric>();
+  const rhMissing = s.metrics.humidity_pct === undefined;
   for (const key of HISTORY_METRIC_DISPLAY_ORDER) {
     const v = s.metrics[key];
     if (v === undefined) continue;
+    if (key === "temperature_c") {
+      if (temperatureOutsideFormRange(v, temperatureUnit)) {
+        invalidKeys.add(key);
+        invalidChips.push({ key, label: "Temp", chip: "Invalid temp" });
+        continue;
+      }
+      const chip = formatMetricChip(key, v, temperatureUnit);
+      if (chip) metrics.push(chip);
+      continue;
+    }
+    if (key === "vpd_kpa" && rhMissing) continue;
     const truth = classifyChangeContextMetric(key, v);
     if (!truth.valid) {
       invalidKeys.add(key);
@@ -154,17 +194,23 @@ function chipsFromSnapshot(
     if (chip) metrics.push(chip);
   }
   // VPD depends on temp + rh; if either was invalid, also flag VPD as
-  // invalid so we don't surface a derived "ghost" reading.
+  // invalid so we don't surface a derived "ghost" reading. A missing RH
+  // is the neutral note, not an invalid humidity chip.
   if (
     (invalidKeys.has("temperature_c") || invalidKeys.has("humidity_pct")) &&
     s.metrics.vpd_kpa !== undefined &&
-    !invalidKeys.has("vpd_kpa")
+    !invalidKeys.has("vpd_kpa") &&
+    !rhMissing
   ) {
     const idx = metrics.findIndex((m) => m.key === "vpd_kpa");
     if (idx !== -1) metrics.splice(idx, 1);
     invalidChips.push({ key: "vpd_kpa", label: "VPD", chip: "Invalid VPD" });
   }
-  return { metrics, invalidChips };
+  return {
+    metrics,
+    invalidChips,
+    rhNote: rhMissing ? RH_MISSING_VPD_NOTE : null,
+  };
 }
 
 /**
@@ -196,7 +242,15 @@ export function buildManualSnapshotHistoryList(
       previous: prev,
       temperatureUnit,
     });
-    const { metrics, invalidChips } = chipsFromSnapshot(snap, temperatureUnit);
+    const { metrics, invalidChips, rhNote } = chipsFromSnapshot(snap, temperatureUnit);
+    const tempTaggedInvalid = invalidChips.some(
+      (chip) => chip.key === "temperature_c" && chip.chip === "Invalid temp",
+    );
+    const suppressedDeltas = tempTaggedInvalid
+      ? ctx.suppressedDeltas.filter(
+          (delta) => !(delta.key === "temperature_c" && delta.reasonChip === "Invalid temp"),
+        )
+      : ctx.suppressedDeltas;
     out.push({
       key: snap.key ?? snap.ts,
       ts: snap.ts,
@@ -204,7 +258,8 @@ export function buildManualSnapshotHistoryList(
       invalidChips,
       firstSnapshot: ctx.firstSnapshot,
       deltas: ctx.deltas,
-      suppressedDeltas: ctx.suppressedDeltas,
+      suppressedDeltas,
+      rhNote,
     });
   }
   return out;

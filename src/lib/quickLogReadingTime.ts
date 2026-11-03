@@ -6,6 +6,9 @@
 
 const LOCAL_VALUE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 
+export const QUICK_LOG_RETRY_READING_TIME_REFUSAL =
+  "This retry keeps the original reading time. Restore that time, or discard the failed save before using a new one.";
+
 export class QuickLogReadingTime {
   static readonly LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
   static readonly FUTURE_MESSAGE = "Reading time cannot be in the future.";

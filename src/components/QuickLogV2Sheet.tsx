@@ -102,7 +102,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { QuickLogReadingTime } from "@/lib/quickLogReadingTime";
+import {
+  QUICK_LOG_RETRY_READING_TIME_REFUSAL,
+  QuickLogReadingTime,
+} from "@/lib/quickLogReadingTime";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useInRouterContext, useNavigate } from "@/lib/react-router-compat";
 import {
@@ -133,6 +136,7 @@ import {
   EMPTY_QUICKLOG_V2_FORM,
   QUICK_LOG_V2_TARGET_FILTER_THRESHOLD,
   QUICK_LOG_V2_EMPTY_CONTENT_HELPER,
+  QuickLogLaunchTarget,
   isQuickLogV2CriticalContentMissing,
   type QuickLogV2FormState,
   type QuickLogV2Action,
@@ -477,6 +481,21 @@ function QuickLogV2SheetForOwner({
     () => (plantsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[1]) ?? [],
     [plantsQ.data],
   );
+  const activePlantIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const plant of plants ?? []) {
+      if (plant && typeof plant.id === "string") ids.add(plant.id);
+    }
+    return ids;
+  }, [plants]);
+  useEffect(() => {
+    if (!plantsQ.data || submissionLockedRef.current) return;
+    setForm((prev) => {
+      if (!prev.selectedKey?.startsWith("plant:")) return prev;
+      if (QuickLogLaunchTarget.retainActivePlant(prev.selectedKey, activePlantIds)) return prev;
+      return { ...prev, selectedKey: null };
+    });
+  }, [plantsQ.data, activePlantIds]);
   const tents = useMemo(
     () => (tentsQ.data as Parameters<typeof buildQuickLogV2TargetOptions>[0]) ?? [],
     [tentsQ.data],
@@ -2043,6 +2062,23 @@ function QuickLogV2SheetForOwner({
     );
     if (!readingTime.ok) {
       setLocalError(readingTime.message);
+      return;
+    }
+    const lockedOccurred = pendingManualSubmission
+      ? pendingManualSubmission.payload.p_occurred_at
+      : pendingFeedingSubmission
+        ? pendingFeedingSubmission.payload.occurred_at
+        : pendingWateringSubmission
+          ? pendingWateringSubmission.payload.occurred_at
+          : null;
+    const lockedIso =
+      typeof lockedOccurred === "string"
+        ? lockedOccurred
+        : lockedOccurred instanceof Date
+          ? lockedOccurred.toISOString()
+          : null;
+    if (pendingSubmission && lockedIso && lockedIso !== readingTime.iso) {
+      setLocalError(QUICK_LOG_RETRY_READING_TIME_REFUSAL);
       return;
     }
     const archivedSaveBlock = quickLogArchivedGrowActionBlock({

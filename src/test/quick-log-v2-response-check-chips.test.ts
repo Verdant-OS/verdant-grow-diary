@@ -171,22 +171,22 @@ describe("D7 — V2 sheet response-check chips", () => {
   });
 });
 
-describe("D7 — tent page opens the sheet tent-scoped", () => {
-  it("passes the tent key even when the tent has exactly one active plant", () => {
-    // A tent page is the whole tent. The sole plant must not become the
-    // default; the grower picks a plant from the sheet when they mean one.
-    expect(TENT_DETAIL).toMatch(/defaultTargetKey=\{tent\?\.id \? `tent:\$\{tent\.id\}` : null\}/);
-    expect(TENT_DETAIL).not.toMatch(/defaultTargetKey=\{[\s\S]{0,160}safePlantId/);
+describe("D7 — sole-plant tent opens the sheet plant-scoped", () => {
+  it("passes a plant target key when the tent has exactly one active plant", () => {
+    // safePlantId is TentDetail's already-shipped sole-plant derivation (it
+    // feeds the One-Tent loop card); reusing it keeps the S4 budget honest
+    // without inventing a second inference.
+    expect(TENT_DETAIL).toMatch(/defaultTargetKey=\{[\s\S]{0,120}safePlantId[\s\S]{0,120}\}/);
+    expect(TENT_DETAIL).toMatch(/`plant:\$\{safePlantId\}`/);
     expect(TENT_DETAIL).toMatch(/`tent:\$\{tent\.id\}`/);
   });
 
   it("never invents a plant when the tent has several", () => {
-    // The FAB key is the tent itself, so a multi-plant roster cannot be
-    // auto-picked either.
-    expect(TENT_DETAIL).not.toMatch(
+    // safePlantId is null unless exactly one active plant exists, so the
+    // expression must fall back to the tent key rather than picking a plant.
+    expect(TENT_DETAIL).toMatch(
       /safePlantId\s*\?\s*`plant:\$\{safePlantId\}`\s*:\s*`tent:\$\{tent\.id\}`/,
     );
-    expect(TENT_DETAIL).toMatch(/defaultTargetKey=\{tent\?\.id \? `tent:\$\{tent\.id\}` : null\}/);
   });
 
   it("never infers a plant from an unsettled roster", () => {

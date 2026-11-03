@@ -243,6 +243,8 @@ function RevisionControls({
       : "",
   );
   const temperatureUnit = useTemperatureUnitPreference();
+  const [temperatureTouched, setTemperatureTouched] = useState(false);
+  const [temperatureError, setTemperatureError] = useState<string | null>(null);
   const [temperatureDraft, setTemperatureDraft] = useState<string>(() => {
     const stored = draftSensor(correctionValues, "temperature_c");
     if (stored === "") return "";
@@ -302,6 +304,8 @@ function RevisionControls({
         ? String(correctionValues.doseAmount)
         : "",
     );
+    setTemperatureTouched(false);
+    setTemperatureError(null);
     setTemperatureDraft(() => {
       const stored = draftSensor(correctionValues, "temperature_c");
       if (stored === "") return "";
@@ -359,12 +363,15 @@ function RevisionControls({
     if (editsSensor && correctionValues) {
       const sensor: QuickLogCorrectionSensorValues = {};
       const original = correctionValues.sensor ?? {};
-      const convertedTemperature = convertTypedTemperatureToCelsius(
-        temperatureDraft,
-        temperatureUnit,
-      );
+      const convertedTemperature = temperatureTouched
+        ? convertTypedTemperatureToCelsius(temperatureDraft, temperatureUnit)
+        : null;
+      if (convertedTemperature?.kind === "unconvertible") {
+        setTemperatureError("Enter a temperature that can be saved.");
+        return;
+      }
       const temperature =
-        convertedTemperature.kind === "celsius" ? convertedTemperature.value : undefined;
+        convertedTemperature?.kind === "celsius" ? convertedTemperature.value : undefined;
       const humidity = humidityDraft.trim() === "" ? undefined : Number(humidityDraft);
       const vpd = vpdDraft.trim() === "" ? undefined : Number(vpdDraft);
       if (temperature !== undefined && temperature !== original.temperature_c) {
@@ -524,12 +531,23 @@ function RevisionControls({
                     value={temperatureDraft}
                     onChange={(e) => {
                       setCorrectFailureReason(null);
+                      setTemperatureError(null);
+                      setTemperatureTouched(true);
                       setTemperatureDraft(e.target.value);
                     }}
+                    aria-invalid={temperatureError ? true : undefined}
                     data-testid="quicklog-correct-temperature-input"
                     className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
                   />
                 </label>
+                {temperatureError && (
+                  <p
+                    className="text-xs text-destructive"
+                    data-testid="quicklog-correct-temperature-error"
+                  >
+                    {temperatureError}
+                  </p>
+                )}
                 <label className="block text-xs text-muted-foreground">
                   Humidity (%)
                   <input

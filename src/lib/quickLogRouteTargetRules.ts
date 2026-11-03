@@ -10,6 +10,30 @@ export interface TentQuickLogTargetEvidence {
   soleActivePlantId: string | null;
 }
 
+export type QuickLogRosterFreshness = "loading" | "failed" | "stale" | "ready";
+
+/**
+ * Tent Quick Log launch target. A plant is the default only when the roster
+ * is current and contains exactly one non-archived plant. Loading, failed,
+ * stale, empty, and multi-plant rosters stay on the tent.
+ */
+export class QuickLogTentLaunchTarget {
+  static resolve(input: {
+    tentId: string;
+    roster: QuickLogRosterFreshness;
+    activePlantIds: readonly (string | null | undefined)[];
+  }): `plant:${string}` | `tent:${string}` {
+    const tentKey = `tent:${input.tentId}` as const;
+    if (input.roster !== "ready") return tentKey;
+    const ids = [
+      ...new Set(
+        input.activePlantIds.filter((id): id is string => typeof id === "string" && isUuid(id)),
+      ),
+    ];
+    return ids.length === 1 ? `plant:${ids[0]}` : tentKey;
+  }
+}
+
 function resolveDetailRouteId(pathname: string, pattern: RegExp): string | null {
   const match = pattern.exec(pathname);
   if (!match) return null;
@@ -66,11 +90,15 @@ export function resolveMobileQuickLogTarget(
   const tentId = resolveDetailRouteId(pathname, TENT_DETAIL_PATH);
   if (!tentId) return null;
 
-  // A tent page opens Whole tent. The sole plant stays in the list.
-  // Evidence is ignored for the launch key so a one-plant tent cannot
-  // silently become a plant log.
-  void evidence;
-  return `tent:${tentId}`;
+  // Match the route tent and validate the id before becoming more specific.
+  // Missing, loading, stale, multi-plant, empty, or malformed evidence stays
+  // tent-scoped. A confirmed sole plant is the only plant default.
+  const solePlantId = evidence?.tentId === tentId ? evidence.soleActivePlantId : null;
+  return QuickLogTentLaunchTarget.resolve({
+    tentId,
+    roster: "ready",
+    activePlantIds: solePlantId ? [solePlantId] : [],
+  });
 }
 
 /**

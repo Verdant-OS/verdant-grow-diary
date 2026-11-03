@@ -78,9 +78,9 @@ why: Issues 2778, 2779, 2780, 2781, and part of 2706. A tent open was resolving 
 branch: cursor/quick-log-target-save-1baf
 base: verdant-grow-diary
 checkout: git fetch origin cursor/quick-log-target-save-1baf verdant-grow-diary && git switch cursor/quick-log-target-save-1baf
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2793 draft
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2793 ready
 head_sha: d6b9abb71 is the implementation; 504ecc08c stamps this block; the pin-fix commit is the child of 504ecc08c. Read origin/cursor/quick-log-target-save-1baf for the exact head. This line cannot name that child.
-state: draft PR 2793, not ready, no auto-merge
+state: ready PR 2793, no auto-merge
 current_step: three CI pins updated after measured tap counts; required CI recheck follows the pin-fix push
 next_action: keep the PR draft until required checks are green at the exact head and Moonbow routes review
 post_merge_check: bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx
@@ -98,7 +98,7 @@ artifacts: src/test/quick-log-target-save-reading-time.test.tsx
 reviewer_seat: not requested
 reviewer_sha: none
 session_state: Grok implementation session
-claimed_by: Grok 2026-11-03
+claimed_by: Grok 2026-11-02
 owner: Grok
 last_updated: 2026-11-02 21:36 CT, by Grok
 

@@ -482,9 +482,15 @@ export default function TentDetail() {
 
   return (
     <div>
-      {/* Tent page opens Whole tent. The sole plant stays selectable and is
-          never the launch target. */}
-      <QuickLogV2Fab defaultTargetKey={tent?.id ? `tent:${tent.id}` : null} />
+      {/* A tent with exactly one active plant can prove its plant target, so
+          the sheet opens plant-scoped and the grower reaches Better/Same/Worse
+          without reselecting. Several plants keep the tent scope and one
+          explicit choice — never a guessed default. */}
+      <QuickLogV2Fab
+        defaultTargetKey={
+          tent?.id ? (safePlantId ? `plant:${safePlantId}` : `tent:${tent.id}`) : null
+        }
+      />
       <Button asChild variant="ghost" size="sm" className="mb-3">
         <Link to={tentsPath()}>
           <ArrowLeft className="h-4 w-4" /> Tents

@@ -88,11 +88,13 @@ describe("manual sensor save — UUID guard regression", () => {
 });
 
 describe("Tent Detail Quick Log — one fixed entry point", () => {
-  it("keeps one V2 Quick Log entry point that opens the tent, never the sole plant", () => {
-    // A tent page opens Whole tent. The sole plant stays selectable and is
-    // not the launch target.
+  it("keeps one V2 Quick Log entry point, plant-scoped only when the tent proves a sole plant", () => {
+    // Renegotiated with Tranche B+ slice D7: a tent with exactly one active
+    // plant opens the sheet plant-scoped so Better/Same/Worse is reachable
+    // without reselection. Several plants keep the tent scope — the pin holds
+    // the exact new shape rather than loosening to allow any target key.
     expect(TENT_DETAIL).toMatch(
-      /<QuickLogV2Fab\s+defaultTargetKey=\{tent\?\.id \? `tent:\$\{tent\.id\}` : null\}/,
+      /<QuickLogV2Fab\s+defaultTargetKey=\{\s*tent\?\.id\s*\?\s*\(safePlantId\s*\?\s*`plant:\$\{safePlantId\}`\s*:\s*`tent:\$\{tent\.id\}`\)\s*:\s*null\s*\}/,
     );
     // safePlantId is null unless exactly one active plant exists AND the
     // roster query has settled, so no default plant can be invented for a

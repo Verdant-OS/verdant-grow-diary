@@ -386,4 +386,14 @@ export class QuickLogLaunchTarget {
     const lastUsed = typeof input.lastUsedKey === "string" ? input.lastUsedKey.trim() : "";
     return lastUsed.length > 0 ? lastUsed : null;
   }
+
+  /** Drop a remembered plant that is missing or no longer active. */
+  static retainActivePlant(
+    lastUsedKey: string | null,
+    activePlantIds: ReadonlySet<string>,
+  ): string | null {
+    if (!lastUsedKey?.startsWith("plant:")) return null;
+    const plantId = lastUsedKey.slice("plant:".length);
+    return activePlantIds.has(plantId) ? lastUsedKey : null;
+  }
 }

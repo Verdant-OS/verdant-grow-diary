@@ -146,7 +146,7 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
 
   async function deletePlant() {
     setBusy(true);
-    const result = await supabase.from("plants").delete().eq("id", plant.id).select("id");
+    const result = await PlantLifecycleWriteRules.deleteOwnedPlant(supabase, plant.id);
     setBusy(false);
     setConfirmDelete(false);
     if (!PlantLifecycleWriteRules.rowWasWritten(result)) {

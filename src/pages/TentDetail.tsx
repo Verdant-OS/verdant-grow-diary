@@ -341,10 +341,7 @@ export default function TentDetail() {
   // Delete stays blocked only by active plants. Archived rows are counted
   // separately so they can be unassigned, and both counts fail closed while
   // the plant query is not current.
-  const assignedPlantCount = resolveVerifiedAssignedPlantCount(
-    allPlantsQuery,
-    (plant) => plant.isArchived !== true,
-  );
+  const assignedPlantCount = resolveVerifiedAssignedPlantCount(allPlantsQuery);
   const archivedAssignedPlantCount = resolveVerifiedAssignedPlantCount(
     allPlantsQuery,
     (plant) => plant.isArchived === true,

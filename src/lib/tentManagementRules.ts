@@ -235,7 +235,12 @@ export function evaluateTentDeleteGuard(input: TentDeleteGuardInput): TentDelete
       recommendedAction: "retry_plant_count",
     };
   }
-  if (input.assignedPlantCount > 0) {
+  const archivedLeft = input.archivedAssignedPlantCount ?? 0;
+  const blockingCount =
+    archivedLeft > 0
+      ? Math.max(0, input.assignedPlantCount - archivedLeft)
+      : input.assignedPlantCount;
+  if (blockingCount > 0) {
     return {
       canDelete: false,
       canArchive: false,
@@ -243,7 +248,6 @@ export function evaluateTentDeleteGuard(input: TentDeleteGuardInput): TentDelete
       recommendedAction: "move_plants_first",
     };
   }
-  const archivedLeft = input.archivedAssignedPlantCount ?? 0;
   const archivedNote =
     archivedLeft > 0
       ? "Archived plants stay in your account and are unassigned from this tent. They are not deleted."

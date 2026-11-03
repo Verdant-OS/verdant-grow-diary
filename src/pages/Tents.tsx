@@ -598,7 +598,7 @@ export default function Tents() {
                           : "Plant count unavailable";
                 const assignedPlantCount = resolveVerifiedAssignedPlantCount(
                   assignmentPlantsQuery,
-                  (plant) => plant.tentId === t.id && plant.isArchived !== true,
+                  (plant) => plant.tentId === t.id,
                 );
                 const archivedAssignedPlantCount = resolveVerifiedAssignedPlantCount(
                   assignmentPlantsQuery,

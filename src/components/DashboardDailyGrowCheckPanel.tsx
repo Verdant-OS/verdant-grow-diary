@@ -224,7 +224,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
             onValueChange={(v) => setFilter(v as DashboardDailyGrowCheckFilter)}
           >
             <SelectTrigger
-              className="h-auto min-h-8 w-full basis-full whitespace-normal py-1 text-left text-xs [&>span]:line-clamp-none! [&>span]:whitespace-normal! sm:w-[220px] sm:basis-auto"
+              className="h-auto min-h-11 w-full basis-full whitespace-normal py-1 text-left text-xs [&>span]:line-clamp-none! [&>span]:whitespace-normal! sm:w-[220px] sm:basis-auto"
               aria-label="Filter today's grow checks"
               data-testid="dashboard-daily-grow-check-panel-filter"
               data-filter={filter}
@@ -402,7 +402,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                     asChild
                     size="sm"
                     variant="outline"
-                    className="h-8 px-2 text-xs"
+                    className="h-11 min-h-11 px-2 text-xs"
                     data-testid="dashboard-daily-grow-check-panel-row-action-note"
                     data-method="note"
                   >
@@ -422,7 +422,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
                     asChild
                     size="sm"
                     variant="outline"
-                    className="h-8 px-2 text-xs"
+                    className="h-11 min-h-11 px-2 text-xs"
                     data-testid="dashboard-daily-grow-check-panel-row-action-sensor"
                     data-method="sensor"
                   >

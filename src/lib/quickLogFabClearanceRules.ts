@@ -106,13 +106,10 @@ export function mobileShellToastBottomOffset(): string {
 }
 
 /**
- * Document-level CSS injected only while `AppShell` (bottom nav) is mounted.
- * The media queries keep `md+` and, by absence of the tag, public routes on
- * the library default toast position.
- */
-/**
- * ID rule so the Quick Log clearance wins over any shorter `pb-*` utility
- * on `#main-content`. An ID beats a single class.
+ * Bottom padding for `#main-content` on every signed-in AppShell page.
+ * An id selector beats a shorter `pb-*` utility on that same element.
+ * Below 768px the length is `mobileQuickLogContentClearanceRem` (FAB offset,
+ * height, and gap). From 768px it is the desktop FAB clearance.
  */
 export function mainContentFabClearanceCss(): string {
   const mobile = mobileQuickLogContentClearanceRem();
@@ -125,6 +122,11 @@ export function mainContentFabClearanceCss(): string {
   ].join("");
 }
 
+/**
+ * Document-level CSS injected only while `AppShell` (bottom nav) is mounted.
+ * The media queries keep `md+` and, by absence of the tag, public routes on
+ * the library default toast position.
+ */
 export function mobileShellToastOffsetCss(): string {
   const offset = MOBILE_SHELL_TOAST_BOTTOM_OFFSET;
   return [

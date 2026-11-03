@@ -25,7 +25,7 @@ export class DashboardMobileLayout {
    * The shared SelectTrigger clamps its label to one line.
    */
   static readonly growCheckFilterTriggerClass =
-    "h-auto min-h-8 w-full basis-full whitespace-normal py-1 text-left text-xs [&>span]:line-clamp-none! [&>span]:whitespace-normal! sm:w-[220px] sm:basis-auto";
+    "h-auto min-h-11 w-full basis-full whitespace-normal py-1 text-left text-xs [&>span]:line-clamp-none! [&>span]:whitespace-normal! sm:w-[220px] sm:basis-auto";
 
   static readonly disclosureDescriptionClass =
     "min-w-0 basis-full text-xs text-muted-foreground break-words sm:basis-auto";

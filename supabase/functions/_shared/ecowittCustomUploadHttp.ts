@@ -1,11 +1,12 @@
 /**
  * HTTP adapter for EcoWitt customized-upload ingest.
  *
- * Logical rejects stay HTTP 200 so a gateway does not retry-storm. An insert
- * failure before any row is durable, or a tent-channel lookup failure, is
- * HTTP 503 and is logged. After rows are stored, receipt and bind failures
- * stay HTTP 200. A unique-index replay is the same 200. The
- * body is never logged. PASSKEY and the claim token are hashed and then dropped.
+ * Logical rejects stay HTTP 200 so a gateway does not retry-storm, and they
+ * store nothing. Reserve, first-sender bind, and the reading insert are one
+ * commit. A rejection from that commit stores zero rows and returns the
+ * uniform rejection. An insert failure rolls the reserve back and is HTTP 503.
+ * A unique-index replay (23505) is HTTP 200 with zero new rows. The body is
+ * never logged. PASSKEY and the claim token are hashed and then dropped.
  * Persistence, tent channel config, and the entitlement lookup are injected ports.
  */
 import {
@@ -16,7 +17,6 @@ import {
   planEcowittCustomUploadIngest,
   type EcowittCustomUploadClaim,
   type EcowittCustomUploadEntitlement,
-  type EcowittCustomUploadIngestPlan,
   type EcowittCustomUploadStoredReading,
 } from "./ecowittCustomUploadIngestRules.ts";
 
@@ -25,26 +25,26 @@ export interface EcowittCustomUploadPorts {
   sha256Hex(value: string): Promise<string>;
   lookupClaim(tokenSha256: string): Promise<EcowittCustomUploadClaim | null>;
   entitlement(userId: string, now: Date): Promise<EcowittCustomUploadEntitlement>;
-  bindClaim(
-    claimId: string,
-    passkeySha256: string,
-    stationtype: string,
-    receivedAt: string,
-  ): Promise<{ ok: true } | { ok: false }>;
-  touchClaim(
-    claimId: string,
-    receivedAt: string,
-    capturedAt: string,
-  ): Promise<
+  commitIngest(input: {
+    readonly claimId: string;
+    readonly receivedAt: string;
+    readonly capturedAt: string;
+    readonly passkeySha256: string;
+    readonly stationtype: string;
+    readonly rows: readonly EcowittCustomUploadStoredReading[];
+  }): Promise<
     | { ok: true }
     | {
         ok: false;
-        reason: "rate_limited" | "duplicate_captured_at" | "claim_not_found" | "store_failed";
+        reason:
+          | "duplicate"
+          | "store_failed"
+          | "rate_limited"
+          | "duplicate_captured_at"
+          | "claim_not_found"
+          | "passkey_mismatch";
       }
   >;
-  insertReadings(
-    rows: readonly EcowittCustomUploadStoredReading[],
-  ): Promise<{ ok: true } | { ok: false; reason?: "duplicate" | "failed" }>;
   tentChannels(
     tentId: string,
   ): Promise<
@@ -58,12 +58,49 @@ export async function sha256Hex(value: string): Promise<string> {
 }
 
 function publicIngestReason(reason: string): string {
-  if (reason === "unknown_claim" || reason === "passkey_mismatch") return "rejected";
+  if (
+    reason === "unknown_claim" ||
+    reason === "passkey_mismatch" ||
+    reason === "claim_not_found" ||
+    reason === "rate_limited" ||
+    reason === "duplicate_captured_at"
+  ) {
+    return "rejected";
+  }
   return reason;
 }
 
+async function readBoundedBody(
+  request: Request,
+  maxBytes: number,
+): Promise<Uint8Array | "too_large"> {
+  const reader = request.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const step = await reader.read();
+    if (step.done) break;
+    const value = step.value;
+    if (value === undefined || value.byteLength === 0) continue;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      return "too_large";
+    }
+    chunks.push(value);
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
 function jsonResponse(
-  plan: Pick<EcowittCustomUploadIngestPlan, "accepted" | "reason">,
+  plan: { readonly accepted: boolean; readonly reason: string },
   stored: number,
   status = 200,
 ): Response {
@@ -133,7 +170,23 @@ export async function handleEcowittCustomUploadRequest(
     return jsonResponse(plan, 0);
   }
 
-  const bodyBytes = new Uint8Array(await request.arrayBuffer());
+  const bounded = await readBoundedBody(request, ECOWITT_CUSTOM_UPLOAD_MAX_BODY_BYTES);
+  if (bounded === "too_large") {
+    const plan = planEcowittCustomUploadIngest({
+      method,
+      pathname: url.pathname,
+      bodyByteLength: ECOWITT_CUSTOM_UPLOAD_MAX_BODY_BYTES + 1,
+      fields: null,
+      claim: null,
+      entitlement: "allowed",
+      now,
+      passkeySha256: null,
+      airChannels: [],
+      soilChannels: [],
+    });
+    return jsonResponse(plan, 0);
+  }
+  const bodyBytes = bounded;
   if (bodyBytes.byteLength > ECOWITT_CUSTOM_UPLOAD_MAX_BODY_BYTES) {
     const plan = planEcowittCustomUploadIngest({
       method,
@@ -203,40 +256,36 @@ export async function handleEcowittCustomUploadRequest(
   });
 
   if (!plan.accepted || claim === null) return jsonResponse(plan, 0);
+  const capturedAt = plan.rows[0]?.capturedAt ?? null;
+  const commitPasskey = plan.bind?.passkeySha256 ?? claim.passkeySha256;
+  const commitStation = plan.bind?.stationtype ?? claim.stationtype;
+  if (
+    plan.rows.length === 0 ||
+    plan.touchReceivedAt === null ||
+    capturedAt === null ||
+    commitPasskey === null ||
+    commitStation === null
+  ) {
+    return jsonResponse({ accepted: false, reason: "no_storable_metrics" }, 0);
+  }
 
-  const inserted = await ports.insertReadings(plan.rows);
-  const duplicate = !inserted.ok && inserted.reason === "duplicate";
-  if (!inserted.ok && !duplicate) {
+  const committed = await ports.commitIngest({
+    claimId: claim.id,
+    receivedAt: plan.touchReceivedAt,
+    capturedAt,
+    passkeySha256: commitPasskey,
+    stationtype: commitStation,
+    rows: plan.rows,
+  });
+  if (!committed.ok && committed.reason === "duplicate") {
+    console.warn("[ecowitt-custom-upload] duplicate_reading_replay", { rows: plan.rows.length });
+    return jsonResponse({ accepted: true, reason: "stored" }, 0);
+  }
+  if (!committed.ok && committed.reason === "store_failed") {
     console.error("[ecowitt-custom-upload] insert_failed", { rows: plan.rows.length });
     return jsonResponse({ accepted: false, reason: "store_failed" }, 0, 503);
   }
-  if (duplicate) {
-    console.warn("[ecowitt-custom-upload] duplicate_reading_replay", {
-      rows: plan.rows.length,
-    });
-  }
-
-  const capturedAt = plan.rows[0]?.capturedAt ?? null;
-  if (plan.touchReceivedAt !== null && capturedAt !== null) {
-    const reserved = await ports.touchClaim(claim.id, plan.touchReceivedAt, capturedAt);
-    if (!reserved.ok) {
-      // Readings are already durable. 503 would make the gateway post the
-      // same captured_at again and collide on sensor_readings_dedupe_uidx.
-      console.warn("[ecowitt-custom-upload] receipt_not_reserved", { reason: reserved.reason });
-    }
-  }
-
-  if (plan.bind !== null) {
-    const bound = await ports.bindClaim(
-      claim.id,
-      plan.bind.passkeySha256,
-      plan.bind.stationtype,
-      plan.touchReceivedAt ?? now.toISOString(),
-    );
-    if (!bound.ok) {
-      console.warn("[ecowitt-custom-upload] bind_not_applied");
-    }
-  }
+  if (!committed.ok) return jsonResponse({ accepted: false, reason: committed.reason }, 0);
   return jsonResponse(plan, plan.rows.length);
 }
 

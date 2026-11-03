@@ -65,6 +65,11 @@ describe("EcoWitt claim migration", () => {
     expect(MIGRATION).toContain(
       "GRANT EXECUTE ON FUNCTION public.reserve_ecowitt_custom_upload_receipt(uuid, timestamptz, timestamptz) TO service_role",
     );
+    expect(MIGRATION).toContain(
+      "GRANT EXECUTE ON FUNCTION public.commit_ecowitt_custom_upload_ingest(uuid, timestamptz, timestamptz, text, text, jsonb)",
+    );
+    expect(MIGRATION).toContain("passkey_sha256 = NULL");
+    expect(MIGRATION).toContain("p_captured_at <= v_last_captured");
     expect(MIGRATION).toContain("public.revoke_ecowitt_custom_upload_claim");
     expect(MIGRATION).toContain("public.rotate_ecowitt_custom_upload_claim");
     expect(MIGRATION).toMatch(

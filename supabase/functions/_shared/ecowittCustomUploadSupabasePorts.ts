@@ -1,12 +1,13 @@
 /**
  * Service-role wiring for customized-upload ingest.
  *
- * Not registered in supabase/config.toml and not deployed. #2702 merged at
- * 2:40 PM CT on 2026-11-02; registration still needs config.toml, which this
- * change does not edit. `requireLiveSensorEntitlement` runs before any claim
- * bind or reading insert. touchClaim calls reserve_ecowitt_custom_upload_receipt
- * before insert. bindClaim calls bind_ecowitt_custom_upload_claim, which
- * updates only while passkey_sha256 is null, and does not write receipt columns.
+ * Not registered in supabase/config.toml and not deployed. There is no Edge
+ * entry and no caller of handleEcowittCustomUploadWithEntitlement yet, so
+ * end-to-end storage is unproven. `requireLiveSensorEntitlement` runs before
+ * commit. commitIngest calls commit_ecowitt_custom_upload_ingest, which
+ * rechecks the claim, reserves the receipt, binds the first sender, and
+ * inserts readings in one transaction. A Postgres 23505 from a direct
+ * service-role insert is reason "duplicate" so the replay 200 is reachable.
  * This module does not read a client-supplied user id from the gateway body.
  */
 import { requireLiveSensorEntitlement } from "./liveSensorEntitlementGate.ts";
@@ -23,6 +24,23 @@ import type {
 
 export const ECOWITT_CUSTOM_UPLOAD_RESERVE_RPC = "reserve_ecowitt_custom_upload_receipt" as const;
 export const ECOWITT_CUSTOM_UPLOAD_BIND_RPC = "bind_ecowitt_custom_upload_claim" as const;
+export const ECOWITT_CUSTOM_UPLOAD_COMMIT_RPC = "commit_ecowitt_custom_upload_ingest" as const;
+
+export function classifyEcowittReadingInsertError(
+  error: { readonly code?: string; readonly message?: string } | null,
+): "duplicate" | "failed" | null {
+  if (error === null) return null;
+  if (error.code === "23505") return "duplicate";
+  return "failed";
+}
+
+export function ecowittServiceRoleInsertResult(
+  error: { readonly code?: string; readonly message?: string } | null,
+): { ok: true } | { ok: false; reason: "duplicate" | "failed" } {
+  const classified = classifyEcowittReadingInsertError(error);
+  if (classified === null) return { ok: true };
+  return { ok: false, reason: classified };
+}
 
 export type EcowittReserveReceipt =
   | { readonly ok: true }
@@ -88,7 +106,21 @@ export interface EcowittCustomUploadServiceRole {
   ): Promise<{ readonly data: unknown; readonly error: { readonly message: string } | null }>;
   insertReadings(
     rows: readonly EcowittCustomUploadStoredReading[],
-  ): Promise<{ ok: true } | { ok: false }>;
+  ): Promise<{ ok: true } | { ok: false; reason: "duplicate" | "failed" }>;
+  callCommit(
+    fn: typeof ECOWITT_CUSTOM_UPLOAD_COMMIT_RPC,
+    args: {
+      readonly p_claim_id: string;
+      readonly p_received_at: string;
+      readonly p_captured_at: string;
+      readonly p_passkey_sha256: string;
+      readonly p_stationtype: string;
+      readonly p_readings: readonly EcowittCustomUploadStoredReading[];
+    },
+  ): Promise<{
+    readonly data: unknown;
+    readonly error: { readonly code?: string; readonly message: string } | null;
+  }>;
   tentChannels(
     tentId: string,
   ): Promise<
@@ -120,25 +152,32 @@ export async function handleEcowittCustomUploadWithEntitlement(
       if (decision.reason === "upgrade_required") return "upgrade_required";
       return "lookup_failed";
     },
-    bindClaim: async (claimId, passkeySha256, stationtype, receivedAt) => {
-      const { data, error } = await deps.serviceRole.callBind(ECOWITT_CUSTOM_UPLOAD_BIND_RPC, {
-        p_claim_id: claimId,
-        p_passkey_sha256: passkeySha256,
-        p_stationtype: stationtype,
-        p_bound_at: receivedAt,
+    commitIngest: async (input) => {
+      const { data, error } = await deps.serviceRole.callCommit(ECOWITT_CUSTOM_UPLOAD_COMMIT_RPC, {
+        p_claim_id: input.claimId,
+        p_received_at: input.receivedAt,
+        p_captured_at: input.capturedAt,
+        p_passkey_sha256: input.passkeySha256,
+        p_stationtype: input.stationtype,
+        p_readings: input.rows,
       });
-      if (error) return { ok: false };
-      const bound = Array.isArray(data) ? data[0] : data;
-      return bound === true ? { ok: true } : { ok: false };
+      if (error) {
+        const classified = classifyEcowittReadingInsertError(error);
+        if (classified === "duplicate") return { ok: false, reason: "duplicate" };
+        return { ok: false, reason: "store_failed" };
+      }
+      const value = Array.isArray(data) ? data[0] : data;
+      if (value === "ok") return { ok: true };
+      if (
+        value === "rate_limited" ||
+        value === "duplicate_captured_at" ||
+        value === "claim_not_found" ||
+        value === "passkey_mismatch"
+      ) {
+        return { ok: false, reason: value };
+      }
+      return { ok: false, reason: "store_failed" };
     },
-    touchClaim: (claimId, receivedAt, capturedAt) =>
-      reserveEcowittCustomUploadReceipt(
-        (fn, args) => deps.serviceRole.callReserve(fn, args),
-        claimId,
-        receivedAt,
-        capturedAt,
-      ),
-    insertReadings: (rows) => deps.serviceRole.insertReadings(rows),
     tentChannels: (tentId) => deps.serviceRole.tentChannels(tentId),
   };
   return handleEcowittCustomUploadRequest(request, ports);

@@ -244,6 +244,25 @@ describe("EcoWitt customized-upload ingest rules", () => {
     expect(plan.rows.find((row) => row.metric === "humidity_pct")?.value).toBe(100);
     expect(plan.rows.find((row) => row.metric === "soil_moisture_pct")?.quality).toBe("degraded");
     expect(plan.rows.find((row) => row.metric === "soil_moisture_pct")?.value).toBe(0);
+    const mixed = planEcowittCustomUploadIngest(
+      input({
+        airChannels: [2, 3],
+        soilChannels: [],
+        fields: fields({
+          temp2f: "72.0",
+          humidity2: "60",
+          humidity3: "0",
+          co2: "",
+        }),
+      }),
+    );
+    const mixedRh = mixed.rows.find((row) => row.metric === "humidity_pct");
+    expect(mixedRh?.value).toBe(60);
+    expect(mixedRh?.quality).toBe("degraded");
+    expect(mixedRh?.rawPayload.channels.map((channel) => channel.includedInMean)).toEqual([
+      true,
+      false,
+    ]);
     const indoorOnly = planEcowittCustomUploadIngest(
       input({
         airChannels: [2],

@@ -61,17 +61,9 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         events.push(`entitlement:${userId}`);
         return "allowed";
       },
-      bindClaim: async (_id, passkeyHash) => {
-        events.push(`bind:${passkeyHash}`);
-        return { ok: true };
-      },
-      touchClaim: async (_id, _receivedAt, capturedAt) => {
-        events.push(`touch:${capturedAt}`);
-        return { ok: true };
-      },
-      insertReadings: async (rows) => {
-        events.push("insert");
-        inserted = rows;
+      commitIngest: async (input) => {
+        events.push(`commit:${input.capturedAt}:${input.passkeySha256}`);
+        inserted = input.rows;
         return { ok: true };
       },
       tentChannels: channels(),
@@ -103,16 +95,12 @@ describe("EcoWitt customized-upload HTTP handler", () => {
     expect(events[0]).toBe(`lookup:${await sha256Hex(TOKEN)}`);
     expect(events[1]?.startsWith("entitlement:")).toBe(true);
     const entitlementAt = events.findIndex((event) => event.startsWith("entitlement:"));
-    const touchAt = events.findIndex((event) => event.startsWith("touch:"));
-    const bindAt = events.findIndex((event) => event.startsWith("bind:"));
-    const insertAt = events.indexOf("insert");
-    expect(insertAt).toBeGreaterThan(entitlementAt);
-    expect(touchAt).toBeGreaterThan(insertAt);
-    expect(bindAt).toBeGreaterThan(touchAt);
-    expect(events.some((event) => event === "touch:2026-11-02T18:00:00Z")).toBe(true);
+    const commitAt = events.findIndex((event) => event.startsWith("commit:"));
+    expect(commitAt).toBeGreaterThan(entitlementAt);
+    expect(events.some((event) => event.startsWith("commit:2026-11-02T18:00:00Z:"))).toBe(true);
   });
 
-  it("reserves the receipt after insert and retries a failed insert", async () => {
+  it("returns 503 on a failed insert and lets the retry commit", async () => {
     const events: string[] = [];
     let failInsert = true;
     const ports: EcowittCustomUploadPorts = {
@@ -120,17 +108,9 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       sha256Hex,
       lookupClaim: async () => claim(null),
       entitlement: async () => "allowed",
-      bindClaim: async () => {
-        events.push("bind");
-        return { ok: true };
-      },
-      touchClaim: async () => {
-        events.push("touch");
-        return { ok: true };
-      },
-      insertReadings: async () => {
-        events.push("insert");
-        if (failInsert) return { ok: false };
+      commitIngest: async () => {
+        events.push("commit");
+        if (failInsert) return { ok: false, reason: "store_failed" };
         return { ok: true };
       },
       tentChannels: channels(),
@@ -144,7 +124,12 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       ports,
     );
     expect(failed.status).toBe(503);
-    expect(events).toEqual(["insert"]);
+    expect(await failed.json()).toMatchObject({
+      accepted: false,
+      stored: 0,
+      reason: "store_failed",
+    });
+    expect(events).toEqual(["commit"]);
     failInsert = false;
     const retried = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
@@ -155,24 +140,31 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       ports,
     );
     expect(retried.status).toBe(200);
-    expect(events).toEqual(["insert", "insert", "touch", "bind"]);
-    const rpc = await handleEcowittCustomUploadRequest(
+    expect(events).toEqual(["commit", "commit"]);
+  });
+
+  it("stores nothing when the commit rejects or a replay hits the unique key", async () => {
+    const events: string[] = [];
+    const limited = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: formBody(),
       }),
       {
-        ...ports,
-        touchClaim: async () => ({ ok: false, reason: "store_failed" }),
+        now: () => NOW,
+        sha256Hex,
+        lookupClaim: async () => claim(null),
+        entitlement: async () => "allowed",
+        commitIngest: async () => {
+          events.push("commit");
+          return { ok: false, reason: "rate_limited" };
+        },
+        tentChannels: channels(),
       },
     );
-    expect(rpc.status).toBe(200);
-    expect(await rpc.json()).toMatchObject({ accepted: true, reason: "stored" });
-  });
-
-  it("returns 200 when a replay hits the unique reading key", async () => {
-    const events: string[] = [];
+    expect(limited.status).toBe(200);
+    expect(await limited.json()).toEqual({ accepted: false, stored: 0, reason: "rejected" });
     const response = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
         method: "POST",
@@ -184,24 +176,16 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         sha256Hex,
         lookupClaim: async () => claim(null),
         entitlement: async () => "allowed",
-        bindClaim: async () => {
-          events.push("bind");
-          return { ok: false };
-        },
-        touchClaim: async () => {
-          events.push("touch");
-          return { ok: false, reason: "claim_not_found" };
-        },
-        insertReadings: async () => {
-          events.push("insert");
+        commitIngest: async () => {
+          events.push("duplicate");
           return { ok: false, reason: "duplicate" };
         },
         tentChannels: channels(),
       },
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ accepted: true, stored: expect.any(Number) });
-    expect(events).toEqual(["insert", "touch", "bind"]);
+    expect(await response.json()).toEqual({ accepted: true, stored: 0, reason: "stored" });
+    expect(events).toEqual(["commit", "duplicate"]);
   });
 
   it("returns 503 when the tent channel lookup fails", async () => {
@@ -216,9 +200,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
         sha256Hex,
         lookupClaim: async () => claim(null),
         entitlement: async () => "allowed",
-        bindClaim: async () => ({ ok: true }),
-        touchClaim: async () => ({ ok: true }),
-        insertReadings: async () => ({ ok: true }),
+        commitIngest: async () => ({ ok: true }),
         tentChannels: async () => ({ ok: false }),
       },
     );
@@ -238,9 +220,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       sha256Hex,
       lookupClaim: async () => claim(passkeyHash),
       entitlement: async () => "allowed",
-      bindClaim: async () => ({ ok: true }),
-      touchClaim: async () => ({ ok: true }),
-      insertReadings: async () => {
+      commitIngest: async () => {
         inserts += 1;
         return { ok: true };
       },
@@ -303,9 +283,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
           sha256Hex,
           lookupClaim: async () => claim(null),
           entitlement: async () => "allowed",
-          bindClaim: async () => ({ ok: true }),
-          touchClaim: async () => ({ ok: true }),
-          insertReadings: async () => ({ ok: false }),
+          commitIngest: async () => ({ ok: false, reason: "store_failed" }),
           tentChannels: channels(),
         },
       );

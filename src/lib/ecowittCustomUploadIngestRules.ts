@@ -12,9 +12,11 @@
  * `sensor_readings_dedupe_uidx` is unique on (user, tent, source, metric,
  * captured_at), so this planner emits one row per metric: the mean of the
  * valid channels. Each channel's number and raw value stay on
- * `raw_payload.channels`. A humidity or soil reading at 0 or 100 stays in the
- * mean. The row quality is `degraded` (the `validate_sensor_reading` allow-list
- * is ok/degraded/stale/invalid). The channel flag `suspect` records the rail
+ * `raw_payload.channels`. A suspect 0% relative-humidity channel stays on
+ * that list and is left out of the mean, so 60 and 0 do not become 30.
+ * Soil at 0 or 100, and humidity at 100, stay in the mean. The row quality
+ * is `degraded` (the `validate_sensor_reading` allow-list is
+ * ok/degraded/stale/invalid). The channel flag `suspect` records the rail
  * so the card can say the value is real and not healthy. `co2` stays on the
  * claim tent. A missing metric is not stored as a healthy zero.
  *
@@ -79,6 +81,7 @@ export interface EcowittCustomUploadStoredReading {
       readonly rawValue: string;
       readonly value: number;
       readonly suspect: boolean;
+      readonly includedInMean: boolean;
     }[];
     readonly passkeyFingerprint: string;
     readonly timestampSource: "ecowitt_dateutc";
@@ -457,33 +460,40 @@ export function planEcowittCustomUploadIngest(
   const receivedAt = input.now.toISOString();
   const rows: EcowittCustomUploadStoredReading[] = [...grouped.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([metric, channels]) => {
-      const mean = channels.reduce((sum, channel) => sum + channel.value, 0) / channels.length;
-      return {
-        userId: claim.userId,
-        tentId: claim.tentId,
-        source: "live" as const,
-        metric,
-        value: Math.round(mean * 100) / 100,
-        quality: channels.some((channel) => channel.suspect)
-          ? ("degraded" as const)
-          : ("ok" as const),
-        capturedAt,
-        receivedAt,
-        rawPayload: {
-          vendor: "ecowitt" as const,
-          aggregation: "mean" as const,
-          channels: channels.map((channel) => ({
-            channel: channel.channel,
-            rawKey: channel.rawKey,
-            rawValue: channel.rawValue,
-            value: channel.value,
-            suspect: channel.suspect,
-          })),
-          passkeyFingerprint: passkeySha256.slice(0, 16),
-          timestampSource: "ecowitt_dateutc" as const,
+    .flatMap(([metric, channels]) => {
+      const included = channels.filter(
+        (channel) => !(metric === "humidity_pct" && channel.suspect && channel.value <= 0),
+      );
+      if (included.length === 0) return [];
+      const mean = included.reduce((sum, channel) => sum + channel.value, 0) / included.length;
+      return [
+        {
+          userId: claim.userId,
+          tentId: claim.tentId,
+          source: "live" as const,
+          metric,
+          value: Math.round(mean * 100) / 100,
+          quality: channels.some((channel) => channel.suspect)
+            ? ("degraded" as const)
+            : ("ok" as const),
+          capturedAt,
+          receivedAt,
+          rawPayload: {
+            vendor: "ecowitt" as const,
+            aggregation: "mean" as const,
+            channels: channels.map((channel) => ({
+              channel: channel.channel,
+              rawKey: channel.rawKey,
+              rawValue: channel.rawValue,
+              value: channel.value,
+              suspect: channel.suspect,
+              includedInMean: included.includes(channel),
+            })),
+            passkeyFingerprint: passkeySha256.slice(0, 16),
+            timestampSource: "ecowitt_dateutc" as const,
+          },
         },
-      };
+      ];
     });
 
   return {

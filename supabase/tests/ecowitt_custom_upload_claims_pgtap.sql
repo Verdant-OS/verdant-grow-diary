@@ -64,6 +64,22 @@ INSERT INTO public.tents (id, user_id) VALUES
 
 \ir ../migrations/20261102150000_ecowitt_custom_upload_claims.sql
 
+CREATE TABLE public.sensor_readings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  tent_id uuid NOT NULL,
+  metric text NOT NULL,
+  value numeric NOT NULL,
+  quality text NOT NULL,
+  source text NOT NULL,
+  captured_at timestamptz NOT NULL,
+  ts timestamptz NOT NULL DEFAULT now(),
+  raw_payload jsonb
+);
+
+CREATE UNIQUE INDEX sensor_readings_dedupe_uidx
+  ON public.sensor_readings (user_id, tent_id, source, metric, captured_at);
+
 CREATE TABLE public.pgtap_ecowitt_scratch (
   k text PRIMARY KEY,
   claim_id uuid,
@@ -73,7 +89,7 @@ CREATE TABLE public.pgtap_ecowitt_scratch (
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.pgtap_ecowitt_scratch
   TO authenticated, service_role;
 
-SELECT plan(50);
+SELECT plan(68);
 
 SELECT has_table(
   'public'::name,
@@ -757,6 +773,257 @@ SELECT lives_ok(
   $body$
 $$,
   'bind updates only while passkey_sha256 is null'
+);
+
+SELECT has_function(
+  'public'::name,
+  'commit_ecowitt_custom_upload_ingest'::name,
+  ARRAY['uuid', 'timestamptz', 'timestamptz', 'text', 'text', 'jsonb']::name[],
+  'commit ingest is one function'
+);
+
+SELECT throws_ok(
+  $$DO $body$
+    BEGIN
+      EXECUTE 'SET LOCAL ROLE authenticated';
+      PERFORM public.commit_ecowitt_custom_upload_ingest(
+        '11111111-1111-4111-8111-111111111111'::uuid,
+        '2026-11-02 18:00:00+00'::timestamptz,
+        '2026-11-02 18:00:00+00'::timestamptz,
+        repeat('ab', 32),
+        'GW1200',
+        '[{"metric":"humidity_pct","value":55,"quality":"ok"}]'::jsonb
+      );
+    END
+  $body$
+$$,
+  '42501',
+  NULL,
+  'authenticated cannot call commit'
+);
+
+SELECT lives_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+      result text;
+    BEGIN
+      result := public.commit_ecowitt_custom_upload_ingest(
+        cid,
+        '2026-11-02 19:00:00+00',
+        '2026-11-02 19:00:00+00',
+        repeat('ab', 32),
+        'GW1200',
+        '[{"metric":"humidity_pct","value":55,"quality":"ok","raw_payload":{"vendor":"ecowitt"}}]'::jsonb
+      );
+      IF result IS DISTINCT FROM 'ok' THEN
+        RAISE EXCEPTION 'commit result %', result;
+      END IF;
+    END
+  $body$
+$$,
+  'service commit stores the reading and binds the first sender'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.sensor_readings),
+  1,
+  'the first commit stored one row'
+);
+
+SELECT is(
+  (SELECT passkey_sha256 FROM public.ecowitt_custom_upload_claims
+    WHERE id = (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again')),
+  repeat('ab', 32),
+  'the first sender is bound'
+);
+
+SELECT is(
+  public.commit_ecowitt_custom_upload_ingest(
+    (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again'),
+    '2026-11-02 19:00:01+00',
+    '2026-11-02 19:00:10+00',
+    repeat('cd', 32),
+    'GW1200B',
+    '[{"metric":"humidity_pct","value":40,"quality":"ok"}]'::jsonb
+  ),
+  'rate_limited',
+  'a second packet inside the gap is rate limited'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.sensor_readings),
+  1,
+  'a rate-limited commit stores zero rows'
+);
+
+SELECT is(
+  public.commit_ecowitt_custom_upload_ingest(
+    (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again'),
+    '2026-11-02 20:00:00+00',
+    '2026-11-02 18:00:00+00',
+    repeat('ab', 32),
+    'GW1200',
+    '[{"metric":"humidity_pct","value":40,"quality":"ok"}]'::jsonb
+  ),
+  'duplicate_captured_at',
+  'an older captured_at is a replay'
+);
+
+SELECT is(
+  public.commit_ecowitt_custom_upload_ingest(
+    (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again'),
+    '2026-11-02 20:00:00+00',
+    '2026-11-02 20:00:00+00',
+    repeat('cd', 32),
+    'GW1200B',
+    '[{"metric":"humidity_pct","value":40,"quality":"ok"}]'::jsonb
+  ),
+  'passkey_mismatch',
+  'a second passkey stores nothing'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.sensor_readings),
+  1,
+  'the mismatched passkey stored zero rows'
+);
+
+SELECT lives_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+    BEGIN
+      PERFORM set_config(
+        'request.jwt.claims',
+        '{"sub":"11111111-1111-4111-8111-111111111111","is_anonymous":false}',
+        true
+      );
+      UPDATE public.ecowitt_custom_upload_claims
+      SET revoked_at = clock_timestamp()
+      WHERE id = cid;
+      IF public.commit_ecowitt_custom_upload_ingest(
+        cid,
+        '2026-11-02 21:00:00+00',
+        '2026-11-02 21:00:00+00',
+        repeat('ab', 32),
+        'GW1200',
+        '[{"metric":"humidity_pct","value":40,"quality":"ok"}]'::jsonb
+      ) IS DISTINCT FROM 'claim_not_found' THEN
+        RAISE EXCEPTION 'revoked claim stored';
+      END IF;
+      UPDATE public.ecowitt_custom_upload_claims
+      SET revoked_at = NULL
+      WHERE id = cid;
+    END
+  $body$
+$$,
+  'a revoked claim stores zero rows'
+);
+
+SELECT lives_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+      rotated text;
+    BEGIN
+      PERFORM set_config(
+        'request.jwt.claims',
+        '{"sub":"11111111-1111-4111-8111-111111111111","is_anonymous":false}',
+        true
+      );
+      EXECUTE 'SET LOCAL ROLE authenticated';
+      rotated := public.rotate_ecowitt_custom_upload_claim(cid);
+      IF rotated !~ '^[0-9a-f]{48}$' THEN
+        RAISE EXCEPTION 'rotate token %', rotated;
+      END IF;
+      IF (
+        SELECT passkey_sha256 IS NULL AND bound_at IS NULL AND stationtype IS NULL
+        FROM public.ecowitt_custom_upload_claims
+        WHERE id = cid
+      ) IS NOT TRUE THEN
+        RAISE EXCEPTION 'rotate kept the passkey binding';
+      END IF;
+    END
+  $body$
+$$,
+  'rotate clears the passkey binding'
+);
+
+SELECT throws_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+    BEGIN
+      CREATE OR REPLACE FUNCTION public.ecowitt_pgtap_fail_reading()
+      RETURNS trigger LANGUAGE plpgsql AS $fn$
+      BEGIN
+        RAISE EXCEPTION 'forced reading failure';
+      END
+      $fn$;
+      CREATE TRIGGER ecowitt_pgtap_fail_reading
+        BEFORE INSERT ON public.sensor_readings
+        FOR EACH ROW EXECUTE FUNCTION public.ecowitt_pgtap_fail_reading();
+      PERFORM public.commit_ecowitt_custom_upload_ingest(
+        cid,
+        '2026-11-02 22:00:00+00',
+        '2026-11-02 22:00:00+00',
+        repeat('ab', 32),
+        'GW1200',
+        '[{"metric":"temperature_c","value":22,"quality":"ok"}]'::jsonb
+      );
+    END
+  $body$
+$$,
+  'P0001',
+  'forced reading failure',
+  'a failed insert raises'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.sensor_readings),
+  1,
+  'the failed insert left the earlier row and stored nothing new'
+);
+
+SELECT is(
+  (
+    SELECT last_received_at = '2026-11-02 19:00:00+00'::timestamptz
+    FROM public.ecowitt_custom_upload_claims
+    WHERE id = (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again')
+  ),
+  true,
+  'the failed insert rolled the reserve back'
+);
+
+SELECT lives_ok(
+  $$DO $body$
+    DECLARE
+      cid uuid := (SELECT claim_id FROM public.pgtap_ecowitt_scratch WHERE k = 'created_again');
+      result text;
+    BEGIN
+      DROP TRIGGER IF EXISTS ecowitt_pgtap_fail_reading ON public.sensor_readings;
+      result := public.commit_ecowitt_custom_upload_ingest(
+        cid,
+        '2026-11-02 22:00:00+00',
+        '2026-11-02 22:00:00+00',
+        repeat('ab', 32),
+        'GW1200',
+        '[{"metric":"temperature_c","value":22,"quality":"ok"}]'::jsonb
+      );
+      IF result IS DISTINCT FROM 'ok' THEN
+        RAISE EXCEPTION 'retry result %', result;
+      END IF;
+    END
+  $body$
+$$,
+  'a retry after the failed insert stores the reading'
+);
+
+SELECT is(
+  (SELECT count(*)::integer FROM public.sensor_readings),
+  2,
+  'the retry stored the reading'
 );
 
 SELECT * FROM finish(true);

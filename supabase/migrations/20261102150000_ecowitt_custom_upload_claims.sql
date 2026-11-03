@@ -137,7 +137,10 @@ BEGIN
   raw_token := encode(extensions.gen_random_bytes(24), 'hex');
   token_hash := encode(extensions.digest(convert_to(raw_token, 'utf8'), 'sha256'), 'hex');
   UPDATE public.ecowitt_custom_upload_claims
-  SET token_sha256 = token_hash
+  SET token_sha256 = token_hash,
+      passkey_sha256 = NULL,
+      stationtype = NULL,
+      bound_at = NULL
   WHERE id = p_claim_id
     AND user_id = uid
     AND revoked_at IS NULL;
@@ -188,7 +191,8 @@ BEGIN
     RETURN 'rate_limited';
   END IF;
 
-  IF v_last_captured IS NOT NULL AND v_last_captured = p_captured_at THEN
+  -- `=` missed an older dateutc. A captured time at or before the last one is a replay.
+  IF v_last_captured IS NOT NULL AND p_captured_at <= v_last_captured THEN
     RETURN 'duplicate_captured_at';
   END IF;
 
@@ -243,6 +247,122 @@ $function$;
 REVOKE ALL ON FUNCTION public.bind_ecowitt_custom_upload_claim(uuid, text, text, timestamptz)
   FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.bind_ecowitt_custom_upload_claim(uuid, text, text, timestamptz)
+  TO service_role;
+
+-- Recheck, reserve, first-sender bind, and reading insert commit together.
+-- A rejection returns before any write. An insert error raises, so the
+-- receipt and bind roll back with it.
+CREATE OR REPLACE FUNCTION public.commit_ecowitt_custom_upload_ingest(
+  p_claim_id uuid,
+  p_received_at timestamptz,
+  p_captured_at timestamptz,
+  p_passkey_sha256 text,
+  p_stationtype text,
+  p_readings jsonb
+)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_user uuid;
+  v_tent uuid;
+  v_interval integer;
+  v_last_received timestamptz;
+  v_last_captured timestamptz;
+  v_revoked timestamptz;
+  v_passkey text;
+  v_gap_ms integer;
+  v_elem jsonb;
+BEGIN
+  IF p_claim_id IS NULL OR p_received_at IS NULL OR p_captured_at IS NULL THEN
+    RETURN 'claim_not_found';
+  END IF;
+  IF p_passkey_sha256 IS NULL OR p_passkey_sha256 !~ '^[0-9a-f]{64}$' THEN
+    RETURN 'passkey_mismatch';
+  END IF;
+  IF p_stationtype IS NULL OR char_length(p_stationtype) < 1 OR char_length(p_stationtype) > 64 THEN
+    RETURN 'passkey_mismatch';
+  END IF;
+  IF p_readings IS NULL OR jsonb_typeof(p_readings) <> 'array' OR jsonb_array_length(p_readings) < 1 THEN
+    RETURN 'claim_not_found';
+  END IF;
+
+  SELECT user_id, tent_id, interval_seconds, last_received_at, last_captured_at, revoked_at, passkey_sha256
+  INTO v_user, v_tent, v_interval, v_last_received, v_last_captured, v_revoked, v_passkey
+  FROM public.ecowitt_custom_upload_claims
+  WHERE id = p_claim_id
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_revoked IS NOT NULL THEN
+    RETURN 'claim_not_found';
+  END IF;
+
+  v_gap_ms := GREATEST(8000, v_interval * 500);
+  IF v_last_received IS NOT NULL
+     AND p_received_at < v_last_received + (v_gap_ms * INTERVAL '1 millisecond') THEN
+    RETURN 'rate_limited';
+  END IF;
+
+  IF v_last_captured IS NOT NULL AND p_captured_at <= v_last_captured THEN
+    RETURN 'duplicate_captured_at';
+  END IF;
+
+  IF v_passkey IS NULL THEN
+    UPDATE public.ecowitt_custom_upload_claims
+    SET passkey_sha256 = p_passkey_sha256,
+        stationtype = p_stationtype,
+        bound_at = p_received_at
+    WHERE id = p_claim_id
+      AND revoked_at IS NULL
+      AND passkey_sha256 IS NULL;
+    IF NOT FOUND THEN
+      RETURN 'passkey_mismatch';
+    END IF;
+  ELSIF v_passkey IS DISTINCT FROM p_passkey_sha256 THEN
+    RETURN 'passkey_mismatch';
+  END IF;
+
+  UPDATE public.ecowitt_custom_upload_claims
+  SET last_received_at = p_received_at,
+      last_captured_at = p_captured_at
+  WHERE id = p_claim_id
+    AND revoked_at IS NULL;
+
+  FOR v_elem IN SELECT value FROM jsonb_array_elements(p_readings)
+  LOOP
+    IF v_elem->>'metric' NOT IN (
+      'temperature_c', 'humidity_pct', 'vpd_kpa', 'co2_ppm', 'soil_moisture_pct',
+      'soil_temp_c', 'ph', 'ec', 'ppfd'
+    ) THEN
+      RAISE EXCEPTION 'invalid sensor metric';
+    END IF;
+    IF v_elem->>'quality' NOT IN ('ok', 'degraded', 'stale', 'invalid') THEN
+      RAISE EXCEPTION 'invalid sensor quality';
+    END IF;
+    INSERT INTO public.sensor_readings (
+      user_id, tent_id, source, metric, value, quality, captured_at, ts, raw_payload
+    ) VALUES (
+      v_user,
+      v_tent,
+      'live',
+      v_elem->>'metric',
+      (v_elem->>'value')::numeric,
+      v_elem->>'quality',
+      p_captured_at,
+      p_captured_at,
+      COALESCE(v_elem->'raw_payload', '{}'::jsonb)
+    );
+  END LOOP;
+
+  RETURN 'ok';
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.commit_ecowitt_custom_upload_ingest(uuid, timestamptz, timestamptz, text, text, jsonb)
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.commit_ecowitt_custom_upload_ingest(uuid, timestamptz, timestamptz, text, text, jsonb)
   TO service_role;
 
 REVOKE ALL ON FUNCTION public.create_ecowitt_custom_upload_claim(uuid)

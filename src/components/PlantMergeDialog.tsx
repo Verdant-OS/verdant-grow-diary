@@ -271,10 +271,10 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
 
   async function executeMergeViaRpc() {
     if (busy) return;
-    if (!user || !target || !canExecuteRpc) {
-      toast.error("Merge could not start. Pick a same-grow target and try again.");
-      return;
-    }
+    if (!user || !target)
+      return void toast.error("Merge could not start. Pick a same-grow target and try again.");
+    if (!canExecuteRpc)
+      return void toast.error("Merge could not start. Pick a same-grow target and try again.");
     setBusy(true);
     try {
       const { data, error } = await supabase.rpc("merge_duplicate_plant", {

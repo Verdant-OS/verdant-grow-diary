@@ -65,6 +65,7 @@ import PhenoProductSamplingSection from "@/components/PhenoProductSamplingSectio
 import PhenoStressTestingSection from "@/components/PhenoStressTestingSection";
 import PhenoSamplingWorkspaceTools from "@/components/PhenoSamplingWorkspaceTools";
 import PhenoDocumentationSections from "@/components/PhenoDocumentationSections";
+import { PHENO_SAVE_DESTINATION_COPY } from "@/constants/phenoSaveDestinationCopy";
 import PhenoDocumentationBackupPanel from "@/components/PhenoDocumentationBackupPanel";
 import PhenoStressObservationsList from "@/components/PhenoStressObservationsList";
 import { PhenoSamplingProvider } from "@/context/PhenoSamplingContext";
@@ -1373,7 +1374,7 @@ const CandidateEditor = memo(function CandidateEditor({
       <PhenoDocumentationSections
         recordId={plantId}
         recordType="candidate"
-        title="Candidate documentation"
+        title={PHENO_SAVE_DESTINATION_COPY.candidateDocumentationTitle}
         defaultOpen={false}
       />
 
@@ -1422,7 +1423,9 @@ const CandidateEditor = memo(function CandidateEditor({
           onClick={onSave}
           className="rounded-md border border-border bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >
-          {saving ? "Saving…" : "Save"}
+          {saving
+            ? PHENO_SAVE_DESTINATION_COPY.accountSaving
+            : PHENO_SAVE_DESTINATION_COPY.accountSave}
         </button>
         {saved && (
           <span data-testid={`workspace-saved-${plantId}`} className="text-xs text-emerald-600">

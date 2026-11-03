@@ -91,6 +91,32 @@ function climateSnapshotDetails(
   };
 }
 
+function isDetailsRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeClimateOntoDetails(
+  details: Record<string, unknown> | null | undefined,
+  climate: Record<string, unknown> | null,
+): Record<string, unknown> | null | undefined {
+  if (!climate) return details;
+  const base = { ...(details ?? {}) };
+  const existingSensor = isDetailsRecord(base.sensor_snapshot) ? base.sensor_snapshot : {};
+  const existingManual = isDetailsRecord(base.manual_sensor_snapshot)
+    ? base.manual_sensor_snapshot
+    : {};
+  const manualClimate = climate.manual_sensor_snapshot;
+  const manual = isDetailsRecord(manualClimate)
+    ? { ...existingManual, ...manualClimate }
+    : existingManual;
+  return {
+    ...base,
+    manual_provenance: buildManualSensorProvenance(),
+    sensor_snapshot: { ...existingSensor, ...(climate.sensor_snapshot as Record<string, unknown>) },
+    ...(Object.keys(manual).length > 0 ? { manual_sensor_snapshot: manual } : {}),
+  };
+}
+
 function parseOptionalNumber(raw: string): number | null | "invalid" {
   const trimmed = raw?.trim?.() ?? "";
   if (trimmed === "") return null;
@@ -174,10 +200,7 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
   // Timeline classification, Recent quick logs, and the tent Sensor Snapshot
   // card read, so the same numbers have to live on the companion.
   const climate = climateSnapshotDetails(t, h, v);
-  const measuredDetails =
-    climate !== null
-      ? { ...input.details, manual_provenance: buildManualSensorProvenance(), ...climate }
-      : input.details;
+  const measuredDetails = mergeClimateOntoDetails(input.details, climate);
   // A new note carries the note marker so saved entries can tell it from an
   // issue. Legacy environment-check envelopes keep their own identity.
   const details =

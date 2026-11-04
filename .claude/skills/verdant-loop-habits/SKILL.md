@@ -92,7 +92,8 @@ never loosen a pin to make a round pass.
 
 ## Amending this list
 
-- **Source.** A habit is added only from a closed block in `docs/agents/HANDOFF_LOG.md` or a
+- **Source.** A habit is added only from a closed block (indexed by `docs/agents/HANDOFF_LOG.md`,
+  one file each under `docs/agents/handoffs/`) or a
   merged PR on `verdant-grow-diary`, and it cites the rounds (PR numbers or SHAs) that show the
   mistake recurring. One occurrence is an observation for the handoff log, not a habit.
 - **Shape.** Every entry has a trigger, the check that would catch it next time (or "none" with

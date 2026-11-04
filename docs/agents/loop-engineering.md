@@ -23,7 +23,8 @@ but which nothing in the app reaches.
 
 `established fact`: most of that pattern already exists here. Thousands of contract-pin tests
 under `src/test/` are the scorer; `AGENTS.md` and `CLAUDE.md` are the fixed rules;
-`docs/agents/HANDOFF_LOG.md` is the per-round results record; `CLAUDE.md` already requires every
+`docs/agents/HANDOFF_LOG.md` indexes the per-round results record (one block per task under
+`docs/agents/handoffs/`); `CLAUDE.md` already requires every
 new test to be shown RED before its fix. Three things were missing, and this page plus its slice
 supplies them:
 
@@ -151,7 +152,8 @@ video gives: only a skill's one-paragraph description stays in every session's c
 body loads when a session is about to build, review or finish a slice.
 
 - **Where:** `.claude/skills/verdant-loop-habits/SKILL.md`.
-- **Results file:** `docs/agents/HANDOFF_LOG.md`. Its closed blocks are the rounds; a habit cites
+- **Results file:** `docs/agents/HANDOFF_LOG.md` and the block files it indexes under
+  `docs/agents/handoffs/`. Its closed blocks are the rounds; a habit cites
   the blocks or merged PRs that show the mistake recurring.
 - **Who may amend it:** any peer, from a closed block or a merged PR, without a `Sentinel-Version`
   bump, because the skill is not one of the eighteen governance files. The amendment rules are in
@@ -170,7 +172,8 @@ miscounts and from §3.
 
 ## 5. The results record a round needs
 
-`docs/agents/HANDOFF_LOG.md` already carries the task block. For a looped task, the block's
+`docs/agents/HANDOFF_LOG.md` gives the template; the task's own block lives in
+`docs/agents/handoffs/<TASK-ID>.md`. For a looped task, the block's
 `current state` line records per round: what was tried, kept or reverted, and which checks still
 fail, with counts (`RED 7 passed / 1 failed` before, `8 passed / 0 failed` after). That is what the
 habits process reads. A round with no counts is not a round.

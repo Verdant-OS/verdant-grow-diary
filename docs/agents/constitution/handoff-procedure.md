@@ -1,6 +1,6 @@
 # Handoff procedure
 
-Normative detail for `AGENTS.md` §12. The log template at the top of `docs/agents/HANDOFF_LOG.md` is the field list. This file is how to use it. Any agent or human follows the same steps.
+Normative detail for `AGENTS.md` §12. The log template at the top of `docs/agents/HANDOFF_LOG.md` is the field list. Each task's block is its own file, `docs/agents/handoffs/<TASK-ID>.md`; write only your own. This file is how to use it. Any agent or human follows the same steps.
 
 ## Write the entry first
 

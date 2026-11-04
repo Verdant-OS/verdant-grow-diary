@@ -350,7 +350,14 @@ async function assertHistory(page: Page, csv: Csv) {
       const row = table
         .locator("tbody tr")
         .filter({ hasText: shownAt })
-        .filter({ hasText: metric === "temperature_c" ? TEMPERATURE_HISTORY_LABEL : metric });
+        .filter({
+          hasText:
+            metric === "temperature_c"
+              ? TEMPERATURE_HISTORY_LABEL
+              : metric === "humidity_pct"
+                ? "Humidity"
+                : "VPD",
+        });
       await expect(row).toHaveCount(1);
       await expect(row.locator("td").nth(2)).toHaveText(
         `${observation[metric]}${HISTORY_VALUE_SUFFIX[metric]}`,
@@ -768,7 +775,14 @@ test("a multi-batch CSV import reconciles a lost final reply beyond the read cap
           .getByTestId("imported-history-recent-rows")
           .locator("tbody tr")
           .filter({ hasText: shownAt })
-          .filter({ hasText: metric === "temperature_c" ? TEMPERATURE_HISTORY_LABEL : metric });
+          .filter({
+            hasText:
+              metric === "temperature_c"
+                ? TEMPERATURE_HISTORY_LABEL
+                : metric === "humidity_pct"
+                  ? "Humidity"
+                  : "VPD",
+          });
         await expect(row).toHaveCount(1);
         await expect(row.locator("td").nth(2)).toHaveText(
           `${latest[metric]}${HISTORY_VALUE_SUFFIX[metric]}`,

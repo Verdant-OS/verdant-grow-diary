@@ -7,6 +7,7 @@ on:
       - "supabase/functions/_shared/**"
       - "supabase/functions/sensor-ingest-webhook/**"
       - "supabase/functions/ecowitt-ingest/**"
+      - "supabase/functions/ecowitt-custom-upload/**"
       - "supabase/functions/mint-bridge-token/**"
       - "supabase/functions/revoke-bridge-token/**"
       - "supabase/config.toml"
@@ -20,6 +21,7 @@ on:
       - "supabase/functions/_shared/**"
       - "supabase/functions/sensor-ingest-webhook/**"
       - "supabase/functions/ecowitt-ingest/**"
+      - "supabase/functions/ecowitt-custom-upload/**"
       - "supabase/functions/mint-bridge-token/**"
       - "supabase/functions/revoke-bridge-token/**"
       - "supabase/config.toml"
@@ -66,6 +68,7 @@ jobs:
             supabase/functions/sensor-ingest-webhook/cors_e2e_test.ts \
             supabase/functions/sensor-ingest-webhook/handler_e2e_test.ts \
             supabase/functions/ecowitt-ingest/handler_e2e_test.ts \
+            supabase/functions/ecowitt-custom-upload/handler_e2e_test.ts \
             supabase/functions/mint-bridge-token/handler_e2e_test.ts \
             supabase/functions/revoke-bridge-token/handler_e2e_test.ts \
             2>&1 | tee deno-edge-tests.log

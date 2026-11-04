@@ -83,6 +83,10 @@ import {
   clearPendingOAuthPostAuthRedirect,
   savePendingOAuthPostAuthRedirect,
 } from "@/lib/oauthPostAuthRedirectRules";
+import {
+  AUTH_CRASHED_TAB_RELOAD_COPY,
+  AUTH_CRASHED_TAB_RELOAD_TESTID,
+} from "@/constants/authSessionCopy";
 
 export default function Auth() {
   usePageSeo({
@@ -683,6 +687,12 @@ export default function Auth() {
               <p className="text-xs text-muted-foreground mb-3">
                 Sign-in is kept separately in each tab. If you opened a new tab, sign in here or
                 return to your signed-in tab.
+              </p>
+              <p
+                className="text-xs text-muted-foreground mb-3"
+                data-testid={AUTH_CRASHED_TAB_RELOAD_TESTID}
+              >
+                {AUTH_CRASHED_TAB_RELOAD_COPY}
               </p>
               <p className="text-xs text-muted-foreground mb-3">
                 Use the email and password you used to create your Verdant account.

@@ -50,8 +50,10 @@ function formatValue(metric: ManualSensorMetric, value: number): string {
 const STATE_STYLES: Record<FreshnessState, string> = {
   fresh: "text-primary",
   aging: "text-amber-400/90",
-  stale: "text-muted-foreground/60",
-  missing: "text-muted-foreground/50",
+  // Full muted token: these words tell a grower a reading is old or absent,
+  // so they must meet WCAG AA (contrast spec in Verdant-OS/verdant-grow-diary#2827, §2.3).
+  stale: "text-muted-foreground",
+  missing: "text-muted-foreground",
 };
 
 const STATE_LABELS: Record<FreshnessState, string> = {
@@ -163,7 +165,7 @@ function FreshnessTile({ snapshot }: { snapshot: FreshnessSnapshot }) {
           </span>
           {loggedAt && (
             <span
-              className="text-[10px] text-muted-foreground/70"
+              className="text-[10px] text-muted-foreground"
               data-testid={`plant-manual-sensor-freshness-${metric}-last-log`}
             >
               {STATE_LABELS[state]} · Last manual log{" "}

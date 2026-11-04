@@ -1,5 +1,5 @@
 /**
- * Contrast guard for the destructive colour (docs/specs/contrast-tokens.md, D1 (a);
+ * Contrast guard for the destructive colour (contrast spec in Verdant-OS/verdant-grow-diary#2827, D1 (a);
  * audit 2026-11-03 finding 12).
  *
  * Error text and white-on-danger fills must meet WCAG AA (4.5:1) in the dark theme

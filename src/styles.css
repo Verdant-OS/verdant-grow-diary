@@ -38,7 +38,7 @@
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
   /* Text, borders and tints use the lighter text token; solid fills use bg-destructive-fill
-     (docs/specs/contrast-tokens.md, D1 a). */
+     (contrast spec, Verdant-OS/verdant-grow-diary#2827, D1 a). */
   --color-destructive: hsl(var(--destructive-text));
   --color-destructive-fill: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));

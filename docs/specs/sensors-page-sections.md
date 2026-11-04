@@ -12,11 +12,12 @@ Measured on the deploy branch `verdant-grow-diary` at `c03f64a`.
 
 ## 1. Collision check
 
-Four EcoWitt and MQTT PRs are open: #2732, #2751, #2752 and #2757. None of them edits
-`src/pages/Sensors.tsx`, and the page mounts none of the EcoWitt station cards that #2732
-changes. `EcowittTentSnapshotV0Card` mounts only at `src/pages/TentDetail.tsx:762`.
-`EcowittCustomUploadStationCard` and `EcowittCustomUploadStationMount` are new files in #2732 and
-are not on base. The EcoWitt blocks Sensors does mount are `EcowittBridgeTroubleshootingPanel`
+Of the four EcoWitt and MQTT PRs, #2732 and #2757 have merged and #2751 and #2752 are still open.
+None of the four edits `src/pages/Sensors.tsx`, and the page mounts none of the EcoWitt station
+cards that #2732 added. `EcowittCustomUploadStationCard` and `EcowittCustomUploadStationMount` are
+now on base, but they reach the UI only through `EcowittTentSnapshotV0Card`
+(`EcowittCustomUploadStationMount.tsx:150` renders the card; `EcowittTentSnapshotV0Card.tsx:292`
+renders the mount), which mounts only at `src/pages/TentDetail.tsx:762`. Sensors.tsx is untouched. The EcoWitt blocks Sensors does mount are `EcowittBridgeTroubleshootingPanel`
 (`src/pages/Sensors.tsx:986`), `EcowittLiveProofPanel` (`:1033`) and
 `EcowittIngestAuditProofPanel` (`:1039`); this spec moves them only as whole components.
 

@@ -1,7 +1,8 @@
 /**
  * Founder Lifetime stays retired as a product and intact as an entitlement.
- * Stripe test-mode checkout must not be required for an existing holder to
- * keep 100 monthly credits, the Blueprint, and credit-pack eligibility.
+ * An existing holder keeps 100 monthly credits, the Blueprint, and credit-pack
+ * eligibility. Kept from stripe-founder-entitlement-preserved.test.ts when the
+ * PR #2702 Stripe lane was retired (#2811; review 5760749999 P2-2).
  */
 import { describe, expect, it } from "vitest";
 import { creditPackPurchaseEligible } from "@/lib/creditPackEligibility";

@@ -531,7 +531,7 @@ last_updated: 2026-10-27 10:30 CT, by Grok
 ### ARCH-CONTRACT-RESTAMP-20261029
 
 ```text
-TASK ARCH-CONTRACT-RESTAMP-20261029  priority: other  status: OPEN
+TASK ARCH-CONTRACT-RESTAMP-20261029  priority: other  status: CLOSED merged as e312c3facd097e89c3786d532a384392f7fe6999 (#2622); slice C continues in TOPOLOGY-RESTAMP-20261104
 goal: re-verify docs/architecture-contract.md against deploy tip 479cadb3032ddc3ad80d93f105283609179d6c0a (#2581) and correct every clause that drifted since the 27991451 stamp and its 0200d255 post-stamp merge.
 why: the founder chose option A (docs-only refresh) on 2026-10-29, after a collision audit found that the contract (#2564) and docs/specs/release-topology-specification.md already exist, so a new contract would duplicate them.
 branch: claude/new-session-kulf08
@@ -1475,6 +1475,40 @@ session_state: none
 claimed_by: Claude, 2026-10-28 23:10 UTC
 owner: Claude
 last_updated: 2026-10-29 18:40 UTC, by Claude (pr link and ready state recorded)
+```
+
+### TOPOLOGY-RESTAMP-20261104
+
+```text
+TASK TOPOLOGY-RESTAMP-20261104  priority: other  status: OPEN
+goal: slice C of the architecture work. Re-verify docs/specs/release-topology-specification.md at deploy tip 776ff8d62d87309c08b1ac9e261c108cb99e679a (#2828) without duplicating the merged contract (#2622).
+why: Matthew chose slice C on 2026-11-04 after Grok ran out of tokens. The three PRs it waited on had resolved: #2539 merged, #2609 and #2589 closed unmerged.
+branch: claude/blissful-pasteur-ntlsw7
+base: verdant-grow-diary
+checkout: git fetch origin claude/blissful-pasteur-ntlsw7 verdant-grow-diary && git switch claude/blissful-pasteur-ntlsw7 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" (a reviewer stops here, at the exact head)
+pr: draft; read the URL from GitHub
+head_sha: a commit cannot record its own SHA; read the full head from the PR
+state: pushed draft
+current_step: amendment written (spec header, §2.12, §6.1 sentence, §6.4, §15.5)
+next_action: an eligible independent non-contributing session (OWNERSHIP.md §4.3; not session 017UoYKwUSLxBTGDKmDQqxii) does a complete review at the full head. Then 35/35 required checks and Matthew's per-item yes at that exact head.
+post_merge_check: NOT_APPLICABLE (docs-only; no runtime behavior changes)
+active_writer: Claude session_017UoYKwUSLxBTGDKmDQqxii
+decisions: (1) amend in place with a dated §2.12/§6.4, following the §2.11/§6.3 pattern, and add no new spec. (2) The §6.1 Lovable-gateway PASS gotcha was already superseded by §6.3 row 5; one §6.1 sentence now says the table is dated. (3) Leave CLAUDE.md alone; open #2853 owns that wording. (4) Edge-function count dated at the tip, because open #2811 and #2751 change it.
+tried_and_rejected: a scripted heredoc edit; the session's network-egress hook matched the apex URL text and refused the command, so edits went through the editor tool instead.
+commands: cite check: for each cite, diff <(git show 27991451a756d2521df08e26e504776a43c7bbb8:<path> | sed -n '<lines>p') <(sed -n '<lines>p' <path>). Counts: git ls-tree --name-only HEAD .github/workflows/ | wc -l; git ls-tree -d --name-only HEAD supabase/functions/ | grep -vc _shared; config/required-status-checks.json array lengths. Format and safety: bunx prettier --check docs/specs/release-topology-specification.md docs/agents/HANDOFF_LOG.md; node scripts/assert-docs-safety.mjs
+files_touched: docs/specs/release-topology-specification.md, docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: live reads M1/M2/M7/M10 BLOCKED from this session (egress hook); Matthew or a session with apex egress
+open_questions: none
+gotchas: Grok was this spec's named reviewer and is unavailable; route acceptance under OWNERSHIP.md §4.3 instead.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2622
+artifacts: the PR's check runs
+reviewer_seat: eligible independent session under OWNERSHIP.md §4.3; author session 017UoYKwUSLxBTGDKmDQqxii excluded
+reviewer_sha: none yet
+session_state: Claude cloud session 017UoYKwUSLxBTGDKmDQqxii; no production access; no scheduled check-ins
+claimed_by: Claude session_017UoYKwUSLxBTGDKmDQqxii, 2026-11-04 05:35 UTC
+owner: Claude
+last_updated: 2026-11-04 05:35 UTC, by Claude
 ```
 
 ## Closed

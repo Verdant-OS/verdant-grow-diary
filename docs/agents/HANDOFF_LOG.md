@@ -173,7 +173,7 @@ session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
 owner: Claude
 last_updated: 2026-11-03 18:30 CT, by Claude
-````
+```
 
 ### REPORTS-DIARY-RANGE-REPORT-LINK
 

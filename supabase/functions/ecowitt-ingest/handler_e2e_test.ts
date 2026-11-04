@@ -36,6 +36,8 @@ interface FakeState {
   tentFilters: Array<{ column: string; value: unknown }>;
   persistedRows: Array<Record<string, unknown>>;
   rpcCalls: Array<{ name: string; args: Record<string, unknown> }>;
+  insertError: { message: string } | null;
+  rpcError: { message: string } | null;
 }
 
 function bridgeRow(overrides: Partial<BridgeTokenRow> = {}): BridgeTokenRow {
@@ -99,6 +101,8 @@ function makeState(
     tentFilters: [],
     persistedRows: [],
     rpcCalls: [],
+    insertError: null,
+    rpcError: null,
   };
 }
 
@@ -217,8 +221,10 @@ function makeAdmin(state: FakeState): EcoWittIngestAdminClient {
             state.persistedRows.push(...rows);
             return {
               select: async () => ({
-                data: rows.map((_, index) => ({ id: `ecowitt-reading-${index + 1}` })),
-                error: null,
+                data: state.insertError
+                  ? null
+                  : rows.map((_, index) => ({ id: `ecowitt-reading-${index + 1}` })),
+                error: state.insertError,
               }),
             };
           },
@@ -228,7 +234,7 @@ function makeAdmin(state: FakeState): EcoWittIngestAdminClient {
     },
     rpc: async (name: string, args: Record<string, unknown>) => {
       state.rpcCalls.push({ name, args });
-      return { data: null, error: null };
+      return { data: null, error: state.rpcError };
     },
   };
   return admin as unknown as EcoWittIngestAdminClient;
@@ -470,4 +476,84 @@ Deno.test("direct EcoWitt handler fails closed when entitlement is unverifiable"
   assertEquals((await responseBody(response)).error, "entitlement_lookup_failed");
   assertEquals(state.tentQueries, 0);
   assertEquals(state.persistedRows.length, 0);
+});
+
+Deno.test("direct EcoWitt handler returns 500 when the reading insert fails", async () => {
+  const fingerprint = await computeEcoWittPasskeyFingerprint(PASSKEY);
+  assert(fingerprint);
+  const state = makeState({ tents: [tentRow(TENT_ID, fingerprint)] });
+  state.insertError = { message: "duplicate key" };
+  const errors: string[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    errors.push(args.map((arg) => String(arg)).join(" "));
+  };
+  try {
+    const response = await handleEcoWittIngestRequest(post(VALID_TOKEN), {
+      admin: makeAdmin(state),
+      now: () => NOW,
+      expectedBillingEnvironment: "live",
+    });
+    assertEquals(response.status, 500);
+    assertEquals((await responseBody(response)).error, "insert_failed");
+    assert(errors.some((line) => line.includes("insert_failed")));
+    assertEquals(state.rpcCalls.length, 0);
+  } finally {
+    console.error = original;
+  }
+});
+
+Deno.test("direct EcoWitt handler returns 200 when bump_bridge_token_usage fails", async () => {
+  const fingerprint = await computeEcoWittPasskeyFingerprint(PASSKEY);
+  assert(fingerprint);
+  const state = makeState({ tents: [tentRow(TENT_ID, fingerprint)] });
+  state.rpcError = { message: "rpc failed" };
+  const warnings: string[] = [];
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args.map((arg) => String(arg)).join(" "));
+  };
+  try {
+    const response = await handleEcoWittIngestRequest(post(VALID_TOKEN), {
+      admin: makeAdmin(state),
+      now: () => NOW,
+      expectedBillingEnvironment: "live",
+    });
+    const body = await responseBody(response);
+    assertEquals(response.status, 200);
+    assertEquals(body.ok, true);
+    assertEquals(body.accepted, true);
+    assertEquals(state.rpcCalls.length, 2);
+    assertEquals(state.rpcCalls[0].name, "bump_bridge_token_usage");
+    assertEquals(state.rpcCalls[0].args.p_inserted, state.rpcCalls[1].args.p_inserted);
+    assert(warnings.some((line) => line.includes("bump_bridge_token_usage_failed")));
+  } finally {
+    console.warn = original;
+  }
+});
+
+Deno.test("direct EcoWitt handler records usage once when the bump retry succeeds", async () => {
+  const fingerprint = await computeEcoWittPasskeyFingerprint(PASSKEY);
+  assert(fingerprint);
+  const state = makeState({ tents: [tentRow(TENT_ID, fingerprint)] });
+  let attempts = 0;
+  const admin = makeAdmin(state);
+  const originalRpc = admin.rpc.bind(admin);
+  admin.rpc = (name: string, args: Record<string, unknown>) => {
+    attempts += 1;
+    if (attempts === 1) return Promise.resolve({ data: null, error: { message: "transient" } });
+    state.rpcError = null;
+    return originalRpc(name, args);
+  };
+  const response = await handleEcoWittIngestRequest(post(VALID_TOKEN), {
+    admin,
+    now: () => NOW,
+    expectedBillingEnvironment: "live",
+  });
+  const body = await responseBody(response);
+  assertEquals(response.status, 200);
+  assertEquals(body.accepted, true);
+  assertEquals(attempts, 2);
+  assertEquals(state.rpcCalls.length, 1);
+  assertEquals(state.rpcCalls[0].args.p_inserted, body.inserted);
 });

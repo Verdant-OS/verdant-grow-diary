@@ -13,7 +13,6 @@
  */
 import {
   ECOWITT_CUSTOM_UPLOAD_MAX_BODY_BYTES,
-  EcowittCustomUploadGatewayResponse,
   ecowittClaimTokenFromPath,
   isEcowittPasskey,
   parseEcowittCustomUploadForm,
@@ -53,6 +52,8 @@ export interface EcowittCustomUploadPorts {
   ): Promise<
     { ok: true; airChannels: readonly number[]; soilChannels: readonly number[] } | { ok: false }
   >;
+  /** Server-side record of a specific reason the gateway only sees as "rejected". */
+  recordRejection?(reason: string): void;
 }
 
 export async function sha256Hex(value: string): Promise<string> {
@@ -71,6 +72,13 @@ function publicIngestReason(reason: string): string {
     return "rejected";
   }
   return reason;
+}
+
+/** Logs the specific reason when the gateway answer masks it. The response never carries it. */
+function recordMaskedRejection(reason: string, ports: EcowittCustomUploadPorts): void {
+  if (publicIngestReason(reason) === reason) return;
+  if (ports.recordRejection) ports.recordRejection(reason);
+  else console.warn("[ecowitt-custom-upload] rejected", { reason });
 }
 
 async function readBoundedBody(
@@ -148,7 +156,7 @@ export async function handleEcowittCustomUploadRequest(
       airChannels: [],
       soilChannels: [],
     });
-    return jsonResponse(plan, 0, ports);
+    return jsonResponse(plan, 0);
   }
 
   const declaredLength = request.headers.get("content-length");
@@ -170,7 +178,7 @@ export async function handleEcowittCustomUploadRequest(
       airChannels: [],
       soilChannels: [],
     });
-    return jsonResponse(plan, 0, ports);
+    return jsonResponse(plan, 0);
   }
 
   const bounded = await readBoundedBody(request, ECOWITT_CUSTOM_UPLOAD_MAX_BODY_BYTES);
@@ -203,7 +211,7 @@ export async function handleEcowittCustomUploadRequest(
       airChannels: [],
       soilChannels: [],
     });
-    return jsonResponse(plan, 0, ports);
+    return jsonResponse(plan, 0);
   }
 
   const token = ecowittClaimTokenFromPath(url.pathname);
@@ -220,7 +228,7 @@ export async function handleEcowittCustomUploadRequest(
       airChannels: [],
       soilChannels: [],
     });
-    return jsonResponse(plan, 0, ports);
+    return jsonResponse(plan, 0);
   }
 
   const bodyText = new TextDecoder().decode(bodyBytes);
@@ -258,7 +266,10 @@ export async function handleEcowittCustomUploadRequest(
     soilChannels: channels.soilChannels,
   });
 
-  if (!plan.accepted || claim === null) return jsonResponse(plan, 0);
+  if (!plan.accepted || claim === null) {
+    recordMaskedRejection(plan.reason, ports);
+    return jsonResponse(plan, 0);
+  }
   const capturedAt = plan.rows[0]?.capturedAt ?? null;
   const commitPasskey = plan.bind?.passkeySha256 ?? claim.passkeySha256;
   const commitStation = plan.bind?.stationtype ?? claim.stationtype;
@@ -288,7 +299,10 @@ export async function handleEcowittCustomUploadRequest(
     console.error("[ecowitt-custom-upload] insert_failed", { rows: plan.rows.length });
     return jsonResponse({ accepted: false, reason: "store_failed" }, 0, 503);
   }
-  if (!committed.ok) return jsonResponse({ accepted: false, reason: committed.reason }, 0);
+  if (!committed.ok) {
+    recordMaskedRejection(committed.reason, ports);
+    return jsonResponse({ accepted: false, reason: committed.reason }, 0);
+  }
   return jsonResponse({ accepted: true, reason: committed.reason }, committed.stored);
 }
 

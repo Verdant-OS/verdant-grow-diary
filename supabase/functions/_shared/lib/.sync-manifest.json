@@ -120,7 +120,7 @@
   "byteTwins": {
     "cloudflare/ecowitt-plain-http-ingest.ts": {
       "source": "src/lib/ecowittPlainHttpRouteRules.ts",
-      "sha256": "ce0cbddc37e166520545802ce54ff59178a863de3192a7daa6b86565659fd2f4"
+      "sha256": "e4325d6dbb0d0564dab0158968f7342eccf97cbd2a63437f6800349863d60fc3"
     }
   }
 }

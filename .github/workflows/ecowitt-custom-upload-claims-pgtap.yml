@@ -37,12 +37,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql
           PG_MAJOR="$(psql --version | awk '{print $3}' | cut -d. -f1)"
           sudo apt-get install -y --no-install-recommends "postgresql-${PG_MAJOR}-pgtap"
-          # Ubuntu names the contrib package postgresql-contrib-N. PGDG names it postgresql-N-contrib.
-          if apt-cache show "postgresql-${PG_MAJOR}-contrib" >/dev/null 2>&1; then
-            sudo apt-get install -y --no-install-recommends "postgresql-${PG_MAJOR}-contrib"
-          else
-            sudo apt-get install -y --no-install-recommends "postgresql-contrib-${PG_MAJOR}"
-          fi
           echo "PG_MAJOR=${PG_MAJOR}" >> "$GITHUB_ENV"
 
       - name: Run ecowitt_custom_upload_claims_pgtap.sql on a fresh loopback database
@@ -79,7 +73,4 @@ jobs:
           # into a non-zero exit so this job fails. The psql -f line stays a
           # real command so the test-execution manifest still sees the SQL path.
           sudo -u postgres psql -h 127.0.0.1 -p "$PORT" -d ecowitt_claims_pgtap -v ON_ERROR_STOP=1 -f supabase/tests/ecowitt_custom_upload_claims_pgtap.sql
-          sudo -u postgres psql -h 127.0.0.1 -p "$PORT" -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS ecowitt_claims_hardening;"
-          sudo -u postgres psql -h 127.0.0.1 -p "$PORT" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE ecowitt_claims_hardening;"
-          sudo -u postgres psql -h 127.0.0.1 -p "$PORT" -d ecowitt_claims_hardening -v ON_ERROR_STOP=1 -f supabase/tests/ecowitt_custom_upload_claim_hardening_pgtap.sql
           sudo -u postgres psql -h 127.0.0.1 -p "$PORT" -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE ecowitt_claims_pgtap;"

@@ -517,19 +517,3 @@ export function parseEcowittCustomUploadForm(body: string): Record<string, strin
   }
   return fields;
 }
-
-/**
- * Gateway-facing reason. unknown_claim and passkey_mismatch share one
- * outward value so a caller cannot tell a missing token from a wrong PASSKEY.
- * The planner still returns the specific reason for the server log.
- */
-export class EcowittCustomUploadGatewayResponse {
-  static readonly genericRejection = "rejected";
-
-  static outwardReason(reason: EcowittCustomUploadRejection | "stored"): string {
-    if (reason === "unknown_claim" || reason === "passkey_mismatch") {
-      return EcowittCustomUploadGatewayResponse.genericRejection;
-    }
-    return reason;
-  }
-}

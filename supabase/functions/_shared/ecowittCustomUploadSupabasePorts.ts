@@ -43,33 +43,6 @@ export function ecowittServiceRoleInsertResult(
   return { ok: false, reason: classified };
 }
 
-export class EcowittCustomUploadClaimBind {
-  static readonly rpcName = "bind_ecowitt_custom_upload_claim";
-
-  static async execute(
-    rpc: (
-      fn: typeof EcowittCustomUploadClaimBind.rpcName,
-      args: {
-        readonly p_claim_id: string;
-        readonly p_passkey_sha256: string;
-        readonly p_stationtype: string;
-      },
-    ) => Promise<{ readonly data: unknown; readonly error: { readonly message: string } | null }>,
-    claimId: string,
-    passkeySha256: string,
-    stationtype: string,
-  ): Promise<{ ok: true } | { ok: false }> {
-    const { data, error } = await rpc(EcowittCustomUploadClaimBind.rpcName, {
-      p_claim_id: claimId,
-      p_passkey_sha256: passkeySha256,
-      p_stationtype: stationtype,
-    });
-    if (error) return { ok: false };
-    const value = Array.isArray(data) ? data[0] : data;
-    return value === true ? { ok: true } : { ok: false };
-  }
-}
-
 export type EcowittReserveReceipt =
   | { readonly ok: true }
   | {

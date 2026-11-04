@@ -586,6 +586,7 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
           />
         ) : isError ? (
           <p
+            role="status"
             className="text-sm text-muted-foreground"
             data-testid="quick-log-grouped-timeline-error"
           >

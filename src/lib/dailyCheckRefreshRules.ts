@@ -31,6 +31,12 @@ export const ENTRY_CREATED_EVENT = "verdant:entry-created";
  */
 export const SENSOR_READING_CREATED_EVENT = "verdant:sensor-reading-created";
 
+/**
+ * Window event a Daily Grow Check surface dispatches when the grower presses
+ * "Try again", so surfaces with their own reads retry together.
+ */
+export const DAILY_CHECK_RETRY_EVENT = "verdant:daily-check-retry";
+
 /** Every cross-component success event that counts as a Daily Grow Check. */
 export const DAILY_CHECK_SUCCESS_EVENTS: ReadonlyArray<string> = [
   ENTRY_CREATED_EVENT,
@@ -59,5 +65,25 @@ export interface DailyCheckRefreshClient {
 export function refreshDailyCheckQueries(client: DailyCheckRefreshClient): void {
   for (const key of DAILY_CHECK_REFRESH_QUERY_KEYS) {
     client.invalidateQueries({ queryKey: key });
+  }
+}
+
+export interface DailyCheckRetryClient {
+  invalidateQueries: (
+    args: { queryKey: ReadonlyArray<string> },
+    options: { cancelRefetch: boolean },
+  ) => unknown;
+}
+
+/**
+ * "Try again" on any Daily Grow Check surface refreshes every Daily Grow Check
+ * read on the page, not only its own. The Dashboard summary card and the
+ * "Today's Grow Checks" panel read different sensor windows, so one retry used
+ * to leave the other surface failed (audit 2026-11-03, finding 6). A read
+ * already in flight (the surface's own refetch) is not restarted.
+ */
+export function retryDailyCheckEvidence(client: DailyCheckRetryClient): void {
+  for (const key of DAILY_CHECK_REFRESH_QUERY_KEYS) {
+    client.invalidateQueries({ queryKey: key }, { cancelRefetch: false });
   }
 }

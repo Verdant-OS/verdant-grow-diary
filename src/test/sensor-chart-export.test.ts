@@ -19,7 +19,7 @@ describe("buildSensorReadingsCsv", () => {
   it("returns header only for empty input", () => {
     const csv = buildSensorReadingsCsv([]);
     expect(csv).toBe(
-      "Timestamp (UTC),Temperature (°C),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At (UTC)",
+      "Timestamp (UTC),Temperature (°C),Humidity (%),VPD (kPa),Calculated VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At (UTC)",
     );
   });
 
@@ -28,7 +28,7 @@ describe("buildSensorReadingsCsv", () => {
     const lines = csv.split("\n");
     expect(lines.length).toBe(2);
     expect(lines[1]).toBe(
-      "2026-06-01 12:00:00,24.5,55,1.23,800,42,,demo,needs_review,2026-06-01 12:00:00",
+      "2026-06-01 12:00:00,24.5,55,1.23,,800,42,,demo,needs_review,2026-06-01 12:00:00",
     );
   });
 
@@ -118,7 +118,17 @@ describe("buildSensorReadingsCsv", () => {
 
     const cells = buildSensorReadingsCsv([r]).split("\n")[1].split(",");
 
-    expect(cells.slice(1, 9)).toEqual(["25.56", "56", "", "907", "55", "800", "manual", "usable"]);
+    expect(cells.slice(1, 10)).toEqual([
+      "25.56",
+      "56",
+      "",
+      "1.44",
+      "907",
+      "55",
+      "800",
+      "manual",
+      "usable",
+    ]);
   });
 });
 

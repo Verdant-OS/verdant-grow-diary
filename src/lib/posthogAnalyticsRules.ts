@@ -16,7 +16,7 @@ import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
 
 export const POSTHOG_DEFAULT_API_HOST = "https://us.i.posthog.com";
 
-const DISTINCT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SIGNUP_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EXCEPTION_TYPE_RE = /^[A-Za-z_][A-Za-z0-9_.$]{0,79}$/;
 const SENSITIVE_KEY_RE =
@@ -87,7 +87,7 @@ export function decidePostHogStartup(input: {
 export function posthogDistinctId(userId: string | null | undefined): string | null {
   if (typeof userId !== "string") return null;
   const trimmed = userId.trim();
-  if (!trimmed || trimmed.includes("@") || !DISTINCT_ID_RE.test(trimmed)) return null;
+  if (!trimmed || trimmed.includes("@") || !UUID_RE.test(trimmed)) return null;
   return trimmed;
 }
 
@@ -157,8 +157,48 @@ function csvImportEvents(props: Record<string, unknown> | null | undefined): Pos
   return events;
 }
 
+/**
+ * Scroll and duration numbers posthog-js adds to `$pageview` and `$pageleave`.
+ * Web analytics reads them for scroll depth and time on page.
+ */
+const PREV_PAGEVIEW_NUMBER_KEYS = [
+  "$prev_pageview_duration",
+  "$prev_pageview_last_scroll",
+  "$prev_pageview_last_scroll_percentage",
+  "$prev_pageview_max_scroll",
+  "$prev_pageview_max_scroll_percentage",
+  "$prev_pageview_last_content",
+  "$prev_pageview_last_content_percentage",
+  "$prev_pageview_max_content",
+  "$prev_pageview_max_content_percentage",
+] as const;
+
+const PAGEVIEW_PROPERTY_KEYS = [
+  "$pathname",
+  "$current_url",
+  "$pageview_id",
+  "$prev_pageview_id",
+  "$prev_pageview_pathname",
+  ...PREV_PAGEVIEW_NUMBER_KEYS,
+] as const;
+
+/** Metric values only. The nested `$web_vitals_*_event` objects carry raw URLs and stay out. */
+const WEB_VITALS_VALUE_KEYS = [
+  "$web_vitals_LCP_value",
+  "$web_vitals_CLS_value",
+  "$web_vitals_FCP_value",
+  "$web_vitals_INP_value",
+] as const;
+
+const NUMERIC_PRODUCT_PROPERTY_KEYS: ReadonlySet<string> = new Set([
+  ...PREV_PAGEVIEW_NUMBER_KEYS,
+  ...WEB_VITALS_VALUE_KEYS,
+]);
+
 const PRODUCT_PROPERTY_KEYS: Record<string, readonly string[]> = {
-  $pageview: ["$pathname", "$current_url"],
+  $pageview: PAGEVIEW_PROPERTY_KEYS,
+  $pageleave: PAGEVIEW_PROPERTY_KEYS,
+  $web_vitals: ["$pathname", "$current_url", ...WEB_VITALS_VALUE_KEYS],
   user_signed_up: [],
   grow_created: [],
   plant_created: [],
@@ -192,7 +232,7 @@ export function buildPostHogInitOptions(apiHost: string): Partial<PostHogConfig>
   return {
     api_host: apiHost,
     capture_pageview: false,
-    capture_pageleave: false,
+    capture_pageleave: true,
     autocapture: false,
     rageclick: true,
     mask_all_text: true,
@@ -204,7 +244,7 @@ export function buildPostHogInitOptions(apiHost: string): Partial<PostHogConfig>
     opt_out_persistence_by_default: true,
     disable_surveys: true,
     enable_recording_console_log: false,
-    capture_performance: false,
+    capture_performance: { web_vitals: true, web_vitals_attribution: false, network_timing: false },
     persistence: "localStorage+cookie",
     property_denylist: ["email", "$email", "name", "note", "notes", "diary"],
     session_recording: {
@@ -245,9 +285,18 @@ function allowProductProperties(
       }
       continue;
     }
-    if (key === "$pathname" || key === "$current_url") {
-      const value = source[key];
-      if (typeof value === "string") out[key] = sanitizeLocationValue(value, key === "$pathname");
+    const value = source[key];
+    if (key === "$pathname" || key === "$current_url" || key === "$prev_pageview_pathname") {
+      if (typeof value === "string")
+        out[key] = sanitizeLocationValue(value, key !== "$current_url");
+      continue;
+    }
+    if (key === "$pageview_id" || key === "$prev_pageview_id") {
+      if (typeof value === "string" && UUID_RE.test(value)) out[key] = value;
+      continue;
+    }
+    if (NUMERIC_PRODUCT_PROPERTY_KEYS.has(key)) {
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0) out[key] = value;
     }
   }
   copySdkTransportProperties(source, out);

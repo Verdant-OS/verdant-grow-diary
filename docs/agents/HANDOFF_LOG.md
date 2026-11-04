@@ -1,5 +1,9 @@
 # Verdant handoff log
 
+**New and updated entries go in `docs/agents/handoffs/<TASK-ID>.md`, not here.** See
+`docs/agents/handoffs/README.md`. This file keeps the template and existing blocks, and a
+task's own file wins over its block here. Read both before `SENTINEL_ACK`.
+
 Pointed to by AGENTS.md (Agent Handoff / Coverage). One block per in-flight task.
 Update daily and before stopping. Display newest last_updated first within each priority;
 selection follows AGENTS.md's priority order and oldest-update tie breaker.

@@ -1539,6 +1539,8 @@ function QuickLogV2SheetForOwner({
     setWateringForm((previous) => ({
       ...previous,
       volumeMl: applyWateringVolumeDefaultsToForm(wateringVolumeDefaults).volumeMl,
+      // The field shows this stored ml in the entry unit; never a stale typed text.
+      volumeEntryText: undefined,
     }));
     setWateringVolumeDefaultsApplied(true);
   }, [

@@ -46,7 +46,7 @@ function statusColumn(csv: string): string[] {
   return csv
     .split("\n")
     .slice(1)
-    .map((line) => line.split(",")[8]);
+    .map((line) => line.split(",")[9]);
 }
 
 function mixedGroup(quality = "ok") {

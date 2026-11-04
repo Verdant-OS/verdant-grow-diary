@@ -23,6 +23,7 @@ import {
   assessWaterVolumeText,
   LARGE_WATER_AMOUNT_HARD_MAX_ML,
 } from "./quickLogWaterVolumeWarningRules";
+import type { WaterEntryUnit } from "./quickLogWaterVolumeUnitRules";
 import type {
   QuickLogWateringManualSnapshot,
   WateringTypedEventInput,
@@ -33,6 +34,11 @@ export type MediumSurface = "" | RootZoneMediumSurface;
 export type DrainageObservation = "" | RootZoneDrainageObservation;
 
 export interface QuickLogWateringFormState {
+  /**
+   * Canonical millilitre text: what every gate validates and what is saved.
+   * When the grower types in L or gal it is derived from volumeEntryText
+   * (docs/specs/quick-log-water-volume-units.md R3).
+   */
   volumeMl: string;
   ph: string;
   ec: string;
@@ -45,6 +51,12 @@ export interface QuickLogWateringFormState {
   potWeightFeel: PotWeightFeel;
   mediumSurface: MediumSurface;
   drainage: DrainageObservation;
+  /** Unit the grower typed Volume and Runoff in. Absent means ml. Display only. */
+  volumeEntryUnit?: WaterEntryUnit;
+  /** Volume exactly as typed in volumeEntryUnit. Absent: show volumeMl in that unit. */
+  volumeEntryText?: string;
+  /** Runoff exactly as typed in volumeEntryUnit. Absent: show runoffMl in that unit. */
+  runoffEntryText?: string;
 }
 
 export const EMPTY_QUICKLOG_WATERING_FORM: QuickLogWateringFormState = {
@@ -142,8 +154,9 @@ function metricInRange(value: number | null, min: number, max: number): boolean 
 }
 
 export function isWateringFormPristine(form: QuickLogWateringFormState): boolean {
+  // The entry unit is a display choice, not evidence: choosing one leaves the form pristine.
   return (Object.keys(form) as (keyof QuickLogWateringFormState)[]).every(
-    (key) => form[key] === "",
+    (key) => key === "volumeEntryUnit" || form[key] === "" || form[key] === undefined,
   );
 }
 

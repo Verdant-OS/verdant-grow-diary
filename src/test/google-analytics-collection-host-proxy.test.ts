@@ -1,4 +1,4 @@
-import { createServer, request as httpRequest, type Server } from "node:http";
+import { Agent, createServer, request as httpRequest, type Server } from "node:http";
 import { connect as netConnect } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -80,6 +80,44 @@ describe("GA collection proxy relay", () => {
     expect(appHits).toBe(3);
   });
 });
+
+describe("GA collection proxy refusals over a keep-alive client", () => {
+  it("closes refused connections so a keep-alive client never reuses a dead socket", async () => {
+    const app = await listenApp();
+    const proxy = await startGaCollectionProxy(0, portOf(app));
+    open.push(proxy, app);
+    const proxyPort = portOf(proxy);
+    const agent = new Agent({ keepAlive: true, maxSockets: 1 });
+    try {
+      for (let i = 0; i < 25; i += 1) {
+        const response = await keepAliveRequest(proxyPort, "http://example.com/secret", agent);
+        expect(response).toEqual({ status: 403, connection: "close" });
+      }
+    } finally {
+      agent.destroy();
+    }
+  });
+});
+
+function keepAliveRequest(
+  proxyPort: number,
+  target: string,
+  agent: Agent,
+): Promise<{ status: number; connection: string | undefined }> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      { hostname: "127.0.0.1", port: proxyPort, path: target, method: "GET", agent },
+      (res) => {
+        res.resume();
+        res.on("end", () =>
+          resolve({ status: res.statusCode ?? 0, connection: res.headers.connection }),
+        );
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
 
 function listenApp(bodyFor?: (url: string | undefined) => string): Promise<Server> {
   const server = createServer((req, res) => {

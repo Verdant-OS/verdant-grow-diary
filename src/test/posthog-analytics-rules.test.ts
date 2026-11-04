@@ -208,7 +208,7 @@ describe("PostHog init privacy", () => {
       expect.objectContaining({
         api_host: POSTHOG_DEFAULT_API_HOST,
         capture_pageview: false,
-        capture_pageleave: false,
+        capture_pageleave: true,
         autocapture: false,
         rageclick: true,
         mask_all_text: true,
@@ -219,7 +219,11 @@ describe("PostHog init privacy", () => {
         opt_out_persistence_by_default: true,
         disable_surveys: true,
         enable_recording_console_log: false,
-        capture_performance: false,
+        capture_performance: {
+          web_vitals: true,
+          web_vitals_attribution: false,
+          network_timing: false,
+        },
         session_recording: expect.objectContaining({
           maskAllInputs: true,
           maskTextSelector: "[data-ph-mask], .ph-mask",

@@ -1,6 +1,7 @@
 /**
  * Review of #2742: a VPD point calculated from temperature and humidity is
- * tagged calculated. It is drawn as calculated and left out of CSV export.
+ * tagged calculated. It is drawn as calculated and exported as a real row whose
+ * "VPD (kPa)" cell stays empty; the value goes in "Calculated VPD (kPa)".
  */
 import { describe, expect, it } from "vitest";
 import { buildSensorReadingsCsv } from "@/lib/sensorChartExport";
@@ -62,13 +63,25 @@ describe("calculated VPD chart points", () => {
 
   it("does not export a calculated point as an observed VPD", () => {
     const csv = buildSensorReadingsCsv(series, Date.parse("2026-11-02T21:00:00.000Z"));
-    expect(csv).toContain("0.84");
-    expect(csv).not.toContain(
-      String(series.find((reading) => reading.vpdPointKind === "calculated")?.vpd),
-    );
-    const lines = csv.split("\n").slice(1);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain("csv");
+    const [header, ...lines] = csv.split("\n");
+    const columns = header.split(",");
+    const vpdIndex = columns.indexOf("VPD (kPa)");
+    const calculatedIndex = columns.indexOf("Calculated VPD (kPa)");
+    const sourceIndex = columns.indexOf("Source");
+    expect(calculatedIndex).toBe(vpdIndex + 1);
+    expect(lines).toHaveLength(2);
+
+    const calculatedRow = lines
+      .map((line) => line.split(","))
+      .find((c) => c[sourceIndex] === "manual");
+    expect(calculatedRow).toBeDefined();
+    expect(calculatedRow![vpdIndex]).toBe("");
+    expect(calculatedRow![calculatedIndex]).toBe("1.26");
+
+    const recordedRow = lines.map((line) => line.split(",")).find((c) => c[sourceIndex] === "csv");
+    expect(recordedRow).toBeDefined();
+    expect(recordedRow![vpdIndex]).toBe("0.84");
+    expect(recordedRow![calculatedIndex]).toBe("");
   });
 });
 

@@ -7,7 +7,7 @@
  * diary window per grow, with the per-tent read's exact semantics; a tent
  * without a grow is idle and never queried.
  */
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,6 +36,8 @@ const io = vi.hoisted(() => {
     queries: [] as {
       table: string;
       calls: { op: string; column?: string; ascending?: boolean }[];
+      // Every `.eq` / `.in` filter, so tent scoping is pinned on real args (#2821).
+      filters: { op: "eq" | "in"; column: string; value: unknown }[];
     }[],
     // A chainable, thenable PostgREST stand-in: fixtures are pre-sorted newest
     // first; `.in` filters by the named column and `.limit` slices.
@@ -47,7 +49,11 @@ const io = vi.hoisted(() => {
             ? state.diaryRows
             : [];
       let limit = Number.POSITIVE_INFINITY;
-      const log = { table, calls: [] as { op: string; column?: string; ascending?: boolean }[] };
+      const log = {
+        table,
+        calls: [] as { op: string; column?: string; ascending?: boolean }[],
+        filters: [] as { op: "eq" | "in"; column: string; value: unknown }[],
+      };
       state.queries.push(log);
       const b = {
         select: () => b,
@@ -56,9 +62,13 @@ const io = vi.hoisted(() => {
           return b;
         },
         is: () => b,
-        eq: () => b,
+        eq: (column: string, value: unknown) => {
+          log.filters.push({ op: "eq", column, value });
+          return b;
+        },
         or: () => b,
         in: (column: string, ids: string[]) => {
+          log.filters.push({ op: "in", column, value: ids });
           rows = rows.filter((row) => ids.includes(row[column] as string));
           return b;
         },
@@ -127,6 +137,25 @@ const diaryRow = (tentId: string, iso: string, temp: number, rh: number): Row =>
 const sensorCalls = () =>
   io.from.mock.calls.filter(([table]) => table === "sensor_readings_effective").length;
 const diaryCalls = () => io.from.mock.calls.filter(([table]) => table === "diary_entries").length;
+// Warm-cache pins (#2821): the only read allowed is the ONE batched Quick Log
+// manual read from `grow_events`, filtered to exactly the tents that have a
+// grow. Any other table (sensor, diary or anything else), a second read, or a
+// `grow_events` filter naming another tent (a tent without a grow) fails. The
+// zero-read case for tents without a grow is pinned by "issues no read at all
+// for tents without a grow" below.
+function expectOnlyQuickLogReadsFor(allowedTentIds: readonly string[]) {
+  const tables = io.from.mock.calls.map(([table]) => table);
+  expect(tables.filter((table) => table !== "grow_events")).toEqual([]);
+  expect(tables).toHaveLength(1);
+  const growEventQueries = io.queries.filter((q) => q.table === "grow_events");
+  expect(growEventQueries).toHaveLength(1);
+  const tentFilters = growEventQueries[0].filters.filter((f) => f.column === "tent_id");
+  expect(tentFilters).toHaveLength(1);
+  const named = tentFilters.flatMap((f) =>
+    Array.isArray(f.value) ? (f.value as unknown[]) : [f.value],
+  );
+  expect([...named].sort()).toEqual([...allowedTentIds].sort());
+}
 
 function snapshotFor(tentId: string, temp: number): SensorSnapshot {
   return {
@@ -163,6 +192,7 @@ beforeEach(() => {
   io.diaryRows = [];
   io.failSensor = false;
   io.failDiary = false;
+  io.queries.length = 0;
 });
 afterEach(() => {
   cleanup();
@@ -183,7 +213,7 @@ describe("useLatestSensorSnapshotsByTent (warm cache)", () => {
     );
     expect(result.current[TENT_A]).toMatchObject({ status: "ok", snapshot: { temp: 21 } });
     expect(result.current[TENT_B]).toMatchObject({ status: "ok", snapshot: { temp: 25 } });
-    expect(io.from).not.toHaveBeenCalled();
+    expectOnlyQuickLogReadsFor([TENT_A, TENT_B]);
   });
 
   it("shares each tent's cache entry with useLatestSensorSnapshot", () => {
@@ -195,7 +225,7 @@ describe("useLatestSensorSnapshotsByTent (warm cache)", () => {
     );
     const single = renderHook(() => useLatestSensorSnapshot(GROW, [TENT_A]), { wrapper });
     expect(page.result.current[TENT_A].snapshot).toBe(single.result.current.snapshot);
-    expect(io.from).not.toHaveBeenCalled();
+    expectOnlyQuickLogReadsFor([TENT_A]);
   });
 
   it("is idle for a tent without a grow and never queries it", () => {
@@ -210,6 +240,20 @@ describe("useLatestSensorSnapshotsByTent (warm cache)", () => {
     );
     expect(result.current[TENT_C]).toMatchObject({ status: "idle", snapshot: EMPTY_SNAPSHOT });
     expect(result.current[TENT_A].status).toBe("ok");
+    expectOnlyQuickLogReadsFor([TENT_A]);
+  });
+
+  it("issues no read at all for tents without a grow, including grow_events", async () => {
+    const client = seededClient();
+    const { result } = renderHook(
+      () => useLatestSensorSnapshotsByTent([{ tentId: TENT_C, growId: null }]),
+      { wrapper: wrapperFor(client) },
+    );
+    // Let any enabled query start its queryFn before asserting none ran.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(result.current[TENT_C]).toMatchObject({ status: "idle", snapshot: EMPTY_SNAPSHOT });
     expect(io.from).not.toHaveBeenCalled();
   });
 

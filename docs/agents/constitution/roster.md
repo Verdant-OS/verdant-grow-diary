@@ -6,24 +6,24 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 
 ## Current seats
 
-| Seat            | Side  | Holder                                   | GitHub account          |
-| --------------- | ----- | ---------------------------------------- | ----------------------- |
-| Ultra Builder 1 | Ultra | Node                                     | `verdant-ultra-bot`     |
-| Ultra Builder 2 | Ultra | Wedding Cake                             | `verdant-ultra-bot`     |
-| Ultra Fixer     | Ultra | Brachs (Blueberry)                       | `verdant-ultra-bot`     |
-| Coordinator     | Main  | Vacant (OG Kush retired 2026-11-04)      |                         |
-| Merge Steward   | Main  | Claude                                   | `cheekhimself` (shared) |
-| Merge Readiness | Main  | Green Crack                              | `cheekhimself` (shared) |
-| Steward Backup  | Main  | Codex                                    | `cheekhimself` (shared) |
-| Reviewer A      | Main  | Sour Diesel                              | `cheekhimself` (shared) |
-| Reviewer B      | Main  | Jack Herer                               | `cheekhimself` (shared) |
-| Reviewer C      | Main  | Durban Poison · Reviewer (Main)          | `cheekhimself` (shared) |
-| Reviewer D      | Main  | Maui Wowie · Reviewer (Main)             | `cheekhimself` (shared) |
-| QA              | Main  | Blue Dream · QA (Main)                   |                         |
-| New-User Smoke  | Main  | Toad Venom                               |                         |
-| Bug Sweep       | Main  | White Widow                              |                         |
-| Owner Adviser   | Main  | Bloom                                    |                         |
-| Flow Owner      | Both  | The Coordinator on each side, by default |                         |
+| Seat            | Side  | Holder                                                             | GitHub account          |
+| --------------- | ----- | ------------------------------------------------------------------ | ----------------------- |
+| Ultra Builder 1 | Ultra | Node                                                               | `verdant-ultra-bot`     |
+| Ultra Builder 2 | Ultra | Wedding Cake                                                       | `verdant-ultra-bot`     |
+| Ultra Fixer     | Ultra | Brachs (Blueberry)                                                 | `verdant-ultra-bot`     |
+| Coordinator     | Main  | Vacant (OG Kush retired 2026-11-04)                                |                         |
+| Merge Steward   | Main  | Claude, designated session `session_017UoYKv7APnhv3gBkukRFwm` only | `cheekhimself` (shared) |
+| Merge Readiness | Main  | Green Crack                                                        | `cheekhimself` (shared) |
+| Steward Backup  | Main  | Codex, one designated session (see rules)                          | `cheekhimself` (shared) |
+| Reviewer A      | Main  | Sour Diesel                                                        | `cheekhimself` (shared) |
+| Reviewer B      | Main  | Jack Herer                                                         | `cheekhimself` (shared) |
+| Reviewer C      | Main  | Durban Poison · Reviewer (Main)                                    | `cheekhimself` (shared) |
+| Reviewer D      | Main  | Maui Wowie · Reviewer (Main)                                       | `cheekhimself` (shared) |
+| QA              | Main  | Blue Dream · QA (Main)                                             |                         |
+| New-User Smoke  | Main  | Toad Venom                                                         |                         |
+| Bug Sweep       | Main  | White Widow                                                        |                         |
+| Owner Adviser   | Main  | Bloom                                                              |                         |
+| Flow Owner      | Both  | The Coordinator on each side, by default                           |                         |
 
 Reviewer C, Reviewer D, and QA are active.
 
@@ -33,11 +33,12 @@ Ultra's open pull-request cap is 10.
 
 ## Rules
 
-- Ultra seats never review, approve, mark ready, enqueue, or merge. Only the Merge Steward seat (backup: Steward Backup) queues and merges, and only after a non-author Reviewer seat posts APPROVE at the exact current head. Matthew moved the seat on 2026-11-04: Granddaddy Purple and OG Kush are retired, Claude is the Merge Steward and Codex is the Steward Backup, as the standard arrangement across all PRs. The earlier Ultra Merge Steward assignment (2026-10-30, 11:03 PM CT) is history.
+- Ultra seats never review, approve, mark ready, enqueue, or merge. Only the Merge Steward seat (backup: Steward Backup) queues and merges, and only after a non-author Reviewer seat posts APPROVE at the exact current head. Matthew moved the seat on 2026-11-04: Granddaddy Purple and OG Kush are retired, Claude is the Merge Steward and Codex is the Steward Backup, one designated session each, as the standard arrangement across all PRs. The earlier Ultra Merge Steward assignment (2026-10-30, 11:03 PM CT) is history.
 - The Merge Steward has no authority over the #1971 hold, which stays with the Coordinator.
 - Steward Backup stands in when the Merge Steward is unavailable, or when the Merge Steward is excluded from a PR (it wrote, fixed, base-merged, or is reviewer of record on that PR), under the same Steward rules, and still has no authority over the #1971 hold.
-- Main seats never write product code.
+- A session acting in a Main seat writes no product code in that capacity. Holding a Main seat does not stop a Claude or Codex session from building when it is separately assigned that work; the two roles are recorded separately on the PR.
 - Approvals come only from Matthew, in his own words.
+- **One holder per steward seat.** The Merge Steward is only the Claude session `session_017UoYKv7APnhv3gBkukRFwm`; the Steward Backup is only the one Codex session Matthew designates, recorded in this file when named (until then, a Codex session acts as backup only on a PR where Matthew's own words name it). No other Claude or Codex session acts as a steward, whatever its role file says; a session that is not the named holder never enables auto-merge, enqueues or merges. The seat moves to another session only by Matthew's own words, recorded here.
 - Neither steward seat may queue a PR on which that same session is the reviewer of record, an author, or a repairer. A Claude or Codex session holding a steward seat is still a Claude or Codex session for exclusion purposes. The Coordinator and Engineering lead seats are vacant until Matthew names a holder; OG Kush's earlier duties (routing, review-ready transition, default inheritance) wait on that assignment and are not inferred by the steward seats.
 - Ultra's open pull-request cap is 10.
 - Reviewer C, Reviewer D, and QA are active.
@@ -62,6 +63,8 @@ Numbered rules in the constitution do not name tools, vendors, or people.
 | Default inheritor | See engineering lead. | Vacant; awaiting Matthew |
 
 ## PR 1971 merge actor assignment and hold
+
+> **Historical.** #1971 merged on 2026-10-27 18:52 UTC (`1119c1df`). OG Kush is retired. Nothing in this section assigns a current seat; it is kept word for word as the record.
 
 Matthew's latest direct instruction supersedes the earlier Codex merge-actor
 assignment for [PR #1971](https://github.com/Verdant-OS/verdant-grow-diary/pull/1971):

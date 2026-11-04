@@ -8,7 +8,7 @@
 
 <!-- prettier-ignore -->
 - **Owner of this file:** Codex. Any agent may propose an edit as a draft PR.
-- **Last revised:** 2026-10-26, Matthew's latest PR #1971 assignment recorded: OG Kush merges, Jack Herer independently accepts, Codex is repair-only; the earlier Codex exception is superseded and the explicit merge hold remains. The 2026-10-22 bounded reviewer-routing correction and historical Graft low-risk lane remain. Before that, 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
+- **Last revised:** 2026-11-04: Claude (designated session only) is Merge Steward and one designated Codex session is Steward Backup; the #1971 text below is historical (merged 2026-10-27). Earlier, 2026-10-26, Matthew's PR #1971 assignment recorded: OG Kush merges, Jack Herer independently accepts, Codex is repair-only; the earlier Codex exception is superseded and the explicit merge hold remains. The 2026-10-22 bounded reviewer-routing correction and historical Graft low-risk lane remain. Before that, 2026-09-28 by Chemdawg (Engineering Lead), at Matthew Cheek's request. First repo version edited by GDP for the channel roster, bug-finder limits, and merge ownership.
 
 ---
 
@@ -119,6 +119,8 @@ low-risk exceptions are listed in [the roster](constitution/roster.md#per-item-a
 
 ### PR 1971 merge actor assignment and hold
 
+> **Historical.** #1971 merged on 2026-10-27 (`1119c1df`) and OG Kush is retired. This section assigns no current seat.
+
 Matthew's latest direct instruction is: **OG Kush merges #1971, Jack Herer
 gives the independent PASS, and Codex is repair-only.** This supersedes the earlier
 Codex merge-actor assignment and removes its author-integration exception for
@@ -223,7 +225,7 @@ current actor, reviewer, repair-only role and hold are the named assignment abov
 | Reviewer assignment and claim ledger                     | Chemdawg's pre-check under §4.3; GDP can route within the same independence and evidence gates                                                       |
 | Review verdicts                                          | Available eligible independent session under §4.3; Codex excluded on Codex-authored/repaired work; Graft only within the existing low-risk allowlist |
 | Opening PRs                                              | Any agent with repository access may open its own authorized draft PR                                                                                                             |
-| Merging PRs                                              | Matthew's current explicit actor assignment; PR #1971 assigns OG Kush to merge and Jack Herer to independent acceptance, with Codex repair-only; merge remains held. Per-item exact-head approval, 35/35 required SUCCESS, applicable supplemental checks and an eligible independent full-head PASS remain required. |
+| Merging PRs                                              | The Merge Steward and Steward Backup named in the roster (one designated session each). The PR #1971 assignment is historical. Per-item exact-head approval, 35/35 required SUCCESS, applicable supplemental checks and an eligible independent full-head PASS remain required. |
 | Edits to this file                                       | Codex                                                                                                                                                |
 | Anything not listed                                      | GDP decides and adds a row here                                                                                                                      |
 
@@ -303,7 +305,7 @@ hooks, channel membership, GitHub settings or existing assignments.
 
 Codex builds each one as a draft PR. Matthew's current explicit actor assignment
 controls merge after the exact-head approval, required-check and independent-PASS
-gate; PR #1971 remains held, with OG Kush assigned to merge and Codex repair-only. An independent reviewer verdict is reported
+gate; the PR #1971 assignment is historical (merged 2026-10-27). An independent reviewer verdict is reported
 only when actually obtained. Codex posts `[READY]` only when the connector is measured live.
 
 ## 5. The loop, end to end (no human step)
@@ -330,7 +332,7 @@ A FAIL at step 4 or step 7 goes back to step 3 automatically.
 
 ## 7. Open items (owner in brackets)
 
-- **O1: superseded by Matthew's current standing order.** Earlier proposed self-integration phases grant no current authority. PR #1971 assigns OG Kush to merge, Jack Herer to independent acceptance and Codex to repairs only, superseding the earlier Codex exception. Codex cannot integrate #1971. Other explicit founder grants retain their separately recorded scope. Every authorized merge still needs 35/35 required checks, applicable supplemental gates and a clean eligible independent full-head PASS under §4.3 (Codex excluded on Codex-authored/repaired work). The current #1971 hold and later same-head founder approval remain required. Graft's outside-review lane remains limited to section 2 docs-only and low-risk work Graft did not author or repair.
+- **O1: superseded by Matthew's current standing order.** Earlier proposed self-integration phases grant no current authority. (Historical: #1971 merged 2026-10-27; the text that follows records its assignment.) PR #1971 assigned OG Kush to merge, Jack Herer to independent acceptance and Codex to repairs only, superseding the earlier Codex exception. Codex cannot integrate #1971. Other explicit founder grants retain their separately recorded scope. Every authorized merge still needs 35/35 required checks, applicable supplemental gates and a clean eligible independent full-head PASS under §4.3 (Codex excluded on Codex-authored/repaired work). The current #1971 hold and later same-head founder approval remain required. Graft's outside-review lane remains limited to section 2 docs-only and low-risk work Graft did not author or repair.
 - **O2 [Codex + Chemdawg]: review truth.** Codex cannot give its own code, or a PR Codex repaired, an independent PASS (for example #1938). Publish-gate acceptance and all named owner locks remain. Historical review receipts retain their original reviewer and SHA.
 - **O3 [Matthew + Codex]: scoped identity.** The current connector acts as Matthew's admin account. Matthew creates a separate scoped identity and protections; Codex then measures allowed and refused operations. No permissions have been granted by the setup document, and code-owner review does not itself reject file pushes.
 - **O4: historical receipt.** Critical Mass and Toad Venom joined the routing channel on 2026-09-28. MotorBreath is on call outside it. This historical receipt does not establish present availability or route future work to Critical Mass.

@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-11-04.4**
+**Sentinel-Version: 2026-11-04.5**
 
 Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
 **Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.
@@ -142,7 +142,7 @@ protected or mixed scopes still need an eligible outside reviewer. Required CI a
 supplemental evidence, protected-file gates, holds, merge queue and founder-only
 production controls remain. Codex uses normal pushes only: no force-push, Publish,
 SQL apply or production Supabase writes; it merges only as Steward Backup,
-through the merge queue. Claude is the Merge Steward (roster). Drafts remain draft.
+through the merge queue. The Merge Steward is the one Claude session named in the roster. Drafts remain draft.
 Check the existing request and receipt before pinging; keep one current review request
 per PR/full head with owner, permalink and requested/running/blocked/verdict/superseded
 state. Transfer an unavailable reviewer once to an eligible fallback; otherwise record

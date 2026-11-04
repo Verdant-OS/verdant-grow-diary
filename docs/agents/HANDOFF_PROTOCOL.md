@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-11-04.4**
+**Sentinel-Version: 2026-11-04.5**
 
 ## Current seats
 
@@ -231,7 +231,7 @@ protected or mixed scopes still need an eligible outside reviewer. Required CI a
 supplemental evidence, protected-file gates, holds, merge queue and founder-only
 production controls remain. Codex uses normal pushes only: no force-push, Publish,
 SQL apply or production Supabase writes; it merges only as Steward Backup,
-through the merge queue. Claude is the Merge Steward (roster). Drafts remain draft.
+through the merge queue. The Merge Steward is the one Claude session named in the roster. Drafts remain draft.
 
 The current holder and acceptance reviewer must be independent; changing the claim
 does not erase earlier contributions. Record the reviewer actually assigned under

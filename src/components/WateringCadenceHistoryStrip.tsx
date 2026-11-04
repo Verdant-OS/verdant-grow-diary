@@ -123,7 +123,11 @@ export function WateringCadenceHistoryStrip({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <p className="text-sm text-muted-foreground" data-testid="watering-cadence-history-error">
+          <p
+            className="text-sm text-muted-foreground"
+            role="status"
+            data-testid="watering-cadence-history-error"
+          >
             Couldn't load watering history right now.
           </p>
           <button

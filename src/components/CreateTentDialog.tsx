@@ -128,6 +128,9 @@ export default function CreateTentDialog({
 
   const formBlocked = writeBlocked || binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);
   const nameFieldId = useId();
+  const sizeFieldId = useId();
+  const brandFieldId = useId();
+  const stageFieldId = useId();
   const disabledReasonId = useId();
   const sizeErrorId = useId();
   const primary = describeCreateTentPrimaryButton({
@@ -455,8 +458,9 @@ export default function CreateTentDialog({
               <div className="grid gap-3 pt-3">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label>Size (optional)</Label>
+                    <Label htmlFor={sizeFieldId}>Size (optional)</Label>
                     <Input
+                      id={sizeFieldId}
                       value={form.size}
                       onChange={(e) => setForm({ ...form, size: e.target.value })}
                       placeholder="4x4"
@@ -475,8 +479,9 @@ export default function CreateTentDialog({
                     ) : null}
                   </div>
                   <div>
-                    <Label>Brand (optional)</Label>
+                    <Label htmlFor={brandFieldId}>Brand (optional)</Label>
                     <Input
+                      id={brandFieldId}
                       value={form.brand}
                       onChange={(e) => setForm({ ...form, brand: e.target.value })}
                       placeholder="Gorilla"
@@ -484,9 +489,9 @@ export default function CreateTentDialog({
                   </div>
                 </div>
                 <div>
-                  <Label>Stage (optional)</Label>
+                  <Label htmlFor={stageFieldId}>Stage (optional)</Label>
                   <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                    <SelectTrigger>
+                    <SelectTrigger id={stageFieldId}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

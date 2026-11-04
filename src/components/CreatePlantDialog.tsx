@@ -371,6 +371,12 @@ export default function CreatePlantDialog({
     !canWriteCreateGrowId(targetGrowId) ||
     tentBlocksWrite;
   const nameFieldId = useId();
+  const stageFieldId = useId();
+  const typeFieldId = useId();
+  const tentFieldId = useId();
+  const strainFieldId = useId();
+  const healthFieldId = useId();
+  const startedFieldId = useId();
   const disabledReasonId = useId();
   const tentRequired = !plantCreateAllowsTentless({
     suppliedTentId: defaultTentId,
@@ -972,9 +978,9 @@ export default function CreatePlantDialog({
               </p>
             </div>
             <div>
-              <Label>Stage</Label>
+              <Label htmlFor={stageFieldId}>Stage</Label>
               <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                <SelectTrigger type="button">
+                <SelectTrigger type="button" id={stageFieldId}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent onKeyDown={stopSelectEnterKeyDown}>
@@ -987,12 +993,16 @@ export default function CreatePlantDialog({
               </Select>
             </div>
             <div>
-              <Label>Type (optional)</Label>
+              <Label htmlFor={typeFieldId}>Type (optional)</Label>
               <Select
                 value={form.plant_type}
                 onValueChange={(v) => setForm({ ...form, plant_type: v })}
               >
-                <SelectTrigger type="button" data-testid="create-plant-type-select">
+                <SelectTrigger
+                  type="button"
+                  id={typeFieldId}
+                  data-testid="create-plant-type-select"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent onKeyDown={stopSelectEnterKeyDown}>
@@ -1004,7 +1014,7 @@ export default function CreatePlantDialog({
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
-                <Label>
+                <Label htmlFor={tentFieldId}>
                   Tent
                   {requireTentForWrite ||
                   !plantCreateAllowsTentless({
@@ -1046,7 +1056,11 @@ export default function CreatePlantDialog({
                 value={form.tent_id}
                 onValueChange={onTentSelect}
               >
-                <SelectTrigger type="button" data-testid="create-plant-tent-select">
+                <SelectTrigger
+                  type="button"
+                  id={tentFieldId}
+                  data-testid="create-plant-tent-select"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent onKeyDown={stopSelectEnterKeyDown}>
@@ -1066,7 +1080,9 @@ export default function CreatePlantDialog({
                   className="text-xs text-muted-foreground mt-1"
                   data-testid="create-plant-no-tents-hint"
                 >
-                  {tentRequired ? "No tents yet. Create a tent first." : PLANT_NO_TENTS_OPTIONAL_HINT}
+                  {tentRequired
+                    ? "No tents yet. Create a tent first."
+                    : PLANT_NO_TENTS_OPTIONAL_HINT}
                 </p>
               )}
             </div>
@@ -1076,22 +1092,27 @@ export default function CreatePlantDialog({
               </summary>
               <div className="grid gap-3 pt-3">
                 <div>
-                  <Label>Strain (optional)</Label>
+                  <Label htmlFor={strainFieldId}>Strain (optional)</Label>
                   <Input
+                    id={strainFieldId}
                     value={form.strain}
                     onChange={(e) => setForm({ ...form, strain: e.target.value })}
                     placeholder="Blue Dream"
                   />
                 </div>
                 <div>
-                  <Label>Health</Label>
+                  <Label htmlFor={healthFieldId}>Health</Label>
                   <Select
                     value={form.health}
                     onValueChange={(v) =>
                       setForm({ ...form, health: plantHealthFromSelectValue(v) })
                     }
                   >
-                    <SelectTrigger type="button" data-testid="create-plant-health">
+                    <SelectTrigger
+                      type="button"
+                      id={healthFieldId}
+                      data-testid="create-plant-health"
+                    >
                       <SelectValue placeholder={PLANT_HEALTH_NOT_ASSESSED_LABEL} />
                     </SelectTrigger>
                     <SelectContent onKeyDown={stopSelectEnterKeyDown}>
@@ -1107,8 +1128,9 @@ export default function CreatePlantDialog({
                   </Select>
                 </div>
                 <div>
-                  <Label>Started at (optional)</Label>
+                  <Label htmlFor={startedFieldId}>Started at (optional)</Label>
                   <Input
+                    id={startedFieldId}
                     type="date"
                     max={plantStartDateInputMax(new Date())}
                     value={form.started_at}

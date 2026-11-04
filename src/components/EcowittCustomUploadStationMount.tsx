@@ -39,6 +39,8 @@ export function EcowittCustomUploadStationMount(props: EcowittCustomUploadStatio
   const [actionError, setActionError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [claimLookup, setClaimLookup] = useState<"pending" | "ready">("pending");
+  // The claims table/RPC is not deployed yet: hide the card instead of erroring.
+  const [backendMissing, setBackendMissing] = useState(false);
   const loadGeneration = useRef(0);
   const actionGeneration = useRef(0);
 
@@ -55,6 +57,12 @@ export function EcowittCustomUploadStationMount(props: EcowittCustomUploadStatio
     let cancelled = false;
     void loadOpenEcowittCustomUploadClaim(claims, tentId).then((loadedClaim) => {
       if (cancelled || ticket !== loadGeneration.current) return;
+      if (!loadedClaim.ok && loadedClaim.reason === "backend_missing") {
+        setLoaded(null);
+        setBackendMissing(true);
+        setClaimLookup("ready");
+        return;
+      }
       if (!loadedClaim.ok) {
         setLoaded(null);
         setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.lookupFailed);
@@ -95,6 +103,10 @@ export function EcowittCustomUploadStationMount(props: EcowittCustomUploadStatio
     try {
       const created = await createEcowittCustomUploadClaim(claims, tentId);
       if (ticket !== actionGeneration.current || loadTicket !== loadGeneration.current) return;
+      if (!created.ok && created.reason === "backend_missing") {
+        setBackendMissing(true);
+        return;
+      }
       if (!created.ok) {
         setActionError(ECOWITT_CUSTOM_UPLOAD_COPY.createFailed);
         return;
@@ -145,6 +157,8 @@ export function EcowittCustomUploadStationMount(props: EcowittCustomUploadStatio
       if (ticket === actionGeneration.current) setCreating(false);
     }
   }
+
+  if (backendMissing) return null;
 
   return (
     <EcowittCustomUploadStationCard

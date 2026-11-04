@@ -7,7 +7,7 @@ why: Matthew asked on 2026-11-04 (Claude session_017UoYKxz4qx5PNBmVy3eKaK) to tr
 branch: claude/impeccable-critique-trial
 base: verdant-grow-diary
 checkout: git fetch origin claude/impeccable-critique-trial verdant-grow-diary && git switch claude/impeccable-critique-trial && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" (a reviewer stops here, at the exact head)
-pr: see the first push; recorded on the PR as `resume here`
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2875 (draft)
 head_sha: a commit cannot record its own SHA; read the full head from the PR
 state: pushed draft
 current_step: first push; docs-only; awaiting an eligible independent reviewer (docs/agents/** is governance-protected under OWNERSHIP.md §2, so the Graft low-risk lane does not apply)

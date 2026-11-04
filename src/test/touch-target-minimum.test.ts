@@ -21,7 +21,7 @@ function files(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) {
-      if (!/__tests__|[\\/]ui$/.test(p)) files(p, out);
+      if (!/[\\/](?:__tests__|ui)$/.test(p)) files(p, out);
     } else if (p.endsWith(".tsx") && !/\.test\.tsx$/.test(p)) out.push(p);
   }
   return out;

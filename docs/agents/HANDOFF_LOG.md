@@ -69,38 +69,38 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### ECOWITT-CUSTOM-UPLOAD-INGEST-PATH
+### FIRST-VIEWPORT-TASK-FIRST-SPEC
 
 ```text
-TASK ECOWITT-CUSTOM-UPLOAD-INGEST-PATH  priority: other  status: OPEN
-goal: The EcoWitt custom-upload station card shows only rows the custom-upload planner wrote. Each planned row carries raw_payload.ingest_path = "ecowitt_custom_upload" and raw_payload.claim_id.
-why: P3-1 from the exact-head reviews of #2732 at 191af23c75310e239318b996276365c7df9c346e (Seat D fix request, Seat C note). With an active claim, live rows from the older passkey bridge (supabase/functions/ecowitt-ingest) on the same tent rendered under the custom-upload card. Genuinely live, but the card misstated which pathway produced them.
-branch: claude/relaxed-fermat-aladcl
-base: verdant-grow-diary (started at e3ecc2b2214314526c9149000ac5932351fd82cd, after #2732 merged as af359ce)
-checkout: git fetch origin claude/relaxed-fermat-aladcl verdant-grow-diary && git switch claude/relaxed-fermat-aladcl
-pr: opened as a draft after this commit; read the URL from GitHub
-head_sha: read the current head on GitHub (this block's commit is the first)
-state: implemented, tests committed, pushed draft
-current_step: draft PR open, gated (touches supabase/functions/_shared)
-next_action: route an independent exact-head review. Exclude Claude session_017UoYKxbtbUu2bCt65XUPv7 (author) and the #2732 contributors (verdant-ultra-bot, Claude session_017UoYKvcvohNxhmW342Lieo).
-post_merge_check: after a Publish that includes this and a live custom-upload packet, the station card shows that packet's values; a passkey-bridge reading on the same tent does not appear under it. NOT_MEASURED until the custom-upload Edge route exists (#2751) and is deployed.
-active_writer: Claude session_017UoYKxbtbUu2bCt65XUPv7
-decisions: Matthew 2026-11-04: rows without the marker are hidden from this card (not shown under a separate label). They stay visible on every other surface. claim_id is stored because claim ids are already owner-readable (column grant in 20261102150000) and stable across rotate; the card filters on ingest_path only. No schema or migration change: commit_ecowitt_custom_upload_ingest stores raw_payload verbatim.
-tried_and_rejected: none
-commands: bunx vitest run src/test/ecowitt-custom-upload-station-card-ingest-path.test.ts src/test/ecowitt-custom-upload-station-card-testbench-fence.test.ts src/test/ecowitt-custom-upload-station-card-view-model.test.ts; node scripts/sync-edge-shared.mjs --check; NODE_OPTIONS=--max-old-space-size=6144 bun run typecheck
-files_touched: src/lib/ecowittCustomUploadIngestRules.ts; supabase/functions/_shared/ecowittCustomUploadIngestRules.ts (byte copy); src/lib/timelineBoundedRead.ts; src/lib/ecowittCustomUploadStationCardViewModel.ts; src/test/ecowitt-custom-upload-station-card-ingest-path.test.ts (new); src/test/ecowitt-custom-upload-station-card-testbench-fence.test.ts; src/test/ecowitt-custom-upload-station-card-view-model.test.ts; docs/agents/HANDOFF_LOG.md
-files_remaining: none
-blockers: none
-open_questions: none
-gotchas: sync-edge-shared.mjs mirrors only supabase/functions/_shared/lib; the _shared/ecowittCustomUploadIngestRules.ts copy is a plain byte copy that a test checks. Open #2752 and #2744 edit the same files with different behaviour; merge-tree is clean for both.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2732
+TASK FIRST-VIEWPORT-TASK-FIRST-SPEC  priority: other  status: OPEN
+goal: Spec how Timeline, AI Doctor, Action Queue and Reports put the grower's task before explanation, with founder decisions D1-D4.
+why: Live audit 2026-11-03 finding 2 (remaining parts) and the layout half of finding 11. Source-traced: about 25 blocks precede the first Timeline entry; the One-Tent Loop next-step card ("Review alerts") sits above the AI Doctor plant picker; Action Queue renders a landing box, header, filters and pagination before its empty state; Reports orders empty learning cards first.
+branch: claude/first-viewport-task-first-spec
+base: verdant-grow-diary
+checkout: git fetch origin claude/first-viewport-task-first-spec verdant-grow-diary && git switch claude/first-viewport-task-first-spec
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2826 (ready for review)
+head_sha: read the current head on GitHub
+state: spec committed; D1-D4 awaiting Matthew.
+current_step: Seat A P2-1/P2-2 (b6b711a) fixed; awaiting Grok exact-head review.
+next_action: record Matthew's D1-D4 answers in section 6, then route for review; implementation follows in four slices (section 9).
+post_merge_check: none (docs only).
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: Safety fences F1-F5 keep truth notices (partial read, history limit, RPC unavailable), approval-required wording, no auto-start or preselect on AI Doctor, no remembered target, and sensor source labels.
+tried_and_rejected: a read-only search subagent for the page map ran out of context on startup instructions; mapped directly with targeted greps instead.
+commands: none (docs only)
+files_touched: docs/specs/first-viewport-task-first.md; docs/agents/HANDOFF_LOG.md
+files_remaining: none for the spec
+blockers: founder decisions D1-D4
+open_questions: D1 next-step card placement; D2 AI Doctor Review alerts; D3 Action Queue landing box; D4 Reports order.
+gotchas: src/test/action-queue-ux.test.ts:125-134 pins source order between filters, pagination and no-results; the Action Queue slice must renegotiate it.
+links: none
 artifacts: none
-reviewer_seat: not requested
-reviewer_sha: NOT_MEASURED
-session_state: no production access; no Publish, APPLY, device or Action Queue operation
-claimed_by: Claude session_017UoYKxbtbUu2bCt65XUPv7, 2026-11-04
+reviewer_seat: Grok (Matthew's gate); Seat A reviewed b6b711a: PASS-with-P2 0/2/1
+reviewer_sha: b6b711a (Seat A); new head needs review
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-03 22:45 CT, by Claude
+last_updated: 2026-11-03 18:55 CT, by Claude
 ```
 
 ### AI-DOCTOR-REPORT-PREVIEW-FOCUS
@@ -237,6 +237,40 @@ session_state: no production writes; auto-merge off
 claimed_by: Grok, 2026-11-03
 owner: Grok
 last_updated: 2026-11-02 23:20 CT, by Grok
+```
+
+### QUICK-LOG-WATER-VOLUME-UNITS-IMPL
+
+```text
+TASK QUICK-LOG-WATER-VOLUME-UNITS-IMPL  priority: other  status: OPEN
+goal: Implement ml / L / gal entry for Quick Log Water volume and runoff per docs/specs/quick-log-water-volume-units.md (spec PR #2813; D1 b, D2 yes, D3 b).
+why: Live audit 2026-11-03 finding 4: Water accepted millilitres only.
+branch: claude/quick-log-water-volume-units-impl
+base: verdant-grow-diary
+checkout: git fetch origin claude/quick-log-water-volume-units-impl verdant-grow-diary && git switch claude/quick-log-water-volume-units-impl
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2814 (ready for review)
+head_sha: read the current head on GitHub (this block rides the first commit)
+state: implemented and tested locally; draft PR, awaiting CI and independent review.
+current_step: Seat A P2s at 54715ba fixed (body test counts; this timestamp); awaiting re-review at the new head.
+next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ). Signed-in visual check of the Water form at 393px is NOT_MEASURED.
+post_merge_check: after Publish, on https://verdantgrowdiary.com with the fixture account, choose gal, enter 1, save a tagged [smoke <timestamp>] Water entry, and confirm the Timeline shows 3785 ml. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: storage stays volume_ml / runoff_ml; typed text converts once (exact rational, rounded once to whole ml); form keeps canonical volumeMl/runoffMl plus optional volumeEntryUnit/volumeEntryText/runoffEntryText; switching unit reinterprets typed text, never a prefilled or restored amount; a preset sets ml without changing the remembered unit; the prefill clears stale typed text.
+tried_and_rejected: per-unit copies of the 50,000 ml gate (two gates could disagree).
+commands: bunx vitest run src/test/quick-log-water-volume-units-rules.test.ts src/test/quick-log-water-volume-units-ui.test.tsx --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/lib/quickLogWaterVolumeUnitRules.ts; src/lib/waterVolumeEntryUnitPreference.ts; src/constants/quickLogWaterVolumeUnitCopy.ts; src/lib/quickLogWateringFormViewModel.ts; src/components/QuickLogWateringForm.tsx; src/components/QuickLogV2Sheet.tsx; src/test/quick-log-water-volume-units-rules.test.ts; src/test/quick-log-water-volume-units-ui.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: none
+gotchas: commit with NODE_OPTIONS=--max-old-space-size=8192 (pre-commit tsc). The spec file lives in #2813, not on this branch, until #2813 merges.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2813
+artifacts: none
+reviewer_seat: Grok (Matthew's gate); Seat A reviewed 54715ba: PASS-with-P2 0/2/1
+reviewer_sha: 54715ba (new head needs review)
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 21:10 CT, by Claude
 ```
 
 ### PHENO-LOCAL-DRAFT-LABELS

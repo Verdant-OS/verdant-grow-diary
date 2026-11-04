@@ -111,6 +111,9 @@ export class TimelineBoundedRead {
     }
     if (row.csv_import === true || row.csv_import === "true") payload.csv_import = true;
     if (row.suspicious === true || row.suspicious === "true") payload.suspicious = true;
+    // Keep "Derived VPD" after reload (#2744 review 5761014874 P2-1).
+    if (row.vpd_source === "derived" || row.vpd_source === "csv")
+      payload.vpd_source = row.vpd_source;
     const flags = row.suspicious_flags;
     if (Array.isArray(flags) && flags.length > 0) payload.suspicious_flags = flags;
     if (typeof flags === "string" && flags.length > 0) {

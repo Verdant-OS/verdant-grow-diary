@@ -184,7 +184,9 @@ accounts (real grows) are **blocked**. CI: workflow_dispatch only
 
 There are **no hardcoded credentials** in this repository. The test
 account's email and password live only in
-`secrets.E2E_TEST_EMAIL` and `secrets.E2E_TEST_PASSWORD`.
+`secrets.E2E_SMOKE_EMAIL` and `secrets.E2E_SMOKE_PASSWORD`. The read-only
+proofs use a separate owner login, `secrets.E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`,
+which the write smoke never reads.
 
 The production smoke lane runs only as the disposable account named in
 `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` and refuses the owner's personal accounts
@@ -199,8 +201,10 @@ To rotate the disposable test account safely:
    manually (see `e2e/FIXTURE_SETUP.md`; bootstrap is unavailable for the
    production lane).
 3. Update GitHub Actions **secrets**:
-   - `E2E_TEST_EMAIL`
-   - `E2E_TEST_PASSWORD`
+   - `E2E_SMOKE_EMAIL`
+   - `E2E_SMOKE_PASSWORD`
+   (The write smoke uses its own secrets. `secrets.E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`
+   stay as the owner login for the read-only proofs; do not change them.)
 4. Update GitHub Actions **variables**:
    - `E2E_GROW_1_PLANT_URL` (new plant URL on the new account)
    - `E2E_FIXTURE_MODE=true`

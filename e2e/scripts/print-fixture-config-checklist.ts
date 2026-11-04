@@ -10,7 +10,7 @@
  *   - prints NAMES and instructions only
  */
 
-const REQUIRED_SECRETS = ["E2E_TEST_EMAIL", "E2E_TEST_PASSWORD"] as const;
+const REQUIRED_SECRETS = ["E2E_SMOKE_EMAIL", "E2E_SMOKE_PASSWORD"] as const;
 
 const REQUIRED_VARS = [
   "E2E_BASE_URL",

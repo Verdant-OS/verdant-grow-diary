@@ -27,7 +27,7 @@ normal authenticated UI.
   (`PERSONAL_ACCOUNT_EMAILS`). Grower bug item 20 (2026-11-03): test tents and
   grows had accumulated in a real account.
 - Do **not** reuse a personal account, the KEEP account or any customer account.
-- The password lives **only** in `secrets.E2E_TEST_PASSWORD`. Never
+- The password lives **only** in `secrets.E2E_SMOKE_PASSWORD`. Never
   paste it into docs, screenshots, scripts, or commit messages.
 
 ## 2. Expected fixture names
@@ -59,8 +59,13 @@ Configure in `Settings → Secrets and variables → Actions`:
 
 **Secrets** (values never printed in logs or summaries):
 
-- `E2E_TEST_EMAIL`
-- `E2E_TEST_PASSWORD`
+- `E2E_SMOKE_EMAIL` — the disposable account's email (must equal
+  `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT`)
+- `E2E_SMOKE_PASSWORD`
+
+`E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are a separate login used by the
+read-only proofs (`actions-readonly-proof.yml`, `settings-account-consent-proof.yml`,
+the authenticated One-Tent proof). The write smoke never reads them; leave them unchanged.
 
 **Variables** (names appear in logs; values do not):
 
@@ -184,8 +189,10 @@ only the secrets and that variable; the owner's personal accounts stay refused.
 2. Sign in as the new account and create only the expected E2E fixture
    names (§2), manually; bootstrap is unavailable for the production lane.
 3. Update GitHub Actions **secrets**:
-   - `E2E_TEST_EMAIL`
-   - `E2E_TEST_PASSWORD`
+   - `E2E_SMOKE_EMAIL`
+   - `E2E_SMOKE_PASSWORD`
+   (The write smoke uses its own secrets. `secrets.E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`
+   stay as the owner login for the read-only proofs; do not change them.)
 4. Update GitHub Actions **variables**:
    - `E2E_GROW_1_PLANT_URL` (new plant URL on the new account)
    - `E2E_FIXTURE_MODE=true`

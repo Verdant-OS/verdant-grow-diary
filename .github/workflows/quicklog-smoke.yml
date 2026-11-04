@@ -22,8 +22,11 @@ name: Quick Log Playwright smoke
 #    fixture saves per run, the same as a push run; skips cleanly without config.
 #
 # Required repository secrets / vars (configure in GitHub → Settings):
-#   secrets.E2E_TEST_EMAIL
+#   secrets.E2E_SMOKE_EMAIL        (write smoke: the disposable account; must equal
+#   secrets.E2E_SMOKE_PASSWORD      vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT)
+#   secrets.E2E_TEST_EMAIL         (authenticated One-Tent proof only: owner login)
 #   secrets.E2E_TEST_PASSWORD
+#   vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT (the disposable account's email)
 #   vars.E2E_BASE_URL              (https://verdantgrowdiary.com only)
 #   vars.E2E_GROW_1_PLANT_URL      (production URL in the test fixture's own grow)
 # Before writes, verify fixture/account ownership; tag [smoke <timestamp>].
@@ -564,8 +567,8 @@ jobs:
       - name: Verify required configuration
         id: e2e_config
         env:
-          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_SMOKE_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_SMOKE_PASSWORD }}
         shell: bash
         run: |
           # Track presence (never echo values). Only NAMES of missing config
@@ -573,8 +576,8 @@ jobs:
           missing=()
           [ -n "$E2E_BASE_URL" ] || missing+=("vars.E2E_BASE_URL")
           [ -n "$E2E_GROW_1_PLANT_URL" ] || missing+=("vars.E2E_GROW_1_PLANT_URL")
-          [ -n "$E2E_TEST_EMAIL" ] || missing+=("secrets.E2E_TEST_EMAIL")
-          [ -n "$E2E_TEST_PASSWORD" ] || missing+=("secrets.E2E_TEST_PASSWORD")
+          [ -n "$E2E_TEST_EMAIL" ] || missing+=("secrets.E2E_SMOKE_EMAIL")
+          [ -n "$E2E_TEST_PASSWORD" ] || missing+=("secrets.E2E_SMOKE_PASSWORD")
           # Disposable E2E fixture safety: required before write-producing smoke.
           # Grow name is OPTIONAL — the current UI has no Grow page in the
           # setup flow (Dashboard → Add Tent → Add Plant).
@@ -582,8 +585,16 @@ jobs:
           [ -n "$E2E_FIXTURE_EXPECTED_TENT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_TENT_NAME")
           [ -n "$E2E_FIXTURE_EXPECTED_PLANT_NAME" ] || missing+=("vars.E2E_FIXTURE_EXPECTED_PLANT_NAME")
 
+          # The write smoke signs in as the disposable account named by
+          # vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT (secrets.E2E_SMOKE_*), never
+          # as a personal account. Read-only proofs keep secrets.E2E_TEST_*.
+          smoke_email=$(printf '%s' "$E2E_TEST_EMAIL" | tr '[:upper:]' '[:lower:]' | xargs)
+          smoke_hint=$(printf '%s' "$E2E_FIXTURE_EXPECTED_ACCOUNT_HINT" | tr '[:upper:]' '[:lower:]' | xargs)
           if [ "$E2E_BASE_URL" != "https://verdantgrowdiary.com" ] ||
-             [ "$E2E_TEST_EMAIL" != "cheekhimself@gmail.com" ]; then
+             [ -z "$smoke_hint" ] ||
+             [ "$smoke_email" != "$smoke_hint" ] ||
+             [ "$smoke_email" = "cheekhimself@gmail.com" ] ||
+             [ "$smoke_email" = "matt@verdantgrowdiary.com" ]; then
             echo "BLOCKED: exact production host and approved fixture-account credentials required." >&2
             echo "should_run=false" >> "$GITHUB_OUTPUT"
             exit 1
@@ -674,24 +685,24 @@ jobs:
         # Never on the unattended schedule: it may only make the two tagged saves.
         if: steps.e2e_config.outputs.should_run == 'true' && vars.E2E_ALLOW_FIXTURE_BOOTSTRAP == 'true' && github.event_name != 'schedule'
         env:
-          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_SMOKE_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_SMOKE_PASSWORD }}
         run: bun run e2e:bootstrap-fixture
 
       - name: Verify disposable E2E fixture
         id: verify_fixture
         if: steps.e2e_config.outputs.should_run == 'true'
         env:
-          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_SMOKE_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_SMOKE_PASSWORD }}
         run: bun run e2e:verify-fixture
 
       - name: Run Quick Log Playwright smoke
         id: quicklog_smoke
         if: steps.e2e_config.outputs.should_run == 'true' && steps.verify_fixture.outcome == 'success'
         env:
-          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_SMOKE_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_SMOKE_PASSWORD }}
         run: bun run e2e:quicklog-smoke
 
       - name: Upload sanitized Quick Log timing receipt
@@ -1936,8 +1947,9 @@ jobs:
               echo ""
               echo "- \`vars.E2E_BASE_URL\`"
               echo "- \`vars.E2E_GROW_1_PLANT_URL\`"
-              echo "- \`secrets.E2E_TEST_EMAIL\`"
-              echo "- \`secrets.E2E_TEST_PASSWORD\`"
+              echo "- \`secrets.E2E_SMOKE_EMAIL\`"
+              echo "- \`secrets.E2E_SMOKE_PASSWORD\`"
+              echo "- \`vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT\`"
               echo "- \`vars.E2E_FIXTURE_MODE\`"
               echo "- \`vars.E2E_FIXTURE_EXPECTED_TENT_NAME\`"
               echo "- \`vars.E2E_FIXTURE_EXPECTED_PLANT_NAME\`"

@@ -386,7 +386,7 @@ function ComparisonCell({ value }: { value: string | boolean }) {
     return value ? (
       <Check className="mx-auto h-4 w-4 text-primary" aria-label="Included" />
     ) : (
-      <X className="mx-auto h-4 w-4 text-muted-foreground/60" aria-label="Not included" />
+      <X className="mx-auto h-4 w-4 text-muted-foreground" aria-label="Not included" />
     );
   }
   return <span className="text-sm">{value}</span>;

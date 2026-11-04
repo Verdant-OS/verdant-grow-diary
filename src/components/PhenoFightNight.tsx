@@ -159,7 +159,7 @@ function AxisRow({ axis, ranked }: { axis: FightAxis; ranked: boolean }) {
         <div className="text-[10px] uppercase leading-tight tracking-wide text-muted-foreground">
           {axis.label}
         </div>
-        <div className="text-[9px] leading-tight text-muted-foreground/70">
+        <div className="text-[9px] leading-tight text-muted-foreground">
           {unknown ? "not scored on both sides" : `${axis.weightPct}%`}
         </div>
       </div>
@@ -300,17 +300,23 @@ export default function PhenoFightNight({
           <span className="text-emerald-600 dark:text-emerald-400">
             {a.name} leads <span className="font-semibold">{a.axisWins}</span>
           </span>
-          <span className="text-muted-foreground/60">·</span>
+          <span aria-hidden className="text-muted-foreground/60">
+            ·
+          </span>
           <span className="text-muted-foreground">
             {ties} tie{ties === 1 ? "" : "s"}
           </span>
-          <span className="text-muted-foreground/60">·</span>
+          <span aria-hidden className="text-muted-foreground/60">
+            ·
+          </span>
           <span className="text-fuchsia-600 dark:text-fuchsia-400">
             {b.name} leads <span className="font-semibold">{b.axisWins}</span>
           </span>
           {fight.unknownAxes > 0 && (
             <>
-              <span className="text-muted-foreground/60">·</span>
+              <span aria-hidden className="text-muted-foreground/60">
+                ·
+              </span>
               <span data-testid="pheno-fight-unknown-axes" className="text-muted-foreground">
                 {fight.unknownAxes} trait{fight.unknownAxes === 1 ? "" : "s"} not scored on both
                 sides

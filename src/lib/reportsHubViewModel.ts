@@ -191,3 +191,6 @@ export const REPORTS_HUB_EMPTY_COPY =
 
 export const REPORTS_HUB_SUBTITLE_COPY =
   "Review recorded grow outcomes, alerts, sensor readings, and timeline activity.";
+
+/** Reports grow-scope bar link to the date-range diary report (audit 2026-11-03, finding 11). */
+export const REPORTS_HUB_DIARY_RANGE_REPORT_LABEL = "Diary range report (PDF)";

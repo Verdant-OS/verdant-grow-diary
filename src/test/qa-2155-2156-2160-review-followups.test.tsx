@@ -351,7 +351,7 @@ describe("PR #2195 review follow-ups", () => {
     expect(lines).toHaveLength(5);
     expect(lines[0]).toContain("Tent");
     expect(lines.slice(1).map((line) => line.split(",")[1])).toEqual(["75", "74", "76", "77"]);
-    expect(lines.slice(1).map((line) => line.split(",")[10])).toEqual([
+    expect(lines.slice(1).map((line) => line.split(",")[11])).toEqual([
       "Main Tent",
       "Second Tent",
       "Main Tent",

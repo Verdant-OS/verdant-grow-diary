@@ -92,6 +92,9 @@ describe("GA collection proxy refusals over a keep-alive client", () => {
       for (let i = 0; i < 25; i += 1) {
         const response = await keepAliveRequest(proxyPort, "http://example.com/secret", agent);
         expect(response).toEqual({ status: 403, connection: "close" });
+        // An unparseable absolute URL takes the 400 branch of the same refusal.
+        const bad = await keepAliveRequest(proxyPort, "http://[bad", agent);
+        expect(bad).toEqual({ status: 400, connection: "close" });
       }
     } finally {
       agent.destroy();

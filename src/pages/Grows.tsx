@@ -79,6 +79,9 @@ export default function Grows() {
     grows.length,
   );
   const nameFieldId = useId();
+  const typeFieldId = useId();
+  const stageFieldId = useId();
+  const notesFieldId = useId();
   const disabledReasonId = useId();
   const primary = describeCreateGrowPrimaryButton({
     busy,
@@ -447,12 +450,12 @@ export default function Grows() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label>Type</Label>
+                <Label htmlFor={typeFieldId}>Type</Label>
                 <Select
                   value={form.grow_type}
                   onValueChange={(v) => setForm({ ...form, grow_type: v })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id={typeFieldId}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -465,9 +468,9 @@ export default function Grows() {
                 </Select>
               </div>
               <div>
-                <Label>Stage</Label>
+                <Label htmlFor={stageFieldId}>Stage</Label>
                 <Select value={form.stage} onValueChange={(v) => setForm({ ...form, stage: v })}>
-                  <SelectTrigger>
+                  <SelectTrigger id={stageFieldId}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -481,8 +484,9 @@ export default function Grows() {
               </div>
             </div>
             <div>
-              <Label>Notes (optional)</Label>
+              <Label htmlFor={notesFieldId}>Notes (optional)</Label>
               <Textarea
+                id={notesFieldId}
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 placeholder="Strain, lighting, medium…"

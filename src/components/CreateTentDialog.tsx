@@ -27,6 +27,7 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@/lib/react-router-compat";
 import { useTents } from "@/hooks/use-tents";
+import { SimilarNameWarningNote } from "@/components/SimilarNameWarningNote";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { evaluateTentCreationGate, FREE_TIER_UPGRADE_PATH } from "@/lib/entitlements/freeTierGates";
 import {
@@ -439,6 +440,11 @@ export default function CreateTentDialog({
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Tent #1"
+              />
+              <SimilarNameWarningNote
+                entity="tent"
+                candidate={form.name}
+                testId="create-tent-similar-name"
               />
               <p
                 className="text-[11px] text-muted-foreground mt-1"

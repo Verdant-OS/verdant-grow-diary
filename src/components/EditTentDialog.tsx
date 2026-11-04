@@ -29,6 +29,7 @@ import {
   tentSizeEditValidationMessage,
 } from "@/lib/tentManagementRules";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
+import { SimilarNameWarningNote } from "@/components/SimilarNameWarningNote";
 
 /**
  * Edits an existing tent's user-facing fields. Mirrors EditPlantDialog
@@ -151,6 +152,12 @@ export default function EditTentDialog({ tent, trigger }: Props) {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               data-testid="edit-tent-name"
+            />
+            <SimilarNameWarningNote
+              entity="tent"
+              candidate={form.name}
+              excludeId={tent.id}
+              testId="edit-tent-similar-name"
             />
           </div>
           <div className="grid grid-cols-2 gap-2">

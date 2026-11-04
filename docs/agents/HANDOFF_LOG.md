@@ -80,8 +80,8 @@ base: verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2820
 head_sha: read the current head on GitHub
 state: pushed draft
-current_step: item 15 not reproduced at HEAD: fixed by #2778 (d6b9abb, 2026-11-03 02:10 UTC, tent targets kept, sheet closes on save). Regression test src/test/quick-log-whole-tent-target-everywhere.test.tsx pins whole-tent targets from the global and plant Quick Log. #2778 also fixed item 3's stay-open half (showTimelineConfirmation closes the sheet)
-next_action: founder picks the next item (remaining: 9, 10, 11, 16, 19, 20); independent review of #2820; founder approval of #2828
+current_step: item 19 done: non-blocking near-duplicate name warning in Create/Edit Plant (same grow) and Create/Edit Tent; cache-only read (no new queries, preserves pinned dialog read/write behavior); rules in src/lib/similarNameWarningRules.ts
+next_action: founder picks the next item (remaining: 9, 10, 11, 16, 20); independent review of #2820; founder approval of #2828; #2828 manual-correction-recovery re-run outcome
 post_merge_check: on verdantgrowdiary.com, the fixture plant page shows "Grow: <name>" and Timeline Recent Quick Logs rows show "Plant: ... · Tent: ..."
 active_writer: Claude session claude/new-session-azpsz3
 decisions: no migration/RLS/auth edits (held); items 2,4,5,6 fixed by #2794; item 3 not reproduced (in-flight guard + idempotency key; duplicates 6.5 h apart); item 7 fixed by f2d6ca2; names never guessed (unknown id reads "name unavailable")
@@ -98,7 +98,7 @@ reviewer_sha: none yet
 session_state: one self check-in armed (send_later) for PR #2820 CI
 claimed_by: Claude, 2026-11-03 16:45 CT
 owner: Claude
-last_updated: 2026-11-03 19:55 CT, by Claude
+last_updated: 2026-11-03 20:15 CT, by Claude
 ```
 
 ### QUICK-LOG-WATER-VOLUME-UNITS-SPEC

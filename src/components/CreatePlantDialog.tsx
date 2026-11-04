@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { useTents } from "@/hooks/use-tents";
+import { SimilarNameWarningNote } from "@/components/SimilarNameWarningNote";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -964,6 +965,12 @@ export default function CreatePlantDialog({
                 placeholder="Plant A"
                 data-testid="create-plant-name"
               />
+              <SimilarNameWarningNote
+                entity="plant"
+                candidate={form.name}
+                growId={targetGrowId}
+                testId="create-plant-similar-name"
+              />
               <p
                 className="text-[11px] text-muted-foreground mt-1"
                 data-testid="plant-create-name-helper"
@@ -1066,7 +1073,9 @@ export default function CreatePlantDialog({
                   className="text-xs text-muted-foreground mt-1"
                   data-testid="create-plant-no-tents-hint"
                 >
-                  {tentRequired ? "No tents yet. Create a tent first." : PLANT_NO_TENTS_OPTIONAL_HINT}
+                  {tentRequired
+                    ? "No tents yet. Create a tent first."
+                    : PLANT_NO_TENTS_OPTIONAL_HINT}
                 </p>
               )}
             </div>

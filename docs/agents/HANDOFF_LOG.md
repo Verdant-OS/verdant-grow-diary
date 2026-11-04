@@ -81,8 +81,8 @@ checkout: git fetch origin claude/rea-lifecycle-marker-race verdant-grow-diary &
 pr: #2837, open and non-draft; https://github.com/Verdant-OS/verdant-grow-diary/pull/2837
 head_sha: read the current head on GitHub
 state: fix committed; edits scorer-locked test scripts/rea/tests/lifecycle.test.mjs, which is still locked; no --unlock record or scorer-unlock.json in this diff; gated.
-current_step: non-draft PR open; gated, awaiting reviewers and Matthew's yes (it edits a scorer-locked test).
-next_action: Matthew names reviewers and the gate; #2815 precedent for locked-test changes was A, C, D PASS plus his yes at the final SHA.
+current_step: non-draft PR open; gated (it edits a scorer-locked test); review routed to Seats A, D and C.
+next_action: gate is Seats A, D and C exact-head PASS plus Matthew's own-words yes naming the final SHA (#2815 precedent for locked-test changes), and 35/35 required green.
 post_merge_check: required CI stops failing on this test; NOT_MEASURED until several post-merge runs.
 active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
 decisions: Fix the test, not the fixture: poll until content is "alive" within the same 4 s deadline; assertions unchanged.
@@ -90,17 +90,17 @@ tried_and_rejected: a 60 ms widened fixture for RED proof (left almost no "alive
 commands: node --test scripts/rea/tests/*.test.mjs; for i in $(seq 1 100); do node --test --test-name-pattern="owned process cleanup" scripts/rea/tests/lifecycle.test.mjs; done
 files_touched: scripts/rea/tests/lifecycle.test.mjs; docs/agents/HANDOFF_LOG.md
 files_remaining: none
-blockers: gate decision for a scorer-locked test change
-open_questions: reviewers and gate.
+blockers: none
+open_questions: none
 gotchas: run scorer-lock --lock after committing.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2818
 artifacts: none
-reviewer_seat: not requested
-reviewer_sha: NOT_MEASURED
+reviewer_seat: A, D, C requested
+reviewer_sha: see PR
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
 owner: Claude
-last_updated: 2026-11-03 18:22 CT, by Claude
+last_updated: 2026-11-03 22:50 CT, by Claude
 ```
 
 ### AI-DOCTOR-REPORT-PREVIEW-FOCUS

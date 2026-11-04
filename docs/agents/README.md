@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-11-04.1**
+**Sentinel-Version: 2026-11-04.3**
 
 Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
 **Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.
@@ -52,7 +52,8 @@ ROLE DOCUMENTS
 
 OPERATING STATE
   docs/agents/CURRENT_STATE.md   the changing shift report
-  docs/agents/HANDOFF_LOG.md     current task claims and resumable coverage blocks
+  docs/agents/HANDOFF_LOG.md     template and existing task blocks; takes no new blocks
+  docs/agents/handoffs/          one current handoff entry per task
   docs/agents/HANDOFF_PROTOCOL.md  handoff format and rules
   docs/agents/cheek-approval-workflow.md  Cheek ship-authority decision workflow
   docs/agents/merge-queue.md       deploy-branch merge queue + snapshot script

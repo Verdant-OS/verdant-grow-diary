@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-11-04.1**
+**Sentinel-Version: 2026-11-04.3**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.

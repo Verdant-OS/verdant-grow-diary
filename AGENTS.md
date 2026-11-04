@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-11-04.1**
+**Sentinel-Version: 2026-11-04.3**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -345,6 +345,11 @@ ran and what you skipped.
 Detail: `docs/agents/constitution/handoff-procedure.md`. Template:
 `docs/agents/HANDOFF_LOG.md`. The log is not a versioned governance file.
 
+The handoff log is `docs/agents/HANDOFF_LOG.md` plus `docs/agents/handoffs/`, and
+reading the log means reading both. Each task's entry lives in its own file,
+`docs/agents/handoffs/<TASK-ID>.md`. Do not add or edit blocks in `HANDOFF_LOG.md`.
+An existing block moves to its own file at its next update, and that file wins.
+
 - Write the block before the first push. Update it at every stop. Unpushed work
   does not count.
 - The block is self-sufficient for any agent or human: goal and why, decisions
@@ -368,8 +373,8 @@ Detail: `docs/agents/constitution/handoff-procedure.md`. Template:
   both a pushed branch and a pull request is open when it has no effective
   claim or that last activity is older than 24 hours, and no assignment or lock
   conflicts. Priority: publish gate, P1, P2, then the rest. Oldest update wins a tie.
-- Closing a merged, superseded, or dropped task moves the block to Closed the
-  same day with the reason and the final SHA.
+- Closing a merged, superseded, or dropped task sets `status: CLOSED` in its file
+  the same day with the reason and the final SHA.
 
 ## 13. Review
 
@@ -556,7 +561,8 @@ snapshots can differ.
 
 ## 17. Changelog
 
-- **2026-11-04.1** — `CLAUDE.md` no longer calls `package-lock.json` a synchronized compatibility lock. `#1873` retired it, and `bun.lock` is the only lockfile. No rule changes.
+- **2026-11-04.3** — `CLAUDE.md` no longer calls `package-lock.json` a synchronized compatibility lock. `#1873` retired it, and `bun.lock` is the only lockfile. No rule changes.
+- **2026-11-04.2** — Each task's handoff entry now lives in `docs/agents/handoffs/<TASK-ID>.md`. `HANDOFF_LOG.md` keeps the template and existing blocks and takes no new ones, so pull requests stop colliding in one file. Review, merge and production gates are unchanged.
 - **2026-10-31.1** — Seats and duties stay in the governance docs. The roster is the only holder map. The Merge Steward queues only after a non-author Reviewer APPROVE at the exact head and has no authority over the PR #1971 hold, which stays with the Coordinator. Reviewer C, Reviewer D, and QA are active seats.
 - **2026-10-27.1** — Founder Lifetime is no longer sold (#2028). Existing Founder rows keep pro-like access and 100 capped monthly AI credits until a separate PR and migration remove the entitlement.
 - **2026-10-26.2** — Preserve the recorded scope of existing explicit founder grants

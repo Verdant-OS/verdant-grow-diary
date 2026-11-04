@@ -45,6 +45,6 @@ convention_docs: AGENTS.md
 
 ### Detected toolchain
 
-- package manager: bun (bun.lock; package-lock.json is a compatibility lock only)
+- package manager: bun (bun.lock)
 - monorepo: none
 - frameworks: TanStack Start (SSR) + TanStack Router, React 19, Vite, Tailwind 4, shadcn/Radix, TanStack Query, Supabase

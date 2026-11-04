@@ -156,9 +156,12 @@ describe("Quick Log Playwright CI surface", () => {
     expect(wf).not.toMatch(/pull_request_target/);
     // No auth bypass language
     expect(wf).not.toMatch(/skipAuth|bypassAuth|AUTH_BYPASS/);
-    // Email/password must come from GitHub secrets, not literals
-    expect(wf).toMatch(/\$\{\{\s*secrets\.E2E_TEST_EMAIL\s*\}\}/);
-    expect(wf).toMatch(/\$\{\{\s*secrets\.E2E_TEST_PASSWORD\s*\}\}/);
+    // Email/password must come from GitHub secrets, not literals. Both jobs here
+    // write to production, so they use the disposable-account login (#2857);
+    // the owner's E2E_TEST_* login must not appear in this workflow at all.
+    expect(wf).toMatch(/\$\{\{\s*secrets\.E2E_SMOKE_EMAIL\s*\}\}/);
+    expect(wf).toMatch(/\$\{\{\s*secrets\.E2E_SMOKE_PASSWORD\s*\}\}/);
+    expect(wf).not.toMatch(/\$\{\{\s*secrets\.E2E_TEST_(EMAIL|PASSWORD)\s*\}\}/);
     // Must not echo secret values to logs
     expect(wf).not.toMatch(/echo\s+["']?\$\{?\s*E2E_TEST_PASSWORD/);
     expect(wf).not.toMatch(/echo\s+["']?\$\{?\s*E2E_TEST_EMAIL/);

@@ -63,9 +63,11 @@ Configure in `Settings → Secrets and variables → Actions`:
   `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT`)
 - `E2E_SMOKE_PASSWORD`
 
-`E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are a separate login used by the
-read-only proofs (`actions-readonly-proof.yml`, `settings-account-consent-proof.yml`,
-the authenticated One-Tent proof). The write smoke never reads them; leave them unchanged.
+`E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are a separate owner login used only by the
+read-only proof workflows (`actions-readonly-proof.yml`, `settings-account-consent-proof.yml`).
+Both jobs in `quicklog-smoke.yml` (the write smoke and the authenticated One-Tent proof,
+which creates and tears down a marker-tagged grow, tent and plant) write to production, so
+both sign in with `E2E_SMOKE_*` only. Leave `E2E_TEST_*` unchanged.
 
 **Variables** (names appear in logs; values do not):
 
@@ -191,8 +193,8 @@ only the secrets and that variable; the owner's personal accounts stay refused.
 3. Update GitHub Actions **secrets**:
    - `E2E_SMOKE_EMAIL`
    - `E2E_SMOKE_PASSWORD`
-   (The write smoke uses its own secrets. `secrets.E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`
-   stay as the owner login for the read-only proofs; do not change them.)
+     (The write smoke uses its own secrets. `secrets.E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`
+     stay as the owner login for the read-only proofs; do not change them.)
 4. Update GitHub Actions **variables**:
    - `E2E_GROW_1_PLANT_URL` (new plant URL on the new account)
    - `E2E_FIXTURE_MODE=true`

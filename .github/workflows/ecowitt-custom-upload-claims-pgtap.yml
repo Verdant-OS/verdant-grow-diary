@@ -1,0 +1,76 @@
+name: EcoWitt custom-upload claims pgTAP
+
+# Runs supabase/tests/ecowitt_custom_upload_claims_pgtap.sql on a fresh loopback
+# Postgres cluster. The file creates its own stub roles and tables, then
+# applies the unmerged EcoWitt claims migration. A migrated Supabase stack
+# already has those objects, so this job uses an empty database instead.
+# Nothing is applied to a hosted database and nothing is deployed.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  push:
+    branches: [main, verdant-grow-diary]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ecowitt-custom-upload-claims-pgtap:
+    name: EcoWitt custom-upload claims pgTAP (disposable local Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install disposable Postgres and pgTAP
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql
+          PG_MAJOR="$(psql --version | awk '{print $3}' | cut -d. -f1)"
+          sudo apt-get install -y --no-install-recommends "postgresql-${PG_MAJOR}-pgtap"
+          echo "PG_MAJOR=${PG_MAJOR}" >> "$GITHUB_ENV"
+
+      - name: Run ecowitt_custom_upload_claims_pgtap.sql on a fresh loopback database
+        run: |
+          set -euo pipefail
+          PG_BIN="/usr/lib/postgresql/${PG_MAJOR}/bin"
+          # /tmp is traversable by the postgres OS user. RUNNER_TEMP is mode 700
+          # and owned by the runner, so initdb there fails with permission denied.
+          PGDATA="/tmp/ecowitt-claims-pg"
+          SOCK="/tmp/ecowitt-claims-sock"
+          PORT=54331
+          cleanup() {
+            if [ -d "$PGDATA" ]; then
+              sudo -u postgres "${PG_BIN}/pg_ctl" -D "$PGDATA" -m fast -w stop || true
+            fi
+          }
+          trap cleanup EXIT
+          mkdir -p "$SOCK"
+          chmod 777 "$SOCK"
+          sudo install -d -o postgres -g postgres -m 700 "$PGDATA"
+          sudo -u postgres "${PG_BIN}/initdb" -D "$PGDATA" --auth=trust --username=postgres --no-instructions
+          sudo -u postgres "${PG_BIN}/pg_ctl" -D "$PGDATA" -w start \
+            -o "-p ${PORT} -k ${SOCK} -c listen_addresses=127.0.0.1"
+          LISTEN="$(sudo -u postgres psql -h "$SOCK" -p "$PORT" -d postgres -Atqc "SHOW listen_addresses")"
+          case "$LISTEN" in
+            127.0.0.1|localhost) ;;
+            *)
+              echo "BLOCKED: refusing non-loopback listen_addresses '${LISTEN}'." >&2
+              exit 2
+              ;;
+          esac
+          sudo -u postgres psql -h 127.0.0.1 -p "$PORT" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE ecowitt_claims_pgtap;"
+          # finish(true) raises when an assert fails. ON_ERROR_STOP turns that
+          # into a non-zero exit so this job fails. The psql -f line stays a
+          # real command so the test-execution manifest still sees the SQL path.
+          sudo -u postgres psql -h 127.0.0.1 -p "$PORT" -d ecowitt_claims_pgtap -v ON_ERROR_STOP=1 -f supabase/tests/ecowitt_custom_upload_claims_pgtap.sql
+          sudo -u postgres psql -h 127.0.0.1 -p "$PORT" -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE ecowitt_claims_pgtap;"

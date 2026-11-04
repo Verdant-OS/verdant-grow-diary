@@ -14,7 +14,36 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import ts from "typescript";
 
-const FAINT = /\btext-muted-foreground\/[1-7]0\b/;
+const MUTED_OPACITY = /\btext-muted-foreground\/(\d+|\[[^\]]+\])/g;
+
+/** True when a class string draws muted text below /80: any integer 0-79, or an arbitrary value
+ * such as `/[.3]` or `/[30%]` below 0.8. */
+function hasFaintMutedText(cls: string): boolean {
+  for (const [, raw] of cls.matchAll(MUTED_OPACITY)) {
+    let pct: number;
+    if (raw.startsWith("[")) {
+      const inner = raw.slice(1, -1).trim();
+      pct = inner.endsWith("%") ? Number(inner.slice(0, -1)) : Number(inner) * 100;
+    } else {
+      pct = Number(raw);
+    }
+    if (!Number.isFinite(pct) || pct < 80) return true;
+  }
+  return false;
+}
+
+/** Only a statically true `aria-hidden` marks decoration: bare, `"true"`, or `{true}`. */
+function isStaticallyHidden(attr: ts.JsxAttribute): boolean {
+  const init = attr.initializer;
+  if (!init) return true;
+  if (ts.isStringLiteral(init)) return init.text === "true";
+  if (ts.isJsxExpression(init) && init.expression) {
+    const e = init.expression;
+    if (e.kind === ts.SyntaxKind.TrueKeyword) return true;
+    if (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e)) return e.text === "true";
+  }
+  return false;
+}
 
 /**
  * PlantManualSensorFreshnessCard's stale and missing labels are fixed in #2830
@@ -64,8 +93,10 @@ function offenders(): string[] {
       if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) {
         const attrs = n.attributes.properties.filter(ts.isJsxAttribute);
         const cls = attrs.find((a) => a.name.getText(sf) === "className");
-        const hidden = attrs.some((a) => a.name.getText(sf) === "aria-hidden");
-        if (cls?.initializer && !hidden && stringsIn(cls.initializer).some((s) => FAINT.test(s))) {
+        const hidden = attrs.some(
+          (a) => a.name.getText(sf) === "aria-hidden" && isStaticallyHidden(a),
+        );
+        if (cls?.initializer && !hidden && stringsIn(cls.initializer).some(hasFaintMutedText)) {
           const { line } = sf.getLineAndCharacterOfPosition(n.getStart(sf));
           found.push(`${rel}:${line + 1}`);
         }
@@ -76,6 +107,49 @@ function offenders(): string[] {
   }
   return found;
 }
+
+function offendersIn(source: string): number {
+  const sf = ts.createSourceFile("x.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let n = 0;
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const attrs = node.attributes.properties.filter(ts.isJsxAttribute);
+      const cls = attrs.find((a) => a.name.getText(sf) === "className");
+      const hidden = attrs.some(
+        (a) => a.name.getText(sf) === "aria-hidden" && isStaticallyHidden(a),
+      );
+      if (cls?.initializer && !hidden && stringsIn(cls.initializer).some(hasFaintMutedText)) n++;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return n;
+}
+
+describe("muted text opacity matcher", () => {
+  it.each(["/0", "/5", "/25", "/65", "/70", "/75", "/79", "/[.3]", "/[0.79]", "/[30%]"])(
+    "flags text-muted-foreground%s",
+    (suffix) => {
+      expect(hasFaintMutedText(`text-sm text-muted-foreground${suffix}`)).toBe(true);
+    },
+  );
+  it.each(["", "/80", "/90", "/100", "/[.8]", "/[80%]"])(
+    "allows text-muted-foreground%s",
+    (suffix) => {
+      expect(hasFaintMutedText(`text-sm text-muted-foreground${suffix}`)).toBe(false);
+    },
+  );
+  it("exempts only a statically true aria-hidden", () => {
+    const faint = 'className="text-muted-foreground/40"';
+    expect(offendersIn(`<span aria-hidden ${faint} />`)).toBe(0);
+    expect(offendersIn(`<span aria-hidden="true" ${faint} />`)).toBe(0);
+    expect(offendersIn(`<span aria-hidden={true} ${faint} />`)).toBe(0);
+    expect(offendersIn(`<span aria-hidden={false} ${faint} />`)).toBe(1);
+    expect(offendersIn(`<span aria-hidden="false" ${faint} />`)).toBe(1);
+    expect(offendersIn(`<span aria-hidden={decorative} ${faint} />`)).toBe(1);
+    expect(offendersIn(`<span ${faint} />`)).toBe(1);
+  });
+});
 
 describe("muted text opacity floor (D2 a)", () => {
   it("no element without aria-hidden draws text-muted-foreground at /70 or fainter", () => {

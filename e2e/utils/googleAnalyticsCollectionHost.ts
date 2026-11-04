@@ -193,9 +193,11 @@ export function startGaCollectionProxy(proxyPort: number, appPort: number): Prom
   const server = createServer((req, res) => {
     const target = forwardTarget(req.url, appPort, boundPort);
     if (target === "forbid" || !target) {
-      res.writeHead(target === "forbid" ? 403 : 400);
+      // Connection: close tells a keep-alive client not to reuse this socket, and lets Node
+      // close it after the response is flushed. Destroying it here instead raced the client's
+      // next request onto a dead socket ("socket hang up").
+      res.writeHead(target === "forbid" ? 403 : 400, { Connection: "close" });
       res.end();
-      req.destroy();
       return;
     }
     const headers = { ...req.headers };

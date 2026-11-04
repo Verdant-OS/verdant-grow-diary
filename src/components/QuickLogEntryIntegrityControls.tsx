@@ -13,7 +13,7 @@
  *   - No entitlement/plan gating — identical for every plan.
  *   - Fixed copy; never echoes raw DB errors.
  */
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PencilLine, Undo2 } from "lucide-react";
 import { toast } from "sonner";
@@ -61,6 +61,7 @@ import {
   type QuickLogCorrectionValueContext,
   type QuickLogRevisionReasonCode,
 } from "@/lib/quick-log/quickLogRevisionRules";
+import { quickLogCorrectionStructuredReadingsNote } from "@/lib/quickLogStructuredReadingRules";
 import type { QuickLogEntryHandle } from "@/lib/quickLogRevisionService";
 import { useQuickLogRevisionMutation } from "@/hooks/useQuickLogRevisionMutation";
 import { useAuth } from "@/store/auth";
@@ -236,6 +237,9 @@ function RevisionControls({
   const readingsNote = quickLogCorrectionEnvironmentCheckReadingsNote(environmentCheckDetails, {
     offersAirReadingFields: editsSensor,
   });
+  // Structured soil/CO₂/PPFD readings are read-only until the correction RPC
+  // is extended (spec quick-log-structured-sensor-readings §3.5).
+  const structuredReadingsNote = quickLogCorrectionStructuredReadingsNote(environmentCheckDetails);
   const [volumeDraft, setVolumeDraft] = useState<string>(volumeDraftFrom(correctionValues));
   const [doseDraft, setDoseDraft] = useState<string>(
     correctionValues?.kind === "feeding" && correctionValues.doseAmount != null
@@ -245,6 +249,7 @@ function RevisionControls({
   const temperatureUnit = useTemperatureUnitPreference();
   const [temperatureTouched, setTemperatureTouched] = useState(false);
   const [temperatureError, setTemperatureError] = useState<string | null>(null);
+  const temperatureErrorId = useId();
   const [temperatureDraft, setTemperatureDraft] = useState<string>(() => {
     const stored = draftSensor(correctionValues, "temperature_c");
     if (stored === "") return "";
@@ -521,6 +526,14 @@ function RevisionControls({
                 {readingsNote}
               </p>
             )}
+            {structuredReadingsNote && (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="quicklog-correct-structured-readings-note"
+              >
+                {structuredReadingsNote}
+              </p>
+            )}
             {editsSensor && (
               <div className="space-y-2">
                 <label className="block text-xs text-muted-foreground">
@@ -536,12 +549,15 @@ function RevisionControls({
                       setTemperatureDraft(e.target.value);
                     }}
                     aria-invalid={temperatureError ? true : undefined}
+                    aria-describedby={temperatureError ? temperatureErrorId : undefined}
                     data-testid="quicklog-correct-temperature-input"
                     className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
                   />
                 </label>
                 {temperatureError && (
                   <p
+                    id={temperatureErrorId}
+                    role="alert"
                     className="text-xs text-destructive"
                     data-testid="quicklog-correct-temperature-error"
                   >

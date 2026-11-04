@@ -1005,6 +1005,9 @@ figures:
   `src/lib/aiDoctorReadinessSummaryRules.ts` declares the six labels plus `"unknown"` (all three
   figures), and `src/lib/ecowittCustomUploadStationCardViewModel.ts` declares
   `"none" | "live" | "stale"`, a freshness union, not a sensor-source one (first and third figures).
+  The `aiDoctorReadinessSummaryRules.ts` line is a new inline sensor-source union, which this
+  clause forbids: the count was allowed to shrink and it grew. It is recorded as drift, not
+  precedent. Do not copy it; new code imports the canonical source type.
   The earlier history:
   each figure was 76/66, 69/60 and 105/85 through `22f8dfe8`, and 77/67, 70/61 and 106/86 at `c8523adc`, `27991451` and `479cadb3`; the added line is `#1857`'s
   `QuickLogAiSensorSource` union (`src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts:172`),

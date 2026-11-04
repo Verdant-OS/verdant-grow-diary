@@ -92,8 +92,11 @@ jobs:
         if: env.ENABLED == 'true'
         id: supabase-start
         run: |
+          # Exclude services no harness uses (Studio, analytics + vector, and imgproxy,
+          # which the CLI stops after start anyway). Fewer pulls means less exposure to registry
+          # "Rate exceeded", and less memory pressure on the runner while the harnesses run.
           set -eo pipefail
-          supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" 2>&1 | tee supabase-start.log
+          supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" -x studio,analytics,vector,imgproxy 2>&1 | tee supabase-start.log
           echo "started=true" >> "$GITHUB_OUTPUT"
 
       - name: Export local Supabase env
@@ -262,6 +265,18 @@ jobs:
         run: |
           set -o pipefail
           bun run test:security-db-local 2>&1 | tee security-db-local.log
+
+      - name: Capture local Supabase container state
+        if: failure() && env.ENABLED == 'true'
+        run: |
+          # Gateway 502s ("An invalid response was received from the upstream server") have failed
+          # this job mid-suite with no container evidence. Keep state and logs so the next failure
+          # shows whether PostgREST, GoTrue or Postgres restarted or errored. Local, disposable keys only.
+          mkdir -p artifacts/security-db/containers
+          docker ps -a --format '{{.Names}}\t{{.Status}}' > artifacts/security-db/containers/ps.txt 2>&1 || true
+          for name in $(docker ps -a --format '{{.Names}}' | grep -E '^supabase_(kong|rest|auth|db|storage|edge_runtime)_' || true); do
+            docker logs --timestamps --tail 400 "$name" > "artifacts/security-db/containers/$name.log" 2>&1 || true
+          done
 
       - name: Upload failure artifacts
         if: failure() && env.ENABLED == 'true'

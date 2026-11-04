@@ -191,7 +191,7 @@ describe("local Supabase replay compatibility workspace", () => {
 
     expect(lifecycleCommands).toHaveLength(4);
     expect(lifecycleCommands).toEqual([
-      'supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" 2>&1 | tee supabase-start.log',
+      'supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" -x studio,analytics,vector,imgproxy 2>&1 | tee supabase-start.log',
       'STATUS_JSON="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o json)"',
       'supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR" 2>&1 | tee supabase-db-reset.log',
       'run: supabase stop --workdir "$SUPABASE_REPLAY_WORKDIR" --no-backup || true',

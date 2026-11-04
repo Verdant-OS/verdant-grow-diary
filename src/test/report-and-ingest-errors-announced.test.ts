@@ -41,8 +41,10 @@ function announces(el: ts.JsxOpeningLikeElement, sf: ts.SourceFile): boolean {
   const a = attrs(el, sf);
   return (
     /alert|status/.test(a.text("role")) ||
-    a.has("aria-live") ||
-    /alert|status/.test(a.text("descriptionRole"))
+    // aria-live="off" turns announcements off, so only polite or assertive counts.
+    /polite|assertive/.test(a.text("aria-live")) ||
+    // Only EmptyState renders descriptionRole (pinned by the render tests below).
+    (el.tagName.getText(sf) === "EmptyState" && /alert|status/.test(a.text("descriptionRole")))
   );
 }
 

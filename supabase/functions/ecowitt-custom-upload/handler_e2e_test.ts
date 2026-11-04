@@ -36,6 +36,7 @@ interface State {
   binds: Array<Record<string, unknown>>;
   reserves: Array<Record<string, unknown>>;
   subscriptionRows: LovableSubscriptionRow[];
+  hardwareConfig: unknown;
 }
 
 function paidSubscription(): LovableSubscriptionRow {
@@ -77,6 +78,7 @@ function makeState(claim: ClaimRow | null = openClaim()): State {
     binds: [],
     reserves: [],
     subscriptionRows: [paidSubscription()],
+    hardwareConfig: { ecowitt: { air_channels: [1], soil_channels: [1] } },
   };
 }
 
@@ -145,6 +147,22 @@ function makeAdmin(state: State): EcowittCustomUploadAdmin {
           },
         };
       }
+      if (table === "tents") {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle: async () => ({
+                    data: { hardware_config: state.hardwareConfig },
+                    error: null,
+                  }),
+                };
+              },
+            };
+          },
+        };
+      }
       if (table === "sensor_readings") {
         return {
           insert(rows: Array<Record<string, unknown>>) {
@@ -155,8 +173,51 @@ function makeAdmin(state: State): EcowittCustomUploadAdmin {
       }
       throw new Error(`unexpected table ${table}`);
     },
-    rpc(_name: string, args: Record<string, unknown>) {
+    // Mirrors commit_ecowitt_custom_upload_ingest (migration 20261102150000).
+    rpc(name: string, args: Record<string, unknown>) {
       state.reserves.push(args);
+      if (name !== "commit_ecowitt_custom_upload_ingest") {
+        throw new Error(`unexpected rpc ${name}`);
+      }
+      const claim = state.claim;
+      const passkey = String(args.p_passkey_sha256 ?? "");
+      const receivedAt = String(args.p_received_at);
+      const capturedAt = String(args.p_captured_at);
+      if (claim === null || claim.revoked_at !== null) {
+        return Promise.resolve({ data: "claim_not_found", error: null });
+      }
+      const gapMs = Math.max(8000, (claim.interval_seconds ?? 16) * 500);
+      if (
+        claim.last_received_at !== null &&
+        Date.parse(receivedAt) < Date.parse(claim.last_received_at) + gapMs
+      ) {
+        return Promise.resolve({ data: "rate_limited", error: null });
+      }
+      if (
+        claim.last_captured_at !== null &&
+        Date.parse(capturedAt) <= Date.parse(claim.last_captured_at)
+      ) {
+        return Promise.resolve({ data: "duplicate_captured_at", error: null });
+      }
+      if (claim.passkey_sha256 === null) {
+        state.binds.push({ passkey_sha256: passkey, stationtype: args.p_stationtype });
+        claim.passkey_sha256 = passkey;
+        claim.stationtype = String(args.p_stationtype);
+      } else if (claim.passkey_sha256 !== passkey) {
+        return Promise.resolve({ data: "passkey_mismatch", error: null });
+      }
+      claim.last_received_at = receivedAt;
+      claim.last_captured_at = capturedAt;
+      const readings = args.p_readings as Array<Record<string, unknown>>;
+      for (const reading of readings) {
+        state.inserts.push({
+          user_id: claim.user_id,
+          tent_id: claim.tent_id,
+          source: "live",
+          captured_at: capturedAt,
+          ...reading,
+        });
+      }
       return Promise.resolve({ data: "ok", error: null });
     },
   };
@@ -189,21 +250,30 @@ const BASE_FIELDS = {
   dateutc: "2026-11-02 18:00:00",
   tempinf: "72",
   humidityin: "55",
+  temp1f: "77",
+  humidity1: "60",
   soilmoisture1: "40",
   co2: "800",
 };
 
 async function withLogs<T>(run: () => Promise<T>): Promise<{ result: T; logs: string }> {
   const lines: string[] = [];
-  const original = console.info;
-  console.info = (...args: unknown[]) => {
-    lines.push(args.map((arg) => String(arg)).join(" "));
-  };
+  const methods = ["log", "info", "warn", "error"] as const;
+  const originals = methods.map((method) => console[method]);
+  for (const method of methods) {
+    console[method] = (...args: unknown[]) => {
+      lines.push(
+        args.map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg))).join(" "),
+      );
+    };
+  }
   try {
     const result = await run();
     return { result, logs: lines.join("\n") };
   } finally {
-    console.info = original;
+    methods.forEach((method, index) => {
+      console[method] = originals[index];
+    });
   }
 }
 
@@ -215,7 +285,7 @@ function assertNoSecrets(logs: string, body: string) {
   assert(!logs.includes("tempinf"), "log contains a body field");
 }
 
-Deno.test("stores live rows for a form post and keeps the reason off the wire", async () => {
+Deno.test("stores live tent rows for a form post and keeps secrets off the wire", async () => {
   const state = makeState();
   const body = form(BASE_FIELDS);
   const { result, logs } = await withLogs(() =>
@@ -227,21 +297,29 @@ Deno.test("stores live rows for a form post and keeps the reason off the wire", 
   );
   assertEquals(result.status, 200);
   const payload = await result.json();
-  assertEquals(payload, { accepted: true, stored: 4 });
-  assertEquals("reason" in payload, false);
-  assertEquals(state.inserts.length, 4);
+  assertEquals(payload, { accepted: true, reason: "stored", stored: 4 });
+  // Indoor tempinf/humidityin are never tent air; channel 1 air and soil are.
+  assertEquals(state.inserts.map((row) => row.metric).sort(), [
+    "co2_ppm",
+    "humidity_pct",
+    "soil_moisture_pct",
+    "temperature_c",
+  ]);
   assertEquals(state.inserts[0].source, "live");
-  assertEquals(state.inserts[0].captured_at, "2026-11-02T18:00:00Z");
-  assert(state.inserts[0].ts !== state.inserts[0].captured_at);
+  assertEquals(state.inserts[0].user_id, USER_ID);
+  assertEquals(state.inserts[0].tent_id, TENT_ID);
+  assertEquals(
+    Date.parse(String(state.inserts[0].captured_at)),
+    Date.parse("2026-11-02T18:00:00Z"),
+  );
   assertEquals(state.binds.length, 1);
-  assertEquals("last_received_at" in state.binds[0], false);
-  assertEquals("last_captured_at" in state.binds[0], false);
-  assert(logs.includes("stored"));
+  assertEquals(state.binds[0].passkey_sha256, await sha256Hex(PASSKEY));
   assertNoSecrets(logs, body);
+  assert(!JSON.stringify(payload).includes(PASSKEY));
 });
 
 Deno.test("accepts plus-encoded dateutc, a charset suffix, and ignores unknown keys", async () => {
-  const plusBody = `PASSKEY=${PASSKEY}&stationtype=GW1200-fixture&${PLUS_ENCODED_DATEUTC}&tempinf=72&humidityin=55`;
+  const plusBody = `PASSKEY=${PASSKEY}&stationtype=GW1200-fixture&${PLUS_ENCODED_DATEUTC}&temp1f=72&humidity1=55`;
   const plusState = makeState();
   const plus = await EcowittCustomUploadEdge.handle(post(plusBody), {
     admin: makeAdmin(plusState),
@@ -249,7 +327,10 @@ Deno.test("accepts plus-encoded dateutc, a charset suffix, and ignores unknown k
     expectedBillingEnvironment: "live",
   });
   assertEquals(plus.status, 200);
-  assertEquals(plusState.inserts[0]?.captured_at, "2026-11-02T18:00:00Z");
+  assertEquals(
+    Date.parse(String(plusState.inserts[0]?.captured_at)),
+    Date.parse("2026-11-02T18:00:00Z"),
+  );
 
   const charsetState = makeState();
   const charsetBody = form(BASE_FIELDS);
@@ -310,9 +391,9 @@ Deno.test("accepts 16s, 60s, and 600s cadences and throttles a faster burst with
     }),
   );
   assertEquals(result.status, 200);
-  assertEquals(await result.json(), { accepted: false, stored: 0 });
+  // rate_limited is masked to "rejected" on the wire (#2732).
+  assertEquals(await result.json(), { accepted: false, reason: "rejected", stored: 0 });
   assertEquals(burst.inserts.length, 0);
-  assert(logs.includes("rate_limited"));
   assertNoSecrets(logs, form(BASE_FIELDS));
 
   assertEquals(isCustomUploadPacketStale("2026-11-02T17:58:00.000Z", 16, NOW), true);
@@ -346,9 +427,11 @@ Deno.test(
       }),
     );
     assertEquals(mismatchResult.result.status, 200);
-    assertEquals(await mismatchResult.result.json(), { accepted: false, stored: 0 });
+    const mismatchPayload = await mismatchResult.result.json();
+    assertEquals(mismatchPayload, { accepted: false, reason: "rejected", stored: 0 });
     assertEquals(mismatch.inserts.length, 0);
-    assert(mismatchResult.logs.includes("passkey_mismatch"));
+    assertEquals(mismatch.claim?.passkey_sha256, await sha256Hex(PASSKEY));
+    assert(!JSON.stringify(mismatchPayload).includes(OTHER_PASSKEY));
     assertNoSecrets(mismatchResult.logs, mismatchBody);
 
     const unknown = makeState(null);
@@ -360,7 +443,11 @@ Deno.test(
       }),
     );
     assertEquals(unknownResult.result.status, 200);
-    assert(unknownResult.logs.includes("unknown_claim"));
+    assertEquals(await unknownResult.result.json(), {
+      accepted: false,
+      reason: "rejected",
+      stored: 0,
+    });
     assertEquals(unknown.inserts.length, 0);
     assertNoSecrets(unknownResult.logs, form(BASE_FIELDS));
 
@@ -373,7 +460,11 @@ Deno.test(
       }),
     );
     assertEquals(revokedResult.result.status, 200);
-    assert(revokedResult.logs.includes("claim_revoked"));
+    assertEquals(await revokedResult.result.json(), {
+      accepted: false,
+      reason: "claim_revoked",
+      stored: 0,
+    });
     assertEquals(revoked.inserts.length, 0);
 
     const oversized = makeState();
@@ -395,7 +486,11 @@ Deno.test(
       ),
     );
     assertEquals(oversizedResult.result.status, 200);
-    assert(oversizedResult.logs.includes("payload_too_large"));
+    assertEquals(await oversizedResult.result.json(), {
+      accepted: false,
+      reason: "payload_too_large",
+      stored: 0,
+    });
     assertEquals(oversized.inserts.length, 0);
     assert(!oversizedResult.logs.includes("PASSKEY=abcd"));
 
@@ -408,8 +503,11 @@ Deno.test(
       }),
     );
     assertEquals(getResult.result.status, 200);
-    assertEquals(await getResult.result.json(), { accepted: false, stored: 0 });
-    assert(getResult.logs.includes("method_not_allowed"));
+    assertEquals(await getResult.result.json(), {
+      accepted: false,
+      reason: "method_not_allowed",
+      stored: 0,
+    });
     assertEquals(getState.inserts.length, 0);
     assertNoSecrets(getResult.logs, "");
   },
@@ -423,6 +521,8 @@ Deno.test("a claim row with no interval is not treated as a 60 second station", 
     expectedBillingEnvironment: "live",
   });
   assertEquals(response.status, 200);
-  assertEquals(await response.json(), { accepted: false, stored: 0 });
+  // readClaim rejects a row without a numeric interval, so it reads as no claim.
+  assertEquals(await response.json(), { accepted: false, reason: "rejected", stored: 0 });
   assertEquals(state.inserts.length, 0);
+  assertEquals(state.reserves.length, 0);
 });

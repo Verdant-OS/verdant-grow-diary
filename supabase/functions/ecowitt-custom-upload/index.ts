@@ -7,10 +7,10 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
+  ecowittServiceRoleInsertResult,
   handleEcowittCustomUploadWithEntitlement,
   type EcowittCustomUploadServiceRole,
 } from "../_shared/ecowittCustomUploadSupabasePorts.ts";
-import { EcowittCustomUploadGatewayResponse } from "../_shared/ecowittCustomUploadHttp.ts";
 import type {
   EcowittCustomUploadClaim,
   EcowittCustomUploadStoredReading,
@@ -24,7 +24,7 @@ export interface EcowittCustomUploadAdmin {
   rpc(
     name: string,
     args: Record<string, unknown>,
-  ): PromiseLike<{ data: unknown; error: { message: string } | null }>;
+  ): PromiseLike<{ data: unknown; error: { code?: string; message: string } | null }>;
 }
 
 export interface EcowittCustomUploadEdgeDeps {
@@ -38,16 +38,11 @@ export class EcowittCustomUploadSupabaseServiceRole {
     return {
       lookupClaim: (tokenSha256) =>
         EcowittCustomUploadSupabaseServiceRole.lookupClaim(admin, tokenSha256),
-      bindClaim: (claimId, passkeySha256, stationtype, receivedAt) =>
-        EcowittCustomUploadSupabaseServiceRole.bindClaim(
-          admin,
-          claimId,
-          passkeySha256,
-          stationtype,
-          receivedAt,
-        ),
-      callReserve: (_fn, args) => EcowittCustomUploadSupabaseServiceRole.callReserve(admin, args),
+      callBind: (fn, args) => EcowittCustomUploadSupabaseServiceRole.callRpc(admin, fn, args),
+      callReserve: (fn, args) => EcowittCustomUploadSupabaseServiceRole.callRpc(admin, fn, args),
+      callCommit: (fn, args) => EcowittCustomUploadSupabaseServiceRole.callRpc(admin, fn, args),
       insertReadings: (rows) => EcowittCustomUploadSupabaseServiceRole.insertReadings(admin, rows),
+      tentChannels: (tentId) => EcowittCustomUploadSupabaseServiceRole.tentChannels(admin, tentId),
     };
   }
 
@@ -94,46 +89,29 @@ export class EcowittCustomUploadSupabaseServiceRole {
     };
   }
 
-  static async bindClaim(
+  /** Service-role RPC passthrough. The Postgres error code is kept so 23505 maps to duplicate. */
+  static async callRpc(
     admin: EcowittCustomUploadAdmin,
-    claimId: string,
-    passkeySha256: string,
-    stationtype: string,
-    receivedAt: string,
-  ): Promise<{ ok: true } | { ok: false }> {
-    const result = await admin
-      .from("ecowitt_custom_upload_claims")
-      .update({
-        passkey_sha256: passkeySha256,
-        stationtype,
-        bound_at: receivedAt,
-      })
-      .eq("id", claimId)
-      .is("passkey_sha256", null);
-    return result.error ? { ok: false } : { ok: true };
-  }
-
-  static async callReserve(
-    admin: EcowittCustomUploadAdmin,
-    args: {
-      readonly p_claim_id: string;
-      readonly p_received_at: string;
-      readonly p_captured_at: string;
-    },
-  ): Promise<{ readonly data: unknown; readonly error: { readonly message: string } | null }> {
-    const result = await admin.rpc("reserve_ecowitt_custom_upload_receipt", {
-      p_claim_id: args.p_claim_id,
-      p_received_at: args.p_received_at,
-      p_captured_at: args.p_captured_at,
-    });
-    if (result.error) return { data: null, error: { message: "reserve_failed" } };
+    fn: string,
+    args: Record<string, unknown>,
+  ): Promise<{
+    readonly data: unknown;
+    readonly error: { readonly code?: string; readonly message: string } | null;
+  }> {
+    const result = await admin.rpc(fn, args);
+    if (result.error) {
+      return {
+        data: null,
+        error: { code: result.error.code, message: result.error.message },
+      };
+    }
     return { data: result.data, error: null };
   }
 
   static async insertReadings(
     admin: EcowittCustomUploadAdmin,
     rows: readonly EcowittCustomUploadStoredReading[],
-  ): Promise<{ ok: true } | { ok: false }> {
+  ): Promise<{ ok: true } | { ok: false; reason: "duplicate" | "failed" }> {
     const payload = rows.map((row) => ({
       user_id: row.userId,
       tent_id: row.tentId,
@@ -149,7 +127,45 @@ export class EcowittCustomUploadSupabaseServiceRole {
       },
     }));
     const result = await admin.from("sensor_readings").insert(payload);
-    return result.error ? { ok: false } : { ok: true };
+    return ecowittServiceRoleInsertResult(result.error);
+  }
+
+  /** Air and soil channels (1–8) from tents.hardware_config.ecowitt. Missing config is empty, not an error. */
+  static async tentChannels(
+    admin: EcowittCustomUploadAdmin,
+    tentId: string,
+  ): Promise<
+    { ok: true; airChannels: readonly number[]; soilChannels: readonly number[] } | { ok: false }
+  > {
+    const result = await admin
+      .from("tents")
+      .select("hardware_config")
+      .eq("id", tentId)
+      .maybeSingle();
+    if (result.error) return { ok: false };
+    return {
+      ok: true,
+      ...EcowittCustomUploadSupabaseServiceRole.readChannels(result.data?.hardware_config),
+    };
+  }
+
+  static readChannels(hardwareConfig: unknown): {
+    airChannels: readonly number[];
+    soilChannels: readonly number[];
+  } {
+    const pick = (value: unknown): number[] =>
+      Array.isArray(value)
+        ? value.filter(
+            (n): n is number => typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 8,
+          )
+        : [];
+    if (!hardwareConfig || typeof hardwareConfig !== "object") {
+      return { airChannels: [], soilChannels: [] };
+    }
+    const eco = (hardwareConfig as Record<string, unknown>).ecowitt;
+    if (!eco || typeof eco !== "object") return { airChannels: [], soilChannels: [] };
+    const e = eco as Record<string, unknown>;
+    return { airChannels: pick(e.air_channels), soilChannels: pick(e.soil_channels) };
   }
 }
 
@@ -158,9 +174,16 @@ export class EcowittCustomUploadEdge {
     const now = deps.now?.() ?? new Date();
     const admin = deps.admin ?? EcowittCustomUploadEdge.adminFromEnv();
     if (admin === null) {
-      return EcowittCustomUploadGatewayResponse.json(
-        { accepted: false, reason: "server_misconfigured" },
-        0,
+      console.error("[ecowitt-custom-upload] server_misconfigured");
+      return new Response(
+        JSON.stringify({ accepted: false, reason: "server_misconfigured", stored: 0 }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "no-store",
+          },
+        },
       );
     }
     return handleEcowittCustomUploadWithEntitlement(request, {

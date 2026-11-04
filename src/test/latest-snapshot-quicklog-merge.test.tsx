@@ -145,6 +145,46 @@ describe("LatestSnapshotQuickLogMerge (pure)", () => {
     ).toBe(tie);
   });
 
+  it("never lets a future-dated Quick Log capture win over a valid reading", () => {
+    const nowMs = Date.parse("2026-11-03T22:00:00.000Z");
+    const valid = base(new Date(nowMs - 60 * 60_000).toISOString());
+    const tol = LatestSnapshotQuickLogMerge.FUTURE_SKEW_TOLERANCE_MS;
+    const farFuture = new Date(nowMs + 24 * 60 * 60_000).toISOString();
+    const justPastSkew = new Date(nowMs + tol + 1_000).toISOString();
+    for (const at of [farFuture, justPastSkew]) {
+      expect(
+        LatestSnapshotQuickLogMerge.merge(
+          valid,
+          [manual(TENT_A, at, 30, 40, 2.5)],
+          [TENT_A],
+          nowMs,
+        ),
+      ).toBe(valid);
+    }
+    // Within the skew tolerance a slightly-ahead capture still counts as newest.
+    const withinSkew = new Date(nowMs + tol - 1_000).toISOString();
+    expect(
+      LatestSnapshotQuickLogMerge.merge(
+        valid,
+        [manual(TENT_A, withinSkew, 23.9, 54, 1.36)],
+        [TENT_A],
+        nowMs,
+      ),
+    ).toMatchObject({ source: "manual", temp: 23.9 });
+    // A future-dated capture beside a valid one: the valid one is used.
+    expect(
+      LatestSnapshotQuickLogMerge.merge(
+        valid,
+        [
+          manual(TENT_A, farFuture, 30, 40, 2.5),
+          manual(TENT_A, new Date(nowMs - 60_000).toISOString(), 23.9, 54, 1.36),
+        ],
+        [TENT_A],
+        nowMs,
+      ),
+    ).toMatchObject({ source: "manual", temp: 23.9 });
+  });
+
   it("uses the Quick Log snapshot when the base is empty or untimed", () => {
     const m = [manual(TENT_A, minutesAgo(5), 23.9, 54, 1.36)];
     expect(LatestSnapshotQuickLogMerge.merge(EMPTY_SNAPSHOT, m, [TENT_A]).temp).toBe(23.9);

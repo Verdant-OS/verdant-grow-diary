@@ -11,7 +11,11 @@
  * base. The manual value is shown as `manual`, never promoted to live, and is
  * never alert-persistence evidence (it carries no sensor row or diary ref).
  *
- * Pure: no I/O, no React, no clock.
+ * A manual capture dated more than `FUTURE_SKEW_TOLERANCE_MS` after `nowMs`
+ * (a wrong device clock or a bad import) is ignored, so it can never win
+ * indefinitely over a real sensor or diary reading.
+ *
+ * Pure: no I/O, no React; the clock is a parameter (defaults to `Date.now()`).
  */
 import type { SensorReading } from "@/mock";
 import { EMPTY_SNAPSHOT, type SensorSnapshot } from "@/lib/sensorSnapshot";
@@ -19,6 +23,9 @@ import { EMPTY_SNAPSHOT, type SensorSnapshot } from "@/lib/sensorSnapshot";
 type Candidate = { reading: SensorReading; ms: number };
 
 export class LatestSnapshotQuickLogMerge {
+  /** Allowed clock skew for a manual capture that is slightly ahead of now. */
+  static readonly FUTURE_SKEW_TOLERANCE_MS = 5 * 60_000;
+
   /**
    * `base` unless an in-scope Quick Log manual was captured strictly after it.
    * An empty scope (no tent ids) never merges: manuals attribute to one tent.
@@ -27,8 +34,9 @@ export class LatestSnapshotQuickLogMerge {
     base: SensorSnapshot,
     manuals: readonly SensorReading[] | null | undefined,
     tentIds: readonly string[],
+    nowMs: number = Date.now(),
   ): SensorSnapshot {
-    const manual = LatestSnapshotQuickLogMerge.newestSnapshot(manuals, tentIds);
+    const manual = LatestSnapshotQuickLogMerge.newestSnapshot(manuals, tentIds, nowMs);
     if (!manual) return base;
     const baseMs = LatestSnapshotQuickLogMerge.baseMs(base);
     const manualMs = Date.parse(manual.ts as string);
@@ -39,12 +47,13 @@ export class LatestSnapshotQuickLogMerge {
   static newestSnapshot(
     manuals: readonly SensorReading[] | null | undefined,
     tentIds: readonly string[],
+    nowMs: number = Date.now(),
   ): SensorSnapshot | null {
     const scope = new Set(tentIds.map((id) => id.trim()).filter(Boolean));
     if (scope.size === 0 || !manuals) return null;
     let newest: Candidate | null = null;
     for (const reading of manuals) {
-      const candidate = LatestSnapshotQuickLogMerge.candidate(reading, scope);
+      const candidate = LatestSnapshotQuickLogMerge.candidate(reading, scope, nowMs);
       if (!candidate) continue;
       // Strictly newer replaces; equal instants keep the first, so the choice
       // is deterministic for one input order.
@@ -56,12 +65,14 @@ export class LatestSnapshotQuickLogMerge {
   private static candidate(
     reading: SensorReading | null | undefined,
     scope: ReadonlySet<string>,
+    nowMs: number,
   ): Candidate | null {
     if (!reading || reading.source !== "manual") return null;
     if (typeof reading.tentId !== "string" || !scope.has(reading.tentId.trim())) return null;
     const at = reading.capturedAt || reading.ts;
     const ms = typeof at === "string" ? Date.parse(at) : Number.NaN;
     if (!Number.isFinite(ms)) return null;
+    if (ms > nowMs + LatestSnapshotQuickLogMerge.FUTURE_SKEW_TOLERANCE_MS) return null;
     if (!LatestSnapshotQuickLogMerge.hasObservedMetric(reading)) return null;
     return { reading, ms };
   }

@@ -8,9 +8,10 @@
 -- (Lovable query_database, read-only): pg_get_constraintdef, pg_indexes,
 -- pg_get_functiondef, pg_policies and information_schema.columns.
 --
--- Contract: every step is guarded by a catalog check, so on production this
--- file changes nothing. On a database built from this repository (local or
--- CI replay) it brings the schema up to production's shape.
+-- Contract: every statement sits inside a catalog-guarded DO block, so on
+-- production this file executes no DDL and takes no table lock. On a database
+-- built from this repository (local or CI replay) it brings the schema up to
+-- production's shape.
 --
 -- Not reproduced on purpose: table privileges on public.stripe_payment_receipts.
 -- Production shows anon and authenticated holding all table privileges there
@@ -87,7 +88,7 @@ BEGIN
     ALTER TABLE public.subscriptions
       ADD CONSTRAINT subscriptions_provider_check
       CHECK (billing_provider = ANY (ARRAY['paddle'::text, 'stripe'::text]));
-  ELSIF v_def <> 'CHECK ((billing_provider = ANY (ARRAY[''paddle''::text, ''stripe''::text])))'
+  ELSIF position('billing_provider' in v_def) = 0
     AND NOT EXISTS (
       SELECT 1 FROM pg_constraint
       WHERE conrelid = 'public.subscriptions'::regclass
@@ -135,13 +136,21 @@ BEGIN
 END
 $record$;
 
-CREATE UNIQUE INDEX IF NOT EXISTS subscriptions_stripe_identity
-  ON public.subscriptions USING btree (environment, stripe_subscription_id)
-  WHERE (stripe_subscription_id IS NOT NULL);
+-- Guarded: CREATE INDEX IF NOT EXISTS takes a ShareLock on the table before it
+-- checks the name, so it would block writes to subscriptions even as a no-op.
+DO $record$
+BEGIN
+  IF to_regclass('public.subscriptions_stripe_identity') IS NULL THEN
+    CREATE UNIQUE INDEX subscriptions_stripe_identity
+      ON public.subscriptions USING btree (environment, stripe_subscription_id)
+      WHERE (stripe_subscription_id IS NOT NULL);
+  END IF;
+END
+$record$;
 
 -- 3. public.ai_credit_grants: allow the stripe_credit_pack source.
--- Each constraint is replaced only when its definition differs from
--- production's. Production's definitions match, so nothing changes there.
+-- Each constraint is replaced only when it does not yet allow stripe_credit_pack.
+-- Production's definitions already do, so nothing changes there.
 DO $record$
 DECLARE
   v_def text;
@@ -151,9 +160,10 @@ BEGIN
   WHERE conrelid = 'public.ai_credit_grants'::regclass
     AND conname = 'ai_credit_grants_source_check';
 
-  IF v_def IS DISTINCT FROM
-    'CHECK ((source = ANY (ARRAY[''credit_pack''::text, ''stripe_credit_pack''::text, ''referral''::text, ''bonus''::text])))'
-  THEN
+  -- Semantic check, not text equality: production's text may be formatted
+  -- differently on another PostgreSQL version, and a false mismatch there
+  -- would DROP and re-ADD the constraint under an ACCESS EXCLUSIVE lock.
+  IF v_def IS NULL OR position('stripe_credit_pack' in v_def) = 0 THEN
     ALTER TABLE public.ai_credit_grants DROP CONSTRAINT IF EXISTS ai_credit_grants_source_check;
     ALTER TABLE public.ai_credit_grants
       ADD CONSTRAINT ai_credit_grants_source_check
@@ -165,9 +175,7 @@ BEGIN
   WHERE conrelid = 'public.ai_credit_grants'::regclass
     AND conname = 'ai_credit_grants_idempotency_anchor';
 
-  IF v_def IS DISTINCT FROM
-    'CHECK ((((source = ''credit_pack''::text) AND (paddle_transaction_id IS NOT NULL) AND (grant_ref IS NULL)) OR ((source = ANY (ARRAY[''stripe_credit_pack''::text, ''referral''::text, ''bonus''::text])) AND (grant_ref IS NOT NULL) AND (paddle_transaction_id IS NULL))))'
-  THEN
+  IF v_def IS NULL OR position('stripe_credit_pack' in v_def) = 0 THEN
     ALTER TABLE public.ai_credit_grants DROP CONSTRAINT IF EXISTS ai_credit_grants_idempotency_anchor;
     ALTER TABLE public.ai_credit_grants
       ADD CONSTRAINT ai_credit_grants_idempotency_anchor
@@ -188,19 +196,25 @@ END
 $record$;
 
 -- 4. public.stripe_payment_receipts: one row per settled Stripe credit-pack payment.
-CREATE TABLE IF NOT EXISTS public.stripe_payment_receipts (
-  environment text NOT NULL,
-  payment_id text NOT NULL,
-  user_id uuid NOT NULL,
-  price_id text NOT NULL,
-  status text NOT NULL,
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT stripe_payment_receipts_pkey PRIMARY KEY (environment, payment_id),
-  CONSTRAINT stripe_payment_receipts_environment_check
-    CHECK (environment = ANY (ARRAY['sandbox'::text, 'live'::text])),
-  CONSTRAINT stripe_payment_receipts_status_check
-    CHECK (status = ANY (ARRAY['paid'::text, 'refunded'::text]))
-);
+DO $record$
+BEGIN
+  IF to_regclass('public.stripe_payment_receipts') IS NULL THEN
+    CREATE TABLE public.stripe_payment_receipts (
+      environment text NOT NULL,
+      payment_id text NOT NULL,
+      user_id uuid NOT NULL,
+      price_id text NOT NULL,
+      status text NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT stripe_payment_receipts_pkey PRIMARY KEY (environment, payment_id),
+      CONSTRAINT stripe_payment_receipts_environment_check
+        CHECK (environment = ANY (ARRAY['sandbox'::text, 'live'::text])),
+      CONSTRAINT stripe_payment_receipts_status_check
+        CHECK (status = ANY (ARRAY['paid'::text, 'refunded'::text]))
+    );
+  END IF;
+END
+$record$;
 
 DO $record$
 BEGIN

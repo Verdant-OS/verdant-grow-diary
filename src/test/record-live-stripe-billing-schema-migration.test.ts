@@ -31,13 +31,22 @@ describe("record-live Stripe billing schema migration", () => {
   });
 
   it("creates objects only behind IF NOT EXISTS or a catalog check", () => {
-    expect(code).toMatch(/CREATE TABLE IF NOT EXISTS public\.stripe_payment_receipts/);
-    expect(code).toMatch(/CREATE UNIQUE INDEX IF NOT EXISTS subscriptions_stripe_identity/);
+    expect(code).toMatch(/CREATE TABLE public\.stripe_payment_receipts/);
+    expect(code).toMatch(/CREATE UNIQUE INDEX subscriptions_stripe_identity/);
     expect(code).toMatch(
       /to_regprocedure\('public\.stripe_record_credit_payment\(text,text,uuid,text,boolean\)'\) IS NULL/,
     );
     expect(code).not.toMatch(/CREATE OR REPLACE FUNCTION/);
     expect(code).not.toMatch(/ADD COLUMN IF NOT EXISTS/);
+  });
+
+  it("keeps every DDL statement inside a catalog-guarded DO block", () => {
+    // CREATE INDEX IF NOT EXISTS and ADD COLUMN IF NOT EXISTS lock the table
+    // before they skip, so nothing may run at the top level (review 5777101717 P2-1).
+    const topLevel = code.replace(/DO \$record\$[\s\S]*?\$record\$;/g, "");
+    expect(topLevel).not.toMatch(/\b(CREATE|ALTER|DROP|GRANT|REVOKE)\b/i);
+    expect(code).toMatch(/to_regclass\('public\.subscriptions_stripe_identity'\) IS NULL/);
+    expect(code).toMatch(/to_regclass\('public\.stripe_payment_receipts'\) IS NULL/);
   });
 
   it("does not widen privileges", () => {

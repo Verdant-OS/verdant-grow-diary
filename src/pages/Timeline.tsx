@@ -53,6 +53,7 @@ import {
   selectTimelineEagerPhotoIds,
   TIMELINE_DEFERRED_PHOTO_COPY,
   TIMELINE_DEFERRED_PHOTO_TESTID,
+  buildTimelineDeferredPhotoAriaLabel,
 } from "@/lib/timelinePhotoDeferralRules";
 import { isActionResponseCandidateDetails } from "@/lib/actionResponseMemoryRules";
 import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemoryViewModel";
@@ -3050,6 +3051,9 @@ export default function Timeline() {
                             setRevealedPhotoIds((current) => new Set(current).add(e.id))
                           }
                           data-testid={TIMELINE_DEFERRED_PHOTO_TESTID}
+                          aria-label={buildTimelineDeferredPhotoAriaLabel(
+                            formatTimelineEntryTimestamp(e.entry_at),
+                          )}
                           title={TIMELINE_DEFERRED_PHOTO_COPY.hint}
                           className="flex w-full items-center justify-center gap-2 border-b border-border/30 bg-secondary/30 px-3 py-3 text-sm text-muted-foreground hover:text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/60"
                         >

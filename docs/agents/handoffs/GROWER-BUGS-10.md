@@ -9,8 +9,8 @@ base: verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2844
 head_sha: read the current head on GitHub
 state: ready for review; required checks green at the last measured head
-current_step: fix shipped - only the newest 20 photo entries load their photo; older ones show "Show photo" and load that one photo on tap (src/lib/timelinePhotoDeferralRules.ts, Timeline card). Same mock after the fix: ~951-1,049 MB, bounded at ~23 unique photos however far you scroll
-next_action: independent review; post-merge production recheck of #2785 on a phone
+current_step: tap-to-load shipped; review FAIL at f4ecf5bc (P2: handoff block dropped) is already fixed by 2e9add4d, which GitHub never synced to the PR head; P3 fixed here: each Show photo button now has an accessible name with the entry time (buildTimelineDeferredPhotoAriaLabel)
+next_action: fresh independent exact-head review at the new head; post-merge production recheck of #2785 on a phone
 post_merge_check: on verdantgrowdiary.com, a plant with more than 20 photo entries shows photos on the newest 20 and "Show photo" on older ones; tapping loads that photo; tab no longer crashes when scrolled to the end
 active_writer: Claude session claude/grower-bugs-10
 decisions: founder chose tap-to-load (2026-11-04) over server image transformation (plan feature, unverifiable here) and an upload display copy (new photos only); limit 20 by render order, text entries do not use a slot; revealed ids persist for the page session
@@ -23,9 +23,9 @@ open_questions: Photo history (24) and Recent Quick Logs (10) thumbnails also lo
 gotchas: PR #2820 and #2842 also edit src/pages/Timeline.tsx; expect small merges. The measurement script is scratch only (not committed)
 links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2785
 reviewer_seat: eligible non-contributing reviewer per OWNERSHIP.md 4.3
-reviewer_sha: none yet
+reviewer_sha: f4ecf5bc (Reviewer A FAIL, P2 handoff; Reviewer B PASS); new head needs a fresh review
 session_state: Claude session also watches PRs #2820, #2828, #2842
 claimed_by: Claude, 2026-11-04 02:45 UTC
 owner: Claude
-last_updated: 2026-11-04 11:25 UTC, by Claude (moved to per-task file per docs/agents/handoffs/README.md)
+last_updated: 2026-11-04 18:25 UTC, by Claude session_017UoYKyhNGum4qmfYdoNRLr
 ```

@@ -238,6 +238,19 @@ describe("Timeline photo deferral (item 10)", () => {
     );
   });
 
+  it("gives each Show photo button its own accessible name from the entry time", async () => {
+    renderTimeline();
+    await screen.findByText(PHOTO_ENTRIES[PHOTO_COUNT - 1].note);
+
+    const names = screen
+      .getAllByTestId(TIMELINE_DEFERRED_PHOTO_TESTID)
+      .map((b) => b.getAttribute("aria-label") ?? "");
+    expect(names.every((n) => n.startsWith(`${TIMELINE_DEFERRED_PHOTO_COPY.button} from `))).toBe(
+      true,
+    );
+    expect(new Set(names).size).toBe(names.length);
+  });
+
   it("a text entry neither takes a photo slot nor shows a Show photo button", async () => {
     renderTimeline();
     const text = card((await screen.findByText(TEXT_ENTRY.note)).textContent ?? "");

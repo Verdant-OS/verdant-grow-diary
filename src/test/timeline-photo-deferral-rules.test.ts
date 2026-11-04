@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTimelineDeferredPhotoAriaLabel,
   selectTimelineEagerPhotoIds,
+  TIMELINE_DEFERRED_PHOTO_COPY,
   TIMELINE_EAGER_PHOTO_LIMIT,
 } from "@/lib/timelinePhotoDeferralRules";
 
@@ -46,5 +48,19 @@ describe("selectTimelineEagerPhotoIds", () => {
     expect([...selectTimelineEagerPhotoIds(rows, revealed)]).toEqual(first);
     expect([...revealed]).toEqual(["z"]);
     expect(first).toHaveLength(TIMELINE_EAGER_PHOTO_LIMIT + 1);
+  });
+});
+
+describe("buildTimelineDeferredPhotoAriaLabel", () => {
+  it("names the entry time", () => {
+    expect(buildTimelineDeferredPhotoAriaLabel("Nov 3, 09:15")).toBe(
+      "Show photo from Nov 3, 09:15",
+    );
+  });
+
+  it("falls back to the visible text when there is no time label", () => {
+    for (const label of [null, undefined, "", "   "]) {
+      expect(buildTimelineDeferredPhotoAriaLabel(label)).toBe(TIMELINE_DEFERRED_PHOTO_COPY.button);
+    }
   });
 });

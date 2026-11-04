@@ -20,6 +20,20 @@ export const TIMELINE_DEFERRED_PHOTO_COPY = {
 
 export const TIMELINE_DEFERRED_PHOTO_TESTID = "timeline-photo-deferred" as const;
 
+/**
+ * Accessible name for one entry's Show photo button. Every deferred entry shows
+ * the same visible text, so the name carries the entry's time to tell them apart
+ * for screen-reader users. `entryTimeLabel` is the Timeline's own entry time label.
+ */
+export function buildTimelineDeferredPhotoAriaLabel(
+  entryTimeLabel: string | null | undefined,
+): string {
+  const label = typeof entryTimeLabel === "string" ? entryTimeLabel.trim() : "";
+  return label
+    ? `${TIMELINE_DEFERRED_PHOTO_COPY.button} from ${label}`
+    : TIMELINE_DEFERRED_PHOTO_COPY.button;
+}
+
 interface PhotoRow {
   id: string;
   photo_url: string | null;

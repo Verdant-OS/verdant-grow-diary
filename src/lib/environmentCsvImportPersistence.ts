@@ -55,6 +55,8 @@ export interface SensorReadingInsert {
     raw_temp_unit: ParsedEnvironmentRow["raw_temp_unit"];
     raw_row: Record<string, string>;
     vpd_source?: "derived" | "csv";
+    source_app?: "ac_infinity" | "spider_farmer" | "vivosun" | null;
+    import_file_name?: string | null;
   };
 }
 
@@ -62,12 +64,14 @@ export interface SensorReadingInsert {
  * Pure mapper: row → one insert per non-null canonical metric. Used directly
  * by the persistence step so tests can assert shape without DB.
  */
+const insertSourceRow = new WeakMap<SensorReadingInsert, number>();
+
 export function buildSensorReadingInserts(
   rows: readonly ParsedEnvironmentRow[],
   scope: CsvInsertScope,
 ): SensorReadingInsert[] {
   const out: SensorReadingInsert[] = [];
-  for (const r of rows) {
+  rows.forEach((r, sourceRow) => {
     const basePayload = {
       source_tag: CSV_SOURCE_TAG,
       grow_id: scope.grow_id,
@@ -76,6 +80,7 @@ export function buildSensorReadingInserts(
       raw_temperature: r.raw_temperature,
       raw_temp_unit: r.raw_temp_unit,
       raw_row: r.raw_payload,
+      ...(r.source_app ? { source_app: r.source_app } : {}),
     } as const;
 
     function pushMetric(
@@ -84,7 +89,7 @@ export function buildSensorReadingInserts(
       extraPayload: Partial<SensorReadingInsert["raw_payload"]> = {},
     ) {
       if (value == null || !Number.isFinite(value)) return;
-      out.push({
+      const insert: SensorReadingInsert = {
         user_id: scope.user_id,
         tent_id: scope.tent_id,
         source: CSV_SENSOR_SOURCE,
@@ -92,7 +97,9 @@ export function buildSensorReadingInserts(
         value,
         captured_at: r.captured_at,
         raw_payload: { ...basePayload, ...extraPayload },
-      });
+      };
+      insertSourceRow.set(insert, sourceRow);
+      out.push(insert);
     }
 
     pushMetric("temperature_c", r.temperature_c);
@@ -100,7 +107,7 @@ export function buildSensorReadingInserts(
     pushMetric("vpd_kpa", r.vpd_kpa, r.vpd_source ? { vpd_source: r.vpd_source } : {});
     pushMetric("co2_ppm", r.co2_ppm);
     pushMetric("ppfd", r.ppfd);
-  }
+  });
   return out;
 }
 
@@ -123,6 +130,8 @@ export interface InsertClient {
 
 export interface PersistResult {
   insertedCount: number;
+  /** Sensor rows with at least one metric insert. Fully duplicate rows are excluded. */
+  contributedSensorRowCount: number;
   /** Rows skipped because they duplicate another row in this file or an
    *  already-imported reading for this tent. Never crashes the import. */
   duplicateCount: number;
@@ -159,15 +168,18 @@ export async function persistCsvEnvironmentRows(
     return {
       insertedCount: 0,
       duplicateCount: 0,
+      contributedSensorRowCount: 0,
       partialWrite: false,
       error: null,
     };
   }
 
-  const fetchExistingKeys = client.fetchExistingSensorReadingKeys
+  const readExistingKeys = client.fetchExistingSensorReadingKeys
     ? client.fetchExistingSensorReadingKeys.bind(client)
     : async () => new Set<string>();
+  const fetchExistingKeys = async (scope: ExistingKeysQueryScope) => readExistingKeys(scope);
 
+  const committedSourceRows = new Set<number>();
   let unconfirmedWrite = false;
   const result = await runDuplicateAwareCsvHistoryImport({
     rows: inserts,
@@ -183,6 +195,12 @@ export async function persistCsvEnvironmentRows(
         if (res.error && !/^(22|23|42)[0-9A-Z]{3}$/.test(res.error.code ?? "")) {
           unconfirmedWrite = true;
         }
+        if (!res.error) {
+          for (const row of batch) {
+            const sourceRow = insertSourceRow.get(row);
+            if (sourceRow != null) committedSourceRows.add(sourceRow);
+          }
+        }
         return { error: res.error };
       } catch {
         // Return through the batch helper so earlier acknowledged counts survive.
@@ -191,6 +209,8 @@ export async function persistCsvEnvironmentRows(
       }
     },
   });
+
+  const contributedSensorRowCount = committedSourceRows.size;
 
   if (!result.ok) {
     const partialWrite = result.batchResult?.partialWrite === true || result.insertedRows > 0;
@@ -201,6 +221,7 @@ export async function persistCsvEnvironmentRows(
       return {
         insertedCount: result.insertedRows,
         duplicateCount: result.duplicateRows,
+        contributedSensorRowCount,
         partialWrite,
         failureReason: "unverified_duplicate",
         error: partialWrite
@@ -211,6 +232,7 @@ export async function persistCsvEnvironmentRows(
     return {
       insertedCount: result.insertedRows,
       duplicateCount: result.duplicateRows,
+      contributedSensorRowCount,
       partialWrite,
       ...(unconfirmedWrite ? { unconfirmedWrite: true } : {}),
       error: buildCsvImportFailureMessage(result.insertedRows, partialWrite, unconfirmedWrite),
@@ -220,6 +242,7 @@ export async function persistCsvEnvironmentRows(
   return {
     insertedCount: result.insertedRows,
     duplicateCount: result.duplicateRows,
+    contributedSensorRowCount,
     partialWrite: false,
     error: null,
   };

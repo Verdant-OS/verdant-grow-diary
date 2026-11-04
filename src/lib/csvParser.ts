@@ -13,6 +13,8 @@
  *  - errors: file-level structured codes (wrong_file_type, file_too_large, ...)
  */
 
+import { CsvImportVendorIdentity } from "@/lib/csvImportVendorIdentity";
+
 export const CSV_SOURCE_TAG = "csv" as const;
 export const MAX_CSV_BYTES = 25 * 1024 * 1024; // 25 MB
 
@@ -65,6 +67,9 @@ export interface ParsedEnvironmentRow {
   vpd_source: "csv" | "derived" | null;
   // source — hardcoded
   source_tag: typeof CSV_SOURCE_TAG;
+  /** Presentation vendor. Never written to sensor_readings.source. */
+  source_app?: "ac_infinity" | "spider_farmer" | "vivosun" | null;
+  import_file_name?: string | null;
 }
 
 export interface ParseEnvironmentCsvResult {
@@ -111,7 +116,27 @@ export async function parseEnvironmentCSV(file: File): Promise<ParseEnvironmentC
   } catch {
     return withError(empty, "damaged_file", "This CSV looks empty or damaged.");
   }
-  return parseEnvironmentCSVText(text);
+  return stampCsvVendor(parseEnvironmentCSVText(text), file.name);
+}
+
+function stampCsvVendor(
+  result: ParseEnvironmentCsvResult,
+  fileName: string | null,
+): ParseEnvironmentCsvResult {
+  const headers = new Set<string>();
+  for (const row of result.validRows) {
+    for (const key of Object.keys(row.raw_payload)) headers.add(key);
+  }
+  const sourceApp = CsvImportVendorIdentity.detect(fileName, [...headers]);
+  if (!sourceApp && !fileName) return result;
+  return {
+    ...result,
+    validRows: result.validRows.map((row) => ({
+      ...row,
+      source_app: sourceApp,
+      import_file_name: fileName,
+    })),
+  };
 }
 
 async function readFileAsText(file: File): Promise<string> {

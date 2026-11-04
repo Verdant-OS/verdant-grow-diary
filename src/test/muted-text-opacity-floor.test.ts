@@ -1,5 +1,5 @@
 /**
- * Contrast guard for faint muted text (docs/specs/contrast-tokens.md, D2 (a); audit 2026-11-03
+ * Contrast guard for faint muted text (contrast spec in Verdant-OS/verdant-grow-diary#2827, D2 (a); audit 2026-11-03
  * finding 12).
  *
  * `text-muted-foreground` at /70 or fainter measures 2.1-4.0:1 in the dark theme, below WCAG AA.

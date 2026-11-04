@@ -14,7 +14,7 @@ import {
   computeStabilityRollup,
   STABILITY_ROLLUP_TONE_CLASS,
 } from "@/lib/dashboardStabilityRollupRules";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 
@@ -75,6 +75,7 @@ import { isUuid } from "@/lib/isUuid";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
+import { LatestSnapshotQuickLogMerge } from "@/lib/latestSnapshotQuickLogMerge";
 import { useEnvironmentTrends } from "@/hooks/useEnvironmentTrends";
 import { isDashboardSupplementalLoading } from "@/lib/dashboardSupplementalLoadingRules";
 import { useGrowTargets } from "@/hooks/useGrowTargets";
@@ -259,7 +260,24 @@ export default function Dashboard() {
   const [tentSelection, setTentSelection] = useState<TentSelection>("all");
   const selectableTents = tents.map((t) => ({ id: t.id, name: t.name }));
   const selectedTentIds = resolveSelectedTentIds(selectableTents, tentSelection);
-  const sensorState = useLatestSensorSnapshot(scopedGrowId ?? null, selectedTentIds);
+  const baseSensorState = useLatestSensorSnapshot(scopedGrowId ?? null, selectedTentIds);
+  // Quick Log snapshots are not in the sensor or diary read; the manuals this
+  // page already loads join it, newest capture wins (#2821).
+  const sensorState = useMemo(
+    () =>
+      baseSensorState.status === "ok"
+        ? {
+            ...baseSensorState,
+            snapshot: LatestSnapshotQuickLogMerge.merge(
+              baseSensorState.snapshot,
+              quickLogManualReadings,
+              selectedTentIds,
+            ),
+          }
+        : baseSensorState,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseSensorState, chartQuickLogManualQuery.data, selectedTentIds.join("|")],
+  );
   // Stage for alert/threshold evaluation on the scoped Dashboard (live
   // audit #14). Resolved from the grow row PLUS the tents in the SAME
   // selection scope as the snapshot being classified — a specific tent

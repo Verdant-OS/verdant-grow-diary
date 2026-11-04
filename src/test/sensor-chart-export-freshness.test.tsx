@@ -58,7 +58,7 @@ describe("sensor chart export freshness", () => {
     const aged = buildSensorReadingsCsv([row], capturedMs + minutes * 60000 + 1);
     expect(fresh).toContain("," + source + ",usable,");
     expect(aged).toBe(fresh.replace(",usable,", ",stale,"));
-    expect(aged).toContain(",25,55,,,,,");
+    expect(aged).toContain(",25,55,,1.43,,,,");
     expect(row).toEqual(before);
     expect(buildSensorReadingsCsv([row], capturedMs + minutes * 60000 + 1)).toBe(aged);
   });

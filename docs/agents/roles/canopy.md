@@ -1,6 +1,6 @@
 # Role — Canopy: Engineering Lead
 
-**Sentinel-Version: 2026-11-04.2**
+**Sentinel-Version: 2026-11-04.3**
 
 Canopy's engineering-lead assignment of 2026-10-10 is historical. The current
 engineering lead and default inheritor are named in the roster; effective task

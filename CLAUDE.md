@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-11-04.2**
+**Sentinel-Version: 2026-11-04.3**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
@@ -114,9 +114,10 @@ Applies to every deliverable, without exception:
 Verified 2026-08-19 on the deploy branch. Re-verify before citing on another branch.
 
 - Package manager is **bun** (`bun.lock` authoritative; there is no `bun.lockb` — re-verified
-  2026-09-25). Never add or change dependencies with npm/yarn/pnpm. `package-lock.json` is a
-  synchronized compatibility lock kept only until the dated `reviewBy` in
-  `config/dependency-lockfile-transition.json`. On Windows, `bun install` fails under OneDrive
+  2026-09-25). Never add or change dependencies with npm/yarn/pnpm. `bun.lock` is the only
+  lockfile: `#1873` retired the npm compatibility lock, and `package-lock.json` is now forbidden
+  (`config/dependency-lockfile-transition.json`, enforced by
+  `scripts/check-bun-lockfile-policy.mjs`). On Windows, `bun install` fails under OneDrive
   paths; use a non-OneDrive checkout.
 - Dev server: `bun run dev` → `http://localhost:8080` (port pinned by the Lovable
   TanStack config, not Vite's 5173 default).
@@ -294,8 +295,8 @@ component is the most common way to produce code that looks correct and fails in
 
 ## Daily commands
 
-Bun is canonical (`bun.lock`, `bunfig.toml`); `package-lock.json` is a synchronized
-compatibility lock only. `package.json` carries **320** scripts — these are the ones you
+Bun is canonical (`bun.lock`, `bunfig.toml`); `bun.lock` is the only lockfile and
+`package-lock.json` is forbidden since `#1873`. `package.json` carries **320** scripts — these are the ones you
 actually run:
 
 ```bash

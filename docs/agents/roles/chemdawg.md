@@ -2,7 +2,7 @@
 
 **Historical — no current seat.**
 
-**Sentinel-Version: 2026-11-04.2**
+**Sentinel-Version: 2026-11-04.3**
 
 **Historical profile — retired from current routing.** Chemdawg and its Grok 91
 alias are retired. The 2026-10-10 merge-actor assignment below is preserved as

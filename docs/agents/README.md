@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-11-04.2**
+**Sentinel-Version: 2026-11-04.3**
 
 Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
 **Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.

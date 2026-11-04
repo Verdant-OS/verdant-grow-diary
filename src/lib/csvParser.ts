@@ -73,8 +73,18 @@ export interface ParseEnvironmentCsvResult {
   dateRange: { start: string; end: string } | null;
   isAmbiguous: boolean;
   detectedColumns: DetectedColumns;
+  /**
+   * Header names this parser recognizes but does not import (today: soil
+   * columns), in file order. They are never mapped to an air metric. Always
+   * set by the parser; absent only on results built elsewhere.
+   */
+  unsupportedColumns?: readonly string[];
   errors: ParseError[];
 }
+
+/** Shown when a file's only readable metrics are soil columns. */
+export const CSV_SOIL_ONLY_MESSAGE =
+  "This file has soil readings only. CSV import reads air temperature, humidity, VPD, CO₂ and PPFD; soil columns aren’t imported." as const;
 
 // ---------- public API ----------
 
@@ -142,7 +152,9 @@ export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult
     return withError(empty, "empty_file", "This CSV looks empty or damaged.");
   }
 
-  const detected = detectColumns(headers);
+  const { detected, unsupported } = detectColumns(headers);
+  empty.unsupportedColumns = unsupported;
+  const soilOnlyMessage = unsupported.length > 0 ? CSV_SOIL_ONLY_MESSAGE : null;
   const hasTimeCol =
     detected.timestamp !== null ||
     (detected.date !== null && detected.time !== null) ||
@@ -154,7 +166,13 @@ export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult
     detected.co2 !== null ||
     detected.ppfd !== null;
   if (!hasTimeCol || !hasMetricCol) {
-    return withError(empty, "no_sensor_data", "We couldn’t read sensor data from this file.");
+    return withError(
+      empty,
+      "no_sensor_data",
+      hasTimeCol && soilOnlyMessage
+        ? soilOnlyMessage
+        : "We couldn’t read sensor data from this file.",
+    );
   }
 
   // Unit detection: header-driven first, then sample values.
@@ -268,16 +286,21 @@ export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult
   });
 
   if (validRows.length === 0) {
+    const onlySoilHadValues =
+      soilOnlyMessage !== null &&
+      skipped.length > 0 &&
+      skipped.every((s) => s.reason === "no_metrics");
     return withError(
       { ...empty, skippedRows: skipped, detectedColumns: detected },
       "no_sensor_data",
-      "We couldn’t read sensor data from this file.",
+      onlySoilHadValues ? soilOnlyMessage : "We couldn’t read sensor data from this file.",
     );
   }
 
   return {
     validRows,
     skippedRows: skipped,
+    unsupportedColumns: unsupported,
     dateRange:
       minTs <= maxTs
         ? { start: new Date(minTs).toISOString(), end: new Date(maxTs).toISOString() }
@@ -345,6 +368,7 @@ function emptyResult(): ParseEnvironmentCsvResult {
       co2: null,
       ppfd: null,
     },
+    unsupportedColumns: [],
     errors: [],
   };
 }
@@ -411,7 +435,21 @@ function parseCsvText(text: string): { headers: string[]; rows: string[][] } {
   return { headers, rows: nonEmpty.slice(1) };
 }
 
-function detectColumns(headers: string[]): DetectedColumns {
+/**
+ * Soil columns (soil temperature, moisture, EC) are recognized but not
+ * imported. They are set aside before any air-metric matching, so their
+ * position in the file can never decide what counts as air temperature or
+ * air humidity (CSV QA F2).
+ */
+function isSoilHeader(normalized: string): boolean {
+  return /soil/.test(normalized);
+}
+
+function detectColumns(headers: string[]): {
+  detected: DetectedColumns;
+  unsupported: string[];
+} {
+  const unsupported: string[] = [];
   const out: DetectedColumns = {
     timestamp: null,
     date: null,
@@ -427,6 +465,10 @@ function detectColumns(headers: string[]): DetectedColumns {
 
   for (const h of headers) {
     const k = normalizeHeader(h);
+    if (isSoilHeader(k)) {
+      unsupported.push(h);
+      continue;
+    }
     if (
       out.timestamp == null &&
       /(^|[^a-z])timestamp([^a-z]|$)|^created.?at$|^recorded.?at$/.test(k)
@@ -458,14 +500,15 @@ function detectColumns(headers: string[]): DetectedColumns {
       out.co2 = h;
       continue;
     }
-    if (out.ppfd == null && /(ppfd|par|photosynthetic)/.test(k)) {
+    // "par" must stand alone ("PAR", "par_umol"), not sit inside a word ("compare").
+    if (out.ppfd == null && /ppfd|(^|[^a-z])par([^a-z]|$)|photosynthetic/.test(k)) {
       out.ppfd = h;
       continue;
     }
   }
 
   out.temperature = chooseTemperatureColumn(temperatureCandidates);
-  return out;
+  return { detected: out, unsupported };
 }
 
 function normalizeHeader(header: string): string {

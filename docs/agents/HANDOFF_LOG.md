@@ -76,16 +76,31 @@ TASK GA-PROXY-SHARD25-SOCKET-HANG-UP  priority: P2  status: OPEN
 goal: Stop the intermittent "socket hang up" in required check Full test suite (shard 25/32), test src/test/google-analytics-collection-host-proxy.test.ts.
 why: Red on unrelated docs PRs (PR 2831 at 01bac39, job 126290700551; PR 2827 at f3cf793, job 126328068392). A required check red across PRs is top priority.
 branch: claude/trusting-davinci-58hzpj
-base: verdant-grow-diary (2b72977b0)
-pr: draft, see the PR for this branch
-head_sha: see PR (set at push)
-state: pushed draft
-cause: the proxy refused with a keep-alive 403 and then destroyed the socket. A keep-alive client may reuse that socket for the next request and get "socket hang up". Node 22.23.4 / 24.22.1 carry a hasPendingRead() guard that usually hides it; the shard job runs the runner image's default Node (version NOT_MEASURED). Under the Bun runtime the unmodified test fails 3/3 with the CI error.
-fix: refusal sends Connection: close and no longer calls req.destroy(); the refused set and allowlist are unchanged; nothing is forwarded.
-rejected: retries, timeouts, skips; CPU load alone did not reproduce (0/300 pinned to one CPU).
-commands: bunx vitest run src/test/google-analytics-collection-host-proxy.test.ts ; bunx --bun vitest run src/test/google-analytics-collection-host-proxy.test.ts
-next_action: independent exact-head review; watch shard 25 on later PRs.
-reviewer: not requested yet (author excluded: this Claude session)
+base: verdant-grow-diary (merge base e3ecc2b2214314526c9149000ac5932351fd82cd)
+checkout: git fetch origin claude/trusting-davinci-58hzpj verdant-grow-diary && git switch claude/trusting-davinci-58hzpj && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2843 (ready for review, not draft; marked ready on Matthew's request 2026-11-04 03:36 UTC)
+head_sha: dc0786bb0e92255b04aa559a24b6686da8acd169 was the reviewed head, observed 2026-11-04 04:45 UTC. The docs-only commit that fixes this block comes after it. Read the current head from the PR.
+state: review. Required CI was 35/35 success at dc0786bb (reported by Seats A, C and D).
+current_step: Fix Seat D's P2-1 (this block's stale fields). The new head needs fresh exact-head verdicts.
+next_action: re-request exact-head review from Seats A, C and D at the new head.
+post_merge_check: Full test suite (shard 25/32) stays green on later PRs; a socket hang up in src/test/google-analytics-collection-host-proxy.test.ts reopens this with the same owner.
+active_writer: Claude session_017UoYKzL7sYyUe1K8xMj3uo
+decisions: The refusal sends Connection: close and no longer calls req.destroy(). The refused set and allowlist are unchanged, and nothing is forwarded.
+tried_and_rejected: retries, longer timeouts, skips (forbidden). CPU load alone did not reproduce it (0/300 pinned to one CPU behind 8 spinners).
+cause: The proxy refused with a keep-alive 403 and then destroyed the socket. A keep-alive client may reuse that socket for its next request and get "socket hang up". Node 22.23.4 / 24.22.1 carry a hasPendingRead() guard that usually hides this. The shard job runs the runner image's default Node (version NOT_MEASURED). Under the Bun runtime the unmodified test fails 3/3 with the CI error.
+commands: bunx vitest run src/test/google-analytics-collection-host-proxy.test.ts ; bunx --bun vitest run src/test/google-analytics-collection-host-proxy.test.ts ; node scripts/scorer-lock.mjs --report --base e3ecc2b2
+files_touched: e2e/utils/googleAnalyticsCollectionHost.ts, src/test/google-analytics-collection-host-proxy.test.ts, docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: Merge needs fresh exact-head verdicts at the new head and Matthew's own-words yes (gated: both code files are scorer-locked). GitHub cannot record APPROVE from the shared author account. Only Matthew can clear either.
+open_questions: none
+gotchas: Unlock records are git-ignored, so a fresh checkout reports both code files as LOCKED modified. Local typecheck needs NODE_OPTIONS=--max-old-space-size=8192.
+links: Reviewer C https://github.com/Verdant-OS/verdant-grow-diary/pull/2843#pullrequestreview-5762938474 and #pullrequestreview-5763348990 ; Seat A #pullrequestreview-5763345015 ; Seat D #pullrequestreview-5763347818
+reviewer_seat: Seats A, C and D
+reviewer_sha: dc0786bb0e92255b04aa559a24b6686da8acd169 (superseded by the fix commit; needs re-review)
+session_state: PR activity subscription and a safety-net check-in in the author session; no paused workflows
+claimed_by: Claude session_017UoYKzL7sYyUe1K8xMj3uo, 2026-11-03 22:48 CT
+owner: Claude
+last_updated: 2026-11-03 22:48 CT, by Claude
 ```
 
 ### AI-DOCTOR-REPORT-PREVIEW-FOCUS

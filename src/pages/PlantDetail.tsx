@@ -65,6 +65,7 @@ import { usePlantDetailDisclosureNavigation } from "@/hooks/usePlantDetailDisclo
 import { PLANT_DETAIL_HARVEST_EVIDENCE_ANCHOR_ID } from "@/lib/plantDetailDisclosureRules";
 
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
+import { DetailGrowContextLine } from "@/components/DetailGrowContextLine";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import PlantAiDoctorSessionsPanel from "@/components/PlantAiDoctorSessionsPanel";
 import PlantPhoto from "@/components/PlantPhoto";
@@ -231,6 +232,7 @@ function ArchivedTimelineReadOnlyView({
         icon={<Sprout className="h-5 w-5" />}
         actions={<StageBadge stage={plant.stage} />}
       />
+      <DetailGrowContextLine growId={plant.growId} testId="plant-detail-grow-context" />
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 glass rounded-2xl p-5 space-y-3">
           <PlantRecentMoveCard plantId={plant.id} />
@@ -549,6 +551,7 @@ export default function PlantDetail() {
           </div>
         }
       />
+      <DetailGrowContextLine growId={plant.growId} testId="plant-detail-grow-context" />
       <PlantCultivarReferenceHint strain={plant.strain} plantId={plant.id} />
       <PlantDetailDataSourceDisclosure
         metas={[plantMeta, tentMeta]}

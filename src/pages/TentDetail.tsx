@@ -24,6 +24,7 @@ import { ArrowLeft, Box, Lightbulb, Plus, Archive, GitMerge } from "lucide-react
 import CreatePlantDialog from "@/components/CreatePlantDialog";
 import AddExistingPlantDialog from "@/components/AddExistingPlantDialog";
 import PlantCardActionsMenu from "@/components/PlantCardActionsMenu";
+import { DetailGrowContextLine } from "@/components/DetailGrowContextLine";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import TentCardActionsMenu from "@/components/TentCardActionsMenu";
 import PlantPhoto from "@/components/PlantPhoto";
@@ -518,6 +519,7 @@ export default function TentDetail() {
         icon={<Box className="h-5 w-5" />}
         actions={<StageBadge stage={tent.stage} />}
       />
+      <DetailGrowContextLine growId={tent.growId} testId="tent-detail-grow-context" />
 
       <GrowDataSourceDisclosure
         resource="tent"

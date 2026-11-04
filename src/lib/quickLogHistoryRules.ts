@@ -221,6 +221,8 @@ export interface QuickLogHistoryRow {
   climate: { tempC?: number; rh?: number; vpd?: number } | null;
   photoUrl: string | null;
   warnings: string[];
+  /** Raw details.manual_sensor_snapshot (structured soil/light readings), when saved. */
+  structuredSnapshot?: unknown;
 }
 
 function asObjectRecord(v: unknown): Record<string, unknown> | null {
@@ -321,6 +323,9 @@ function toRow(entry: NormalizedDiaryEntry): QuickLogHistoryRow {
     climate: climateFromSnapshot(enriched.details.sensorSnapshot),
     photoUrl: enriched.photoUrl,
     warnings: enriched.warnings.slice(),
+    ...(enriched.details.extras?.manual_sensor_snapshot !== undefined
+      ? { structuredSnapshot: enriched.details.extras.manual_sensor_snapshot }
+      : {}),
   };
 }
 

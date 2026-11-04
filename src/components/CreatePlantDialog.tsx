@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useGrows } from "@/store/grows";
 import { useTents } from "@/hooks/use-tents";
+import { SimilarNameWarningNote } from "@/components/SimilarNameWarningNote";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -969,6 +970,12 @@ export default function CreatePlantDialog({
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Plant A"
                 data-testid="create-plant-name"
+              />
+              <SimilarNameWarningNote
+                entity="plant"
+                candidate={form.name}
+                growId={targetGrowId}
+                testId="create-plant-similar-name"
               />
               <p
                 className="text-[11px] text-muted-foreground mt-1"

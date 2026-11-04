@@ -3,6 +3,10 @@ import {
   type QuickLogV2Action,
   type QuickLogV2FormState,
 } from "@/lib/quickLogV2Rules";
+import {
+  EMPTY_STRUCTURED_READING_INPUT,
+  type StructuredReadingTextInput,
+} from "@/lib/quickLogStructuredReadingRules";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import {
   RESPONSE_CHECK_STATUSES,
@@ -31,6 +35,34 @@ export interface QuickLogObservationDraft {
   tempEntryUnit: TemperatureUnitPreference | null;
   /** Status whose response line a chip wrote, so a retarget can still remove it. */
   chipStatus: ResponseCheckStatus | null;
+  /** Note structured readings as typed (grower bug item 14). Absent in older drafts. */
+  structured?: StructuredReadingTextInput;
+  /** Unit the soil temperature was typed in, so a preference change cannot reinterpret it. */
+  soilTempEntryUnit?: TemperatureUnitPreference | null;
+}
+
+function readTemperatureUnit(value: unknown): TemperatureUnitPreference | null {
+  return value === "celsius" || value === "fahrenheit" ? value : null;
+}
+
+function readStructured(value: unknown): StructuredReadingTextInput {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return EMPTY_STRUCTURED_READING_INPUT;
+  }
+  const record = value as Record<string, unknown>;
+  const out = { ...EMPTY_STRUCTURED_READING_INPUT };
+  for (const key of Object.keys(out) as (keyof StructuredReadingTextInput)[]) {
+    out[key] = readText(record[key]);
+  }
+  return out;
+}
+
+/** True when no structured reading has any typed text. */
+export function isStructuredReadingInputEmpty(
+  structured: StructuredReadingTextInput | null | undefined,
+): boolean {
+  if (!structured) return true;
+  return Object.values(structured).every((value) => value.trim().length === 0);
 }
 
 export function readQuickLogObservationIdempotencyKey(value: unknown): string | null {
@@ -60,7 +92,7 @@ export function restorableQuickLogObservationDraft(
   stored: QuickLogObservationDraft | null,
   defaultTargetKey: string | null | undefined,
 ): QuickLogObservationDraft | null {
-  if (!stored || isQuickLogObservationDraftEmpty(stored.form)) return null;
+  if (!stored || isQuickLogObservationDraftEmpty(stored.form, stored.structured)) return null;
   const target = defaultTargetKey || null;
   if (stored.form.selectedKey === target) return stored;
   if (target !== null) return null;
@@ -70,7 +102,7 @@ export function restorableQuickLogObservationDraft(
     ? removeChipAuthoredResponseLine(stored.form.note, stored.chipStatus)
     : stored.form.note;
   const form = { ...stored.form, selectedKey: null, note };
-  if (isQuickLogObservationDraftEmpty(form)) return null;
+  if (isQuickLogObservationDraftEmpty(form, stored.structured)) return null;
   return { ...stored, form, saveFailed: false, idempotencyKey: null, chipStatus: null };
 }
 
@@ -91,10 +123,11 @@ export function parseQuickLogObservationDraft(value: unknown): QuickLogObservati
   const idempotencyKey = readQuickLogObservationIdempotencyKey(wrapper.idempotencyKey);
   if (!isAction(record.action)) return null;
   const selectedKey = readText(record.selectedKey).trim();
-  const tempEntryUnit =
-    wrapper.tempEntryUnit === "celsius" || wrapper.tempEntryUnit === "fahrenheit"
-      ? wrapper.tempEntryUnit
-      : null;
+  const tempEntryUnit = readTemperatureUnit(wrapper.tempEntryUnit);
+  const structured = readStructured(wrapper.structured);
+  const soilTempEntryUnit = structured.soilTemp.trim()
+    ? readTemperatureUnit(wrapper.soilTempEntryUnit)
+    : null;
   const chipStatus = (RESPONSE_CHECK_STATUSES as readonly unknown[]).includes(wrapper.chipStatus)
     ? (wrapper.chipStatus as ResponseCheckStatus)
     : null;
@@ -103,6 +136,8 @@ export function parseQuickLogObservationDraft(value: unknown): QuickLogObservati
     idempotencyKey,
     tempEntryUnit,
     chipStatus,
+    structured,
+    soilTempEntryUnit,
     form: {
       selectedKey: selectedKey.length > 0 ? selectedKey : null,
       action: record.action,
@@ -117,9 +152,11 @@ export function parseQuickLogObservationDraft(value: unknown): QuickLogObservati
 
 export function isQuickLogObservationDraftEmpty(
   form: QuickLogV2FormState | null | undefined,
+  structured?: StructuredReadingTextInput | null,
 ): boolean {
   if (!form) return true;
   return (
+    isStructuredReadingInputEmpty(structured) &&
     form.note.trim().length === 0 &&
     form.volumeMl.trim().length === 0 &&
     form.temperatureC.trim().length === 0 &&

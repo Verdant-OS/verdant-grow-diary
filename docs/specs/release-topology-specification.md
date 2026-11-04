@@ -683,6 +683,14 @@ topology-adjacent files: `#2811` and `#2751` change `supabase/config.toml` (the 
 inventory above), and `#2853` changes `CLAUDE.md` (above). None of them competes with this
 specification or the contract.
 
+**After the stamp** (`established fact`, `git ls-tree` and GitHub REST at deploy tip
+`f071075d10d1036253879d91d3ccadd0a044cb78`, 2026-11-04 19:50 UTC). The counts above stay dated at
+`776ff8d6`. Since then, `#2811` and `#2751` have merged. At `f071075d` there are 34 edge-function
+directories besides `_shared`: `create-checkout-session` and `stripe-webhook` were removed and
+`ecowitt-custom-upload` was added. There are 115 workflows, because `stripe-test-mode-sink-pgtap.yml`
+was removed. `#2864` merged a contract restamp at `af6a416d`. Open `#2870` adds three lines to
+`docs/architecture-contract.md` and does not touch this document.
+
 ---
 
 ## 3. The topology model — six axes, one owner each
@@ -1970,7 +1978,9 @@ next_slice:
 
 files_touched:
   - docs/specs/release-topology-specification.md (this amendment only)
-  - docs/agents/HANDOFF_LOG.md (the TOPOLOGY-RESTAMP-20261104 block)
+  - docs/agents/handoffs/TOPOLOGY-RESTAMP-20261104.md and
+    docs/agents/handoffs/ARCH-CONTRACT-RESTAMP-20261029.md (per-file handoff entries;
+    HANDOFF_LOG.md is unchanged, per AGENTS.md §12)
 ```
 
 ## Appendix A. Baseline measurement — 2026-09-25, dated, superseded by later stamps

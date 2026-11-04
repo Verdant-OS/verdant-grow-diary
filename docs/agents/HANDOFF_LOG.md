@@ -668,6 +668,40 @@ owner: Grok
 last_updated: 2026-10-27 10:30 CT, by Grok
 ```
 
+### ARCH-CONTRACT-RESTAMP-20261029
+
+```text
+TASK ARCH-CONTRACT-RESTAMP-20261029  priority: other  status: OPEN
+goal: re-verify docs/architecture-contract.md against deploy tip 479cadb3032ddc3ad80d93f105283609179d6c0a (#2581) and correct every clause that drifted since the 27991451 stamp and its 0200d255 post-stamp merge.
+why: the founder chose option A (docs-only refresh) on 2026-10-29, after a collision audit found that the contract (#2564) and docs/specs/release-topology-specification.md already exist, so a new contract would duplicate them.
+branch: claude/new-session-kulf08
+base: verdant-grow-diary
+checkout: git fetch origin claude/new-session-kulf08 verdant-grow-diary && git switch claude/new-session-kulf08 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" (a reviewer stops here, at the exact head; only the writer then runs git merge origin/verdant-grow-diary and pushes a new head)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2622 (draft)
+head_sha: a commit cannot record its own SHA; read the full head from the PR
+state: pushed; ready for review. Independent verdicts by session_017UoYKvqHhSHehpNuWHT7qV, each stale once the head moved: 4c718a4 PASS-with-findings (6505081663), 37f2756 PASS-with-findings (6505693483), 8e06a5d PASS-with-findings (6506351031), d16efc2 PASS-with-findings (6508569894). Founder yes given at 37f2756 and 8e06a5d, both superseded by base merges. This commit fixes F6 and the Codex P2 on next_action, so the d16efc2 verdict is stale too.
+current_step: restamp written. 419 path:line cites re-read by text (9 moved, 3 live in AC-8.1, all in scripts/check-bun-lockfile-policy.mjs after #2569); AC-3.2, AC-4.3 and AC-10.2 counts unchanged; AC-3.4 940 in 939 -> 945 in 944.
+next_action: an eligible independent reviewer (not session 017UoYKx8T6Y6eyPhvDvxPjS or 017UoYKxQUVr5LNsENPKJ59K) does a complete re-review of the whole PR at the new full head SHA (OWNERSHIP.md section 4.3; a delta-only re-review is not acceptance). Then 35/35 required checks and the founder's per-item yes at that exact head.
+post_merge_check: NOT_APPLICABLE (docs-only; no runtime behavior changes)
+active_writer: Claude
+decisions: (1) no new contract and no topology edit; slice C (topology) waits for #2539, #2609 and #2589. (2) the six moved cites inside the 27991451 header record stay as that tree's lines, because a stamp record describes its own tree. (3) the counts were reproduced at 27991451 before measuring 479cadb, so the same method gives both. (4) the stale CLAUDE.md lockfile wording (option B) is out of scope; it would need the 18-file Sentinel bump.
+tried_and_rejected: a first cite pass that ignored bare `:NN` cites missed the AC-8.1 drift; the binder now ties each bare cite to the last full path in the same paragraph. Comparing topology-spec cites against 0200d255 gave false drift; 604274a7 is the right base because #2564 merged the spec and the contract together.
+commands: format and safety: bunx prettier --check docs/architecture-contract.md docs/agents/HANDOFF_LOG.md; node scripts/assert-docs-safety.mjs. Counts, run at both 27991451 and the head (replace REF): rules=$(git ls-tree --name-only REF src/lib/ | grep -E 'Rules\.ts$'); echo "$rules" | wc -l; git grep -l 'Date\.now()' REF -- $rules | wc -l; git grep -l 'Math\.random()' REF -- $rules | wc -l; git grep -h -o 'from "@/lib/react-router-compat"' REF -- src | wc -l; git grep -liE 'nelson|modified z|modifiedZ|median absolute deviation|\bMAD\b|z-?score|zscore|robust ?z' REF -- src supabase scripts e2e tools plugins spikes | wc -l. The cite re-read and the AC-4.3 pair count used session-local scripts that are not committed; their method is in the contract header and the PR body. SKIPPED, not passed: Vitest, bun run typecheck and the pre-commit full tsc, because this session has no node_modules and no test reads either file.
+files_touched: docs/architecture-contract.md, docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: whether to run option B (fix CLAUDE.md:117 and :297, which still call package-lock.json a compatibility lock) as a governance PR.
+gotchas: docs/specs/release-topology-specification.md:1012 records `PASS` for "AI Doctor inference through the Lovable AI gateway", citing GATEWAY_URL and LOVABLE_API_KEY, but AI Doctor is Gemini-direct since #1982 (contract AC-5.1). In slice C, confirm whether that §6.1 row is a dated measurement that a later section supersedes; if not, correct it.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564
+artifacts: the PR's check runs
+reviewer_seat: eligible independent session under OWNERSHIP.md §4.3. A non-contributing Claude session qualifies. Excluded: author session 017UoYKx8T6Y6eyPhvDvxPjS and holder session 017UoYKxQUVr5LNsENPKJ59K
+reviewer_sha: none at the current head. Latest stale verdict: d16efc2aad329264b8f1f3dd1c6ba808b56e50e5, PASS-with-findings (P3 only), comment 6508569894; earlier ones are listed under state. F3 and F4 go to the next restamp, per the founder.
+session_state: Claude cloud session 017UoYKx8T6Y6eyPhvDvxPjS; separate one-shot check-in trig_01F8BsQcKVPKV5VDk4EPy3X1 is for #2597 CI
+claimed_by: Claude, 2026-10-29 12:20 CT
+owner: Claude
+last_updated: 2026-10-29 21:35 UTC, by Claude session 017UoYKxQUVr5LNsENPKJ59K (F6; full re-review scope per Codex P2)
+```
+
 ### SEO-NOINDEX-UNKNOWN-GUIDE-SLUGS-20261028
 
 ```text
@@ -1583,40 +1617,6 @@ owner: Claude
 last_updated: 2026-10-29 18:40 UTC, by Claude (pr link and ready state recorded)
 ```
 
-### TOPOLOGY-RESTAMP-20261104
-
-```text
-TASK TOPOLOGY-RESTAMP-20261104  priority: other  status: OPEN
-goal: slice C of the architecture work. Re-verify docs/specs/release-topology-specification.md at deploy tip 776ff8d62d87309c08b1ac9e261c108cb99e679a (#2828) without duplicating the merged contract (#2622).
-why: Matthew chose slice C on 2026-11-04 after Grok ran out of tokens. The three PRs it waited on had resolved: #2539 merged, #2609 and #2589 closed unmerged.
-branch: claude/blissful-pasteur-ntlsw7
-base: verdant-grow-diary
-checkout: git fetch origin claude/blissful-pasteur-ntlsw7 verdant-grow-diary && git switch claude/blissful-pasteur-ntlsw7 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" (a reviewer stops here, at the exact head)
-pr: draft; read the URL from GitHub
-head_sha: a commit cannot record its own SHA; read the full head from the PR
-state: pushed draft
-current_step: amendment written (spec header, §2.12, §6.1 sentence, §6.4, §15.5)
-next_action: an eligible independent non-contributing session (OWNERSHIP.md §4.3; not session 017UoYKwUSLxBTGDKmDQqxii) does a complete review at the full head. Then 35/35 required checks and Matthew's per-item yes at that exact head.
-post_merge_check: NOT_APPLICABLE (docs-only; no runtime behavior changes)
-active_writer: Claude session_017UoYKwUSLxBTGDKmDQqxii
-decisions: (1) amend in place with a dated §2.12/§6.4, following the §2.11/§6.3 pattern, and add no new spec. (2) The §6.1 Lovable-gateway PASS gotcha was already superseded by §6.3 row 5; one §6.1 sentence now says the table is dated. (3) Leave CLAUDE.md alone; open #2853 owns that wording. (4) Edge-function count dated at the tip, because open #2811 and #2751 change it.
-tried_and_rejected: a scripted heredoc edit; the session's network-egress hook matched the apex URL text and refused the command, so edits went through the editor tool instead.
-commands: cite check: for each cite, diff <(git show 27991451a756d2521df08e26e504776a43c7bbb8:<path> | sed -n '<lines>p') <(sed -n '<lines>p' <path>). Counts: git ls-tree --name-only HEAD .github/workflows/ | wc -l; git ls-tree -d --name-only HEAD supabase/functions/ | grep -vc _shared; config/required-status-checks.json array lengths. Format and safety: bunx prettier --check docs/specs/release-topology-specification.md docs/agents/HANDOFF_LOG.md; node scripts/assert-docs-safety.mjs
-files_touched: docs/specs/release-topology-specification.md, docs/agents/HANDOFF_LOG.md
-files_remaining: none
-blockers: M1 BLOCKED (the session's egress hook refused the read); M2/M7/M10 not attempted (NOT_MEASURED); needs Matthew or a session with apex egress
-open_questions: none
-gotchas: Grok was this spec's named reviewer and is unavailable; route acceptance under OWNERSHIP.md §4.3 instead.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2622
-artifacts: the PR's check runs
-reviewer_seat: eligible independent session under OWNERSHIP.md §4.3; author session 017UoYKwUSLxBTGDKmDQqxii excluded
-reviewer_sha: none yet
-session_state: Claude cloud session 017UoYKwUSLxBTGDKmDQqxii; no production access; no scheduled check-ins
-claimed_by: Claude session_017UoYKwUSLxBTGDKmDQqxii, 2026-11-04 05:35 UTC
-owner: Claude
-last_updated: 2026-11-04 05:35 UTC, by Claude
-```
-
 ### RETIRE-PR2702-STRIPE-EDGE-PATH
 
 ```text
@@ -1652,40 +1652,6 @@ last_updated: 2026-11-03, by Claude session_017UoYKvcvohNxhmW342Lieo (takeover +
 ```
 
 ## Closed
-
-### ARCH-CONTRACT-RESTAMP-20261029
-
-```text
-TASK ARCH-CONTRACT-RESTAMP-20261029  priority: other  status: CLOSED merged as e312c3facd097e89c3786d532a384392f7fe6999 (#2622); slice C continues in TOPOLOGY-RESTAMP-20261104
-goal: re-verify docs/architecture-contract.md against deploy tip 479cadb3032ddc3ad80d93f105283609179d6c0a (#2581) and correct every clause that drifted since the 27991451 stamp and its 0200d255 post-stamp merge.
-why: the founder chose option A (docs-only refresh) on 2026-10-29, after a collision audit found that the contract (#2564) and docs/specs/release-topology-specification.md already exist, so a new contract would duplicate them.
-branch: claude/new-session-kulf08
-base: verdant-grow-diary
-checkout: git fetch origin claude/new-session-kulf08 verdant-grow-diary && git switch claude/new-session-kulf08 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" (a reviewer stops here, at the exact head; only the writer then runs git merge origin/verdant-grow-diary and pushes a new head)
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2622 (draft)
-head_sha: a commit cannot record its own SHA; read the full head from the PR
-state: pushed; ready for review. Independent verdicts by session_017UoYKvqHhSHehpNuWHT7qV, each stale once the head moved: 4c718a4 PASS-with-findings (6505081663), 37f2756 PASS-with-findings (6505693483), 8e06a5d PASS-with-findings (6506351031), d16efc2 PASS-with-findings (6508569894). Founder yes given at 37f2756 and 8e06a5d, both superseded by base merges. This commit fixes F6 and the Codex P2 on next_action, so the d16efc2 verdict is stale too.
-current_step: restamp written. 419 path:line cites re-read by text (9 moved, 3 live in AC-8.1, all in scripts/check-bun-lockfile-policy.mjs after #2569); AC-3.2, AC-4.3 and AC-10.2 counts unchanged; AC-3.4 940 in 939 -> 945 in 944.
-next_action: an eligible independent reviewer (not session 017UoYKx8T6Y6eyPhvDvxPjS or 017UoYKxQUVr5LNsENPKJ59K) does a complete re-review of the whole PR at the new full head SHA (OWNERSHIP.md section 4.3; a delta-only re-review is not acceptance). Then 35/35 required checks and the founder's per-item yes at that exact head.
-post_merge_check: NOT_APPLICABLE (docs-only; no runtime behavior changes)
-active_writer: Claude
-decisions: (1) no new contract and no topology edit; slice C (topology) waits for #2539, #2609 and #2589. (2) the six moved cites inside the 27991451 header record stay as that tree's lines, because a stamp record describes its own tree. (3) the counts were reproduced at 27991451 before measuring 479cadb, so the same method gives both. (4) the stale CLAUDE.md lockfile wording (option B) is out of scope; it would need the 18-file Sentinel bump.
-tried_and_rejected: a first cite pass that ignored bare `:NN` cites missed the AC-8.1 drift; the binder now ties each bare cite to the last full path in the same paragraph. Comparing topology-spec cites against 0200d255 gave false drift; 604274a7 is the right base because #2564 merged the spec and the contract together.
-commands: format and safety: bunx prettier --check docs/architecture-contract.md docs/agents/HANDOFF_LOG.md; node scripts/assert-docs-safety.mjs. Counts, run at both 27991451 and the head (replace REF): rules=$(git ls-tree --name-only REF src/lib/ | grep -E 'Rules\.ts$'); echo "$rules" | wc -l; git grep -l 'Date\.now()' REF -- $rules | wc -l; git grep -l 'Math\.random()' REF -- $rules | wc -l; git grep -h -o 'from "@/lib/react-router-compat"' REF -- src | wc -l; git grep -liE 'nelson|modified z|modifiedZ|median absolute deviation|\bMAD\b|z-?score|zscore|robust ?z' REF -- src supabase scripts e2e tools plugins spikes | wc -l. The cite re-read and the AC-4.3 pair count used session-local scripts that are not committed; their method is in the contract header and the PR body. SKIPPED, not passed: Vitest, bun run typecheck and the pre-commit full tsc, because this session has no node_modules and no test reads either file.
-files_touched: docs/architecture-contract.md, docs/agents/HANDOFF_LOG.md
-files_remaining: none
-blockers: none
-open_questions: whether to run option B (fix CLAUDE.md:117 and :297, which still call package-lock.json a compatibility lock) as a governance PR.
-gotchas: docs/specs/release-topology-specification.md:1012 records `PASS` for "AI Doctor inference through the Lovable AI gateway", citing GATEWAY_URL and LOVABLE_API_KEY, but AI Doctor is Gemini-direct since #1982 (contract AC-5.1). In slice C, confirm whether that §6.1 row is a dated measurement that a later section supersedes; if not, correct it.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2564
-artifacts: the PR's check runs
-reviewer_seat: eligible independent session under OWNERSHIP.md §4.3. A non-contributing Claude session qualifies. Excluded: author session 017UoYKx8T6Y6eyPhvDvxPjS and holder session 017UoYKxQUVr5LNsENPKJ59K
-reviewer_sha: none at the current head. Latest stale verdict: d16efc2aad329264b8f1f3dd1c6ba808b56e50e5, PASS-with-findings (P3 only), comment 6508569894; earlier ones are listed under state. F3 and F4 go to the next restamp, per the founder.
-session_state: Claude cloud session 017UoYKx8T6Y6eyPhvDvxPjS; separate one-shot check-in trig_01F8BsQcKVPKV5VDk4EPy3X1 is for #2597 CI
-claimed_by: Claude, 2026-10-29 12:20 CT
-owner: Claude
-last_updated: 2026-10-29 21:35 UTC, by Claude session 017UoYKxQUVr5LNsENPKJ59K (F6; full re-review scope per Codex P2)
-```
 
 ### PLANT-OVERVIEW-TENT-READINGS-COPY
 

@@ -95,6 +95,10 @@ function makeWindowsStyleCheckout(): string {
   writeFile(seed, "index.html", "<html></html>\n");
   writeFile(seed, "src/routeTree.gen.ts", "export const routeTree = {};\n");
   writeFile(seed, "src/lib/edgeShared.ts", 'export const edgeShared = "ok";\n');
+  // sync-edge-shared.mjs requires its byte twins (BYTE_TWINS) to exist and match.
+  const twin = 'export const ecowittPlainHttpRoute = "ok";\n';
+  writeFile(seed, "src/lib/ecowittPlainHttpRouteRules.ts", twin);
+  writeFile(seed, "cloudflare/ecowitt-plain-http-ingest.ts", twin);
   writeFile(
     seed,
     "supabase/functions/demo/index.ts",

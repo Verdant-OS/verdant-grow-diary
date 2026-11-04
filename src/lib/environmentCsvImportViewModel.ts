@@ -18,6 +18,8 @@ export interface ImportState {
   phase: ImportPhase;
   parsed: ParseEnvironmentCsvResult | null;
   insertedCount: number;
+  /** Sensor rows that contributed an insert. Null until confirm returns. */
+  contributedSensorRowCount: number | null;
   /** Rows skipped as duplicates (same file or already imported for this tent). */
   duplicateCount: number;
   /** Earlier batches committed before a later batch failed. */
@@ -30,6 +32,7 @@ export const INITIAL_IMPORT_STATE: ImportState = {
   phase: "idle",
   parsed: null,
   insertedCount: 0,
+  contributedSensorRowCount: null,
   duplicateCount: 0,
   partialWrite: false,
   errorCode: null,
@@ -76,14 +79,22 @@ export function cancelImport(): ImportState {
  * Never mentions raw database internals — duplicates are an expected,
  * safe outcome, not a failure.
  */
-export function buildCsvImportDoneMessage(insertedCount: number, duplicateCount: number): string {
+export function buildCsvImportDoneMessage(
+  insertedCount: number,
+  duplicateCount: number,
+  sensorRowCount?: number,
+): string {
   if (insertedCount === 0 && duplicateCount > 0) {
     return "No new readings imported. These readings already exist in Verdant.";
   }
+  const stored =
+    sensorRowCount != null && sensorRowCount > 0 && sensorRowCount !== insertedCount
+      ? `Imported ${insertedCount} CSV reading(s). From ${sensorRowCount} sensor row(s).`
+      : `Imported ${insertedCount} CSV reading(s).`;
   if (duplicateCount > 0) {
-    return `Imported ${insertedCount} CSV reading(s). Skipped ${duplicateCount} duplicate reading(s) already in Verdant.`;
+    return `${stored} Skipped ${duplicateCount} duplicate reading(s) already in Verdant.`;
   }
-  return `Imported ${insertedCount} CSV reading(s).`;
+  return stored;
 }
 
 /** Convenience wrapper that calls the parser and reduces the result. */

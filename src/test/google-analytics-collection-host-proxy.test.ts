@@ -79,6 +79,27 @@ describe("GA collection proxy relay", () => {
     }
     expect(appHits).toBe(3);
   });
+
+  it("closes the connection after a refusal so no client reuses a dead socket", async () => {
+    const app = await listenApp();
+    const proxy = await startGaCollectionProxy(0, portOf(app));
+    open.push(proxy, app);
+    const proxyPort = portOf(proxy);
+    for (const target of ["http://example.com/secret", "http://[bad"]) {
+      const connection = await new Promise<string | undefined>((resolve, reject) => {
+        const req = httpRequest(
+          { hostname: "127.0.0.1", port: proxyPort, path: target, method: "GET" },
+          (res) => {
+            res.resume();
+            res.on("end", () => resolve(res.headers.connection));
+          },
+        );
+        req.on("error", reject);
+        req.end();
+      });
+      expect(connection, target).toBe("close");
+    }
+  });
 });
 
 function listenApp(bodyFor?: (url: string | undefined) => string): Promise<Server> {

@@ -69,6 +69,25 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### GA-PROXY-SHARD25-SOCKET-HANG-UP
+
+```text
+TASK GA-PROXY-SHARD25-SOCKET-HANG-UP  priority: P2  status: OPEN
+goal: Stop the intermittent "socket hang up" in required check Full test suite (shard 25/32), test src/test/google-analytics-collection-host-proxy.test.ts.
+why: Red on unrelated docs PRs (PR 2831 at 01bac39, job 126290700551; PR 2827 at f3cf793, job 126328068392). A required check red across PRs is top priority.
+branch: claude/trusting-davinci-58hzpj
+base: verdant-grow-diary (2b72977b0)
+pr: draft, see the PR for this branch
+head_sha: see PR (set at push)
+state: pushed draft
+cause: the proxy refused with a keep-alive 403 and then destroyed the socket. A keep-alive client may reuse that socket for the next request and get "socket hang up". Node 22.23.4 / 24.22.1 carry a hasPendingRead() guard that usually hides it; the shard job runs the runner image's default Node (version NOT_MEASURED). Under the Bun runtime the unmodified test fails 3/3 with the CI error.
+fix: refusal sends Connection: close and no longer calls req.destroy(); the refused set and allowlist are unchanged; nothing is forwarded.
+rejected: retries, timeouts, skips; CPU load alone did not reproduce (0/300 pinned to one CPU).
+commands: bunx vitest run src/test/google-analytics-collection-host-proxy.test.ts ; bunx --bun vitest run src/test/google-analytics-collection-host-proxy.test.ts
+next_action: independent exact-head review; watch shard 25 on later PRs.
+reviewer: not requested yet (author excluded: this Claude session)
+```
+
 ### REPORTS-DIARY-RANGE-REPORT-LINK
 
 ```text

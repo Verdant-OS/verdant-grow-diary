@@ -17,16 +17,17 @@ test(
     const script = fileURLToPath(new URL("./fixtures/process-tree.mjs", import.meta.url));
     const child = spawnOwned(process.execPath, [script, dir], { stdio: "ignore" });
     try {
+      // The descendant rewrites the marker every 10 ms, and each write truncates
+      // first, so a read can land on an empty file. Wait for the content, not
+      // just the file, within the same deadline.
       const deadline = Date.now() + 4000;
+      let content = "";
       while (Date.now() < deadline) {
-        try {
-          await access(marker);
-          break;
-        } catch {
-          await delay(20);
-        }
+        content = await readFile(marker, "utf8").catch(() => "");
+        if (content === "alive") break;
+        await delay(20);
       }
-      assert.equal(await readFile(marker, "utf8"), "alive");
+      assert.equal(content, "alive");
       await terminateOwned(child);
       await rm(dir, { recursive: true, force: true });
       await delay(100);

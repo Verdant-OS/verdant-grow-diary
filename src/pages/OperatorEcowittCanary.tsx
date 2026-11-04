@@ -1026,7 +1026,7 @@ type WorkflowStageStatus = "pass" | "fail" | "incomplete" | "active" | "pending"
 function StageDot({ status }: { status: WorkflowStageStatus }) {
   const cls: Record<WorkflowStageStatus, string> = {
     pass: "bg-primary text-primary-foreground border-primary",
-    fail: "bg-destructive text-destructive-foreground border-destructive",
+    fail: "bg-destructive-fill text-destructive-foreground border-destructive",
     incomplete: "bg-muted text-muted-foreground border-border",
     active: "bg-background text-foreground border-primary",
     pending: "bg-background text-muted-foreground border-border",

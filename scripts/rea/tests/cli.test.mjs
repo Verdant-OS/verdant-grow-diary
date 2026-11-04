@@ -11,10 +11,13 @@ async function waitFor(path) {
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
     try {
-      return await readFile(path, "utf8");
+      // The fixtures write with writeFile, which truncates before writing, so a read can see "".
+      const text = await readFile(path, "utf8");
+      if (text) return text;
     } catch {
-      await delay(20);
+      /* Not written yet. */
     }
+    await delay(20);
   }
   throw new Error("Fixture did not reach the expected phase.");
 }

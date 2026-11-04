@@ -3,9 +3,22 @@
  * import Supabase and does not keep the raw token after returning it.
  */
 
+import { EcowittClaimsBackendAvailability } from "@/lib/ecowittClaimsBackendAvailability";
+
 export interface EcowittClaimRpcResult {
   readonly data: unknown;
-  readonly error: { readonly message: string } | null;
+  readonly error: {
+    readonly message: string;
+    readonly code?: string | null;
+  } | null;
+  readonly status?: number;
+}
+
+function isMissingBackend(result: EcowittClaimRpcResult): boolean {
+  return EcowittClaimsBackendAvailability.isMissingBackend({
+    code: result.error?.code ?? null,
+    status: result.status ?? null,
+  });
 }
 
 export const ECOWITT_OPEN_CLAIM_COLUMNS =
@@ -49,7 +62,10 @@ export interface EcowittOpenClaim {
 
 export type EcowittClaimCreateResult =
   | { readonly ok: true; readonly claimId: string; readonly uploadToken: string }
-  | { readonly ok: false; readonly reason: "tent_missing" | "rpc_failed" | "malformed_response" };
+  | {
+      readonly ok: false;
+      readonly reason: "tent_missing" | "rpc_failed" | "malformed_response" | "backend_missing";
+    };
 
 function readCreatedToken(data: unknown): { claimId: string; uploadToken: string } | null {
   const row = Array.isArray(data) ? data[0] : data;
@@ -70,10 +86,13 @@ export async function createEcowittCustomUploadClaim(
   tentId: string | null,
 ): Promise<EcowittClaimCreateResult> {
   if (tentId === null || tentId === "") return { ok: false, reason: "tent_missing" };
-  const { data, error } = await client.rpc("create_ecowitt_custom_upload_claim", {
+  const result = await client.rpc("create_ecowitt_custom_upload_claim", {
     p_tent_id: tentId,
   });
-  if (error) return { ok: false, reason: "rpc_failed" };
+  const { data, error } = result;
+  if (error) {
+    return { ok: false, reason: isMissingBackend(result) ? "backend_missing" : "rpc_failed" };
+  }
   const created = readCreatedToken(data);
   if (created === null) return { ok: false, reason: "malformed_response" };
   return { ok: true, claimId: created.claimId, uploadToken: created.uploadToken };
@@ -152,16 +171,22 @@ export async function loadOpenEcowittCustomUploadClaim(
   tentId: string | null,
 ): Promise<
   | { readonly ok: true; readonly claim: EcowittOpenClaim | null }
-  | { readonly ok: false; readonly reason: "tent_missing" | "rpc_failed" | "malformed_response" }
+  | {
+      readonly ok: false;
+      readonly reason: "tent_missing" | "rpc_failed" | "malformed_response" | "backend_missing";
+    }
 > {
   if (tentId === null || tentId === "") return { ok: false, reason: "tent_missing" };
-  const { data, error } = await client
+  const result = await client
     .from("ecowitt_custom_upload_claims")
     .select(ECOWITT_OPEN_CLAIM_COLUMNS)
     .eq("tent_id", tentId)
     .is("revoked_at", null)
     .maybeSingle();
-  if (error) return { ok: false, reason: "rpc_failed" };
+  const { data, error } = result;
+  if (error) {
+    return { ok: false, reason: isMissingBackend(result) ? "backend_missing" : "rpc_failed" };
+  }
   if (data === null) return { ok: true, claim: null };
   const claim = readOpenClaim(data);
   if (claim === null) return { ok: false, reason: "malformed_response" };

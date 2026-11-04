@@ -243,8 +243,11 @@ describe("Docs: rotation + fixture setup + screenshots", () => {
     const readme = read("e2e/README.md");
     expect(readme).toMatch(/##\s+Rotate or recreate the disposable E2E account/);
     expect(readme.toLowerCase()).toContain("no hardcoded credentials");
+    // The write smoke has its own disposable-account secrets (#2857); the
+    // owner's E2E_TEST_* login stays with the read-only proofs.
+    expect(readme).toContain("secrets.E2E_SMOKE_EMAIL");
+    expect(readme).toContain("secrets.E2E_SMOKE_PASSWORD");
     expect(readme).toContain("secrets.E2E_TEST_EMAIL");
-    expect(readme).toContain("secrets.E2E_TEST_PASSWORD");
     expect(readme).toContain("E2E_FIXTURE_EXPECTED_ACCOUNT_HINT");
     expect(readme).toContain("workflow_dispatch");
     // Bootstrap is referenced and gated

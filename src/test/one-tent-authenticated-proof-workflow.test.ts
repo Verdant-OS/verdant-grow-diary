@@ -579,8 +579,11 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     expect(jobEnv).not.toContain("secrets.E2E_TEST_EMAIL");
     expect(jobEnv).not.toContain("secrets.E2E_TEST_PASSWORD");
     for (const firstPartyStep of [boundaryStep, materializeStep]) {
-      expect(firstPartyStep).toContain("E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}");
-      expect(firstPartyStep).toContain("E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}");
+      // The proof writes a marker-tagged hierarchy on production, so it signs in
+      // only as the disposable smoke account, never the owner (#2857).
+      expect(firstPartyStep).toContain("E2E_TEST_EMAIL: ${{ secrets.E2E_ONETENT_EMAIL }}");
+      expect(firstPartyStep).toContain("E2E_TEST_PASSWORD: ${{ secrets.E2E_ONETENT_PASSWORD }}");
+      expect(firstPartyStep).not.toContain("secrets.E2E_TEST_");
     }
     expect(proofStep).not.toContain("${{ secrets.");
     expect(proofStep).toContain('E2E_TEST_EMAIL: "managed-session-trace-off"');
@@ -611,8 +614,9 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     );
     expect(targetStep).not.toContain("secrets.E2E_TEST_");
     expect(targetStep).not.toContain("grep");
-    expect(credentialStep).toContain("secrets.E2E_TEST_EMAIL");
-    expect(credentialStep).toContain("secrets.E2E_TEST_PASSWORD");
+    expect(credentialStep).toContain("secrets.E2E_ONETENT_EMAIL");
+    expect(credentialStep).toContain("secrets.E2E_ONETENT_PASSWORD");
+    expect(credentialStep).toContain('"$onetent_email" != "$onetent_hint"');
     expect(credentialStep).not.toContain("VITE_SUPABASE_URL");
   });
 

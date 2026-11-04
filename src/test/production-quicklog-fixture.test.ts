@@ -29,9 +29,16 @@ const secondId = "22222222-2222-4222-8222-222222222222";
 const tentId = "33333333-3333-4333-8333-333333333333";
 const growId = "44444444-4444-4444-8444-444444444444";
 const plantUrl = `https://verdantgrowdiary.com/plants/${plantId}`;
-const expected = { grow: "QA Test Grow", tent: "E2E Test Tent", plant: "E2E Test Plant" };
+const fixtureAccount = "e2e-fixture@verdant-test.invalid";
+const expected = {
+  grow: "QA Test Grow",
+  tent: "E2E Test Tent",
+  plant: "E2E Test Plant",
+  account: fixtureAccount,
+};
 const env = {
   E2E_FIXTURE_MODE: "true",
+  E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: fixtureAccount,
   E2E_GROW_1_PLANT_URL: plantUrl,
   E2E_FIXTURE_EXPECTED_GROW_NAME: expected.grow,
   E2E_FIXTURE_EXPECTED_TENT_NAME: expected.tent,
@@ -40,7 +47,7 @@ const env = {
 const target = { plantId, tentId, growId };
 function evidence(): ProductionFixtureEvidence {
   return {
-    identity: { id: owner, email: "cheekhimself@gmail.com" },
+    identity: { id: owner, email: fixtureAccount },
     invalidated: false,
     plants: [
       {
@@ -145,7 +152,7 @@ describe("Quick Log timing fixture continuity", () => {
       await h.proof.assertInitial(env);
       const invalidate = () => {
         if (change === "account changed")
-          h.emit("/auth/v1/user", { id: foreign, email: "cheekhimself@gmail.com" });
+          h.emit("/auth/v1/user", { id: foreign, email: fixtureAccount });
         else if (change === "identity rejected") h.emit("/auth/v1/user", null, 401);
         else if (change === "plant archived" || change === "plant ownership changed")
           h.emit("/rest/v1/plants", [

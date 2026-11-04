@@ -4,7 +4,35 @@ import type { FixtureSafetyEnv, FixtureEnvValidation } from "./fixtureSafety";
 export const QUICKLOG_SMOKE_APP_ORIGIN = "https://verdantgrowdiary.com";
 // Public backend origin committed in .env; this is not a credential.
 export const QUICKLOG_SMOKE_BACKEND_ORIGIN = "https://knkwiiywfkbqznbxwqfh.supabase.co";
+/**
+ * The owner's account. Used only by the read-only production proofs (signed-in,
+ * Actions, Settings), which never write. Production write smokes refuse it.
+ */
 export const QUICKLOG_SMOKE_ACCOUNT_EMAIL = "cheekhimself@gmail.com";
+/**
+ * The owner's personal accounts. A production write smoke must never run as
+ * either one (docs/production-only-verification-runbook.md:8; grower bug item 20:
+ * test tents and grows had accumulated in a real account).
+ */
+export const PERSONAL_ACCOUNT_EMAILS: readonly string[] = [
+  "cheekhimself@gmail.com",
+  "matt@verdantgrowdiary.com",
+];
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * The disposable test account a production write smoke runs as, from
+ * E2E_FIXTURE_EXPECTED_ACCOUNT_HINT. Null when missing, malformed or personal.
+ */
+export function resolveProductionWriteAccount(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const email = value.trim().toLowerCase();
+  if (!EMAIL.test(email) || PERSONAL_ACCOUNT_EMAILS.includes(email)) return null;
+  return email;
+}
+
+/** Expected fixture names plus the disposable write account the server must report. */
+export type ProductionFixtureExpected = FixtureEnvValidation["expected"] & { account?: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Non-alphanumeric boundaries (not \b) so underscore-joined names such as
 // "E2E_Test_Tent" carry a marker, while "Contest" or "Testing" do not.
@@ -76,9 +104,13 @@ export function validateProductionQuickLogEnv(
     if (key === "grow" ? name && !MARKER.test(name) : !name || !MARKER.test(name))
       errors.push(`${key}_fixture_name_required`);
   }
-  const hint = env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT?.trim().toLowerCase();
-  if (hint && hint !== QUICKLOG_SMOKE_ACCOUNT_EMAIL) errors.push("unapproved_account_hint");
-  return { ok: errors.length === 0, errors, expected };
+  const hint = env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT?.trim().toLowerCase() ?? "";
+  const account = resolveProductionWriteAccount(hint);
+  if (!hint) errors.push("disposable_account_required");
+  else if (PERSONAL_ACCOUNT_EMAILS.includes(hint)) errors.push("personal_account_refused");
+  else if (!account) errors.push("disposable_account_invalid");
+  const withAccount: ProductionFixtureExpected = { ...expected, account: account ?? "" };
+  return { ok: errors.length === 0, errors, expected: withAccount };
 }
 
 /** Discard every field except the non-secret ownership/relationship evidence. */
@@ -132,7 +164,7 @@ export function productionFixtureResponseKind(
 export function validateProductionFixtureTarget(
   evidence: ProductionFixtureEvidence | null | undefined,
   target: FixtureTarget | null | undefined,
-  expected: FixtureEnvValidation["expected"] | null | undefined,
+  expected: ProductionFixtureExpected | null | undefined,
   plantName = expected?.plant ?? "",
 ): { ok: boolean; errors: string[] } {
   if (!evidence || !target || !expected)
@@ -140,11 +172,8 @@ export function validateProductionFixtureTarget(
   const errors: string[] = [];
   const identity = evidence.identity;
   if (evidence.invalidated) errors.push("fixture_evidence_invalidated");
-  if (
-    !identity ||
-    !UUID.test(identity.id) ||
-    identity.email.toLowerCase() !== QUICKLOG_SMOKE_ACCOUNT_EMAIL
-  )
+  const account = resolveProductionWriteAccount(expected.account);
+  if (!account || !identity || !UUID.test(identity.id) || identity.email.toLowerCase() !== account)
     errors.push("approved_server_account_required");
   if (![target.plantId, target.tentId, target.growId].every((id) => UUID.test(id)))
     errors.push("complete_target_required");

@@ -94,13 +94,16 @@ const ToastTitle = React.forwardRef<
 ));
 ToastTitle.displayName = ToastPrimitives.Title.displayName;
 
+/** Destructive toasts drop the 90% opacity: blended into the danger fill it measures 4.33:1. */
+export const toastDescriptionClass = "text-sm opacity-90 group-[.destructive]:opacity-100";
+
 const ToastDescription = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Description>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Description>
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Description
     ref={ref}
-    className={cn("text-sm opacity-90", className)}
+    className={cn(toastDescriptionClass, className)}
     {...props}
   />
 ));

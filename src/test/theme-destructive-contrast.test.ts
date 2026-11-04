@@ -16,6 +16,7 @@ import postcss, { type Rule, type AtRule } from "postcss";
 
 import { buttonVariants } from "@/components/ui/button";
 import { badgeVariants } from "@/components/ui/badge";
+import { toastDescriptionClass } from "@/components/ui/toast";
 
 const AA = 4.5;
 const css = postcss.parse(readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8"));
@@ -106,6 +107,31 @@ describe("destructive colour contrast (D1 a)", () => {
     expect(
       contrast(token(light, "--destructive-foreground"), token(light, "--destructive")),
     ).toBeGreaterThanOrEqual(AA);
+  });
+
+  it("both themes: the white label on the opaque hover fill meets AA", () => {
+    expect(theme["--color-destructive-fill-hover"]).toBe("hsl(var(--destructive-hover))");
+    for (const vars of [root, light]) {
+      expect(
+        contrast(token(vars, "--destructive-foreground"), token(vars, "--destructive-hover")),
+      ).toBeGreaterThanOrEqual(AA);
+    }
+  });
+
+  it("Button and Badge destructive hovers use the opaque hover fill, never a translucent fill", () => {
+    for (const cls of [
+      buttonVariants({ variant: "destructive" }),
+      badgeVariants({ variant: "destructive" }),
+    ]) {
+      const classes = cls.split(/\s+/);
+      expect(classes).toContain("hover:bg-destructive-fill-hover");
+      expect(classes.filter((c) => /bg-destructive(-fill)?(-hover)?\//.test(c))).toEqual([]);
+    }
+  });
+
+  it("destructive toast descriptions render at full opacity", () => {
+    const classes = toastDescriptionClass.split(/\s+/);
+    expect(classes).toContain("group-[.destructive]:opacity-100");
   });
 
   it("Button and Badge destructive variants use the fill, not the text colour", () => {

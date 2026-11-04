@@ -65,9 +65,17 @@ Configure in `Settings → Secrets and variables → Actions`:
 
 `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are a separate owner login used only by the
 read-only proof workflows (`actions-readonly-proof.yml`, `settings-account-consent-proof.yml`).
-Both jobs in `quicklog-smoke.yml` (the write smoke and the authenticated One-Tent proof,
-which creates and tears down a marker-tagged grow, tent and plant) write to production, so
-both sign in with `E2E_SMOKE_*` only. Leave `E2E_TEST_*` unchanged.
+Both jobs in `quicklog-smoke.yml` write to production, so neither uses `E2E_TEST_*`;
+leave those unchanged. The write smoke signs in with `E2E_SMOKE_*`. The authenticated
+One-Tent proof creates and tears down a marker-tagged grow, tent and plant, so it needs a
+**second, empty** disposable account: a Free account holds one active grow, and this
+account's `E2E Test` grow already uses it. Configure that second account as:
+
+- `E2E_ONETENT_EMAIL` / `E2E_ONETENT_PASSWORD` (secrets)
+- `E2E_ONETENT_EXPECTED_ACCOUNT_HINT` (variable; must equal `E2E_ONETENT_EMAIL`)
+
+The One-Tent proof refuses both personal accounts and refuses this fixture account.
+Leave the second account with no grows; the proof tears down its own.
 
 **Variables** (names appear in logs; values do not):
 

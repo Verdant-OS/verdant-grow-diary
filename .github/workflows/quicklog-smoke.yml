@@ -22,11 +22,16 @@ name: Quick Log Playwright smoke
 #    fixture saves per run, the same as a push run; skips cleanly without config.
 #
 # Required repository secrets / vars (configure in GitHub → Settings):
-#   secrets.E2E_SMOKE_EMAIL        (both jobs here write to production, so both sign in
-#   secrets.E2E_SMOKE_PASSWORD      as the disposable account; it must equal
-#                                   vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT)
+#   Both jobs here write to production, so each signs in as its own disposable
+#   account, never a personal one. They cannot share one: a Free account holds one
+#   active grow, and the One-Tent proof creates its own grow.
+#   secrets.E2E_SMOKE_EMAIL        quicklog-smoke job (Quick Log write smoke); must equal
+#   secrets.E2E_SMOKE_PASSWORD      vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT
+#   vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT (the Quick Log fixture account's email)
+#   secrets.E2E_ONETENT_EMAIL      one-tent-authenticated-proof job; an empty disposable
+#   secrets.E2E_ONETENT_PASSWORD    account that must equal vars.E2E_ONETENT_EXPECTED_ACCOUNT_HINT
+#   vars.E2E_ONETENT_EXPECTED_ACCOUNT_HINT (the One-Tent proof account's email)
 #   (secrets.E2E_TEST_* is the owner login for the read-only proof workflows; unused here.)
-#   vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT (the disposable account's email)
 #   vars.E2E_BASE_URL              (https://verdantgrowdiary.com only)
 #   vars.E2E_GROW_1_PLANT_URL      (production URL in the test fixture's own grow)
 # Before writes, verify fixture/account ownership; tag [smoke <timestamp>].
@@ -423,24 +428,28 @@ jobs:
 
       - name: Verify E2E credentials are configured
         env:
-          E2E_TEST_EMAIL: ${{ secrets.E2E_SMOKE_EMAIL }}
-          E2E_TEST_PASSWORD: ${{ secrets.E2E_SMOKE_PASSWORD }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_ONETENT_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_ONETENT_PASSWORD }}
+          E2E_ONETENT_EXPECTED_ACCOUNT_HINT: ${{ vars.E2E_ONETENT_EXPECTED_ACCOUNT_HINT }}
           E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: ${{ vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT }}
         shell: bash
         run: |
           set -euo pipefail
-          [ -n "$E2E_TEST_EMAIL" ] || { echo "Missing secrets.E2E_SMOKE_EMAIL" >&2; exit 1; }
-          [ -n "$E2E_TEST_PASSWORD" ] || { echo "Missing secrets.E2E_SMOKE_PASSWORD" >&2; exit 1; }
+          [ -n "$E2E_TEST_EMAIL" ] || { echo "Missing secrets.E2E_ONETENT_EMAIL" >&2; exit 1; }
+          [ -n "$E2E_TEST_PASSWORD" ] || { echo "Missing secrets.E2E_ONETENT_PASSWORD" >&2; exit 1; }
           # This proof creates and tears down a marker-tagged grow, tent and plant on
-          # production, so it signs in only as the disposable account named by
-          # vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT, never as a personal account.
-          smoke_email=$(printf '%s' "$E2E_TEST_EMAIL" | tr '[:upper:]' '[:lower:]' | xargs)
+          # production, so it signs in only as its own disposable account named by
+          # vars.E2E_ONETENT_EXPECTED_ACCOUNT_HINT: never a personal account, and never
+          # the Quick Log fixture account, whose one Free grow is already in use.
+          onetent_email=$(printf '%s' "$E2E_TEST_EMAIL" | tr '[:upper:]' '[:lower:]' | xargs)
+          onetent_hint=$(printf '%s' "$E2E_ONETENT_EXPECTED_ACCOUNT_HINT" | tr '[:upper:]' '[:lower:]' | xargs)
           smoke_hint=$(printf '%s' "$E2E_FIXTURE_EXPECTED_ACCOUNT_HINT" | tr '[:upper:]' '[:lower:]' | xargs)
-          if [ -z "$smoke_hint" ] ||
-             [ "$smoke_email" != "$smoke_hint" ] ||
-             [ "$smoke_email" = "cheekhimself@gmail.com" ] ||
-             [ "$smoke_email" = "matt@verdantgrowdiary.com" ]; then
-            echo "BLOCKED: the One-Tent proof writes to production and needs the disposable fixture account." >&2
+          if [ -z "$onetent_hint" ] ||
+             [ "$onetent_email" != "$onetent_hint" ] ||
+             [ "$onetent_email" = "cheekhimself@gmail.com" ] ||
+             [ "$onetent_email" = "matt@verdantgrowdiary.com" ] ||
+             { [ -n "$smoke_hint" ] && [ "$onetent_email" = "$smoke_hint" ]; }; then
+            echo "BLOCKED: the One-Tent proof writes to production and needs its own disposable account." >&2
             exit 1
           fi
 
@@ -457,8 +466,8 @@ jobs:
 
       - name: Materialize authenticated managed session
         env:
-          E2E_TEST_EMAIL: ${{ secrets.E2E_SMOKE_EMAIL }}
-          E2E_TEST_PASSWORD: ${{ secrets.E2E_SMOKE_PASSWORD }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_ONETENT_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_ONETENT_PASSWORD }}
         run: bun --env-file=.env run scripts/e2e/materialize-managed-session.mjs
 
       - name: Run and verify authenticated One-Tent proof

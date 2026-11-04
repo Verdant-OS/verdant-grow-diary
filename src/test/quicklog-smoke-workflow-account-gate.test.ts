@@ -115,21 +115,25 @@ describe("quicklog-smoke write gate (grower bug item 20)", () => {
 
 /**
  * The authenticated One-Tent proof in the same workflow creates and tears down a
- * marker-tagged grow, tent and plant on production. It must sign in with the same
- * disposable account and the same gate (#2857, Reviewer B P2).
+ * marker-tagged grow, tent and plant on production. It signs in as its own empty
+ * disposable account (#2857, Reviewer B P2), never the Quick Log fixture account:
+ * a Free account holds one active grow and the fixture's grow already uses it
+ * (#2857, Codex P2; founder decision 2026-11-04, a second disposable account).
  */
 const oneTentStep = workflow.jobs["one-tent-authenticated-proof"].steps.find(
   (s) => s.name === "Verify E2E credentials are configured",
 )!;
+const oneTentAccount = "e2e-onetent@verdant-test.invalid";
 
-function runOneTentGate(email: string, hint: string): boolean {
+function runOneTentGate(email: string, oneTentHint: string, smokeHint = disposable): boolean {
   try {
     execFileSync("bash", ["-c", oneTentStep.run!], {
       env: {
         PATH: process.env.PATH ?? "/usr/bin:/bin",
         E2E_TEST_EMAIL: email,
         E2E_TEST_PASSWORD: "not-a-real-password",
-        E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: hint,
+        E2E_ONETENT_EXPECTED_ACCOUNT_HINT: oneTentHint,
+        E2E_FIXTURE_EXPECTED_ACCOUNT_HINT: smokeHint,
       },
       stdio: "pipe",
     });
@@ -140,26 +144,35 @@ function runOneTentGate(email: string, hint: string): boolean {
 }
 
 describe("One-Tent proof account gate (grower bug item 20)", () => {
-  it("passes only the disposable account named by the hint", () => {
-    expect(runOneTentGate(disposable, disposable)).toBe(true);
-    expect(runOneTentGate(" E2E-Fixture@Verdant-Test.invalid ", disposable)).toBe(true);
+  it("passes only the One-Tent account named by its own hint", () => {
+    expect(runOneTentGate(oneTentAccount, oneTentAccount)).toBe(true);
+    expect(runOneTentGate(" E2E-OneTent@Verdant-Test.invalid ", oneTentAccount)).toBe(true);
+    expect(runOneTentGate(oneTentAccount, oneTentAccount, "")).toBe(true);
   });
 
   it("refuses a missing hint, a mismatch and each personal account", () => {
-    expect(runOneTentGate(disposable, "")).toBe(false);
-    expect(runOneTentGate("someone-else@verdant-test.invalid", disposable)).toBe(false);
+    expect(runOneTentGate(oneTentAccount, "")).toBe(false);
+    expect(runOneTentGate("someone-else@verdant-test.invalid", oneTentAccount)).toBe(false);
     for (const personal of ["cheekhimself@gmail.com", "matt@verdantgrowdiary.com"]) {
       expect(runOneTentGate(personal, personal)).toBe(false);
     }
   });
 
-  it("reads the disposable account's secrets, never the owner login", () => {
-    expect(oneTentStep.env).toMatchObject({
-      E2E_TEST_EMAIL: "${{ secrets.E2E_SMOKE_EMAIL }}",
-      E2E_TEST_PASSWORD: "${{ secrets.E2E_SMOKE_PASSWORD }}",
-    });
-    expect(JSON.stringify(workflow.jobs["one-tent-authenticated-proof"])).not.toContain(
-      "secrets.E2E_TEST_",
+  it("refuses the Quick Log fixture account, whose one Free grow is in use", () => {
+    expect(runOneTentGate(disposable, disposable, disposable)).toBe(false);
+    expect(runOneTentGate(" E2E-Fixture@Verdant-Test.invalid ", disposable, disposable)).toBe(
+      false,
     );
+  });
+
+  it("reads its own disposable secrets, never the owner login or the smoke login", () => {
+    expect(oneTentStep.env).toMatchObject({
+      E2E_TEST_EMAIL: "${{ secrets.E2E_ONETENT_EMAIL }}",
+      E2E_TEST_PASSWORD: "${{ secrets.E2E_ONETENT_PASSWORD }}",
+      E2E_ONETENT_EXPECTED_ACCOUNT_HINT: "${{ vars.E2E_ONETENT_EXPECTED_ACCOUNT_HINT }}",
+    });
+    const job = JSON.stringify(workflow.jobs["one-tent-authenticated-proof"]);
+    expect(job).not.toContain("secrets.E2E_TEST_");
+    expect(job).not.toContain("secrets.E2E_SMOKE_");
   });
 });

@@ -186,7 +186,9 @@ There are **no hardcoded credentials** in this repository. The test
 account's email and password live only in
 `secrets.E2E_SMOKE_EMAIL` and `secrets.E2E_SMOKE_PASSWORD`. The read-only
 proofs use a separate owner login, `secrets.E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`,
-which the write smoke never reads.
+which the write smoke never reads. The authenticated One-Tent proof uses a second, empty
+disposable account (`secrets.E2E_ONETENT_*`, `vars.E2E_ONETENT_EXPECTED_ACCOUNT_HINT`),
+because a Free account holds one active grow; see `e2e/FIXTURE_SETUP.md` §3.
 
 The production smoke lane runs only as the disposable account named in
 `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` and refuses the owner's personal accounts

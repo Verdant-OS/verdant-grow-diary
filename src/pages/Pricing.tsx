@@ -526,7 +526,7 @@ export default function Pricing() {
       ],
       [
         "Do I need specific hardware?",
-        "No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge.",
+        "No. Verdant is hardware-neutral. You can log everything manually or import CSVs. MQTT setups can forward readings through your own bridge.",
       ],
       [
         "Does Verdant control my equipment or grow for me?",
@@ -1184,7 +1184,7 @@ export default function Pricing() {
           <TrustCard
             icon={<Cpu className="h-5 w-5" />}
             title="Hardware-neutral"
-            body="Verdant works with the gear you already own. Bring sensors over webhook, MQTT, Raspberry Pi bridge, or manual entry. No vendor lock-in. No forced ecosystem."
+            body="Verdant works with the gear you already own. Log readings manually or import a CSV. MQTT setups can forward readings through your own bridge. No vendor lock-in. No forced ecosystem."
           />
           <TrustCard
             icon={<ShieldCheck className="h-5 w-5" />}
@@ -1237,9 +1237,9 @@ export default function Pricing() {
           <AccordionItem value="hardware">
             <AccordionTrigger>Do I need specific hardware?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              No. Verdant is hardware-neutral. You can log everything manually, import CSVs, or
-              connect sensors over webhook, MQTT, ESP32, or a Raspberry Pi bridge. Bring the gear
-              you already own — Verdant does not sell or require any specific gear.
+              No. Verdant is hardware-neutral. You can log everything manually or import CSVs. MQTT
+              setups can forward readings through your own bridge. Bring the gear you already own —
+              Verdant does not sell or require any specific gear.
             </AccordionContent>
           </AccordionItem>
 

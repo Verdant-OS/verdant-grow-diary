@@ -83,10 +83,21 @@ export function buildCsvImportFailureMessage(
 
 export function formatCsvPreviewRow(row: ParsedEnvironmentRow): string {
   const parts = [new Date(row.captured_at).toLocaleString()];
-  parts.push(row.temperature_c != null ? `${row.temperature_c.toFixed(1)}°C` : "—");
+  parts.push(previewTemperature(row));
   parts.push(row.humidity_pct != null ? `${row.humidity_pct.toFixed(0)}%` : "—");
   if (row.vpd_kpa != null) parts.push(`${row.vpd_kpa.toFixed(2)} kPa VPD`);
   if (row.co2_ppm != null) parts.push(`${row.co2_ppm.toFixed(0)} ppm CO₂`);
   if (row.ppfd != null) parts.push(`${row.ppfd.toFixed(0)} PPFD`);
   return parts.join(" · ");
+}
+
+/** File unit when the parser kept it; canonical Celsius only when the file unit is unknown. */
+function previewTemperature(row: ParsedEnvironmentRow): string {
+  if (row.raw_temp_unit === "F" && row.raw_temperature != null) {
+    return `${row.raw_temperature.toFixed(1)}°F`;
+  }
+  if (row.raw_temp_unit === "C" && row.raw_temperature != null) {
+    return `${row.raw_temperature.toFixed(1)}°C`;
+  }
+  return row.temperature_c != null ? `${row.temperature_c.toFixed(1)}°C` : "—";
 }

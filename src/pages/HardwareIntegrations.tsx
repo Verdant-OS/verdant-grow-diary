@@ -313,7 +313,7 @@ const INTEGRATION_PATHS = [
   },
   {
     title: "MQTT",
-    body: "Subscribe to topic streams from existing controllers or DIY rigs. Read-only by default; no outbound control.",
+    body: "MQTT setups can forward readings through your own bridge. Read-only by default; no outbound control.",
   },
   {
     title: "Home " + "Assistant",

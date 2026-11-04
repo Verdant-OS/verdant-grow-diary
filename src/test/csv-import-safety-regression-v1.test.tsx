@@ -120,6 +120,7 @@ describe("CSV Import Safety Regression v1 — persistence boundary", () => {
     expect(res).toEqual({
       insertedCount: 0,
       duplicateCount: 0,
+      contributedSensorRowCount: 0,
       partialWrite: false,
       error:
         "Import could not be completed. No CSV readings were saved. Try again. No live sensor data was created.",

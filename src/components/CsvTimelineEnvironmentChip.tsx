@@ -56,14 +56,14 @@ export function CsvTimelineEnvironmentChip(props: CsvTimelineEnvironmentChipProp
   return (
     <aside
       aria-label={snapshot.title}
-      data-testid={`csv-timeline-chip-${diaryEntryId}`}
+      data-testid={`csv-timeline-chip-${diaryEntryId.replace(/:/g, "-")}`}
       data-source={snapshot.sourceLabel}
       className="mt-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs"
     >
       <header className="flex items-center justify-between gap-2">
         <span className="font-medium">{snapshot.title}</span>
         <span
-          data-testid={`csv-timeline-chip-source-${diaryEntryId}`}
+          data-testid={`csv-timeline-chip-source-${diaryEntryId.replace(/:/g, "-")}`}
           className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground"
         >
           {snapshot.sourceLabel}

@@ -10,7 +10,8 @@
  * route changes. Logic lives in importedSensorHistoryViewModel.
  *
  * Safety:
- *   - Never reads or renders `raw_payload`.
+ *   - The vendor badge reads `raw_payload.source_app`, and for older rows
+ *     `import_file_name` or `raw_row` headers. It never renders the payload.
  *   - Never classifies imported readings as live.
  *   - No writes. No automation. No alerts. No Action Queue.
  */
@@ -30,6 +31,7 @@ import {
   type ImportedHistoryAiDoctorHandoffPlant,
   type ImportedHistoryAiDoctorHandoffReadStatus,
 } from "@/lib/importedSensorHistoryAiDoctorHandoffRules";
+import { CsvImportVendorIdentity } from "@/lib/csvImportVendorIdentity";
 import {
   IMPORTED_SENSOR_HISTORY_ALL_METRICS,
   IMPORTED_SENSOR_HISTORY_ANCHOR_ID,
@@ -95,15 +97,24 @@ export default function ImportedSensorHistoryPanel({
     }
   }, [location.hash]);
 
+  const labeledReadings = useMemo(
+    () =>
+      readings.map((row) => ({
+        ...row,
+        vpd_source: CsvImportVendorIdentity.vpdSource(row),
+      })),
+    [readings],
+  );
+
   const vm = useMemo(
     () =>
       buildImportedSensorHistoryViewModel({
-        readings,
+        readings: labeledReadings,
         limit,
         selectedMetric,
         temperatureUnit,
       }),
-    [readings, limit, selectedMetric, temperatureUnit],
+    [labeledReadings, limit, selectedMetric, temperatureUnit],
   );
 
   const handoffVm = useMemo(
@@ -150,7 +161,7 @@ export default function ImportedSensorHistoryPanel({
       <header className="flex flex-wrap items-center gap-2">
         <h2 className="text-base font-semibold">Imported sensor history</h2>
         <Badge variant="secondary" data-testid="imported-history-source-badge">
-          Source: CSV
+          Source: {CsvImportVendorIdentity.badgeForRows(readings)}
         </Badge>
         <Badge variant="outline" data-testid="imported-history-not-live-badge">
           {IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY}
@@ -292,7 +303,9 @@ export default function ImportedSensorHistoryPanel({
                     className="border-t border-border/40"
                   >
                     <td className="py-1 pr-2">{formatTimestamp(r.capturedAt)}</td>
-                    <td className="py-1 pr-2">{r.metricLabel}</td>
+                    <td className="py-1 pr-2" data-metric={r.metric}>
+                      {r.metricLabel}
+                    </td>
                     <td className="py-1">
                       <span>{r.displayValue}</span>
                       {r.outOfRangeNote ? (

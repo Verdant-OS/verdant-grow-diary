@@ -79,15 +79,15 @@ branch: claude/new-session-azpsz3
 base: verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2820
 head_sha: read the current head on GitHub
-state: pushed draft
-current_step: item 19 done: non-blocking near-duplicate name warning in Create/Edit Plant (same grow) and Create/Edit Tent; cache-only read (no new queries, preserves pinned dialog read/write behavior); rules in src/lib/similarNameWarningRules.ts
-next_action: founder picks the next item (remaining: 9, 10, 11, 16, 20); independent review of #2820; founder approval of #2828; #2828 manual-correction-recovery re-run outcome
+state: open, ready for review (not draft); head frozen for seats A + D + C, moved only for the HANDOFF_LOG conflict (cd3104c) and this review fix
+current_step: items 1, 7, 8, restore, 12 (spec; migration in #2828), 14, 15, 17, 18, 19, 21 on PR #2820; review fixes for Seat D P2 (this block) and Seat A P3 (thousands-comma parse) pushed
+next_action: seats A + D + C re-review at the new head; then Cheeko's own-words yes at that SHA; #2828 needs its own review and yes
 post_merge_check: on verdantgrowdiary.com, the fixture plant page shows "Grow: <name>" and Timeline Recent Quick Logs rows show "Plant: ... · Tent: ..."
 active_writer: Claude session claude/new-session-azpsz3
 decisions: no migration/RLS/auth edits (held); items 2,4,5,6 fixed by #2794; item 3 not reproduced (in-flight guard + idempotency key; duplicates 6.5 h apart); item 7 fixed by f2d6ca2; names never guessed (unknown id reads "name unavailable")
-tried_and_rejected: editing existing test files under scorer-lock; new test files instead
+tried_and_rejected: subscribing the near-duplicate name note to usePlants/useTents (changed pinned dialog fetch counts; replaced with a cache-only read); editing a scorer-locked test without declaring it (refused). One locked test WAS renegotiated after founder approval: src/test/plant-card-actions-archive-restore-menu.test.tsx, supabase mock shape only, commit 8e15933
 commands: bunx vitest run src/test/grow-and-target-context-labels.test.tsx src/test/quick-log-recent-row-target-label.test.tsx src/test/plant-archive-outcome-toast.test.tsx src/test/tent-name-markup-export-escape.test.ts --reporter=dot
-files_touched: src/test/tent-name-markup-export-escape.test.ts, src/components/PlantCardActionsMenu.tsx, src/test/plant-archive-outcome-toast.test.tsx, src/lib/detailPageGrowContextRules.ts, src/lib/quickLogHistoryTargetLabelRules.ts, src/components/DetailGrowContextLine.tsx, src/components/QuickLogHistoryPanels.tsx, src/pages/PlantDetail.tsx, src/pages/TentDetail.tsx, src/pages/Timeline.tsx, src/test/grow-and-target-context-labels.test.tsx, src/test/quick-log-recent-row-target-label.test.tsx, docs/agents/HANDOFF_LOG.md
+files_touched: see https://github.com/Verdant-OS/verdant-grow-diary/pull/2820/files (33+ files)
 files_remaining: per founder choice
 blockers: item 12 design choice (founder); live /version.json probe blocked by a session egress hook; no production DB/Worker log access
 open_questions: is #2794 live?
@@ -98,7 +98,7 @@ reviewer_sha: none yet
 session_state: one self check-in armed (send_later) for PR #2820 CI
 claimed_by: Claude, 2026-11-03 16:45 CT
 owner: Claude
-last_updated: 2026-11-03 20:15 CT, by Claude
+last_updated: 2026-11-03 20:55 CT, by Claude
 ```
 
 ### REPORTS-DIARY-RANGE-REPORT-LINK

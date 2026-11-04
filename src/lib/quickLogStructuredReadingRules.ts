@@ -23,6 +23,7 @@ export type StructuredReadingKey = (typeof STRUCTURED_READING_KEYS)[number];
 
 export const STRUCTURED_READING_COPY = {
   notANumber: "Enter a number",
+  ambiguousComma: "Write 1000 or 1.2, without a thousands comma",
   invalidPpfd: "Invalid PPFD",
   checkValue: "Saved as entered — check value",
   fixBeforeSave: "Fix the soil and light readings before saving.",
@@ -73,11 +74,14 @@ export interface StructuredReadingResult {
   errors: Array<{ key: StructuredReadingKey; message: string }>;
 }
 
-function parse(raw: string | null | undefined): number | null | "nan" {
+function parse(raw: string | null | undefined): number | null | "nan" | "ambiguous" {
   if (typeof raw !== "string") return null;
-  const t = raw.trim().replace(",", ".");
-  if (t === "") return null;
-  const n = Number(t);
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  // "1,000" could be one thousand or 1.000; never guess. A single comma with
+  // other than three digits after it is a decimal comma ("1,2").
+  if ((trimmed.match(/,/g) ?? []).length > 1 || /,\d{3}(?!\d)/.test(trimmed)) return "ambiguous";
+  const n = Number(trimmed.replace(",", "."));
   return Number.isFinite(n) ? n : "nan";
 }
 
@@ -98,8 +102,14 @@ export function buildStructuredReadings(input: StructuredReadingInput): Structur
   for (const [key, raw] of fields) {
     const parsed = parse(raw);
     if (parsed === null) continue;
-    if (parsed === "nan") {
-      result.errors.push({ key, message: STRUCTURED_READING_COPY.notANumber });
+    if (parsed === "nan" || parsed === "ambiguous") {
+      result.errors.push({
+        key,
+        message:
+          parsed === "nan"
+            ? STRUCTURED_READING_COPY.notANumber
+            : STRUCTURED_READING_COPY.ambiguousComma,
+      });
       continue;
     }
     const value =

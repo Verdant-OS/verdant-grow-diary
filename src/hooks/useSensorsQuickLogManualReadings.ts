@@ -49,7 +49,7 @@ export function buildSensorsQuickLogManualReadingsQueryKey(
   ] as const;
 }
 
-export async function fetchManualEvents(tentId: string): Promise<RawGrowEventRow[]> {
+async function fetchManualEvents(tentId: string): Promise<RawGrowEventRow[]> {
   const { data, error } = await supabase
     .from("grow_events")
     .select(GROW_EVENT_SELECT)
@@ -59,6 +59,30 @@ export async function fetchManualEvents(tentId: string): Promise<RawGrowEventRow
     .eq("event_type", "environment")
     .order("occurred_at", { ascending: false })
     .limit(200);
+
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("Quick Log environment history unavailable");
+  return data as unknown as RawGrowEventRow[];
+}
+
+/**
+ * Batched Quick Log environment events for several tents in one read (#2821,
+ * the /tents list). The limit scales with the tent count so one busy tent
+ * cannot crowd another tent's newest capture out of the window.
+ */
+export async function fetchManualEventsForTents(
+  tentIds: readonly string[],
+): Promise<RawGrowEventRow[]> {
+  if (tentIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("grow_events")
+    .select(GROW_EVENT_SELECT)
+    .in("tent_id", [...tentIds])
+    .eq("source", "manual")
+    .eq("is_deleted", false)
+    .eq("event_type", "environment")
+    .order("occurred_at", { ascending: false })
+    .limit(Math.min(200 * tentIds.length, 1000));
 
   if (error) throw error;
   if (!Array.isArray(data)) throw new Error("Quick Log environment history unavailable");

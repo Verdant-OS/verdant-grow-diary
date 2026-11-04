@@ -223,13 +223,82 @@ describe("LatestSnapshotQuickLogMerge (pure)", () => {
     expect(LatestSnapshotQuickLogMerge.merge(b, null, [TENT_A])).toBe(b);
   });
 
-  it("never invents a metric the Quick Log save did not observe", () => {
+  it("merges per metric: a temp-only Quick Log keeps the sensor's other metrics and links", () => {
+    const sensorAt = minutesAgo(600);
+    const sensor: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "live",
+      ts: sensorAt,
+      temp: 22.2,
+      rh: 60,
+      vpd: 1.07,
+      co2: 850,
+      soil: 41,
+      ppfd: 620,
+      device_id: "ecowitt-gw1200",
+      tent_id: TENT_A,
+      metric_refs: {
+        temp: { id: "row-temp", captured_at: sensorAt, source: "live" },
+        rh: { id: "row-rh", captured_at: sensorAt, source: "live" },
+        ppfd: { id: "row-ppfd", captured_at: sensorAt, source: "live" },
+      },
+    };
+    const at = minutesAgo(1);
+    const tempOnly = {
+      ...manual(TENT_A, at, 24, 0, 0),
+      observedMetrics: ["temp"],
+    } as unknown as SensorReading;
+    const merged = LatestSnapshotQuickLogMerge.merge(sensor, [tempOnly], [TENT_A]);
+    // The newer Quick Log temp wins; RH and VPD keep the sensor values.
+    expect(merged).toMatchObject({ temp: 24, rh: 60, vpd: 1.07 });
+    // CO2, soil, PPFD and the device survive, with their sensor links.
+    expect(merged).toMatchObject({ co2: 850, soil: 41, ppfd: 620, device_id: "ecowitt-gw1200" });
+    expect(merged.metric_refs?.rh?.id).toBe("row-rh");
+    expect(merged.metric_refs?.ppfd?.id).toBe("row-ppfd");
+    // Per-metric provenance: temp is manual and no longer linked to the sensor row.
+    expect(merged.metric_refs?.temp).toBeUndefined();
+    expect(merged.manual_metric_refs).toEqual({ temp: { captured_at: at } });
+    // Never live, never alert evidence once a manual value is in it.
+    expect(merged.source).toBe("manual");
+    expect(merged.alert_persistence_eligible).toBe(false);
+    expect(merged.ts).toBe(at);
+  });
+
+  it("decides each metric against that metric's own sensor capture time", () => {
+    const old = minutesAgo(600);
+    const recent = minutesAgo(2);
+    const sensor: SensorSnapshot = {
+      ...EMPTY_SNAPSHOT,
+      source: "live",
+      ts: recent,
+      temp: 22.2,
+      rh: 60,
+      tent_id: TENT_A,
+      metric_refs: {
+        temp: { id: "row-temp", captured_at: recent, source: "live" },
+        rh: { id: "row-rh", captured_at: old, source: "live" },
+      },
+    };
+    const merged = LatestSnapshotQuickLogMerge.merge(
+      sensor,
+      [manual(TENT_A, minutesAgo(30), 25, 50, 1.4)],
+      [TENT_A],
+    );
+    // temp: sensor 2 min ago is newer, keeps the sensor. rh: sensor 10 h ago, Quick Log wins.
+    expect(merged).toMatchObject({ temp: 22.2, rh: 50 });
+    expect(merged.metric_refs?.temp?.id).toBe("row-temp");
+    expect(merged.metric_refs?.rh).toBeUndefined();
+    expect(Object.keys(merged.manual_metric_refs ?? {}).sort()).toEqual(["rh", "vpd"]);
+  });
+
+  it("a Quick Log-only snapshot never invents a metric the save did not observe", () => {
     const tempOnly = {
       ...manual(TENT_A, minutesAgo(1), 24, 0, 0),
       observedMetrics: ["temp"],
-    } as unknown as SensorReading;
-    const merged = LatestSnapshotQuickLogMerge.merge(base(minutesAgo(600)), [tempOnly], [TENT_A]);
-    expect(merged).toMatchObject({ temp: 24, rh: null, vpd: null });
+    } as unknown as SensorSnapshot & SensorReading;
+    const merged = LatestSnapshotQuickLogMerge.merge(EMPTY_SNAPSHOT, [tempOnly], [TENT_A]);
+    expect(merged).toMatchObject({ source: "manual", temp: 24, rh: null, vpd: null, co2: null });
+    expect(merged.tent_id).toBe(TENT_A);
   });
 });
 
@@ -268,8 +337,10 @@ describe("useLatestSensorSnapshotsByTent merges Quick Log snapshots (#2821)", ()
     ];
     io.growEvents = [quickLogEvent(TENT_A, minutesAgo(300), 23.9, 54, 1.36)];
     const { result } = render([{ tentId: TENT_A, growId: GROW }]);
-    await waitFor(() => expect(result.current[TENT_A].status).toBe("ok"));
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(result.current[TENT_A].snapshot.temp).toBe(22.2);
+    // The sensor has no VPD row, so the Quick Log VPD fills it: that proves the
+    // Quick Log read resolved and merged before the keep-sensor assertions.
+    await waitFor(() => expect(result.current[TENT_A].snapshot.vpd).toBe(1.36));
+    // temp and RH: the 2-minute-old sensor rows are newer and must be kept.
+    expect(result.current[TENT_A].snapshot).toMatchObject({ temp: 22.2, rh: 60 });
   });
 });

@@ -230,6 +230,7 @@ function latestLive(
   readings: readonly EcowittStationReadingInput[],
   tentId: string,
   metric: LiveMetric,
+  freshWithin: { intervalSeconds: number; now: Date } | null,
 ): EcowittStationReadingInput | null {
   let best: EcowittStationReadingInput | null = null;
   let bestMs = Number.NEGATIVE_INFINITY;
@@ -243,6 +244,14 @@ function latestLive(
     if (reading.capturedAt === null) continue;
     const ms = Date.parse(reading.capturedAt);
     if (!Number.isFinite(ms)) continue;
+    // A metric older than three gateway intervals is not current, even when
+    // another metric keeps the packet fresh (#2732 review 5761010782 P2-1).
+    if (
+      freshWithin !== null &&
+      isCustomUploadPacketStale(reading.capturedAt, freshWithin.intervalSeconds, freshWithin.now)
+    ) {
+      continue;
+    }
     if (ms >= bestMs) {
       best = reading;
       bestMs = ms;
@@ -339,10 +348,15 @@ export function buildEcowittCustomUploadStationCard(
     };
   }
 
-  const temp = latestLive(input.readings, input.tentId, "temperature_c");
-  const humidity = latestLive(input.readings, input.tentId, "humidity_pct");
-  const soil = latestLive(input.readings, input.tentId, "soil_moisture_pct");
-  const co2 = latestLive(input.readings, input.tentId, "co2_ppm");
+  // Per-metric freshness (#2732 review 5761010782 P2-1): when any metric is
+  // current, older metrics are dropped instead of riding along under "Live".
+  // When none is current, the newest values are shown but always labelled stale.
+  const tentId = input.tentId;
+  const pick = (window: { intervalSeconds: number; now: Date } | null) =>
+    LIVE_METRICS.map((metric) => latestLive(input.readings, tentId, metric, window));
+  const fresh = pick({ intervalSeconds: interval, now: input.now });
+  const anyFresh = fresh.some((reading) => reading !== null);
+  const [temp, humidity, soil, co2] = anyFresh ? fresh : pick(null);
   const present = [temp, humidity, soil, co2].filter(
     (reading): reading is EcowittStationReadingInput => reading !== null,
   );
@@ -387,7 +401,7 @@ export function buildEcowittCustomUploadStationCard(
     };
   }
   const packetAt = input.lastReceivedAt ?? newest;
-  const stale = isCustomUploadPacketStale(packetAt, interval, input.now);
+  const stale = !anyFresh || isCustomUploadPacketStale(packetAt, interval, input.now);
 
   return {
     ...base,

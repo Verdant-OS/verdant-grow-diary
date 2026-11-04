@@ -108,3 +108,41 @@ describe("ecowittStationFenceFromListRow", () => {
     });
   });
 });
+
+describe("EcoWitt station card per-metric staleness (#2732 review 5761010782 P2-1)", () => {
+  it("drops a days-old metric while a fresh metric keeps the card live", () => {
+    const model = buildEcowittCustomUploadStationCard({
+      tentId: TENT,
+      now: NOW,
+      intervalSeconds: 60,
+      lastReceivedAt: AT,
+      claimState: "active",
+      claimId: "33333333-3333-4333-8333-333333333333",
+      justCreatedToken: null,
+      readings: [
+        live("co2_ppm", 800),
+        live("temperature_c", 30, { capturedAt: "2026-10-30T18:00:00.000Z" }),
+        live("humidity_pct", 50, { capturedAt: "2026-10-30T18:00:00.000Z" }),
+      ],
+    });
+    expect(model.co2).toBe("800 ppm");
+    expect(model.freshness).toBe("live");
+    expect(model.indoorTempF).toBeNull();
+    expect(model.indoorRh).toBeNull();
+  });
+
+  it("labels the card stale when every metric is older than three intervals", () => {
+    const model = buildEcowittCustomUploadStationCard({
+      tentId: TENT,
+      now: NOW,
+      intervalSeconds: 60,
+      lastReceivedAt: AT,
+      claimState: "active",
+      claimId: "33333333-3333-4333-8333-333333333333",
+      justCreatedToken: null,
+      readings: [live("temperature_c", 30, { capturedAt: "2026-11-02T17:50:00.000Z" })],
+    });
+    expect(model.indoorTempF).toBe("86.0 °F");
+    expect(model.freshness).toBe("stale");
+  });
+});

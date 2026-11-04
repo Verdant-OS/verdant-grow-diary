@@ -69,6 +69,11 @@ export const ONE_TENT_LOOP_STEP_LABEL: Record<OneTentLoopStep, string> = {
 /** Safe explanation shown when the next step cannot be linked yet. */
 export const ONE_TENT_LOOP_DISABLED_COPY = "Next step unavailable until this record is selected.";
 
+/** Tent with a verified count of zero active plants: the next step is adding one. */
+export const ONE_TENT_LOOP_TENT_ADD_PLANT_LABEL = "Add plant";
+/** Tent with several verified active plants: the grower picks one from the list below. */
+export const ONE_TENT_LOOP_TENT_CHOOSE_PLANT_COPY = "Choose a plant below to open it.";
+
 /**
  * Cautious helper copy describing why the next step matters. Presenter-only.
  * Must never imply automation, device control, or guaranteed action.
@@ -103,6 +108,12 @@ export interface OneTentLoopIds {
   plantId?: string | null;
   alertId?: string | null;
   actionId?: string | null;
+  /**
+   * Verified count of the tent's active plants (tent step only). Pass it only when
+   * the plant list read is current; anything else keeps the generic disabled state.
+   * Never used to choose a plant.
+   */
+  tentPlantCount?: number | null;
 }
 
 export interface OneTentLoopNextStep {
@@ -221,6 +232,25 @@ export function resolveOneTentLoopNextStep(
       // CTA is "Open plant" — must route to an actual plant, never self-link
       // back to Tent Detail. Without a selected plant, stay disabled.
       if (plantId) return enable(base, `/plants/${plantId}`);
+      {
+        // Audit 2026-11-03 finding 2: on an identified tent, a known plant count
+        // gives a real next step instead of "unavailable". No plant is chosen here.
+        const count = ids.tentPlantCount;
+        const verified = typeof count === "number" && Number.isInteger(count) && count >= 0;
+        if (verified && count === 0 && normalizedGrowId && normalizedTentId) {
+          return {
+            ...enable(
+              base,
+              buildConnectedActivationRoutes({ growId: normalizedGrowId, tentId: normalizedTentId })
+                .addPlant,
+            ),
+            ctaLabel: ONE_TENT_LOOP_TENT_ADD_PLANT_LABEL,
+          };
+        }
+        if (verified && count >= 2) {
+          return { ...base, disabledReason: ONE_TENT_LOOP_TENT_CHOOSE_PLANT_COPY };
+        }
+      }
       return base;
     case "plant":
       {

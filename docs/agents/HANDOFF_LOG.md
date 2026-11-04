@@ -78,17 +78,17 @@ why: The test waited only for the marker file to exist, then read once; the fixt
 branch: claude/rea-lifecycle-marker-race
 base: verdant-grow-diary
 checkout: git fetch origin claude/rea-lifecycle-marker-race verdant-grow-diary && git switch claude/rea-lifecycle-marker-race
-pr: opened as a draft after this commit; read the URL from GitHub
+pr: #2837, open and non-draft; https://github.com/Verdant-OS/verdant-grow-diary/pull/2837
 head_sha: read the current head on GitHub
-state: fix committed; scorer-locked test renegotiated through scripts/scorer-lock.mjs --unlock (reason recorded) and re-locked.
-current_step: draft PR open; gate awaiting Matthew (it changes a scorer-locked test).
+state: fix committed; edits scorer-locked test scripts/rea/tests/lifecycle.test.mjs, which is still locked; no --unlock record or scorer-unlock.json in this diff; gated.
+current_step: non-draft PR open; gated, awaiting reviewers and Matthew's yes (it edits a scorer-locked test).
 next_action: Matthew names reviewers and the gate; #2815 precedent for locked-test changes was A, C, D PASS plus his yes at the final SHA.
 post_merge_check: required CI stops failing on this test; NOT_MEASURED until several post-merge runs.
 active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
 decisions: Fix the test, not the fixture: poll until content is "alive" within the same 4 s deadline; assertions unchanged.
 tried_and_rejected: a 60 ms widened fixture for RED proof (left almost no "alive" window, unrealistic); used 4 ms of each 10 ms cycle instead.
 commands: node --test scripts/rea/tests/*.test.mjs; for i in $(seq 1 100); do node --test --test-name-pattern="owned process cleanup" scripts/rea/tests/lifecycle.test.mjs; done
-files_touched: scripts/rea/tests/lifecycle.test.mjs; .claude/scorer-unlock.json (if tracked); docs/agents/HANDOFF_LOG.md
+files_touched: scripts/rea/tests/lifecycle.test.mjs; docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: gate decision for a scorer-locked test change
 open_questions: reviewers and gate.

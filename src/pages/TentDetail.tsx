@@ -536,7 +536,11 @@ export default function TentDetail() {
             current="tent"
             ids={{
               growId: tent.growId ?? null,
+              tentId: tent.id,
               plantId: safePlantId,
+              // null while the active-plant read is not current, so the card
+              // falls back to its generic disabled state.
+              tentPlantCount: verifiedActivePlantCount,
             }}
             testId="tent-detail-one-tent-loop-next-step-card"
             className="mb-3"

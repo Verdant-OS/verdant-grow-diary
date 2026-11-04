@@ -129,6 +129,7 @@ export default function CreateTentDialog({
   const formBlocked = writeBlocked || binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);
   const nameFieldId = useId();
   const disabledReasonId = useId();
+  const sizeErrorId = useId();
   const primary = describeCreateTentPrimaryButton({
     busy,
     outcomeUnknown: createOutcomeUnknown,
@@ -460,9 +461,12 @@ export default function CreateTentDialog({
                       onChange={(e) => setForm({ ...form, size: e.target.value })}
                       placeholder="4x4"
                       aria-invalid={sizeMessage ? true : undefined}
+                      aria-describedby={sizeMessage ? sizeErrorId : undefined}
                     />
                     {sizeMessage ? (
                       <p
+                        id={sizeErrorId}
+                        role="alert"
                         className="text-[11px] text-destructive mt-1"
                         data-testid="tent-create-size-error"
                       >

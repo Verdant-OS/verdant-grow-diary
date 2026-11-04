@@ -215,7 +215,11 @@ export function DrybackMonitoringStrip({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <p className="text-sm text-muted-foreground" data-testid="dryback-monitoring-error">
+          <p
+            className="text-sm text-muted-foreground"
+            role="status"
+            data-testid="dryback-monitoring-error"
+          >
             Couldn't load soil moisture or watering markers right now.
           </p>
           <button

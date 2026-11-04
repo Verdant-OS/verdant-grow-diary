@@ -4,6 +4,8 @@ Normative detail for `AGENTS.md` §12. The log template at the top of `docs/agen
 
 ## Write the entry first
 
+Each task's entry is its own file, `docs/agents/handoffs/<TASK-ID>.md`. See `docs/agents/handoffs/README.md`. Do not add or edit blocks in `docs/agents/HANDOFF_LOG.md`; "the log" below means that file plus the directory.
+
 Create the block before the first push. Update it at least daily and at every stop, including low budget and retirement. A log edit on a task branch is invisible until it merges, so the current holder also posts `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` on the PR.
 
 Push the branch and open the draft PR before implementation, not only before a planned stop. A block with no pushed branch and no PR cannot be resumed. Unpushed work does not count.

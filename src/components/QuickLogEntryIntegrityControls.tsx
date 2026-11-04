@@ -13,7 +13,7 @@
  *   - No entitlement/plan gating — identical for every plan.
  *   - Fixed copy; never echoes raw DB errors.
  */
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PencilLine, Undo2 } from "lucide-react";
 import { toast } from "sonner";
@@ -245,6 +245,7 @@ function RevisionControls({
   const temperatureUnit = useTemperatureUnitPreference();
   const [temperatureTouched, setTemperatureTouched] = useState(false);
   const [temperatureError, setTemperatureError] = useState<string | null>(null);
+  const temperatureErrorId = useId();
   const [temperatureDraft, setTemperatureDraft] = useState<string>(() => {
     const stored = draftSensor(correctionValues, "temperature_c");
     if (stored === "") return "";
@@ -536,12 +537,15 @@ function RevisionControls({
                       setTemperatureDraft(e.target.value);
                     }}
                     aria-invalid={temperatureError ? true : undefined}
+                    aria-describedby={temperatureError ? temperatureErrorId : undefined}
                     data-testid="quicklog-correct-temperature-input"
                     className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm"
                   />
                 </label>
                 {temperatureError && (
                   <p
+                    id={temperatureErrorId}
+                    role="alert"
                     className="text-xs text-destructive"
                     data-testid="quicklog-correct-temperature-error"
                   >

@@ -1,9 +1,56 @@
 # Verdant — Current Architecture Contract
 
 **Scope:** the permanent architectural invariants of the Verdant Grow OS application.
-**Verified from source at:** `479cadb3032ddc3ad80d93f105283609179d6c0a` (deploy branch
+**Verified from source at:** `af6a416d5d1cc99c22b2ba3677f2b0e191e9edb5` (deploy branch
+`verdant-grow-diary`, `#2751`), 2026-11-04, by Claude (§15 re-verification from the `479cadb3`
+stamp; see §15.1). **Every clause describes that tree.** The window is 81 first-parent merges after
+`#2581` (first `#2605`, last `#2751`), 573 changed files, 230 of them under `src/test/`. Twenty-six
+cited files changed. A script read every backticked `path:line` cite into them above §15.1, with bare
+`:NN` cites bound to the path before them in the same paragraph, and compared the cited text at both
+trees: 121 cites, 70 of them inside the stamp records in this header, which describe their own trees
+and stay as written, and 51 live. Of the 51, 28 hold and 23 moved. Twenty-two were re-pointed;
+the twenty-third, `src/pages/Pricing.tsx:316`, is history pinned to `27991451` and stays. Three more
+cites the script does not parse (`Settings.tsx:341` without its directory, and the bare `:60` and
+`:63` list items in AC-3.3) were re-read by hand and re-pointed. Two of the moved cites were already
+wrong at `479cadb3`: AC-4.2's `dashboardEnvironmentSnapshotViewModel.ts:217,246` named a doc comment
+and a blank line, and now names the call and the label assignment. Changed in substance, with the
+clauses amended: `src/server.ts` now installs a request-hostname reader at module load (`#2539`) and
+wraps every SSR response in `ServiceUnavailablePage.present` (`#2777`) (AC-1.1, AC-1.6 cites);
+`#2811` removed the Stripe Edge Function lane, the Stripe sink migration stays unapplied history, and
+the Lovable Stripe route it names is absent from this tree (AC-6.1); `cultivarSlugRouteRules.ts`
+imports the Supabase client, so AC-3.2's runtime-client row is 1 (AC-3.2);
+`config/required-status-checks.json` now has 8 `mustBeGreen` entries, still 35 `required` (AC-9.1);
+the Supabase-CLI workflow count was stale and is now ten (AC-9.3). Line moves only: `src/server.ts`,
+`src/routes/__root.tsx`, `src/pages/GuidesIndex.tsx`, `supabase/functions/ecowitt-ingest/index.ts`,
+`src/pages/Dashboard.tsx`, `.github/workflows/ci.yml` and `src/pages/Settings.tsx`. The other changed
+cited files hold, because their cited lines are unchanged or they are cited by name: `AGENTS.md`,
+`CLAUDE.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, `docs/codebase-map.md`
+(`:472-473`), `package.json` (every cited line; `posthog-js` 1.444.0 was added and the
+`@hono/node-server` and `follow-redirects` overrides raised, with the pinned `@tanstack/start-*` and
+`@lovable.dev/vite-tanstack-config` versions unchanged), `scripts/check-bun-lockfile-policy.mjs`,
+`src/test/check-bun-lockfile-policy.test.ts`, `src/lib/appRouteManifest.ts`, `src/routeTree.gen.ts`,
+`src/integrations/supabase/types.ts` (generated; AC-1.2 names it only),
+`src/components/TonightTentHomeCard.tsx`, `src/pages/AthenaFeedLog.tsx`, `src/pages/PlantDetail.tsx`
+(AC-3.4 importers), and `src/hooks/useQuickLogActivitySave.ts` and `src/hooks/useQuickLogV2Save.ts`
+(the §13 Quick Log RPC callers are unchanged). The counts were reproduced at `479cadb3` first and
+matched every recorded figure, then measured here: AC-3.2 634 files, the `Date.now()` and
+`Math.random()` sets unchanged, the runtime-client row 0 → 1; AC-3.4 945 → 1,002 statements;
+AC-4.3 77/67, 70/61, 106/86 → 79/69, 71/62, 108/88; AC-10.2 zero hits over all seven roots. Four
+migrations were added in the window: `20261101143000_owner_badge_awards.sql`,
+`20261101180000_stripe_test_mode_subscription_sink.sql`,
+`20261102150000_ecowitt_custom_upload_claims.sql` and `20261103233000_profiles_time_zone.sql`. None
+had a prior version on this branch, so AC-9.1 is not engaged; no clause cites them except AC-6.1's
+note on the Stripe sink; `config/local-supabase-replay-compatibility.json` is unchanged (5
+`compatibility_patches`). Whether any is applied is operating state in
+`docs/agents/CURRENT_STATE.md`. AC-2.1's 34 edge-function directories hold here; the figure was 33
+at `479cadb3` (`#2570` deleted `founder-slots-remaining`), and `ecowitt-custom-upload` restores it.
+Package-internal cites (AC-1.4, AC-1.5, §14) are carried, not re-read. Production behaviour stays
+`NOT_MEASURED`.
+
+**Previous stamp, `479cadb3`, kept as the record of its own tree.** Verified from source at
+`479cadb3032ddc3ad80d93f105283609179d6c0a` (deploy branch
 `verdant-grow-diary`, `#2581`), 2026-10-29, by Claude (§15 re-verification from the `27991451`
-stamp and its `0200d255` post-stamp merge; see §15.1). **Every clause describes that tree.**
+stamp and its `0200d255` post-stamp merge; see §15.1). Every clause described that tree.
 The re-read covered the 16 first-parent merges after `#2564` (`604274a7`), through `#2581`. All 419
 `path:line` cites outside §15.1 and §15.2 were re-read by text against both trees, including bare
 `:NN` cites bound to the path before them in the same paragraph. Nine cites moved, all into
@@ -19,7 +66,7 @@ reproduced at `27991451` first, then measured here: AC-3.2 and AC-4.3 are unchan
 (940 → 945 statements), and AC-10.2 still finds zero hits over all seven roots. No migration
 merged in the window. Production behaviour stays `NOT_MEASURED`.
 
-**Previous stamp, kept as the record of its own tree.** Verified from source at
+**Earlier stamp, `27991451`, kept as the record of its own tree.** Verified from source at
 `27991451a756d2521df08e26e504776a43c7bbb8` (deploy branch
 `verdant-grow-diary`, `#2283`), 2026-10-27, by Claude (§15 re-verification from the last full
 stamp `c8523adc`, carrying `#2149`'s nine-P2 amendment at `dfb1567e`; see §15.1). Every clause
@@ -215,12 +262,12 @@ reasoning over it; `source claim` is carried from another document and not re-me
 The SSR entry `src/server.ts` wraps `@tanstack/react-start/server-entry`; `src/start.ts` calls
 `createStart`; `src/router.tsx` calls `createRouter` over the generated route tree. Any document or
 comment describing Verdant as a "React + Vite SPA" is stale wording, not a description of the code.
-_Source:_ `src/server.ts:20,53-76`, `src/start.ts:28`, `src/router.tsx:2,8-9`. `established fact`.
+_Source:_ `src/server.ts:25,58-84`, `src/start.ts:28`, `src/router.tsx:2,8-9`. `established fact`.
 _Enforcement:_ build and typecheck — the app does not start without these entries.
 
 The default export's `fetch` now does host routing before SSR, from
 `src/lib/cloudflareHostRoutingRules.ts`. A redirect is returned straight from `redirectResponseFor`
-(`src/server.ts:55-56`), which builds the response with the routing decision's host headers itself
+(`src/server.ts:60-61`), which builds the response with the routing decision's host headers itself
 (`src/lib/cloudflareHostRoutingRules.ts:280-283`). The health path (`healthResponseFor`, `:254-265`) and
 every SSR response, error page included (`withHostHeaders`, `:286-302`), go through `withHostHeaders`. The invariant is that
 every response carries the host headers; only the non-redirect paths get them from the wrapper.
@@ -229,6 +276,21 @@ comment says why (`src/lib/cloudflareHostRoutingRules.ts:7-17`). This is source 
 handler. It is not publisher evidence. Which host serves the apex, and whether this handler or
 `vercel.json` is what applies there, stays unsettled here (§14, §12 `vercel.json` row).
 `established fact` for the code; production `NOT_MEASURED`.
+
+Two further steps run inside the same entry at `af6a416d`. First, module load calls
+`installRequestHostnameReader()` (`src/server.ts:12,15`; `#2539`). It registers a request-scoped
+hostname reader on `globalThis` (`src/lib/requestHostname.server.ts:8-9,22-24`), so client-graph code
+such as the Paddle checkout path can read the request host on the server without a static import of
+`@tanstack/react-start/server`; that file's comment records the cold-dev-server reload it avoids
+(`:15-20`). Second, every SSR response passes through `ServiceUnavailablePage.present` after the
+AC-1.6 normaliser and before `withHostHeaders` (`src/server.ts:69-72`; `#2777`, merged as `#2782`).
+`present` returns any non-503 response unchanged; a 503 becomes an HTML page with `cache-control:
+no-store`, no `Location` and a default `retry-after: 30` (`src/lib/serviceUnavailablePage.ts:32-41`),
+because router redirects with status 503 have a null body (`:1-4`). The page's copy is about the
+cultivar reference (`:11`, `:24-25`), so any SSR 503, from any route, is shown as "The cultivar
+reference could not be loaded" (`inference` from the code; no other route returning 503 was searched
+for). `src/test/cultivar-unavailable-page.test.ts` drives the Worker with an empty 503 and asserts the
+page. `established fact` for the code; production `NOT_MEASURED`.
 
 **AC-1.2 — Machine-produced files are never hand-authored.**
 Routes live under `src/routes/` and compile into `src/routeTree.gen.ts`. That file, together with
@@ -378,8 +440,9 @@ h3 swallows in-handler throws into a normal `500` carrying
 `{"unhandled":true,"message":"HTTPError"}`, which no `try`/`catch` ever sees. `src/server.ts`
 detects that body shape and substitutes a rendered error page. A refactor that trusts `try`/`catch`
 alone reintroduces a JSON blob as the user-visible error.
-_Source:_ `src/server.ts:29-42` (`normalizeCatastrophicSsrResponse`), `:44-51`
-(`isH3SwallowedErrorBody`), `:64` (where it is applied). `established fact`.
+_Source:_ `src/server.ts:34-47` (`normalizeCatastrophicSsrResponse`), `:49-56`
+(`isH3SwallowedErrorBody`), `:71` (where it is applied, inside the AC-1.1 503 wrapper, which leaves
+the resulting 500 untouched). `established fact`.
 _Enforcement:_ **gated** since `#1937`. `src/test/server-security-headers-runtime.test.ts:94-105`
 imports the Worker, feeds it the swallowed `{"unhandled":true,"message":"HTTPError"}` body, and
 asserts a `text/html` 500. It runs in the required shards. An earlier stamp recorded this clause as
@@ -390,11 +453,11 @@ asserts a `text/html` 500. It runs in the required shards. An earlier stamp reco
 mount effects in JSX order and `Outlet`'s content is a sibling, not a descendant — placing the sink
 later loses mount-effect funnel events on cold loads. The reason is committed as a comment beside
 the code.
-_Source:_ `src/routes/__root.tsx:302-315`: the comment is at `:303-312`, followed by
-`<AnalyticsShell />` `:313`, `<FunnelEventDbSink />` `:314`, `<Outlet />` `:315`. `established fact`.
-The rule binds the application shell. The Grow Help Toolkit path (`isGrowHelpToolkitPath`, `:129-131`)
+_Source:_ `src/routes/__root.tsx:305-318`: the comment is at `:306-315`, followed by
+`<AnalyticsShell />` `:316`, `<FunnelEventDbSink />` `:317`, `<Outlet />` `:318`. `established fact`.
+The rule binds the application shell. The Grow Help Toolkit path (`isGrowHelpToolkitPath`, `:132-134`)
 is deliberately rendered without application providers: `RootComponent` returns
-`createElement(Outlet)` inside `RootDocument` with no analytics shell or sink (`:267-277`), so no
+`createElement(Outlet)` inside `RootDocument` with no analytics shell or sink (`:270-280`), so no
 funnel event is captured there by design. A page added to that branch must not rely on funnel
 tracking. `established fact`.
 _Enforcement:_ **gated, by source scan.** `src/test/funnel-event-db-sink.test.tsx:132-135` pins
@@ -511,13 +574,13 @@ clock, no randomness. Time is injected.**
 This is the contract for **new** code, not a description of every existing file. Re-measured at the
 stamped SHA, over the root-level `src/lib/*Rules.ts` glob:
 
-| Measure                                                       | Count | Files                                                                                                                                                                                                                       |
-| ------------------------------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `*Rules.ts` files                                             |   610 | —                                                                                                                                                                                                                           |
-| contain a direct `Date.now()` call                            |    55 | raw-text match over the root-level glob, re-measured at `dccaf732`, `66ea7bd3`, `2ffe78cc1`, `7e024f93`, `22f8dfe8`, `ce1d281f`, `c8523adc` and `27991451`: 44 of the 55 call it on an executable line, 11 in comments only |
-| contain a direct `Math.random()` call                         |     7 | the seven named in `CLAUDE.md` "Layering, as actually practised"; 6 call it on an executable line, 1 mentions it in a comment only                                                                                          |
-| import the Supabase client at runtime                         |     0 | —                                                                                                                                                                                                                           |
-| type-only import from generated `integrations/supabase/types` |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`                                                                                                                                                          |
+| Measure                                                       | Count | Files                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `*Rules.ts` files                                             |   634 | —                                                                                                                                                                                                                                                   |
+| contain a direct `Date.now()` call                            |    55 | raw-text match over the root-level glob, re-measured at `dccaf732`, `66ea7bd3`, `2ffe78cc1`, `7e024f93`, `22f8dfe8`, `ce1d281f`, `c8523adc`, `27991451`, `479cadb3` and `af6a416d`: 44 of the 55 call it on an executable line, 11 in comments only |
+| contain a direct `Math.random()` call                         |     7 | the seven named in `CLAUDE.md` "Layering, as actually practised"; 6 call it on an executable line, 1 mentions it in a comment only                                                                                                                  |
+| import the Supabase client at runtime                         |     1 | `cultivarSlugRouteRules.ts` (new drift at `af6a416d`, below)                                                                                                                                                                                        |
+| type-only import from generated `integrations/supabase/types` |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`                                                                                                                                                                                  |
 
 The clock, randomness and type-import files are legacy, not precedent. Do not cite them, and do not
 extend the pattern. The file added since `9b06be3f` is `src/lib/blueprintEvidenceRules.ts` (#1657);
@@ -605,6 +668,26 @@ At `479cadb3` the total is still 610, but four files changed: `founderShareRules
 and `quickLogNoteMarkerRules.ts` (`#2583`) were added. The two new files import nothing and call
 neither `Date.now()` nor `Math.random()`. The 55-file `Date.now()` set is byte-identical to the
 `27991451` set, and every other row holds.
+At `af6a416d` the total is 634: 24 added, none deleted (`aiDoctorReadinessSummaryRules.ts`,
+`badgeAwardLocalHostRules.ts`, `badgeAwardRules.ts`, `checkoutBlockedScopeRules.ts`,
+`cultivarSlugRouteRules.ts`, `cultivarVerifiedProfileRules.ts`, `dashboardMobileLayoutRules.ts`,
+`ecowittCustomUploadIngestRules.ts`, `ecowittPlainHttpRouteRules.ts`, `guideAnswerFirstLayoutRules.ts`,
+`guideRouteHeadRules.ts`, `plantLifecycleWriteRules.ts`, `posthogAnalyticsRules.ts`,
+`quickLogObservationDraftRules.ts`, `quickLogRecentEmptyStateRules.ts`, `quickLogV2NoteFirstRules.ts`,
+`quickLogWaterTemperatureGateRules.ts`, `quickLogWaterVolumeUnitRules.ts`, `rootDocumentHeadRules.ts`,
+`sensorHashAnchorRules.ts`, `sessionFormDraftRules.ts`, `startYourRoomDraftRules.ts`,
+`tentManualEnvironmentSnapshotRules.ts`, `timelineEntryDetailPermalinkRules.ts`). The 55-file
+`Date.now()` and 7-file `Math.random()` sets are byte-identical to the `479cadb3` sets, and the two
+type-only importers are unchanged. **One row moved: the runtime-client row is 1, not 0.**
+`src/lib/cultivarSlugRouteRules.ts` (`#2758`, which added the import in `8e697208`; changed again by
+`#2777`/`#2782`) imports `supabase` from `@/integrations/supabase/client` (`:8`) and calls
+`fetchPublishedCultivarSnapshot` with it (`:88-90`). It also holds a module-level catalog promise and
+clears it with `setTimeout` (`:68`). That is I/O and ambient state in a `*Rules.ts` file: drift, not
+precedent. The corrected statement above ("no root-level `*Rules.ts` imports the Supabase client")
+holds through `479cadb3` and is false at `af6a416d`. `CLAUDE.md` "Layering, as actually practised" and
+`docs/codebase-map.md` still say no root-level `*Rules.ts` imports the client; correcting `CLAUDE.md`
+is a governance edit with the eighteen-file bump, so it is left to its own slice (§13). Moving the
+read into a `*Service.ts` is a code change, also out of scope here.
 _Enforcement:_ `convention only`.
 
 **AC-3.3 — Copy that is pinned, reused, or safety-bearing is data, not markup.**
@@ -618,30 +701,31 @@ boundary is purpose, not location: **copy a test pins, copy reused across surfac
 carries a safety or entitlement claim** belong in constants. One-off page prose may stay inline.
 
 **The earlier example was a poor one, and is recorded as drift instead.** Earlier versions offered
-`src/pages/GuidesIndex.tsx:56-70` as representative inline prose. That block inlines copy the clause
+`src/pages/GuidesIndex.tsx:57-71` as representative inline prose. That block inlines copy the clause
 says belongs in constants:
 
-- `:60` inlines the pinned positioning tagline, which lives at
+- `:61` inlines the pinned positioning tagline, which lives at
   `src/constants/verdantPositioningCopy.ts:20`;
-- `:63` inlines the reused safety claim "Verdant cannot touch your equipment.".
+- `:64` inlines the reused safety claim "Verdant cannot touch your equipment.".
 
 Treat that block as legacy drift, not precedent.
-_Source:_ `src/constants/`; `src/pages/GuidesIndex.tsx:60,63`; `src/constants/verdantPositioningCopy.ts:20`.
+_Source:_ `src/constants/`; `src/pages/GuidesIndex.tsx:61,64`; `src/constants/verdantPositioningCopy.ts:20`.
 `established fact` for the constants pattern and the drift; `inference` for the boundary.
 
 **AC-3.4 — Component code routes through the react-router compat shim, not TanStack Router
 directly.**
 `src/lib/react-router-compat.tsx` re-implements the react-router-dom v6 surface on TanStack Router.
 The census is **alias-only**: it counts static `from "@/lib/react-router-compat"` import
-statements and no other specifier. Measured at the stamped SHA, that census is **945** statements
-in **944** files; `src/pages/PlantDetail.tsx` imports it twice. By directory: 708 under `src/test`,
-134 under `src/components`, 95 statements in 94 files elsewhere under `src/pages`, 1 under
-`src/pages/support/__tests__`, and 7 under `src/hooks`. Three static imports are outside the
+statements and no other specifier. Measured at the stamped SHA, that census is **1,002**
+statements in **1,000** files; `src/pages/PlantDetail.tsx` and `src/test/plant-delete-confirm.test.tsx`
+each import it twice. By directory: 762 statements in 761 files under `src/test`, 135 under
+`src/components`, 96 statements in 95 files elsewhere under `src/pages`, 1 under
+`src/pages/support/__tests__`, and 8 under `src/hooks`. Three static imports are outside the
 census, each a `../lib/react-router-compat` specifier used on purpose so a test can compare the
 product module with the alias: `src/test/react-router-compat-navigate-real.test.tsx:28-39`
 (`#740`), `src/test/react-router-compat-search-params-scroll.test.tsx:21` and
 `src/test/search-param-scroll-anchor.test.tsx:20` (the `#2348` review). With those statements the
-full static-import totals are **948** statements in **947** files. **Zero** files under
+full static-import totals are **1,005** statements in **1,003** files. **Zero** files under
 `src/components/` or `src/pages/` mention `@tanstack/react-router` at all. Vitest aliases the shim to
 a real MemoryRouter, so idiomatic TanStack hooks in a component look correct and fail in tests.
 _Source:_ `src/lib/react-router-compat.tsx`; the Vitest alias is at `vitest.config.ts:50-52`. The count
@@ -665,7 +749,10 @@ added in new `src/test/` files, alias-only, the same relative-specifier exceptio
 the new `src/components/AlertRowActionQueueButton.tsx`; 945 in 944 at `479cadb3`, a net five:
 seven more under `src/test/`, and one fewer each under `src/components/`
 (`CheckoutSuccessFounderNote.tsx`) and `src/pages/` (`Founder.tsx`). `#2028` deleted both when it
-stopped selling Founder Lifetime. The
+stopped selling Founder Lifetime; 1,002 in 1,000 at `af6a416d`, a net 57: 54 statements in 53 files
+under `src/test/`, and one each in `src/components/PlantDetailAiDoctorReadinessSection.tsx`,
+`src/pages/PublicGrowGuideArticle.tsx` and `src/hooks/useSensorCsvImportEntry.ts`. The three
+relative-specifier imports are unchanged. The
 shim's `useNavigate` now returns the navigate promise, and its `useSearchParams` now keeps the
 scroll position unless the caller opts out (`#2348`); neither affects this clause.
 `established fact`.
@@ -780,7 +867,7 @@ wrapper with no callers is not enforcement.
 3. **EcoWitt direct ingest.** `ecowitt-ingest` builds routed rows carrying `source: "ecowitt"`
    (`supabase/functions/_shared/ecowittRoutedRowBuilder.ts:247`), and `buildEcoWittStoredRows`
    (`:135-145`) rewrites them to `source: "live"` before persistence
-   (`supabase/functions/ecowitt-ingest/index.ts:378`), keeping `vendor` and
+   (`supabase/functions/ecowitt-ingest/index.ts:389`), keeping `vendor` and
    `metadata.transport_source` as `ecowitt`. The transport name is not stored as trust state.
 
 Schema still admits the wider token set for historical rows (AC-4.1). Schema-narrow remains out of
@@ -793,8 +880,10 @@ and transport names (`pi_bridge`, `home_assistant`, EcoWitt, …) are **provenan
 must not appear as the Source label. **Known gap, recorded rather than fixed here:** the older
 `resolveSensorSourceLabel` relabels a `live` reading whose vendor is `ecowitt` as `"Ecowitt"`
 (`src/lib/sensorSourceLabelRules.ts:80-81`, `vendorPromoted: true`), and
-`src/lib/dashboardEnvironmentSnapshotViewModel.ts:217,246` feeds that label to the Dashboard Source
-line (`src/pages/Dashboard.tsx:1028`). Trust is not widened, because only `live` is relabelled, but a
+`src/lib/dashboardEnvironmentSnapshotViewModel.ts:429,470` feeds that label to the Dashboard Source
+line (`src/pages/Dashboard.tsx:1076`). (The view-model cite read `:217,246` through `479cadb3`, where
+those lines were a doc comment and a blank line; the call and the label assignment were at `:406`
+and `:447` there. Corrected at `af6a416d`.) Trust is not widened, because only `live` is relabelled, but a
 vendor name does appear as the Source label there. What a rendered Dashboard shows is
 `NOT_MEASURED`. The display module does not widen the canonical set, change
 ingest write paths, or alter trust-live membership. Collapsing a vendor name into Source would be
@@ -906,10 +995,18 @@ tested. That reproduces all three single-line figures exactly at `4ddb2322`, `72
 whose first match `"stale" | "invalid"` consumes the `"invalid"` that pairs with `"demo"`. The
 figures:
 
-- **77 lines in 67 files** when at least one label of the pair is `live`, `manual`, `csv` or `demo`;
-- 70 lines in 61 files when both labels must be among those four;
-- 106 lines in 86 files when a `"stale" | "invalid"` pair also counts, which catches quality unions.
-  Each figure was 76/66, 69/60 and 105/85 through `22f8dfe8`, and is unchanged at `c8523adc` and at `27991451`; the added line is `#1857`'s
+- **79 lines in 69 files** when at least one label of the pair is `live`, `manual`, `csv` or `demo`;
+- 71 lines in 62 files when both labels must be among those four;
+- 108 lines in 88 files when a pair of `stale` and `invalid`, in either order, also counts, which
+  catches quality unions.
+  At `479cadb3` the three figures were still 77/67, 70/61 and 106/86, reproduced by this method
+  first (counting only the `"stale" | "invalid"` order gives 102/84, so the either-order reading is
+  the recorded one). Two lines were added by `af6a416d`:
+  `src/lib/aiDoctorReadinessSummaryRules.ts` declares the six labels plus `"unknown"` (all three
+  figures), and `src/lib/ecowittCustomUploadStationCardViewModel.ts` declares
+  `"none" | "live" | "stale"`, a freshness union, not a sensor-source one (first and third figures).
+  The earlier history:
+  each figure was 76/66, 69/60 and 105/85 through `22f8dfe8`, and 77/67, 70/61 and 106/86 at `c8523adc`, `27991451` and `479cadb3`; the added line is `#1857`'s
   `QuickLogAiSensorSource` union (`src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts:172`),
   which is exactly the six;
 - multi-line unions add 12 matching lines in 6 files. This figure is a `source claim`: its pattern
@@ -1080,7 +1177,7 @@ spend at `:474-475`), `:595-611` (request and fetch); `supabase/functions/ai-coa
 (`GEMINI_INLINE_IMAGE_MAX_BYTES`); `supabase/functions/ai-cultivar-qa/index.ts:73,91`; the wider
 key readers by grep over `supabase/functions/`. `established fact`.
 _Enforcement:_ **partially gated**, in the required `Lint, typecheck, test, build` job
-(`.github/workflows/ci.yml:438-439`). `supabase/functions/_shared/geminiDirectChat.test.ts:27-45`
+(`.github/workflows/ci.yml:442-443`). `supabase/functions/_shared/geminiDirectChat.test.ts:27-45`
 resolves both routes and asserts the provider, endpoint and model ids on the returned objects;
 `:62-99` asserts that a missing or blank key fails closed without calling `fetch`; `:177-202` scans
 both function sources for the helper call and for the absence of the gateway URL and of
@@ -1302,6 +1399,28 @@ Monetization rules. The only non-test read of `billing_subscriptions` is a legac
 account deletion (`supabase/functions/delete-account/index.ts:84`), which grants nothing.
 `established fact`.
 
+**Stripe, as of `af6a416d`. The source of truth is still `public.subscriptions`.** `#2811`
+(`3a1e1b65`) removed the `#2702` Stripe Edge Function lane: `git ls-tree -r --name-only af6a416d`
+names no `create-checkout-session/`, `stripe-webhook/`, `stripeWebhook*`, `stripeCheckoutSession*` or
+`stripeTestModeCatalog*` path (count 0), and the edge inventory is 34 directories plus `_shared`
+(AC-2.1). Migration `20261101180000_stripe_test_mode_subscription_sink.sql` stays in history,
+byte-identical, under AC-9.1. Its header says it was not applied by the PR that added it and must not
+run against production without a separate founder authorization naming it (`:2-3`). It would add
+`provider`, `stripe_customer_id` and `stripe_subscription_id` columns to `public.subscriptions`
+(`:9-12`). The recorded owner decision is that it is never applied; whether it is applied anywhere is
+operating state for `docs/agents/CURRENT_STATE.md`. The same decision records that Lovable's payments
+integration owns Stripe, through a TanStack route `/api/public/payments/webhook` writing
+`public.subscriptions.billing_provider` (`source claim`, from the `#2811` description and
+`docs/agents/HANDOFF_LOG.md` block `RETIRE-PR2702-STRIPE-EDGE-PATH`). **The deploy-branch tree does
+not contain that path.** At `af6a416d`, `git grep` finds `payments/webhook` nowhere under `src/` or
+`supabase/`, no route file under `src/routes/` serves `/api/public/`, and `billing_provider` appears
+in no file except that handoff block: not in `src/integrations/supabase/types.ts`, not in any
+migration, not in any edge function. The `payments-webhook` Edge Function present on this tree is
+the Lovable built-in **Paddle** sink (`supabase/functions/payments-webhook/index.ts:1-24`). Where the
+Stripe route lives, and whether it writes `public.subscriptions` in production, is `NOT_MEASURED`.
+Any Stripe writer must still write `public.subscriptions` through a server path, and entitlement still
+reads only that table (`missing evidence` for the Stripe path's code).
+
 **Billing changes since the first stamp leave this clause intact.** #1375 blocks a founder purchase
 after an earlier refund. #1388 routes approved Paddle refund adjustments to revoke. #1374 and
 #1398 add founder-refund migrations. They only revoke or deny founder rows in `subscriptions`
@@ -1323,9 +1442,9 @@ Prefer `canUseCapability(entitlement, "advancedExports")` over `if (plan === "pr
 not belong in JSX.
 _Source:_ `src/lib/entitlements/capabilities.ts`, `src/lib/entitlements/capabilityAccess.ts:13-18`
 (`canUseCapability`), `src/lib/entitlements/planCatalog.ts`. `established fact`. Examples of
-display-only `founder_lifetime` comparisons exist in pages (`src/pages/Settings.tsx:343`;
+display-only `founder_lifetime` comparisons exist in pages (`src/pages/Settings.tsx:344`;
 `src/pages/Pricing.tsx:316` at `27991451`, removed by `#2028`, which stopped selling Founder
-Lifetime and rewrote the page). `Settings.tsx:341` also compares `planId` with `free`, so the
+Lifetime and rewrote the page). `Settings.tsx:342` also compares `planId` with `free`, so the
 `founder_lifetime` line is an example, not a complete plan-id count. The example predates the first
 stamp and is not a capability gate. It is drift, not precedent.
 
@@ -1449,7 +1568,8 @@ SHA-256 against the PR's base branch: path filter at `:18-23`, job at `:34-35`, 
 `:72-78`, hashing in `scripts/verify-published-migration-integrity.mjs`. The check runs on every PR
 that touches `supabase/migrations/**`, and a red result is visible. **It is not one of the 35
 required contexts**, nor in `mustBeGreen`, in `config/required-status-checks.json`, captured
-2026-08-10. By that mirror, a red result would not block a merge. Whether the live ruleset requires
+2026-08-10. At `af6a416d` that file lists 35 `required` and 8 `mustBeGreen` contexts (the eighth,
+`badge pgTAP (disposable local DB)`, is new in the window); the integrity check is still in neither. By that mirror, a red result would not block a merge. Whether the live ruleset requires
 it is `NOT_MEASURED`.
 
 > Earlier versions called this **gated**, and `AGENTS.md` says the check "will fail the PR". Both
@@ -1499,7 +1619,9 @@ newer edge code while the backend stays stale.
 _Source:_ `package.json:21-22` (`deploy:functions`, `deploy:functions:all`) and `:226`
 (`sb:functions:deploy`). The Actions absence was established by grep over `.github/workflows/` at the
 stamped SHA for `functions deploy`, `supabase functions`, `supabase link` and `db push`: only comments
-and help text match. The eight workflows that install the Supabase CLI run local stacks only.
+and help text match. The ten workflows that install the Supabase CLI (`supabase/setup-cli`) run local
+stacks only. Earlier stamps said eight; the same grep finds nine at `479cadb3` (`#2282` added
+`community-v1-db-proof.yml`) and ten at `af6a416d` (`badge-pgtap-disposable.yml`, new in the window).
 `Makefile:77-78` holds the `functions-deploy` target and its comment (non-authoritative). See also
 `AGENTS.md`.
 `established fact` for the scripts and for the Actions absence; trigger identity `NOT_MEASURED`.
@@ -1537,14 +1659,16 @@ described as implemented.**
 Case-insensitive search across `src/` and `supabase/` at the stamped SHA returns **zero** hits for
 `nelson`, `modified z`, `modifiedZ`, `median absolute deviation`, `\bMAD\b`, `z-?score`, `zscore`
 or `robust ?z`, and the same at `2ffe78cc1` and `7e024f93` over `scripts/`, `e2e/`, `tools/`, `plugins/` and
-`spikes/`. Outside this contract, Nelson is mentioned only as not-implemented guidance: the
+`spikes/`. Re-run at `479cadb3` and at `af6a416d` over all seven roots: zero hits at both. Outside this contract, Nelson is mentioned only as not-implemented guidance: the
 2026-08-21 adjudication, `docs/specs/release-topology-specification.md:1017` (the §6.1
 not-implemented row on this branch, after its own §2.11 insert; the §6.3 re-read at `:1064` is a
 second not-implemented mention and counts the same way; `:948` at `27991451`, `:943` at `dfb1567e`,
 `:853` at `c8523adc`, `:831` before `#2072`), and the review
 rule at `.coderabbit.yaml:206-207`. The `#2073` PR body named a prospective `:936` for that row.
 Merged PR bodies are not edited. A later integration that moves the row must revalidate this
-citation; each stamp above did.
+citation; each stamp above did. At `af6a416d` the spec is unchanged since `479cadb3` and `:1017`
+(and `:1064`) still hold the row. An open restamp of that spec would move it; whichever of that
+change and this contract lands second re-points this cite.
 _Source:_ measured at the stamped SHA; `docs/audits/architecture-audit-adjudication-2026-08-21.md`
 §4.1. `established fact`.
 
@@ -1838,6 +1962,7 @@ stale every time the operating picture moved. Only the durable rules stay:
 | 2026-10-27 | `27991451a756d2521df08e26e504776a43c7bbb8` | Claude | §15 re-verification at the deploy tip (`#2283`), from the last full stamp `c8523adc`, carrying `#2149`'s `dfb1567e` amendment (merged into the restamp branch rather than re-done). Supersedes both stamps. 952 files across 174 merges since `c8523adc` (first `#2099`, last `#2283`; 465 in `src/test/`; six migrations, none cited and none with a prior version on this branch); 27 cited files changed, and every cite into them was re-read on the stamped tree by a script comparing line text at both trees. Substance: AC-1.8 records `zod` 4 (`#2505`); AC-1.5's package cites re-read at `start-server-core` 1.169.39 / `start-client-core` 1.170.34 (fallback `:302`, condition `:338`; T8's `getOptions` call `:290`); AC-1.1's `healthResponseFor` / `withHostHeaders` cites corrected to the function bodies (wrong since `c8523adc`); AC-9.2's `compatibility_patches` row now matches the file (5, after `#2550`). Counts, after the script first reproduced every `c8523adc` figure: AC-3.2 610 files, drift rows unchanged (55/7, 44/6, 0, 2; same file sets); AC-3.4 940 in 939 alias-only (943 in 942 with three relative-specifier test imports); AC-4.3 77/67, 70/61, 106/86 unchanged; AC-10.2 zero. Line moves are listed in the header. Production remains `NOT_MEASURED`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | 2026-10-27 | `0200d2551b86d3df63e709651874ee85d9863fdc` | Claude | Merge of the deploy tip (`#2559`, `#2028`) into the restamp branch, stamp unchanged, after the `sour diesel` review of `#2564` at `4ce69f5c` (should-fix 2, nit 1). Five cited files changed in 35 commits past `27991451`; their cites were re-read on the merged tree: AC-1.1 `cloudflareHostRoutingRules.ts:254-265`, `:280-283`, `:286-302`; AC-6.2 `Settings.tsx:341`, `:343`, with the `Pricing.tsx:316` example recorded as removed by `#2028`; `appRouteManifest.ts` and `route-manifest-sync.test.ts` cited lines unchanged. AC-10.2 re-pinned to `:1017` (the §6.3 copy at `:1064`) after this branch's own §2.11 insert. Line moves are listed in the header's post-stamp note. Counts not re-measured.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | 2026-10-29 | `479cadb3032ddc3ad80d93f105283609179d6c0a` | Claude | §15 re-verification at the deploy tip (`#2581`), 16 first-parent merges after `#2564`; no migration in the window. Re-read all 419 `path:line` cites outside §15.1 and §15.2 by text against `604274a7` and the stamped SHA, bare `:NN` cites included. Nine moved, all in `scripts/check-bun-lockfile-policy.mjs` after `#2569`'s `ip-address` floor: AC-8.1 `:75-80`, `:188-199`, `:194-195` → `:76-81`, `:189-200`, `:195-196`; the six in the `27991451` header record stay as that tree's lines. Counts reproduced at `27991451`, then measured: AC-3.2 610 / 55 / 7 / 0 / 2 unchanged (two Founder rules files deleted, two added); AC-3.4 940 in 939 → 945 in 944 (948 in 947 with the three relative imports); AC-4.3 77/67, 70/61, 106/86 unchanged; AC-10.2 zero hits. Production behaviour `NOT_MEASURED`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 2026-11-04 | `af6a416d5d1cc99c22b2ba3677f2b0e191e9edb5` | Claude | §15 re-verification at the deploy tip (`#2751`), 81 first-parent merges after `#2581`; supersedes the `479cadb3` stamp. Census reproduced at `479cadb3` first, then measured: AC-3.2 634 files and a new runtime Supabase-client importer (`cultivarSlugRouteRules.ts`, `#2758`), recorded as drift; AC-3.4 1,002 statements in 1,000 files; AC-4.3 79/69, 71/62, 108/88; AC-10.2 zero. 121 cites into 26 changed files read by script (51 live: 28 hold, 22 re-pointed, 1 historical kept) plus 3 re-pointed by hand; two inherited stale cites corrected. AC-1.1 records the request-hostname reader and the 503 page in `src/server.ts`; AC-6.1 records `#2811`, the unapplied Stripe sink migration and the absence from this tree of the Lovable Stripe route; AC-9.1 records 8 `mustBeGreen`; AC-9.3's CLI-workflow count corrected to ten. Four migrations added, none cited by a gate clause. Production `NOT_MEASURED`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ### 15.2 Evidence status at deploy tip `e0bb3930` — 2026-10-07, dated
 

@@ -461,7 +461,7 @@ export default function TimelineMemorySection(props: Props) {
                         {group.label}
                       </h3>
                       <span
-                        className="text-[10px] text-muted-foreground/70"
+                        className="text-[10px] text-muted-foreground"
                         data-testid="timeline-day-group-count"
                       >
                         {group.count} event{group.count === 1 ? "" : "s"}

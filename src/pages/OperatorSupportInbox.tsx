@@ -94,7 +94,7 @@ function Stars({ value }: { value: number | null }) {
         <Star
           key={n}
           className={`h-3.5 w-3.5 ${
-            n <= value ? "fill-emerald-500 text-emerald-500" : "text-muted-foreground/40"
+            n <= value ? "fill-emerald-500 text-emerald-500" : "text-muted-foreground"
           }`}
         />
       ))}

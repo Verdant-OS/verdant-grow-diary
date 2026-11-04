@@ -15,8 +15,12 @@ const Landing = lazy(() => import("@/pages/Landing"));
 
 function RootEntryLoader() {
   return (
-    <div role="status" aria-live="polite" className="flex min-h-[60vh] items-center justify-center">
-      <span className="sr-only">Loading…</span>
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex min-h-[60vh] items-center justify-center text-muted-foreground"
+    >
+      Loading…
     </div>
   );
 }

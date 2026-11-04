@@ -87,3 +87,16 @@ describe("RootEntry client-side mount for a signed-in grower (item 11)", () => {
     container.remove();
   });
 });
+
+describe("RootEntry loading fallback (item 11)", () => {
+  it("shows visible Loading… text, not an empty page, while the shell chunk loads", async () => {
+    vi.resetModules();
+    const { default: FreshRootEntry } = await import("@/components/RootEntry");
+    auth.user = { id: "grower-1" };
+    render(<FreshRootEntry />);
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Loading…");
+    expect(status.querySelector(".sr-only")).toBeNull();
+    await screen.findByTestId("dashboard");
+  });
+});

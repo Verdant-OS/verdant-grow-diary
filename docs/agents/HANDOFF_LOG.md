@@ -80,18 +80,18 @@ base: verdant-grow-diary
 pr: opened as a draft after this commit; read the URL from GitHub
 head_sha: read the current head on GitHub
 state: pushed draft
-current_step: fix - RootEntry uses the shared useHydrated() (useSyncExternalStore): false only for SSR and the hydration pass, true on later client mounts. Test src/test/root-entry-client-nav-no-landing-flash.test.tsx (RED 1 failed before the fix; hydration-without-mismatch case kept)
+current_step: fix - (1) RootEntry uses the shared useHydrated() (useSyncExternalStore): false only for SSR and the hydration pass, true on later client mounts; (2) RootEntry's Suspense fallback shows visible "Loading…" (was sr-only, so the page looked empty); (3) Onboarding shows "Opening your dashboard…" while redirecting a grower who has grows (was a bare Navigate). Re-recorded in mocked Chromium: every frame from /onboarding to the dashboard shows text
 next_action: independent review; production-build before/after frame measurement in the PR body
 post_merge_check: on verdantgrowdiary.com, sign in as the fixture grower with a grow and no saved start screen; the page goes Loading your grows -> dashboard with no blank page between
 active_writer: Claude session claude/grower-bugs-11
 decisions: ERR_CONNECTION_CLOSED part is BLOCKED (needs Worker/host logs; no access from this session); the /onboarding hop itself is kept (it decides first-run vs returning), only the `/` remount detour is fixed
 tried_and_rejected: none
 commands: bunx vitest run src/test/root-entry-client-nav-no-landing-flash.test.tsx src/test/root-entry-routing.test.tsx --reporter=dot
-files_touched: src/components/RootEntry.tsx, src/test/root-entry-client-nav-no-landing-flash.test.tsx, docs/agents/HANDOFF_LOG.md
+files_touched: src/components/RootEntry.tsx, src/pages/Onboarding.tsx, src/test/root-entry-client-nav-no-landing-flash.test.tsx, src/test/onboarding-opening-dashboard-status.test.tsx, docs/agents/HANDOFF_LOG.md
 files_remaining: none for this slice
 blockers: ERR_CONNECTION_CLOSED needs the host's request/Worker logs (owner access)
 open_questions: whether to send growers with grows from /auth straight to `/` (skips the /onboarding hop; behaviour change, not done here)
-gotchas: `bun run build` refuses a dirty tree (stamp_dirty) and rewrites public/version.json and src/generated/buildInfo.ts; restore them after a local build
+gotchas: production build is the cloudflare-module preset; `vite preview` fails (no dist/server/server.js) and wrangler is not installed, so local prod serving is BLOCKED; frame measurements are on the dev server. `bun run build` refuses a dirty tree (stamp_dirty) and rewrites public/version.json and src/generated/buildInfo.ts; restore them after a local build
 links: none
 reviewer_seat: eligible non-contributing reviewer per OWNERSHIP.md 4.3
 reviewer_sha: none yet

@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-11-04.2**
+**Sentinel-Version: 2026-11-04.4**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-11-04.2**
+**Sentinel-Version: 2026-11-04.4**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -306,7 +306,7 @@ ran and what you skipped.
   that head and an independent exact-head review passes, with no P1 or P2.
   A skipped, missing, pending, or failed required check is not green. There is
   no author-integration exception. The merge seat is named in the roster.
-  The Merge Steward (Ultra) is the only seat that queues or merges, with
+  The Merge Steward (backup: Steward Backup) is the only seat that queues or merges, with
   `gh pr merge <N> --auto --match-head-commit <full-sha>`, and only after a
   non-author Reviewer seat APPROVES that exact head. Builder and Fixer seats
   never approve, mark ready, enqueue, or merge. The Merge Steward has no
@@ -569,6 +569,7 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-11-04.4** — Matthew retired Granddaddy Purple and OG Kush. Claude is the Merge Steward and Codex is the Steward Backup, as the standard across all PRs. The Merge Steward is no longer an Ultra seat. A steward session never queues a PR it wrote, fixed, base-merged, or reviewed as reviewer of record; the backup queues that PR. Codex merges only as Steward Backup through the merge queue. Every other merge gate is unchanged.
 - **2026-11-04.2** — Each task's handoff entry now lives in `docs/agents/handoffs/<TASK-ID>.md`. `HANDOFF_LOG.md` keeps the template and existing blocks and takes no new ones, so pull requests stop colliding in one file. Review, merge and production gates are unchanged.
 - **2026-10-31.1** — Seats and duties stay in the governance docs. The roster is the only holder map. The Merge Steward queues only after a non-author Reviewer APPROVE at the exact head and has no authority over the PR #1971 hold, which stays with the Coordinator. Reviewer C, Reviewer D, and QA are active seats.
 - **2026-10-27.1** — Founder Lifetime is no longer sold (#2028). Existing Founder rows keep pro-like access and 100 capped monthly AI credits until a separate PR and migration remove the entitlement.

@@ -18,18 +18,18 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 
 Comms tags are PR comments. The PR thread is the ledger. Slack pings never count. The protocol is not stored in this repository.
 
-| Duty                                                   | Seat                  | Backup         |
-| ------------------------------------------------------ | --------------------- | -------------- |
-| Pre-check and CI chasing                               | Merge Readiness       | Coordinator    |
-| Routing, `[ROUTE]` / `[ACK]` / `[FALLBACK]`, intake    | Coordinator           | Steward Backup |
-| Review-ready transition                                | Coordinator           | Steward Backup |
-| Enqueue, merge, and post-merge `[LIVE]` reconciliation | Merge Steward (Ultra) | Steward Backup |
-| QA and `[VERIFY]`                                      | QA                    |                |
-| New-user smoke, on request after the deploy ping       | New-User Smoke        |                |
-| Bug sweep, file only                                   | Bug Sweep             |                |
-| Per-item approval, gated paths, exceptions             | Matthew only          |                |
+| Duty                                                   | Seat            | Backup         |
+| ------------------------------------------------------ | --------------- | -------------- |
+| Pre-check and CI chasing                               | Merge Readiness | Coordinator    |
+| Routing, `[ROUTE]` / `[ACK]` / `[FALLBACK]`, intake    | Coordinator     | Steward Backup |
+| Review-ready transition                                | Coordinator     | Steward Backup |
+| Enqueue, merge, and post-merge `[LIVE]` reconciliation | Merge Steward   | Steward Backup |
+| QA and `[VERIFY]`                                      | QA              |                |
+| New-user smoke, on request after the deploy ping       | New-User Smoke  |                |
+| Bug sweep, file only                                   | Bug Sweep       |                |
+| Per-item approval, gated paths, exceptions             | Matthew only    |                |
 
-Ultra Builder 1, Ultra Builder 2, and Ultra Fixer write. They never approve, mark ready, enqueue, or merge. The Merge Steward is an Ultra seat that merges only after a non-author Reviewer seat APPROVES the exact head. The account is named only in the roster. The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
+Ultra Builder 1, Ultra Builder 2, and Ultra Fixer write. They never approve, mark ready, enqueue, or merge. The Merge Steward merges only after a non-author Reviewer seat APPROVES the exact head. Its holder, its backup, and their account are named only in the roster. The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
 
 Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.
 
@@ -52,7 +52,7 @@ Fallback is run by hand by the Coordinator. No automation is claimed. 60 minutes
 - Only the Merge Steward may dismiss a `REQUEST_CHANGES`, and only with Matthew's written exception naming the PR, SHA, and finding, linked in the dismissal message.
 - Open findings stay open until each is fixed at a sha or waived by Matthew in writing.
 
-**Merge Steward.** Queues only with `gh pr merge <N> --auto --match-head-commit <full-sha>`, and only with: 35/35 required checks at that sha; a clean `APPROVE` from a non-contributing Reviewer seat at the current head (an approval from the Ultra account named in the roster never counts); a hard head re-check (`|| exit 1`) right before queueing; no conflicts; any gated `[BLOCKED-ON-MATTHEW]` cleared by Matthew; holds respected (#2532 and #2535 are never re-enqueued; #2539, #2526, #2231, #2536, and #2640 are held; #2593 and #2594 only after #2592). The Steward session never queues a PR it wrote, fixed, or base-merged. Builder and Fixer seats never approve, mark ready, enqueue, or merge. The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
+**Merge Steward.** Queues only with `gh pr merge <N> --auto --match-head-commit <full-sha>`, and only with: 35/35 required checks at that sha; a clean `APPROVE` from a non-contributing Reviewer seat at the current head (an approval from the Ultra account named in the roster never counts); a hard head re-check (`|| exit 1`) right before queueing; no conflicts; any gated `[BLOCKED-ON-MATTHEW]` cleared by Matthew; holds respected (#2532 and #2535 are never re-enqueued; #2539, #2526, #2231, #2536, and #2640 are held; #2593 and #2594 only after #2592). The Steward session never queues a PR it wrote, fixed, base-merged, or reviewed as reviewer of record; the Steward Backup queues that PR instead. Builder and Fixer seats never approve, mark ready, enqueue, or merge. The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
 
 **Enforced by GitHub vs by agents.** Live ruleset `24445196`, the 35-check union, and the queue settings were not re-read for this change (`NOT_MEASURED`).
 

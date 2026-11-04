@@ -11,10 +11,10 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 | Ultra Builder 1 | Ultra | Node                                     | `verdant-ultra-bot`     |
 | Ultra Builder 2 | Ultra | Wedding Cake                             | `verdant-ultra-bot`     |
 | Ultra Fixer     | Ultra | Brachs (Blueberry)                       | `verdant-ultra-bot`     |
-| Coordinator     | Main  | OG Kush                                  | `cheekhimself` (shared) |
-| Merge Steward   | Ultra | Granddaddy Purple                        | `verdant-ultra-bot`     |
+| Coordinator     | Main  | Vacant (OG Kush retired 2026-11-04)      |                         |
+| Merge Steward   | Main  | Claude                                   | `cheekhimself` (shared) |
 | Merge Readiness | Main  | Green Crack                              | `cheekhimself` (shared) |
-| Steward Backup  | Main  | OG Kush                                  | `cheekhimself` (shared) |
+| Steward Backup  | Main  | Codex                                    | `cheekhimself` (shared) |
 | Reviewer A      | Main  | Sour Diesel                              | `cheekhimself` (shared) |
 | Reviewer B      | Main  | Jack Herer                               | `cheekhimself` (shared) |
 | Reviewer C      | Main  | Durban Poison · Reviewer (Main)          | `cheekhimself` (shared) |
@@ -33,16 +33,16 @@ Ultra's open pull-request cap is 10.
 
 ## Rules
 
-- Ultra seats never review, approve, or mark ready. Only the Ultra Merge Steward seat queues and merges, as `verdant-ultra-bot`, and only after a non-author Main Reviewer seat posts APPROVE at the exact current head. Matthew set that seat on 2026-10-30 at 11:03 PM CT.
+- Ultra seats never review, approve, mark ready, enqueue, or merge. Only the Merge Steward seat (backup: Steward Backup) queues and merges, and only after a non-author Reviewer seat posts APPROVE at the exact current head. Matthew moved the seat on 2026-11-04: Granddaddy Purple and OG Kush are retired, Claude is the Merge Steward and Codex is the Steward Backup, as the standard arrangement across all PRs. The earlier Ultra Merge Steward assignment (2026-10-30, 11:03 PM CT) is history.
 - The Merge Steward has no authority over the #1971 hold, which stays with the Coordinator.
-- Steward Backup (Main) stands in when the Ultra Merge Steward is unavailable, under the same Steward rules, and still has no authority over the #1971 hold.
+- Steward Backup stands in when the Merge Steward is unavailable, or when the Merge Steward is excluded from a PR (it wrote, fixed, base-merged, or is reviewer of record on that PR), under the same Steward rules, and still has no authority over the #1971 hold.
 - Main seats never write product code.
 - Approvals come only from Matthew, in his own words.
-- OG Kush holds both Coordinator and Steward Backup. When it acts as Steward Backup, it cannot also be the reviewer of record for the same PR.
+- Neither steward seat may queue a PR on which that same session is the reviewer of record, an author, or a repairer. A Claude or Codex session holding a steward seat is still a Claude or Codex session for exclusion purposes. The Coordinator and Engineering lead seats are vacant until Matthew names a holder; OG Kush's earlier duties (routing, review-ready transition, default inheritance) wait on that assignment and are not inferred by the steward seats.
 - Ultra's open pull-request cap is 10.
 - Reviewer C, Reviewer D, and QA are active.
 
-**Historical, no current seat:** Codex, Claude, Chemdawg/Grok 91, GDP. Their historical attribution, receipts, and contributor exclusions are kept word for word below. **Handoff guard:** any active assignment or hold owned by a historical agent stays in force until the Coordinator posts an explicit handoff to a seat (or Matthew releases it, as he released Codex's work on 2026-10-30), so no work is abandoned and no two writers collide.
+**Historical, no current seat:** Chemdawg/Grok 91, GDP, Granddaddy Purple, OG Kush. (Claude and Codex hold steward seats from 2026-11-04; their earlier history below is kept.) Their historical attribution, receipts, and contributor exclusions are kept word for word below. **Handoff guard:** any active assignment or hold owned by a historical agent stays in force until the Coordinator posts an explicit handoff to a seat (or Matthew releases it, as he released Codex's work on 2026-10-30), so no work is abandoned and no two writers collide.
 
 ## Historical
 
@@ -55,11 +55,11 @@ Numbered rules in the constitution do not name tools, vendors, or people.
 | Seat | What the constitution means | Current holder |
 | --- | --- | --- |
 | Founder | Explicit current instructions outrank the constitution. Production database changes, spend, publish gates, and the publish decision remain with this seat. Repository work does not authorize those operations. | Matthew Cheek |
-| Engineering lead | Default inheritor when a workstream's holder retires and names no successor. | OG Kush |
-| Merge seat | Merges only after per-item approval at the exact head, every required check is green, and an independent exact-head review passes. Does not bypass the queue. | Matthew's current explicit assignment: OG Kush merges PR #1971; Jack Herer gives its independent PASS; Codex is repair-only. The hold below remains. Chemdawg/Grok 91 is retired; no Harvest succession is inferred. |
+| Engineering lead | Default inheritor when a workstream's holder retires and names no successor. | Vacant (OG Kush retired 2026-11-04); awaiting Matthew |
+| Merge seat | Merges only after per-item approval at the exact head, every required check is green, and an independent exact-head review passes. Does not bypass the queue. | Merge Steward: Claude. Steward Backup: Codex (Matthew, 2026-11-04). The PR #1971 assignment below is history; #1971 merged on 2026-10-27. Chemdawg/Grok 91 is retired; no Harvest succession is inferred. |
 | Peers | No peer outranks another. Assignment, named lock, and the coverage claim decide who writes. | Codex, Claude, Grok |
 | Independent reviewer | A session that did not author or repair the change. A shared account is not independence. | See eligibility below |
-| Default inheritor | See engineering lead. | OG Kush |
+| Default inheritor | See engineering lead. | Vacant; awaiting Matthew |
 
 ## PR 1971 merge actor assignment and hold
 

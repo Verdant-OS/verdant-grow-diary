@@ -49,6 +49,11 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # disabling platform JWT verification only lets that strict verifier run.
   [functions.ecowitt-ingest]
     verify_jwt = false
+  # Customized-upload gateways post form bodies to /ew/<claim-token>. They
+  # cannot send a platform JWT. The claim token is the auth, checked in the
+  # handler. The gateway always receives HTTP 200.
+  [functions.ecowitt-custom-upload]
+    verify_jwt = false
   # Raspberry Pi bridges authenticate each request with the handler's
   # x-bridge-id / timestamp / HMAC signature contract, not a Supabase user
   # JWT. Keep the platform JWT gate off so the strict bridge verifier can run.

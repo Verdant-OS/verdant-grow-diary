@@ -1,5 +1,9 @@
 # Verdant handoff log
 
+**New and updated entries go in `docs/agents/handoffs/<TASK-ID>.md`, not here.** See
+`docs/agents/handoffs/README.md`. This file keeps the template and existing blocks, and a
+task's own file wins over its block here. Read both before `SENTINEL_ACK`.
+
 Pointed to by AGENTS.md (Agent Handoff / Coverage). One block per in-flight task.
 Update daily and before stopping. Display newest last_updated first within each priority;
 selection follows AGENTS.md's priority order and oldest-update tie breaker.
@@ -68,6 +72,40 @@ Use the original base and declared closed scope. The example command assumes no 
 active checkout has the branch open; inspect worktree ownership before selecting a checkout.
 
 ## Open
+
+### FRESHNESS-LABEL-CONTRAST
+
+```text
+TASK FRESHNESS-LABEL-CONTRAST  priority: other  status: OPEN
+goal: Make the plant freshness card's stale and missing text meet WCAG AA.
+why: Live audit 2026-11-03 finding 12, measured in docs/specs/contrast-tokens.md section 2.3 (#2827): the stale value drew at muted-foreground/60 (3.28:1), "No plant manual log" at /50 (2.64:1) and the "Stale · Last manual log" line at /70 (4.04:1). These words tell a grower a reading is old or absent. File plan step 1 of that spec; needs neither D1 nor D2.
+branch: claude/freshness-label-contrast
+base: verdant-grow-diary
+checkout: git fetch origin claude/freshness-label-contrast verdant-grow-diary && git switch claude/freshness-label-contrast
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub
+state: implementation and test committed.
+current_step: draft PR open; reviewer and merge authority awaiting Matthew.
+next_action: Matthew names the reviewer and merge gate; then mark ready and route.
+post_merge_check: after Publish, open a plant with a stale manual reading on https://verdantgrowdiary.com and confirm the stale and missing lines read clearly. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: Full text-muted-foreground (6.59:1 on card). Stale stays distinct from fresh by colour (muted vs primary), the amber alert icon labelled "Stale", and the word "Stale" in the last-log line.
+tried_and_rejected: none
+commands: bunx vitest run src/test/plant-manual-sensor-freshness-contrast.test.tsx --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/components/PlantManualSensorFreshnessCard.tsx; src/test/plant-manual-sensor-freshness-contrast.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: reviewer and merge authority for this PR.
+gotchas: commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify).
+links: docs/specs/contrast-tokens.md (#2827)
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 17:41 CT, by Claude
+```
 
 ### FIRST-VIEWPORT-TASK-FIRST-SPEC
 
@@ -273,38 +311,38 @@ owner: Claude
 last_updated: 2026-11-03, by Claude
 ```
 
-### POSTHOG-PUBLIC-CLIENT-KEY
+### HANDOFF-CONFIG
 
 ```text
-TASK POSTHOG-PUBLIC-CLIENT-KEY  priority: other  status: OPEN
-goal: Lovable production builds initialise PostHog from the committed public client key in VITE_POSTHOG_KEY after analytics consent.
-why: The live bundle reads VITE_POSTHOG_KEY and VITE_POSTHOG_HOST, and Lovable builds from the committed .env. Neither variable was set, so PostHog never initialised. Cheeko chose committing the public client key.
-branch: cursor/posthog-public-client-key-f411
+TASK HANDOFF-CONFIG  priority: other  status: OPEN
+goal: Commit .handoff/config.md, the agent-handoff plugin's config (verification commands, convention docs, doc index), so /plan, /execute and /verify read the repo's real commands.
+why: Matthew chose a separate draft PR (2026-11-03) over committing it on #2817 or keeping it local.
+branch: claude/new-session-5qygai (recreated from verdant-grow-diary; the earlier branch merged as #2809 and was deleted)
 base: verdant-grow-diary
-checkout: git fetch origin cursor/posthog-public-client-key-f411 verdant-grow-diary && git switch cursor/posthog-public-client-key-f411
-pr: read the URL from GitHub after push
-head_sha: read git rev-parse HEAD after the push
-state: implementation in this commit; merge waits on Cheeko's own-words yes at the exact head SHA
-current_step: consent test waits on vi.dynamicImportSettled; committed env presence and per-directive CSP assertions added. Secret scan stays red until a separate base allowlist lands.
-next_action: confirm required CI is green at the head, then wait for Cheeko's yes at that SHA. Do not merge, enqueue, or publish.
-post_merge_check: after Publish, load https://verdantgrowdiary.com while signed out, grant analytics consent, and confirm a request to https://us.i.posthog.com. Before consent, that request must be absent. NOT_MEASURED until live /version.json reports this SHA.
-active_writer: Grok cloud agent on this branch
-decisions: Commit only VITE_POSTHOG_KEY and https://us.i.posthog.com in .env. CSP adds that host plus https://us-assets.i.posthog.com because posthog-js 1.444.0 RequestRouter loads /static from the region assets host when api_host is the US ingestion host and asset_host is unset. script-src lists the assets host; connect-src lists both. .env.example stays empty and says personal PostHog keys must never be committed.
-tried_and_rejected: none
-commands: bunx vitest run src/test/posthog-env-consent-startup.test.ts src/test/security-headers-rules.test.ts src/test/posthog-consent-client.test.ts --reporter=dot
-files_touched: .env; .env.example; src/lib/securityHeadersRules.ts; src/test/posthog-env-consent-startup.test.ts; docs/agents/HANDOFF_LOG.md
+checkout: git fetch origin claude/new-session-5qygai verdant-grow-diary && git switch claude/new-session-5qygai
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2818 (ready for review)
+head_sha: read the current head on GitHub (this block rides the first commit)
+state: config written from Matthew's answers (en; targeted vitest; typecheck with 8 GB heap; eslint; AGENTS.md conventions).
+current_step: Seat A P2-1 at 6b22913 fixed (package-lock.json clause dropped); awaiting Seat A re-review at the new head.
+next_action: merge on Seat A (Sour Diesel) PASS with no P1/P2 at the exact head + 35/35 required green (Matthew, 2026-11-03).
+post_merge_check: none (agent tooling config; no runtime effect).
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: config lives at .handoff/config.md as the plugin expects; no secrets or production values in it.
+tried_and_rejected: local .git/info/exclude (blocked by a guard hook); committing on #2817's branch (would move a PR under review).
+commands: none
+files_touched: .handoff/config.md; docs/agents/HANDOFF_LOG.md
 files_remaining: none
-blockers: env/config gate — Cheeko's own-words yes at the exact head SHA before merge
-open_questions: none
-gotchas: do not commit a personal PostHog key. Do not edit workflows, wrangler, package.json, lockfiles, migrations, or auth. Existing posthog-consent-client.test.ts stays untouched; it stubs an empty key and injects a fixture reader.
-links: none yet
+blockers: none
+open_questions: reviewer and merge authority
+gotchas: none
+links: none
 artifacts: none
-reviewer_seat: not requested
-reviewer_sha: NOT_MEASURED
-session_state: no production writes; auto-merge off
-claimed_by: Grok, 2026-11-03
-owner: Cheeko
-last_updated: 2026-11-02 20:40 CT, by Grok
+reviewer_seat: Seat A (Sour Diesel); verdict at 6b22913 PASS-with-P2 0/1/2
+reviewer_sha: 6b22913 (new head needs re-review)
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 21:00 CT, by Claude
 ```
 
 ### VER-302-IMPORTED-HISTORY-TEMPERATURE-UNITS
@@ -1124,7 +1162,7 @@ last_updated: 2026-10-06 16:05 CT, by Claude
 
 ```text
 TASK CLOSE-STALE-GROK-HANDOFF-BLOCKS  priority: other  status: OPEN
-goal: move ten Grok-owned handoff blocks whose PRs already merged or closed from Open to Closed, each with its final SHA, so no live agent reads them as current claims
+goal: move eleven Grok-owned handoff blocks whose PRs already merged or closed from Open to Closed, each with its final SHA, so no live agent reads them as current claims
 why: Matthew, 2026-11-04 ~06:40 UTC, in Claude session_017UoYKv4arxJYBMGNNh1bvN: "take over all of Grok's work and close it out"; Grok is no longer active. Every Grok PR is merged, closed, or (#2751, #2752) already held by Claude session_017UoYKvcvohNxhmW342Lieo
 branch: claude/close-stale-grok-handoff-blocks
 base: verdant-grow-diary
@@ -1132,17 +1170,17 @@ checkout: git fetch origin claude/close-stale-grok-handoff-blocks verdant-grow-d
 pr: read the URL from GitHub (draft)
 head_sha: the commit carrying this block; base 484f8ace3069af94ed9444b07e1e18b8dfad3350
 state: pushed draft
-current_step: draft PR open; waiting for required checks
+current_step: draft PR open; base merged after #2811 and #2818; waiting for Matthew to mark ready
 next_action: after #2811 merges, merge origin/verdant-grow-diary, confirm 35/35 required checks at that head, then route one independent exact-head review (not Claude session_017UoYKv4arxJYBMGNNh1bvN). Docs-only; Graft's low-risk lane applies (HANDOFF_LOG.md only)
 post_merge_check: on the merged deploy tip, none of the ten names below appears between "## Open" and the first "## Closed"; the file's fence lines pair up
 active_writer: Claude session_017UoYKv4arxJYBMGNNh1bvN
-decisions: closed blocks are appended at the end of the Closed list, not the top, because #2811 and #2858 both insert at the top of Closed. POSTHOG-PUBLIC-CLIENT-KEY (#2776 merged as cd0fe0cd) is left Open for now: #2818 inserts a block directly after it and moving it would conflict. Only the TASK status, the first state line and the first next_action line of each block change; every other line is kept verbatim. #2751/#2752 blocks are not touched (held by another Claude session). VER-288-SERVED-BUILD-BASELINE (#2538) and FIX-2004-APP-DOCUMENT-TITLES (#2082) name a "Cursor cloud agent" without saying Grok and are left for an owner call
+decisions: closed blocks are appended at the end of the Closed list, not the top, because #2811 and #2858 both insert at the top of Closed. POSTHOG-PUBLIC-CLIENT-KEY (#2776 merged as cd0fe0cd) was held back until #2818 merged (it inserted HANDOFF-CONFIG directly after it); closed in the base merge after #2818 landed, where the HANDOFF-CONFIG conflict was resolved by keeping #2818's block. Only the TASK status, the first state line and the first next_action line of each block change; every other line is kept verbatim. #2751/#2752 blocks are not touched (held by another Claude session). VER-288-SERVED-BUILD-BASELINE (#2538) and FIX-2004-APP-DOCUMENT-TITLES (#2082) name a "Cursor cloud agent" without saying Grok and are left for an owner call
 tried_and_rejected: moving blocks to the top of Closed (collides with #2811 and #2858)
 commands: count the code-fence lines in docs/agents/HANDOFF_LOG.md (must be even and pair up); diff <(git show origin/verdant-grow-diary:docs/agents/HANDOFF_LOG.md | sort) <(sort docs/agents/HANDOFF_LOG.md) shows only the 30 rewritten status/state/next_action lines plus this block
 files_touched: docs/agents/HANDOFF_LOG.md
 files_remaining: none
 blockers: merge order (after #2811); Matthew's yes at the exact head
-open_questions: close POSTHOG-PUBLIC-CLIENT-KEY after #2818 lands; owner call on VER-288-SERVED-BUILD-BASELINE and FIX-2004-APP-DOCUMENT-TITLES
+open_questions: owner call on VER-288-SERVED-BUILD-BASELINE and FIX-2004-APP-DOCUMENT-TITLES
 gotchas: almost every open PR edits this file; re-check placement after each base merge
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2805 #2793 #2541 #2540 #2555 #2553 #2554 #2545 #2544 #2523
 artifacts: none
@@ -3061,6 +3099,40 @@ active_writer: Cursor Grok cloud agent (this session)
 claimed_by: Cursor Grok cloud agent, 2026-10-24 13:10 UTC
 owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
 last_updated: 2026-10-24 13:50 UTC, by Cursor Grok cloud agent
+```
+
+### POSTHOG-PUBLIC-CLIENT-KEY
+
+```text
+TASK POSTHOG-PUBLIC-CLIENT-KEY  priority: other  status: CLOSED
+goal: Lovable production builds initialise PostHog from the committed public client key in VITE_POSTHOG_KEY after analytics consent.
+why: The live bundle reads VITE_POSTHOG_KEY and VITE_POSTHOG_HOST, and Lovable builds from the committed .env. Neither variable was set, so PostHog never initialised. Cheeko chose committing the public client key.
+branch: cursor/posthog-public-client-key-f411
+base: verdant-grow-diary
+checkout: git fetch origin cursor/posthog-public-client-key-f411 verdant-grow-diary && git switch cursor/posthog-public-client-key-f411
+pr: read the URL from GitHub after push
+head_sha: read git rev-parse HEAD after the push
+state: CLOSED. Merged as cd0fe0cd4353c0145eae9d1855b54427240c1f3a (#2776) on 2026-11-03T03:08:14Z. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
+current_step: consent test waits on vi.dynamicImportSettled; committed env presence and per-directive CSP assertions added. Secret scan stays red until a separate base allowlist lands.
+next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
+post_merge_check: after Publish, load https://verdantgrowdiary.com while signed out, grant analytics consent, and confirm a request to https://us.i.posthog.com. Before consent, that request must be absent. NOT_MEASURED until live /version.json reports this SHA.
+active_writer: Grok cloud agent on this branch
+decisions: Commit only VITE_POSTHOG_KEY and https://us.i.posthog.com in .env. CSP adds that host plus https://us-assets.i.posthog.com because posthog-js 1.444.0 RequestRouter loads /static from the region assets host when api_host is the US ingestion host and asset_host is unset. script-src lists the assets host; connect-src lists both. .env.example stays empty and says personal PostHog keys must never be committed.
+tried_and_rejected: none
+commands: bunx vitest run src/test/posthog-env-consent-startup.test.ts src/test/security-headers-rules.test.ts src/test/posthog-consent-client.test.ts --reporter=dot
+files_touched: .env; .env.example; src/lib/securityHeadersRules.ts; src/test/posthog-env-consent-startup.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: env/config gate — Cheeko's own-words yes at the exact head SHA before merge
+open_questions: none
+gotchas: do not commit a personal PostHog key. Do not edit workflows, wrangler, package.json, lockfiles, migrations, or auth. Existing posthog-consent-client.test.ts stays untouched; it stubs an empty key and injects a fixture reader.
+links: none yet
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; auto-merge off
+claimed_by: Grok, 2026-11-03
+owner: Cheeko
+last_updated: 2026-11-02 20:40 CT, by Grok
 ```
 
 ## Coverage not yet imported

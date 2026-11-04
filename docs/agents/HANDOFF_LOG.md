@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### STRUCTURED-READINGS-REVIEW-FIXES
+
+```text
+TASK STRUCTURED-READINGS-REVIEW-FIXES  priority: P2  status: OPEN
+goal: Fix the two review findings on the #2820 structured-readings work: pin the soil-temperature entry unit once typing starts, and keep structured readings and the soil unit in Note drafts.
+why: Review of #2820 found the soil-temperature unit could flip mid-entry when the display unit changed, and a restored Note draft dropped structured readings. The #2820 branch is frozen, so the fix is a stacked PR.
+branch: claude/structured-readings-review-fixes
+base: claude/new-session-azpsz3 (retarget to verdant-grow-diary after #2820 merges)
+checkout: git fetch origin claude/structured-readings-review-fixes && git switch claude/structured-readings-review-fixes
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2863
+head_sha: read the current head on GitHub
+state: fix and tests committed (e09e4f50); required CI does not run until the base is verdant-grow-diary.
+current_step: waiting for #2820 to merge.
+next_action: retarget #2863 to verdant-grow-diary, merge the base, get 35/35 green and an independent exact-head PASS.
+post_merge_check: on production, type a soil temperature, switch the display unit, save; the saved reading keeps the unit it was typed in.
+active_writer: Claude session_017UoYKyhNGum4qmfYdoNRLr
+decisions: the unit pins on the first non-blank edit and clears when the field is emptied; drafts store structured input and soilTempEntryUnit as optional fields, so old drafts still parse.
+tried_and_rejected: pushing the fix to the frozen #2820 branch (denied; it belongs to that PR's frozen head).
+commands: bunx vitest run src/test/quick-log-structured-readings-review-fixes.test.tsx --reporter=dot
+files_touched: src/lib/quickLogObservationDraftRules.ts; src/components/QuickLogV2Sheet.tsx; src/test/quick-log-structured-readings-review-fixes.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: #2820 merge
+open_questions: none
+gotchas: Quick Log saves only through quicklog_save_manual; this change touches draft state only.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2820
+artifacts: none
+reviewer_seat: any non-contributing review session
+reviewer_sha: none yet
+session_state: no production access; merge seat held by this session
+claimed_by: Claude session_017UoYKyhNGum4qmfYdoNRLr, 2026-11-04
+owner: Claude
+last_updated: 2026-11-04 02:50 CT, by Claude
+```
+
 ### FIRST-VIEWPORT-TASK-FIRST-SPEC
 
 ```text

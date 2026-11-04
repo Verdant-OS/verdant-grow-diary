@@ -25,10 +25,13 @@
  * Read-only: no .insert/.update/.delete/.upsert/.rpc. No ai-coach call.
  * No device-control surface. No elevated keys. RLS enforces ownership.
  */
+import { useMemo } from "react";
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import type { SensorReadingRow } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { useQuickLogEnvironmentManuals } from "@/hooks/useQuickLogEnvironmentManuals";
+import { LatestSnapshotQuickLogMerge } from "@/lib/latestSnapshotQuickLogMerge";
 import {
   EMPTY_SNAPSHOT,
   hasFiniteSnapshotMetric,
@@ -685,12 +688,29 @@ export function useLatestSensorSnapshotsByTent(
       retry: false,
     })),
   });
+  // Quick Log snapshots live in grow_events, which the batched read above
+  // never touches; the newest capture wins per tent (#2821).
+  const scopeKey = tents
+    .filter((tent) => !!user && !!tent.growId)
+    .map((tent) => tent.tentId)
+    .join("|");
+  const scope = useMemo(() => (scopeKey ? scopeKey.split("|") : []), [scopeKey]);
+  const manuals = useQuickLogEnvironmentManuals(scope);
   const byTent: Record<string, SnapshotState> = {};
   tents.forEach((tent, index) => {
-    byTent[tent.tentId] = snapshotStateFromQuery(
+    const state = snapshotStateFromQuery(
       results[index] as SnapshotQueryLike,
       !!user && !!tent.growId,
     );
+    byTent[tent.tentId] =
+      state.status === "ok"
+        ? {
+            ...state,
+            snapshot: LatestSnapshotQuickLogMerge.merge(state.snapshot, manuals.data, [
+              tent.tentId,
+            ]),
+          }
+        : state;
   });
   return byTent;
 }

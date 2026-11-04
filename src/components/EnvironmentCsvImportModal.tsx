@@ -61,6 +61,7 @@ export interface EnvironmentCsvImportModalProps {
     /** Rows skipped as duplicates (same file or already imported). Optional
      *  for callers that predate duplicate-aware import. */
     duplicateCount?: number;
+    contributedSensorRowCount?: number;
     /** Earlier atomic batches committed before a later batch failed. */
     partialWrite?: boolean;
     /** The dispatched batch may have committed without a usable response. */
@@ -167,6 +168,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
           ),
           insertedCount: receipt.insertedCount,
           duplicateCount: res.duplicateCount ?? 0,
+          contributedSensorRowCount: res.contributedSensorRowCount ?? null,
           partialWrite: receipt.partialWrite === true,
         }));
         return;
@@ -180,6 +182,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
         errorMessage: null,
         insertedCount: res.insertedCount,
         duplicateCount: res.duplicateCount ?? 0,
+        contributedSensorRowCount: res.contributedSensorRowCount ?? null,
       }));
     } finally {
       inFlightRef.current = false;
@@ -323,7 +326,11 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
         {state.phase === "done" ? (
           <div data-testid="csv-import-done" className="space-y-2">
             <p className="text-sm">
-              {buildCsvImportDoneMessage(state.insertedCount, state.duplicateCount)}
+              {buildCsvImportDoneMessage(
+                state.insertedCount,
+                state.duplicateCount,
+                state.contributedSensorRowCount ?? undefined,
+              )}
             </p>
             <p className="text-xs text-muted-foreground" data-testid="csv-import-historical-note">
               {CSV_IMPORT_HISTORICAL_CONTEXT_NOTE}

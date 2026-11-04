@@ -33,6 +33,8 @@ import { OnboardingFlowControls } from "@/lib/onboardingFlowControls";
 import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 
 export const ONBOARDING_GROWS_LOADING_COPY = "Loading your grows…";
+/** Shown while a grower who already has grows is redirected to the dashboard (item 11). */
+export const ONBOARDING_OPENING_DASHBOARD_COPY = "Opening your dashboard…";
 import {
   buildStarterQuickLogPrefill,
   STARTER_SETUP_BUTTON_LABEL,
@@ -174,7 +176,20 @@ export default function Onboarding() {
       </div>
     );
   }
-  if (grows.length >= 1) return <Navigate to={routeForStartScreen("dashboard")} replace />;
+  if (grows.length >= 1) {
+    // Keep a visible status on screen while the redirect lands, so the page
+    // never shows an empty body between "Loading your grows…" and the dashboard.
+    return (
+      <div
+        className="min-h-dvh flex items-center justify-center px-6"
+        role="status"
+        data-testid="onboarding-opening-dashboard"
+      >
+        <p className="text-sm text-muted-foreground">{ONBOARDING_OPENING_DASHBOARD_COPY}</p>
+        <Navigate to={routeForStartScreen("dashboard")} replace />
+      </div>
+    );
+  }
 
   function go(c: StartScreenChoice, save: boolean) {
     if (save && user) setStartScreenChoice(user.id, c);

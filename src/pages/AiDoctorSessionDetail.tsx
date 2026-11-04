@@ -99,6 +99,7 @@ function CopyReviewSummaryButton({ vm }: { vm: ReviewSummaryViewModel }) {
       onClick={onClick}
       data-testid="ai-doctor-session-detail-copy-review-button"
       aria-label="Copy review summary"
+      aria-live="polite"
     >
       {state === "copied" ? (
         <>
@@ -145,6 +146,7 @@ function CopyLinkButton({ sessionId }: { sessionId: string }) {
       onClick={onClick}
       data-testid="ai-doctor-session-detail-copy-link-button"
       aria-label="Copy link to this session"
+      aria-live="polite"
     >
       {state === "copied" ? (
         <>

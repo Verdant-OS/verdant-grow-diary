@@ -136,20 +136,6 @@ export default function PhenoHuntsIndex() {
         icon={<Sprout className="size-5" />}
       />
 
-      {status === "ready" && rollupUnavailable && (
-        <p
-          data-testid="pheno-hunts-index-stability-unavailable"
-          role="status"
-          className="mb-4 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
-        >
-          The keeper stability roll-up could not be loaded right now — its absence below is a failed
-          read, not an empty ledger. Reload to retry.
-        </p>
-      )}
-      {status === "ready" && !rollupUnavailable && (
-        <PhenoStabilityDashboard model={stabilityModel} />
-      )}
-
       {status === "loading" ? (
         <div
           className="flex items-center justify-center rounded-3xl border border-border/60 bg-card/50 py-16 text-muted-foreground"
@@ -219,6 +205,23 @@ export default function PhenoHuntsIndex() {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Hunt list first (audit 2026-11-03, finding 10); the keeper roll-up follows. */}
+      {status === "ready" && rollupUnavailable && (
+        <p
+          data-testid="pheno-hunts-index-stability-unavailable"
+          role="status"
+          className="mt-6 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+        >
+          The keeper stability roll-up could not be loaded right now — its absence here is a failed
+          read, not an empty ledger. Reload to retry.
+        </p>
+      )}
+      {status === "ready" && !rollupUnavailable && (
+        <div className="mt-6">
+          <PhenoStabilityDashboard model={stabilityModel} />
+        </div>
       )}
 
       {/* Related pheno surfaces — previously reachable only by typing the URL. */}

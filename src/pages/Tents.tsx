@@ -382,6 +382,7 @@ export default function Tents() {
                 {tentsAsyncState.primaryRefreshFailed && (
                   <li
                     data-testid="tents-primary-refresh-error"
+                    aria-live="polite"
                     className="flex flex-wrap items-center justify-between gap-2"
                   >
                     <span>Tent list refresh unavailable; showing last loaded tents.</span>
@@ -410,6 +411,7 @@ export default function Tents() {
                 {tentsAsyncState.plantsStatus === "error" && (
                   <li
                     data-testid="tents-plants-error"
+                    aria-live="polite"
                     className="flex flex-wrap items-center justify-between gap-2"
                   >
                     <span>
@@ -461,6 +463,7 @@ export default function Tents() {
                 {tentsAsyncState.assignmentPlantsStatus === "error" && (
                   <li
                     data-testid="tents-assignment-guard-error"
+                    aria-live="polite"
                     className="flex flex-wrap items-center justify-between gap-2"
                   >
                     <span>

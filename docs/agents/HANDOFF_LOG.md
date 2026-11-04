@@ -71,7 +71,7 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ### GROWER-BUGS-10
 
-```text
+````text
 TASK GROWER-BUGS-10  priority: P1  status: OPEN
 goal: grower bug brief 2026-11-03 item 10 / issue #2785 - plant, tent and timeline tabs crash or hang; per-plant Timeline worst
 why: measured in mocked Chromium at verdant-grow-diary 773635e: 100 Timeline entries with 12 MP photos took the renderer to ~1,509 MB after scrolling (no photos ~419 MB, 800x600 photos ~646 MB); JS heap ~56-75 MB in all runs; zero REST calls after settle (no refetch loop). Cause: every entry photo renders the original camera file
@@ -99,7 +99,40 @@ session_state: Claude session also watches PRs #2820, #2828, #2842
 claimed_by: Claude, 2026-11-04 02:45 UTC
 owner: Claude
 last_updated: 2026-11-04 02:45 UTC, by Claude
-```
+
+### AI-DOCTOR-REPORT-PREVIEW-FOCUS
+
+```text
+TASK AI-DOCTOR-REPORT-PREVIEW-FOCUS  priority: other  status: OPEN
+goal: The AI Doctor report preview (an aria-modal dialog) moves focus to its Close button on open and returns focus to Preview report on Close or Escape.
+why: Grower UX audit 2026-11-03 finding 12 (keyboard): focus stayed on the opener behind the modal, so Tab walked the page underneath. The citation modal in the same file already does this.
+branch: claude/ai-doctor-report-preview-focus
+base: verdant-grow-diary
+checkout: git fetch origin claude/ai-doctor-report-preview-focus verdant-grow-diary && git switch claude/ai-doctor-report-preview-focus
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub (this block's commit is the first)
+state: fix and test committed.
+current_step: draft PR open.
+next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ).
+post_merge_check: on the live build, open AI Doctor Preview report with the keyboard; focus lands on Close; Escape returns focus to Preview report.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: copy the citation modal's pattern (focus Close on mount; return focus to the trigger in a microtask after unmount). No focus trap added; the other in-file modals have none either.
+tried_and_rejected: none
+commands: bunx vitest run src/test/ai-doctor-report-preview-focus.test.tsx
+files_touched: src/components/AiDoctorDiagnosisPanel.tsx; src/test/ai-doctor-report-preview-focus.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: none
+gotchas: Close is disabled while an export is pending; the dialog cannot close then, so focus return does not run.
+links: audit finding 12 (private upload, not committed)
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
+owner: Claude
+last_updated: 2026-11-03 18:30 CT, by Claude
+````
 
 ### REPORTS-DIARY-RANGE-REPORT-LINK
 

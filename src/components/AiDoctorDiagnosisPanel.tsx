@@ -253,9 +253,12 @@ export default function AiDoctorDiagnosisPanel({
   }, [buildFullReportInput, runGated]);
 
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
+  const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
   const handleClosePreview = useCallback(() => {
     if (pendingExport !== null) return;
     setPreviewOpen(false);
+    // Return focus to Preview report after the dialog unmounts (audit finding 12).
+    queueMicrotask(() => previewTriggerRef.current?.focus());
   }, [pendingExport]);
   const previewInput = useMemo(
     () => (previewOpen ? buildFullReportInput() : null),
@@ -507,6 +510,7 @@ export default function AiDoctorDiagnosisPanel({
           data-testid={tid("ai-doctor-diagnosis-export-bar")}
         >
           <button
+            ref={previewTriggerRef}
             type="button"
             onClick={() => setPreviewOpen(true)}
             data-testid={tid("ai-doctor-diagnosis-preview-report")}
@@ -900,6 +904,12 @@ function ReportPreviewPanel({
   testId: string;
 }) {
   const metricRows: PerMetricReportRow[] = useMemo(() => buildPerMetricStatusTable(input), [input]);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+
+  // Move focus into the modal on open, like the citation modal (audit finding 12).
+  useEffect(() => {
+    closeRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -963,6 +973,7 @@ function ReportPreviewPanel({
               Download Evidence CSV
             </button>
             <button
+              ref={closeRef}
               type="button"
               onClick={onClose}
               disabled={exportPending}

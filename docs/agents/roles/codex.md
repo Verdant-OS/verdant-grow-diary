@@ -2,7 +2,7 @@
 
 **Steward Backup: held by one designated Codex session only** (Matthew, 2026-11-04; see `docs/agents/constitution/roster.md`). Any other Codex session does not act as steward. The steward duties are in `docs/agents/OWNERSHIP.md`.
 
-**Sentinel-Version: 2026-11-04.5**
+**Sentinel-Version: 2026-11-04.3**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.

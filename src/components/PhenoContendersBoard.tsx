@@ -96,7 +96,7 @@ function AxisCell({ axis, id, ranked }: { axis: ContenderAxis; id: string; ranke
         data-testid={`pheno-contenders-axis-${id}-${axis.key}`}
       >
         <span
-          className="text-[11px] text-muted-foreground/70"
+          className="text-[11px] text-muted-foreground"
           title="Not yet scored"
           aria-label={`${axis.label}: not yet scored`}
         >

@@ -32,6 +32,11 @@ export const ECOWITT_CUSTOM_UPLOAD_MAX_AGE_MS = ECOWITT_CUSTOM_UPLOAD_FUTURE_SKE
 export const ECOWITT_CUSTOM_UPLOAD_DEFAULT_INTERVAL_SECONDS = 16;
 export const ECOWITT_CUSTOM_UPLOAD_MIN_INTERVAL_SECONDS = 16;
 export const ECOWITT_CUSTOM_UPLOAD_MAX_INTERVAL_SECONDS = 600;
+/**
+ * Stamped on every row this planner writes, so the station card can tell its
+ * rows from the passkey bridge's live rows on the same tent (#2732 P3-1).
+ */
+export const ECOWITT_CUSTOM_UPLOAD_INGEST_PATH = "ecowitt_custom_upload";
 
 /** Marker keys copied from the listener. PASSKEY is intentionally absent. */
 export const ECOWITT_CUSTOM_UPLOAD_GATEWAY_MARKERS = [
@@ -74,6 +79,9 @@ export interface EcowittCustomUploadStoredReading {
   readonly receivedAt: string;
   readonly rawPayload: {
     readonly vendor: "ecowitt";
+    readonly ingest_path: typeof ECOWITT_CUSTOM_UPLOAD_INGEST_PATH;
+    /** The claim that wrote the row. The owner can already read claim ids. */
+    readonly claim_id: string;
     readonly aggregation: "mean";
     readonly channels: readonly {
       readonly channel: number;
@@ -480,6 +488,8 @@ export function planEcowittCustomUploadIngest(
           receivedAt,
           rawPayload: {
             vendor: "ecowitt" as const,
+            ingest_path: ECOWITT_CUSTOM_UPLOAD_INGEST_PATH,
+            claim_id: claim.id,
             aggregation: "mean" as const,
             channels: channels.map((channel) => ({
               channel: channel.channel,

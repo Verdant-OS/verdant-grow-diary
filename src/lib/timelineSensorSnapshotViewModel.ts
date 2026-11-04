@@ -21,6 +21,7 @@ import {
 } from "@/constants/sensorTruthRanges";
 import { validateManualSnapshot } from "@/lib/manualSensorSnapshotRules";
 import { resolveSensorSourceLabel, type ResolvedSourceLabel } from "@/lib/sensorSourceLabelRules";
+import { isPpfdValid } from "@/lib/ppfdRules";
 import { classifyManualMetric, CO2_PPM_RANGE } from "@/lib/sensorTruthRules";
 import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRules";
 import { fahrenheitToCelsius, tempFFromC } from "@/lib/temperatureUnits";
@@ -30,7 +31,17 @@ import {
 } from "@/lib/temperatureUnitPreference";
 
 export type TimelineSensorChipMetric =
-  "temp_f" | "temp_c" | "rh" | "ph" | "ec" | "vpd" | "soil_moisture" | "co2";
+  | "temp_f"
+  | "temp_c"
+  | "rh"
+  | "ph"
+  | "ec"
+  | "vpd"
+  | "soil_moisture"
+  | "co2"
+  | "soil_temp"
+  | "soil_ec"
+  | "ppfd";
 
 export interface TimelineSensorChip {
   metric: TimelineSensorChipMetric;
@@ -254,10 +265,17 @@ export function buildTimelineSensorSnapshotViewModel(
     "swc",
   );
   const co2 = pick(obj, "co2", "co2_ppm", "co2Ppm");
+  // Structured Quick Log readings (grower bug item 14). Stored under the
+  // canonical keys only; soil temperature is canonical °C.
+  const soilTempC = pick(obj, "soil_temp_c");
+  const soilEc = pick(obj, "soil_ec_ms_cm");
+  const ppfd = pick(obj, "ppfd");
 
   if (
     options.validateManualCompatibility &&
-    ![tempF, tempC, tempGeneric, rh, ph, ec, vpd, soil, co2].some((value) => value !== undefined)
+    ![tempF, tempC, tempGeneric, rh, ph, ec, vpd, soil, co2, soilTempC, soilEc, ppfd].some(
+      (value) => value !== undefined,
+    )
   ) {
     return { kind: "none" };
   }
@@ -362,6 +380,22 @@ export function buildTimelineSensorSnapshotViewModel(
     manualErrors.push(
       `CO₂ is outside the plausible ${CO2_PPM_RANGE.min}–${CO2_PPM_RANGE.max} ppm range.`,
     );
+  }
+  // Structured readings: an implausible value is reported, never shown as a
+  // healthy chip (the same rule the CO₂ chip follows above).
+  const soilTempImplausible =
+    isFiniteNumber(soilTempC) && !classifyManualMetric("soil_temp_c", soilTempC).valid;
+  const soilEcImplausible =
+    isFiniteNumber(soilEc) && !classifyManualMetric("soil_ec_ms_cm", soilEc).valid;
+  const ppfdImplausible = isFiniteNumber(ppfd) && !isPpfdValid(ppfd);
+  if (soilTempImplausible) {
+    manualErrors.push("Soil temperature is outside the plausible range; the value was not shown.");
+  }
+  if (soilEcImplausible) {
+    manualErrors.push("Soil EC is outside the plausible range; the value was not shown.");
+  }
+  if (ppfdImplausible) {
+    manualErrors.push("PPFD is outside the plausible range; the value was not shown.");
   }
   if (
     manualValidation !== null &&
@@ -517,6 +551,53 @@ export function buildTimelineSensorSnapshotViewModel(
       value: v,
       unit: "ppm",
       display: `${v} ppm`,
+    });
+  }
+
+  if (isFiniteNumber(soilTempC) && !soilTempImplausible) {
+    if (options.preferUnit === "C") {
+      const v = roundTo(soilTempC, 1);
+      chips.push({
+        metric: "soil_temp",
+        label: "Soil temp",
+        value: v,
+        unit: "°C",
+        display: `${v}°C`,
+      });
+    } else {
+      const soilTempF = tempFFromC(soilTempC);
+      if (soilTempF !== null) {
+        const v = roundTo(soilTempF, 1);
+        chips.push({
+          metric: "soil_temp",
+          label: "Soil temp",
+          value: v,
+          unit: "°F",
+          display: `${v}°F`,
+        });
+      }
+    }
+  }
+
+  if (isFiniteNumber(soilEc) && !soilEcImplausible) {
+    const v = roundTo(soilEc, 2);
+    chips.push({
+      metric: "soil_ec",
+      label: "Soil EC",
+      value: v,
+      unit: "mS/cm",
+      display: `${v} mS/cm`,
+    });
+  }
+
+  if (isFiniteNumber(ppfd) && !ppfdImplausible) {
+    const v = Math.round(ppfd);
+    chips.push({
+      metric: "ppfd",
+      label: "PPFD",
+      value: v,
+      unit: "µmol/m²/s",
+      display: `${v} µmol/m²/s`,
     });
   }
 

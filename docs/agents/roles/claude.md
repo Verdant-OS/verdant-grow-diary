@@ -2,7 +2,7 @@
 
 **Merge Steward: held by one designated Claude session only** (Matthew, 2026-11-04; the session is named in `docs/agents/constitution/roster.md`). Any other Claude session does not act as steward. The steward duties are in `docs/agents/OWNERSHIP.md`.
 
-**Sentinel-Version: 2026-11-04.5**
+**Sentinel-Version: 2026-11-04.3**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.

@@ -20,6 +20,23 @@ import {
 } from "@/lib/timelineSensorSnapshotViewModel";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { tempFFromC } from "@/lib/temperatureUnits";
+import { STRUCTURED_READING_KEYS } from "@/lib/quickLogStructuredReadingRules";
+
+/**
+ * Air-reading keys a `manual_sensor_snapshot` carries when it was written by the
+ * manual reading path (or by `withSnapshot` below). Their absence means the air
+ * readings are still only on the exact environment sibling.
+ */
+const MANUAL_AIR_READING_KEYS = [
+  "temp_f",
+  "temp_c",
+  "temperature_f",
+  "temperature_c",
+  "humidity_percent",
+  "humidity_pct",
+  "humidity",
+  "rh",
+] as const;
 
 export type TimelineQuickLogDiaryReadbackRow = {
   id: string;
@@ -85,12 +102,20 @@ export class TimelineQuickLogEnvironmentSnapshotReadback {
     return typeof linked === "string" && linked.length > 0 ? linked : null;
   }
 
+  /**
+   * Whether `details` already carries the air readings, so the exact sibling
+   * need not be attached. A `manual_sensor_snapshot` that holds only structured
+   * readings (soil temp, VWC, soil EC, CO₂, PPFD — grower bug item 14) is not a
+   * complete snapshot: the air readings still live on the sibling and are
+   * attached alongside it. Otherwise a soil reading made the air readings
+   * disappear from the card while the air rows stayed in the database.
+   */
   private static hasSnapshot(details: Record<string, unknown> | null | undefined): boolean {
     if (!details) return false;
-    return (
-      TimelineQuickLogEnvironmentSnapshotReadback.isRecord(details.sensor_snapshot) ||
-      TimelineQuickLogEnvironmentSnapshotReadback.isRecord(details.manual_sensor_snapshot)
-    );
+    if (TimelineQuickLogEnvironmentSnapshotReadback.isRecord(details.sensor_snapshot)) return true;
+    const manual = details.manual_sensor_snapshot;
+    if (!TimelineQuickLogEnvironmentSnapshotReadback.isRecord(manual)) return false;
+    return MANUAL_AIR_READING_KEYS.some((key) => key in manual);
   }
 
   /** The exact-sibling helper accepts numbers only. Stored readings may be numeric strings. */
@@ -126,6 +151,20 @@ export class TimelineQuickLogEnvironmentSnapshotReadback {
   ): Record<string, unknown> {
     const sensor: Record<string, unknown> = { source: "manual" };
     if (ts) sensor.ts = ts;
+    // Structured readings the save wrote to manual_sensor_snapshot (soil temp,
+    // VWC, soil EC, CO₂, PPFD) ride along on the canonical snapshot the card
+    // reads first, so air and soil show together.
+    const existingManual = TimelineQuickLogEnvironmentSnapshotReadback.isRecord(
+      details?.manual_sensor_snapshot,
+    )
+      ? details.manual_sensor_snapshot
+      : null;
+    if (existingManual) {
+      for (const key of STRUCTURED_READING_KEYS) {
+        const value = existingManual[key];
+        if (typeof value === "number" && Number.isFinite(value)) sensor[key] = value;
+      }
+    }
     if (metrics.tempC !== null) sensor.temp_c = metrics.tempC;
     if (metrics.rh !== null) sensor.rh = metrics.rh;
     // `vpd`, not `vpd_kpa`: the correction dialog treats `vpd_kpa` on
@@ -142,7 +181,11 @@ export class TimelineQuickLogEnvironmentSnapshotReadback {
 
     const next: Record<string, unknown> = { ...(details ?? {}) };
     next.sensor_snapshot = sensor;
-    if ("temp_f" in manual || "humidity_percent" in manual) next.manual_sensor_snapshot = manual;
+    if ("temp_f" in manual || "humidity_percent" in manual) {
+      // Keep any structured readings the save already wrote there; the sibling
+      // supplies only the air readings.
+      next.manual_sensor_snapshot = { ...(existingManual ?? {}), ...manual };
+    }
     return next;
   }
 

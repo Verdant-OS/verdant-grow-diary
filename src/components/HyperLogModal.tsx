@@ -319,7 +319,7 @@ export function HyperLogModal({
             </div>
             <button
               onClick={() => handleClose(false)}
-              className="text-white/40 hover:text-white/80 transition-colors"
+              className="inline-flex h-6 w-6 items-center justify-center text-white/40 hover:text-white/80 transition-colors"
               aria-label="Close"
             >
               <X className="h-4 w-4" />
@@ -557,7 +557,7 @@ export function HyperLogModal({
                         data-testid={`hyperlog-photo-remove-${p.id}`}
                         aria-label={`Remove ${p.name}`}
                         onClick={() => removePhoto(p.id)}
-                        className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black"
+                        className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black"
                       >
                         <X className="h-3 w-3" />
                       </button>

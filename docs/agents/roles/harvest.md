@@ -1,6 +1,6 @@
 # Role — Harvest: Historical Backup Merge Profile
 
-**Sentinel-Version: 2026-11-04.5**
+**Sentinel-Version: 2026-11-04.3**
 
 **Historical profile — no current backup merge assignment.** The Merge Executive
 assignment recorded on 2026-10-10 at 3:25 PM CT made Harvest the conditional backup

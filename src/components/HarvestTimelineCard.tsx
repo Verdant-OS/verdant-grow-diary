@@ -94,7 +94,7 @@ export default function HarvestTimelineCard({
           <span
             data-testid="harvest-timeline-card-timestamp"
             data-fallback={timestampIsFallback ? "true" : "false"}
-            className={cn(timestampIsFallback && "italic text-muted-foreground/70")}
+            className={cn(timestampIsFallback && "italic text-muted-foreground")}
           >
             {timestampLabel}
           </span>

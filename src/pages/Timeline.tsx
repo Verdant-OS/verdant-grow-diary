@@ -49,6 +49,12 @@ import {
   ListChecks,
   ClipboardCheck,
 } from "lucide-react";
+import {
+  selectTimelineEagerPhotoIds,
+  TIMELINE_DEFERRED_PHOTO_COPY,
+  TIMELINE_DEFERRED_PHOTO_TESTID,
+  buildTimelineDeferredPhotoAriaLabel,
+} from "@/lib/timelinePhotoDeferralRules";
 import { isActionResponseCandidateDetails } from "@/lib/actionResponseMemoryRules";
 import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemoryViewModel";
 import { useActionResponseMemory } from "@/hooks/useActionResponseMemory";
@@ -1662,6 +1668,10 @@ export default function Timeline() {
     user,
     directoryGrowId,
   );
+  const recentLaneTargetNames = useMemo(
+    () => ({ plantNamesById, tentNamesById, plantTentIdsById }),
+    [plantNamesById, tentNamesById, plantTentIdsById],
+  );
   const demoSensorDataPresent = useMemo(
     () => displayEntries.some((row) => deriveTimelineRowSensorSource(row) === "demo"),
     [displayEntries],
@@ -2173,6 +2183,12 @@ export default function Timeline() {
     });
     return groups;
   }, [filtered]);
+  // Item 10 (#2785): only the newest photos load on their own; older ones on tap.
+  const [revealedPhotoIds, setRevealedPhotoIds] = useState<ReadonlySet<string>>(() => new Set());
+  const eagerPhotoIds = useMemo(
+    () => selectTimelineEagerPhotoIds(filtered, revealedPhotoIds),
+    [filtered, revealedPhotoIds],
+  );
 
   const currentStage = normalizeQuickLogStage(activeGrow?.stage);
   const currentStageIdx = STAGES.findIndex((s) => s.value === currentStage);
@@ -2915,6 +2931,7 @@ export default function Timeline() {
           limit={10}
           growId={activeGrowId ?? null}
           dateFiltered={Boolean(effectiveStartDate || effectiveEndDate)}
+          targetNames={recentLaneTargetNames}
           onEntryChanged={() => {
             void load();
           }}
@@ -3054,45 +3071,61 @@ export default function Timeline() {
                           hidden
                         />
                       ) : null}
-                      {e.photo_url
-                        ? (() => {
-                            const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
-                            const item = idx >= 0 ? lightboxItems[idx] : null;
-                            const alt = buildTimelinePhotoAltText(item);
-                            const showNonDiagnostic = shouldShowPhotoNonDiagnosticLabel({
-                              hasPhoto: true,
-                              details: e.details,
-                            });
-                            return (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (idx >= 0) setLightboxPhotoId(e.id);
-                                  }}
-                                  aria-label={`Open photo: ${alt}`}
-                                  data-testid="timeline-photo-open"
-                                  className="block w-full focus:outline-hidden focus:ring-2 focus:ring-primary/60"
+                      {e.photo_url && !eagerPhotoIds.has(e.id) ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRevealedPhotoIds((current) => new Set(current).add(e.id))
+                          }
+                          data-testid={TIMELINE_DEFERRED_PHOTO_TESTID}
+                          aria-label={buildTimelineDeferredPhotoAriaLabel(
+                            formatTimelineEntryTimestamp(e.entry_at),
+                          )}
+                          title={TIMELINE_DEFERRED_PHOTO_COPY.hint}
+                          className="flex w-full items-center justify-center gap-2 border-b border-border/30 bg-secondary/30 px-3 py-3 text-sm text-muted-foreground hover:text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/60"
+                        >
+                          <Camera className="h-4 w-4" aria-hidden="true" />
+                          {TIMELINE_DEFERRED_PHOTO_COPY.button}
+                        </button>
+                      ) : e.photo_url ? (
+                        (() => {
+                          const idx = findTimelinePhotoIndexById(lightboxItems, e.id);
+                          const item = idx >= 0 ? lightboxItems[idx] : null;
+                          const alt = buildTimelinePhotoAltText(item);
+                          const showNonDiagnostic = shouldShowPhotoNonDiagnosticLabel({
+                            hasPhoto: true,
+                            details: e.details,
+                          });
+                          return (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (idx >= 0) setLightboxPhotoId(e.id);
+                                }}
+                                aria-label={`Open photo: ${alt}`}
+                                data-testid="timeline-photo-open"
+                                className="block w-full focus:outline-hidden focus:ring-2 focus:ring-primary/60"
+                              >
+                                <img
+                                  src={e.photo_url}
+                                  className="w-full aspect-[4/3] object-cover"
+                                  alt={alt}
+                                  loading="lazy"
+                                />
+                              </button>
+                              {showNonDiagnostic && (
+                                <div
+                                  data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
+                                  className="px-3 py-1.5 text-[11px] text-muted-foreground bg-secondary/30 border-t border-border/30"
                                 >
-                                  <img
-                                    src={e.photo_url}
-                                    className="w-full aspect-[4/3] object-cover"
-                                    alt={alt}
-                                    loading="lazy"
-                                  />
-                                </button>
-                                {showNonDiagnostic && (
-                                  <div
-                                    data-testid={PHOTO_NON_DIAGNOSTIC_TESTID}
-                                    className="px-3 py-1.5 text-[11px] text-muted-foreground bg-secondary/30 border-t border-border/30"
-                                  >
-                                    {PHOTO_NON_DIAGNOSTIC_LABEL}
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()
-                        : null}
+                                  {PHOTO_NON_DIAGNOSTIC_LABEL}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()
+                      ) : null}
                       <div
                         className="p-4"
                         onClick={() => openTimelineEntryDetail(e.id)}

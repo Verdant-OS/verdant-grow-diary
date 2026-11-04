@@ -10,6 +10,7 @@ import {
   plantStartDateSaveMessage,
 } from "@/lib/plantStartDateRules";
 import { useTents } from "@/hooks/use-tents";
+import { SimilarNameWarningNote } from "@/components/SimilarNameWarningNote";
 import { useGrows } from "@/store/grows";
 import {
   buildPlantStageFollowUp,
@@ -555,6 +556,13 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               data-testid="edit-plant-name"
+            />
+            <SimilarNameWarningNote
+              entity="plant"
+              candidate={form.name}
+              growId={plant.growId ?? null}
+              excludeId={plant.id}
+              testId="edit-plant-similar-name"
             />
           </div>
           <div>

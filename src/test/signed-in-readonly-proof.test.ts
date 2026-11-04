@@ -590,10 +590,13 @@ describe("performance workflow credential and timing boundaries", () => {
             ]
           : ["Verify production fixture configuration", "Measure three signed-in read-only routes"],
       );
+      // The write smoke signs in with its own disposable-account secrets
+      // (#2857); the read-only lane keeps the owner's E2E_TEST_* login.
+      const secretPrefix = key === "quicklog-smoke" ? "E2E_SMOKE" : "E2E_TEST";
       for (const step of credentialSteps) {
         expect(step.env).toEqual({
-          E2E_TEST_EMAIL: "${{ secrets.E2E_TEST_EMAIL }}",
-          E2E_TEST_PASSWORD: "${{ secrets.E2E_TEST_PASSWORD }}",
+          E2E_TEST_EMAIL: `\${{ secrets.${secretPrefix}_EMAIL }}`,
+          E2E_TEST_PASSWORD: `\${{ secrets.${secretPrefix}_PASSWORD }}`,
         });
       }
     });
@@ -649,7 +652,12 @@ describe("performance workflow credential and timing boundaries", () => {
       (step: any) => step.name === "Verify required configuration",
     ).run;
     expect(preflight).toContain('"$E2E_BASE_URL" != "https://verdantgrowdiary.com"');
-    expect(preflight).toContain('"$E2E_TEST_EMAIL" != "cheekhimself@gmail.com"');
+    // Only the disposable account named by the hint may write; personal
+    // accounts are refused even when named (#2857).
+    expect(preflight).toContain('"$smoke_email" != "$smoke_hint"');
+    expect(preflight).toContain('[ -z "$smoke_hint" ]');
+    expect(preflight).toContain('"$smoke_email" = "cheekhimself@gmail.com"');
+    expect(preflight).toContain('"$smoke_email" = "matt@verdantgrowdiary.com"');
   });
 });
 

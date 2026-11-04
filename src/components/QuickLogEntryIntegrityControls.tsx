@@ -61,6 +61,7 @@ import {
   type QuickLogCorrectionValueContext,
   type QuickLogRevisionReasonCode,
 } from "@/lib/quick-log/quickLogRevisionRules";
+import { quickLogCorrectionStructuredReadingsNote } from "@/lib/quickLogStructuredReadingRules";
 import type { QuickLogEntryHandle } from "@/lib/quickLogRevisionService";
 import { useQuickLogRevisionMutation } from "@/hooks/useQuickLogRevisionMutation";
 import { useAuth } from "@/store/auth";
@@ -236,6 +237,9 @@ function RevisionControls({
   const readingsNote = quickLogCorrectionEnvironmentCheckReadingsNote(environmentCheckDetails, {
     offersAirReadingFields: editsSensor,
   });
+  // Structured soil/CO₂/PPFD readings are read-only until the correction RPC
+  // is extended (spec quick-log-structured-sensor-readings §3.5).
+  const structuredReadingsNote = quickLogCorrectionStructuredReadingsNote(environmentCheckDetails);
   const [volumeDraft, setVolumeDraft] = useState<string>(volumeDraftFrom(correctionValues));
   const [doseDraft, setDoseDraft] = useState<string>(
     correctionValues?.kind === "feeding" && correctionValues.doseAmount != null
@@ -519,6 +523,14 @@ function RevisionControls({
                 data-testid="quicklog-correct-readings-note"
               >
                 {readingsNote}
+              </p>
+            )}
+            {structuredReadingsNote && (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="quicklog-correct-structured-readings-note"
+              >
+                {structuredReadingsNote}
               </p>
             )}
             {editsSensor && (

@@ -128,6 +128,26 @@ export function buildStructuredReadings(input: StructuredReadingInput): Structur
   return result;
 }
 
+export const QUICKLOG_CORRECTION_STRUCTURED_READINGS_NOTE =
+  "Soil, CO₂ and PPFD readings on this entry can't be corrected yet. You can still correct the note, time, plant, and air readings.";
+
+/**
+ * Explains, inside the correction dialog, that this entry carries structured
+ * readings the dialog has no field for (spec §3.5: the new keys are read-only
+ * after save until the correction RPC is extended). Null when the saved
+ * `manual_sensor_snapshot` holds none of them, so older entries are unchanged.
+ */
+export function quickLogCorrectionStructuredReadingsNote(details: unknown): string | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+  const snapshot = (details as Record<string, unknown>).manual_sensor_snapshot;
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return null;
+  const rec = snapshot as Record<string, unknown>;
+  const present = STRUCTURED_READING_KEYS.some(
+    (key) => typeof rec[key] === "number" && Number.isFinite(rec[key]),
+  );
+  return present ? QUICKLOG_CORRECTION_STRUCTURED_READINGS_NOTE : null;
+}
+
 export interface StructuredReadingChip {
   readonly label: string;
   readonly value: string;

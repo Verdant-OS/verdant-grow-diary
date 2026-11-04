@@ -69,6 +69,39 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### CLAUDE-MD-NPM-LOCK-RETIRED
+
+```text
+TASK CLAUDE-MD-NPM-LOCK-RETIRED  priority: other  status: OPEN
+goal: Stop CLAUDE.md from calling package-lock.json a "synchronized compatibility lock". #1873 retired it; bun.lock is the only lockfile and package-lock.json is forbidden.
+why: The architecture contract audit of 2026-11-04 (deploy tip e3ecc2b2214314526c9149000ac5932351fd82cd) found the stale wording at CLAUDE.md "Repository operating facts" and "Daily commands". Every Claude session loads CLAUDE.md, so it teaches a retired setup. Matthew asked for this slice.
+branch: claude/claude-md-npm-lock-retired
+base: verdant-grow-diary at e3ecc2b2214314526c9149000ac5932351fd82cd
+checkout: git fetch origin claude/claude-md-npm-lock-retired verdant-grow-diary && git switch claude/claude-md-npm-lock-retired && git merge origin/verdant-grow-diary
+pr: see the draft PR for this branch (opened right after the first push)
+head_sha: the single commit on top of e3ecc2b2214314526c9149000ac5932351fd82cd. This block is written before the first push (AGENTS.md §12); verify with git rev-parse origin/claude/claude-md-npm-lock-retired
+state: pushed draft
+current_step: awaiting 35/35 required checks and an independent exact-head review
+next_action: route an eligible outside reviewer under OWNERSHIP.md §4.3 (a governance scope, so Graft's low-risk lane does not apply)
+post_merge_check: on the merged tip, `grep -c "synchronized compatibility lock" CLAUDE.md` returns 0 and `node scripts/check-sentinel-version-parity.mjs` reports 2026-11-04.1 across 18 files
+active_writer: Claude session_017UoYKywiErQ3bEQMo9dYGe
+decisions: Wording only; no rule changes. Cite #1873, not a date, because config/dependency-lockfile-transition.json (approved 2026-10-04) and scripts/check-bun-lockfile-policy.mjs (retired 2026-10-03) state different dates. Sentinel-Version bumped to 2026-11-04.1 across all 18 governance files with scripts/sync-sentinel-mirror.mjs; AGENTS.md §17 gains the changelog line §0.2 requires.
+tried_and_rejected: Folding this into the architecture-contract restamp: rejected, because a governance edit needs the 18-file bump and an outside reviewer, while the restamp is docs-only.
+commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-11-04.1 ; node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary ; node scripts/check-bun-lockfile-policy.mjs ; node scripts/assert-docs-safety.mjs ; bunx vitest run $(grep -rlE "CLAUDE\.md|Sentinel-Version|AGENTS\.md|GEMINI\.md" src/test --include=*.test.ts)
+files_touched: CLAUDE.md, AGENTS.md (§17 plus version), GEMINI.md (version plus mirror), .grok/rules/verdant-grok-role.md, docs/agents/README.md, docs/agents/HANDOFF_PROTOCOL.md, docs/agents/roles/*.md (12), docs/agents/HANDOFF_LOG.md (this block)
+files_remaining: none
+blockers: none; an open-PR scan at 04:12 UTC found no open PR touching the 18 governance files
+open_questions: none
+gotchas: Any other governance PR that merges first forces a re-bump (a new N for the same date) and a GEMINI.md re-sync.
+links: architecture contract audit (this session's chat report); #1873
+reviewer_seat: not requested yet (author excluded: Claude session_017UoYKywiErQ3bEQMo9dYGe)
+reviewer_sha: none
+session_state: no paused workflows; pending human decision: merge yes at the exact head
+claimed_by: Claude session_017UoYKywiErQ3bEQMo9dYGe, 2026-11-03 22:15 CT
+owner: Claude session_017UoYKywiErQ3bEQMo9dYGe
+last_updated: 2026-11-03 22:15 CT, by Claude
+```
+
 ### AI-DOCTOR-REPORT-PREVIEW-FOCUS
 
 ```text

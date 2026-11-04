@@ -33,14 +33,14 @@ reviewer would act on, or the register records it as not worth adopting.
 | 1   | Visibility of system status     | 3         | Walkthrough step rail is clear; no loading or error state was exercised                             |
 | 2   | Match system / real world       | 4         | Grower language throughout; source labels (live, manual, csv, demo, stale, invalid) named in copy   |
 | 3   | User control and freedom        | 3         | "Back to home", FAQ accordions, step rail all work; no exit observed inside "Check my context"      |
-| 4   | Consistency and standards       | 2         | Two display typefaces (hero geometric sans vs later serif-leaning display); tagline drifts (see P2) |
+| 4   | Consistency and standards       | 3         | Tagline drifts between `/` and `/pricing` (see P2)                                                  |
 | 5   | Error prevention                | 3         | Demo banners prevent reading the walkthrough as live data                                           |
 | 6   | Recognition rather than recall  | 3         | Every nav item labelled; pricing toggle labelled                                                    |
 | 7   | Flexibility and efficiency      | n/a       | Persuade surface                                                                                    |
 | 8   | Aesthetic and minimalist design | 2         | Long page: hero, walkthrough, 5-card grid, SEO blocks, FAQ, trust box, AI check, CTA, beta (see P1) |
 | 9   | Error recovery                  | 3         | Not exercised; copy promises missing context stays visibly missing                                  |
 | 10  | Help and documentation          | n/a       | Persuade surface                                                                                    |
-|     | **Total**                       | **23/32** | **72%, Good**                                                                                       |
+|     | **Total**                       | **24/32** | **75%, Good**                                                                                       |
 
 ## Design specificity verdict
 
@@ -83,15 +83,15 @@ who was convinced in the first half. The single biggest opportunity is cutting t
   grow tent monitoring app…", "Verdant is a cannabis plant tracker and grow room timeline…".
   - Why it matters: the hero earns trust by talking like an operator; these paragraphs spend
     it. They also push the FAQ and the trust box below the sixth screen.
-  - Fix: move the long-tail copy to `/features` (already linked as "Explore Verdant features")
-    or compress each block to one sentence. Keep the H2s if search needs them.
+  - Fix: compress each block to one sentence in place. Keep the H2s if search needs them.
+    There is no separate features page to move them to at `57ed5a29`: `src/routes/features.tsx`
+    redirects `/features` to `/`, `src/lib/cloudflareHostRoutingRules.ts` maps it the same way,
+    and the landing's "Explore Verdant features" button is an in-page `#features` anchor
+    (`src/pages/Landing.tsx`). A standalone destination would be a new route plus redirect
+    changes, which is a different and larger slice. (Corrected after review 5776338214.)
 - **[P2] Tagline drift.** Hero: "Plant memory. Sensor truth. Grower-approved decisions."
   Pricing and `AGENTS.md` §3: "Plant memory. Sensor truth. Better decisions."
   - Fix: pin one string in `src/constants` and reuse it; a test can assert both pages read it.
-- **[P2] Two display typefaces.** The hero headline and the `Grow diary app for serious
-growers` / `Built so the grower stays the decision-maker.` headings use different display
-  faces. If this is a token, one of the two is off-token; if it is intentional, the switch
-  should happen at a section boundary the reader can see.
 - **[P2] Orphan feature card.** Five cards in a two-column grid leaves one card alone with an
   empty slot beside it. Six cards, four cards, or a one-column list on this width.
 - **[P3] Savings lines are easy to miss.** "~31% savings vs. monthly" sits in small muted text
@@ -108,6 +108,13 @@ growers` / `Built so the grower stays the decision-maker.` headings use differen
   the trial did not open it, so the promise is unverified here (`NOT_MEASURED`).
 
 ## Minor observations
+
+- **Withdrawn after review:** the first draft of this report listed "two display typefaces"
+  as a P2. At `57ed5a29` every landing heading uses the one `font-display` token
+  (`src/pages/Landing.tsx`, resolving to Space Grotesk in `src/styles.css`), so the screenshot
+  difference is not a token defect. The likeliest cause is a web-font swap between the hero
+  capture and the later scroll captures; computed fonts were not read, so that cause is
+  `NOT_MEASURED`. Removed from the score and from the follow-up scope (review 5776338214).
 
 - Pricing shows Craft at 300 AI Doctor credits / month. `AGENTS.md` §7 names 100 credits per
   month for paid tiers and does not name Craft. This is a copy-versus-constitution question
@@ -147,9 +154,9 @@ with no credentials and compare its findings with this report.
 
 ## Questions for the founder (the procedure requires these at three or more priority issues)
 
-1. **Priority direction.** Hero decision load, mid-page SEO copy, or the tagline/typeface
-   consistency pair: which first? (Options: hero only; hero plus SEO blocks; all three.)
+1. **Priority direction.** Hero decision load, mid-page SEO copy, or the tagline drift:
+   which first? (Options: hero only; hero plus SEO blocks; all three.)
 2. **SEO copy intent.** Were the long-tail paragraphs placed on `/` deliberately for search?
    (Options: yes, keep on `/` but shorten; move to `/features`; drop them.)
-3. **Scope.** Address the two P1s only, or all five P1/P2 items in one slice?
+3. **Scope.** Address the two P1s only, or all four P1/P2 items in one slice?
    (Options: P1s only; P1 + P2; everything including P3.)

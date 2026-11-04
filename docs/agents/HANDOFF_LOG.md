@@ -69,37 +69,38 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### CLAUDE-MD-NPM-LOCK-RETIRED
+### FIRST-VIEWPORT-TASK-FIRST-SPEC
 
 ```text
-TASK CLAUDE-MD-NPM-LOCK-RETIRED  priority: other  status: OPEN
-goal: Stop CLAUDE.md from calling package-lock.json a "synchronized compatibility lock". #1873 retired it; bun.lock is the only lockfile and package-lock.json is forbidden.
-why: The architecture contract audit of 2026-11-04 (deploy tip e3ecc2b2214314526c9149000ac5932351fd82cd) found the stale wording at CLAUDE.md "Repository operating facts" and "Daily commands". Every Claude session loads CLAUDE.md, so it teaches a retired setup. Matthew asked for this slice.
-branch: claude/claude-md-npm-lock-retired
-base: verdant-grow-diary at e3ecc2b2214314526c9149000ac5932351fd82cd
-checkout: git fetch origin claude/claude-md-npm-lock-retired verdant-grow-diary && git switch claude/claude-md-npm-lock-retired && git merge origin/verdant-grow-diary
-pr: see the draft PR for this branch (opened right after the first push)
-head_sha: the single commit on top of e3ecc2b2214314526c9149000ac5932351fd82cd. This block is written before the first push (AGENTS.md §12); verify with git rev-parse origin/claude/claude-md-npm-lock-retired
-state: pushed draft
-current_step: awaiting 35/35 required checks and an independent exact-head review
-next_action: route an eligible outside reviewer under OWNERSHIP.md §4.3 (a governance scope, so Graft's low-risk lane does not apply)
-post_merge_check: on the merged tip, `grep -c "synchronized compatibility lock" CLAUDE.md` returns 0 and `node scripts/check-sentinel-version-parity.mjs` reports 2026-11-04.1 across 18 files
-active_writer: Claude session_017UoYKywiErQ3bEQMo9dYGe
-decisions: Wording only; no rule changes. Cite #1873, not a date, because config/dependency-lockfile-transition.json (approved 2026-10-04) and scripts/check-bun-lockfile-policy.mjs (retired 2026-10-03) state different dates. Sentinel-Version bumped to 2026-11-04.1 across all 18 governance files with scripts/sync-sentinel-mirror.mjs; AGENTS.md §17 gains the changelog line §0.2 requires.
-tried_and_rejected: Folding this into the architecture-contract restamp: rejected, because a governance edit needs the 18-file bump and an outside reviewer, while the restamp is docs-only.
-commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-11-04.1 ; node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary ; node scripts/check-bun-lockfile-policy.mjs ; node scripts/assert-docs-safety.mjs ; bunx vitest run $(grep -rlE "CLAUDE\.md|Sentinel-Version|AGENTS\.md|GEMINI\.md" src/test --include=*.test.ts)
-files_touched: CLAUDE.md, AGENTS.md (§17 plus version), GEMINI.md (version plus mirror), .grok/rules/verdant-grok-role.md, docs/agents/README.md, docs/agents/HANDOFF_PROTOCOL.md, docs/agents/roles/*.md (12), docs/agents/HANDOFF_LOG.md (this block)
-files_remaining: none
-blockers: none; an open-PR scan at 04:12 UTC found no open PR touching the 18 governance files
-open_questions: none
-gotchas: Any other governance PR that merges first forces a re-bump (a new N for the same date) and a GEMINI.md re-sync.
-links: architecture contract audit (this session's chat report); #1873
-reviewer_seat: not requested yet (author excluded: Claude session_017UoYKywiErQ3bEQMo9dYGe)
-reviewer_sha: none
-session_state: no paused workflows; pending human decision: merge yes at the exact head
-claimed_by: Claude session_017UoYKywiErQ3bEQMo9dYGe, 2026-11-03 22:15 CT
-owner: Claude session_017UoYKywiErQ3bEQMo9dYGe
-last_updated: 2026-11-03 22:15 CT, by Claude
+TASK FIRST-VIEWPORT-TASK-FIRST-SPEC  priority: other  status: OPEN
+goal: Spec how Timeline, AI Doctor, Action Queue and Reports put the grower's task before explanation, with founder decisions D1-D4.
+why: Live audit 2026-11-03 finding 2 (remaining parts) and the layout half of finding 11. Source-traced: about 25 blocks precede the first Timeline entry; the One-Tent Loop next-step card ("Review alerts") sits above the AI Doctor plant picker; Action Queue renders a landing box, header, filters and pagination before its empty state; Reports orders empty learning cards first.
+branch: claude/first-viewport-task-first-spec
+base: verdant-grow-diary
+checkout: git fetch origin claude/first-viewport-task-first-spec verdant-grow-diary && git switch claude/first-viewport-task-first-spec
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2826 (ready for review)
+head_sha: read the current head on GitHub
+state: spec committed; D1-D4 awaiting Matthew.
+current_step: Seat A P2-1/P2-2 (b6b711a) fixed; awaiting Grok exact-head review.
+next_action: record Matthew's D1-D4 answers in section 6, then route for review; implementation follows in four slices (section 9).
+post_merge_check: none (docs only).
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: Safety fences F1-F5 keep truth notices (partial read, history limit, RPC unavailable), approval-required wording, no auto-start or preselect on AI Doctor, no remembered target, and sensor source labels.
+tried_and_rejected: a read-only search subagent for the page map ran out of context on startup instructions; mapped directly with targeted greps instead.
+commands: none (docs only)
+files_touched: docs/specs/first-viewport-task-first.md; docs/agents/HANDOFF_LOG.md
+files_remaining: none for the spec
+blockers: founder decisions D1-D4
+open_questions: D1 next-step card placement; D2 AI Doctor Review alerts; D3 Action Queue landing box; D4 Reports order.
+gotchas: src/test/action-queue-ux.test.ts:125-134 pins source order between filters, pagination and no-results; the Action Queue slice must renegotiate it.
+links: none
+artifacts: none
+reviewer_seat: Grok (Matthew's gate); Seat A reviewed b6b711a: PASS-with-P2 0/2/1
+reviewer_sha: b6b711a (Seat A); new head needs review
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 18:55 CT, by Claude
 ```
 
 ### AI-DOCTOR-REPORT-PREVIEW-FOCUS
@@ -236,6 +237,40 @@ session_state: no production writes; auto-merge off
 claimed_by: Grok, 2026-11-03
 owner: Grok
 last_updated: 2026-11-02 23:20 CT, by Grok
+```
+
+### QUICK-LOG-WATER-VOLUME-UNITS-IMPL
+
+```text
+TASK QUICK-LOG-WATER-VOLUME-UNITS-IMPL  priority: other  status: OPEN
+goal: Implement ml / L / gal entry for Quick Log Water volume and runoff per docs/specs/quick-log-water-volume-units.md (spec PR #2813; D1 b, D2 yes, D3 b).
+why: Live audit 2026-11-03 finding 4: Water accepted millilitres only.
+branch: claude/quick-log-water-volume-units-impl
+base: verdant-grow-diary
+checkout: git fetch origin claude/quick-log-water-volume-units-impl verdant-grow-diary && git switch claude/quick-log-water-volume-units-impl
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2814 (ready for review)
+head_sha: read the current head on GitHub (this block rides the first commit)
+state: implemented and tested locally; draft PR, awaiting CI and independent review.
+current_step: Seat A P2s at 54715ba fixed (body test counts; this timestamp); awaiting re-review at the new head.
+next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ). Signed-in visual check of the Water form at 393px is NOT_MEASURED.
+post_merge_check: after Publish, on https://verdantgrowdiary.com with the fixture account, choose gal, enter 1, save a tagged [smoke <timestamp>] Water entry, and confirm the Timeline shows 3785 ml. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: storage stays volume_ml / runoff_ml; typed text converts once (exact rational, rounded once to whole ml); form keeps canonical volumeMl/runoffMl plus optional volumeEntryUnit/volumeEntryText/runoffEntryText; switching unit reinterprets typed text, never a prefilled or restored amount; a preset sets ml without changing the remembered unit; the prefill clears stale typed text.
+tried_and_rejected: per-unit copies of the 50,000 ml gate (two gates could disagree).
+commands: bunx vitest run src/test/quick-log-water-volume-units-rules.test.ts src/test/quick-log-water-volume-units-ui.test.tsx --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/lib/quickLogWaterVolumeUnitRules.ts; src/lib/waterVolumeEntryUnitPreference.ts; src/constants/quickLogWaterVolumeUnitCopy.ts; src/lib/quickLogWateringFormViewModel.ts; src/components/QuickLogWateringForm.tsx; src/components/QuickLogV2Sheet.tsx; src/test/quick-log-water-volume-units-rules.test.ts; src/test/quick-log-water-volume-units-ui.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: none
+gotchas: commit with NODE_OPTIONS=--max-old-space-size=8192 (pre-commit tsc). The spec file lives in #2813, not on this branch, until #2813 merges.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2813
+artifacts: none
+reviewer_seat: Grok (Matthew's gate); Seat A reviewed 54715ba: PASS-with-P2 0/2/1
+reviewer_sha: 54715ba (new head needs review)
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 21:10 CT, by Claude
 ```
 
 ### PHENO-LOCAL-DRAFT-LABELS

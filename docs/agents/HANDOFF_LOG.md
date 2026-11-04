@@ -95,10 +95,10 @@ open_questions: none
 gotchas: run scorer-lock --lock after committing.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2818
 artifacts: none
-reviewer_seat: A, D, C requested
-reviewer_sha: see PR
+reviewer_seat: Seats A and D reviewed 851fbd1c3fb46b6d4297f6ed4cf37c844bdfc124; Seat C pending. The new head needs exact-head verdicts from Seats A, D and C.
+reviewer_sha: 851fbd1c3fb46b6d4297f6ed4cf37c844bdfc124 (superseded by the docs-only fix commits; needs re-review)
 session_state: no production access
-claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03 CT
 owner: Claude
 last_updated: 2026-11-03 22:50 CT, by Claude
 ```

@@ -146,10 +146,10 @@ why: Live audit 2026-11-03 finding 4: Water accepted millilitres only.
 branch: claude/quick-log-water-volume-units-impl
 base: verdant-grow-diary
 checkout: git fetch origin claude/quick-log-water-volume-units-impl verdant-grow-diary && git switch claude/quick-log-water-volume-units-impl
-pr: opened as a draft after this commit; read the URL from GitHub
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2814 (ready for review)
 head_sha: read the current head on GitHub (this block rides the first commit)
 state: implemented and tested locally; draft PR, awaiting CI and independent review.
-current_step: draft PR open.
+current_step: Seat A P2s at 54715ba fixed (body test counts; this timestamp); awaiting re-review at the new head.
 next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ). Signed-in visual check of the Water form at 393px is NOT_MEASURED.
 post_merge_check: after Publish, on https://verdantgrowdiary.com with the fixture account, choose gal, enter 1, save a tagged [smoke <timestamp>] Water entry, and confirm the Timeline shows 3785 ml. NOT_MEASURED until live /version.json reports the merge SHA.
 active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
@@ -163,12 +163,12 @@ open_questions: none
 gotchas: commit with NODE_OPTIONS=--max-old-space-size=8192 (pre-commit tsc). The spec file lives in #2813, not on this branch, until #2813 merges.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2813
 artifacts: none
-reviewer_seat: not requested
-reviewer_sha: NOT_MEASURED
+reviewer_seat: Grok (Matthew's gate); Seat A reviewed 54715ba: PASS-with-P2 0/2/1
+reviewer_sha: 54715ba (new head needs review)
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-03, by Claude
+last_updated: 2026-11-03 21:10 CT, by Claude
 ```
 
 ### PHENO-LOCAL-DRAFT-LABELS

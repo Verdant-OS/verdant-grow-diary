@@ -602,13 +602,17 @@ function QuickLogV2SheetForOwner({
   const [structuredInput, setStructuredInput] = useState<StructuredReadingTextInput>(
     EMPTY_STRUCTURED_READING_INPUT,
   );
+  // Soil temperature keeps the unit it was first typed in, like the other
+  // temperature fields, so a preference change cannot reinterpret its digits.
+  const soilTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
+  const soilTempEntryUnit = soilTempEntryUnitRef.current ?? temperatureUnit;
   const structuredReadings = useMemo(
     () =>
       buildStructuredReadings({
         ...structuredInput,
-        soilTempUnit: temperatureUnit === "fahrenheit" ? "F" : "C",
+        soilTempUnit: soilTempEntryUnit === "fahrenheit" ? "F" : "C",
       }),
-    [structuredInput, temperatureUnit],
+    [structuredInput, soilTempEntryUnit],
   );
   // A structured reading alone is content for a Note (both content checks use this).
   const structuredHasContent =
@@ -1390,7 +1394,9 @@ function QuickLogV2SheetForOwner({
       setRecentSuggestionDismissed(false);
       setTargetFilterQuery("");
       setReadingTimeLocal("");
-      setStructuredInput(EMPTY_STRUCTURED_READING_INPUT);
+      // A restored draft brings back its structured readings and soil unit.
+      setStructuredInput(restorable?.structured ?? EMPTY_STRUCTURED_READING_INPUT);
+      soilTempEntryUnitRef.current = restorable?.soilTempEntryUnit ?? null;
       setTentPlantAutoApplied(false);
       resetPhotoSelection();
     } else {
@@ -1409,13 +1415,13 @@ function QuickLogV2SheetForOwner({
     // the note the grower sees; persist it, not the hidden form.note.
     const draftForm = form.action === "feed" ? { ...form, note: feedingForm.note } : form;
     if (observationDraftSuppressedRef.current) {
-      if (open && isQuickLogObservationDraftEmpty(draftForm)) {
+      if (open && isQuickLogObservationDraftEmpty(draftForm, structuredInput)) {
         observationDraftSuppressedRef.current = false;
       }
       return;
     }
     if (!open || postSave) return;
-    if (isQuickLogObservationDraftEmpty(draftForm)) {
+    if (isQuickLogObservationDraftEmpty(draftForm, structuredInput)) {
       if (observationDraftOwnedRef.current) {
         clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
         observationDraftOwnedRef.current = false;
@@ -1429,10 +1435,12 @@ function QuickLogV2SheetForOwner({
       idempotencyKey: observationUnconfirmedRef.current ? saveIdempotencyKeyRef.current : null,
       tempEntryUnit: manualTempEntryUnitRef.current,
       chipStatus: chipAuthoredStatusRef.current,
+      structured: structuredInput,
+      soilTempEntryUnit: soilTempEntryUnitRef.current,
     });
     // localError is a trigger, not an input: when only the error flips, this
     // re-persists the ref-held saveFailed flag even though the form is unchanged.
-  }, [user?.id, open, form, feedingForm.note, postSave, localError]);
+  }, [user?.id, open, form, feedingForm.note, postSave, localError, structuredInput]);
 
   // Tent-scoped pick: recent plant in the tent, else the sole plant, else the
   // selected tent. Only when selectedKey is still empty — never rewrite an
@@ -3264,6 +3272,7 @@ function QuickLogV2SheetForOwner({
     }));
     setReadingTimeLocal("");
     setStructuredInput(EMPTY_STRUCTURED_READING_INPUT);
+    soilTempEntryUnitRef.current = null;
     setVisitMode("fast_check");
     manualTempEntryUnitRef.current = null;
     // Same reason as the open reset: "Log another" begins a new draft, and its
@@ -4137,7 +4146,7 @@ function QuickLogV2SheetForOwner({
                     const id = `qlv2-${field.input}`;
                     const error = structuredReadings.errors.find((e) => e.key === field.key);
                     const flag = structuredReadings.flags.find((f) => f.key === field.key);
-                    const unit = field.unit ?? getTemperatureUnitSymbol(temperatureUnit);
+                    const unit = field.unit ?? getTemperatureUnitSymbol(soilTempEntryUnit);
                     return (
                       <div key={field.key}>
                         <Label htmlFor={id}>
@@ -4150,12 +4159,15 @@ function QuickLogV2SheetForOwner({
                           value={structuredInput[field.input]}
                           disabled={submissionLocked}
                           aria-invalid={Boolean(error) || undefined}
-                          onChange={(e) =>
-                            setStructuredInput((prev) => ({
-                              ...prev,
-                              [field.input]: e.target.value,
-                            }))
-                          }
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (field.input === "soilTemp") {
+                              // Pin on the first typed character; release when cleared.
+                              if (!value.trim()) soilTempEntryUnitRef.current = null;
+                              else soilTempEntryUnitRef.current ??= temperatureUnit;
+                            }
+                            setStructuredInput((prev) => ({ ...prev, [field.input]: value }));
+                          }}
                         />
                         {error ? (
                           <p

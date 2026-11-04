@@ -24,6 +24,7 @@ import { useGrows } from "@/store/grows";
 import { useReportsHubData } from "@/hooks/useReportsHubData";
 import {
   buildReportsHubSummary,
+  REPORTS_HUB_DIARY_RANGE_REPORT_LABEL,
   REPORTS_HUB_EMPTY_COPY,
   REPORTS_HUB_SUBTITLE_COPY,
   type ReportsHubCard,
@@ -35,6 +36,10 @@ import { buildReportsHubOnboarding } from "@/lib/reportsHubOnboarding";
 import ReportsHubOnboardingSection from "@/components/ReportsHubOnboardingSection";
 import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSection";
 import { growDetailPath, growLearningPath } from "@/lib/routes";
+import {
+  buildDiaryRangeReportUrl,
+  defaultDiaryRangeReportRange,
+} from "@/lib/diaryRangeReportNavigationRules";
 
 export default function Reports() {
   const { scopedGrow } = useScopedGrow();
@@ -117,9 +122,22 @@ export default function Reports() {
           <span className="text-muted-foreground">
             Showing reports for <span className="text-foreground font-medium">{grow.name}</span>
           </span>
-          <Link to={growDetailPath(grow.id)} className="text-primary hover:underline">
-            Open grow detail
-          </Link>
+          <span className="flex items-center gap-3">
+            {/* Same entry Timeline offers: this grow, last 30 days (audit 2026-11-03, finding 11). */}
+            <Link
+              to={buildDiaryRangeReportUrl({
+                growId: grow.id,
+                ...defaultDiaryRangeReportRange(),
+              })}
+              className="text-primary hover:underline"
+              data-testid="reports-diary-range-report-link"
+            >
+              {REPORTS_HUB_DIARY_RANGE_REPORT_LABEL}
+            </Link>
+            <Link to={growDetailPath(grow.id)} className="text-primary hover:underline">
+              Open grow detail
+            </Link>
+          </span>
         </div>
       )}
 

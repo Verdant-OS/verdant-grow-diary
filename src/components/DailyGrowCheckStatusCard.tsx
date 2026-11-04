@@ -16,6 +16,7 @@ import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import { DAILY_CHECK_RETRY_EVENT } from "@/lib/dailyCheckRefreshRules";
 import { deriveDailyGrowCheckStatus, type DailyCheckStatus } from "@/lib/dailyGrowCheckStatusRules";
 import { DASHBOARD_SAVED_WORK_LINK_CLASS } from "@/lib/dashboardSavedWorkLinkClass";
 import { plantDetailPath, timelinePath, withGrowId } from "@/lib/routes";
@@ -122,6 +123,8 @@ export default function DailyGrowCheckStatusCard({
           data-testid="daily-grow-check-status-retry"
           onClick={() => {
             void Promise.all([readingsQuery.refetch(), diaryQuery.refetch()]);
+            // Other Daily Grow Check surfaces read their own windows; retry them too.
+            window.dispatchEvent(new Event(DAILY_CHECK_RETRY_EVENT));
           }}
         >
           Try again

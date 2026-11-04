@@ -214,7 +214,7 @@ export default function DailyGrowCheckOnboardingCard({
                   type="button"
                   aria-label="What is a manual snapshot?"
                   data-testid="daily-grow-check-onboarding-help-trigger"
-                  className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
+                  className="inline-flex h-6 w-6 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <HelpCircle className="h-3.5 w-3.5" />
                 </button>

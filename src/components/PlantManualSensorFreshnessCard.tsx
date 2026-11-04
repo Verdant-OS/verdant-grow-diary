@@ -51,7 +51,7 @@ const STATE_STYLES: Record<FreshnessState, string> = {
   fresh: "text-primary",
   aging: "text-amber-400/90",
   // Full muted token: these words tell a grower a reading is old or absent,
-  // so they must meet WCAG AA (docs/specs/contrast-tokens.md §2.3).
+  // so they must meet WCAG AA (contrast spec in Verdant-OS/verdant-grow-diary#2827, §2.3).
   stale: "text-muted-foreground",
   missing: "text-muted-foreground",
 };

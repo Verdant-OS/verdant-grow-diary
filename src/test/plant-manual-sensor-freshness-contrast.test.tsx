@@ -1,5 +1,5 @@
 /**
- * Audit 2026-11-03 finding 12, measured in docs/specs/contrast-tokens.md §2.3:
+ * Audit 2026-11-03 finding 12, measured in the contrast spec (Verdant-OS/verdant-grow-diary#2827, §2.3):
  * the freshness card drew its stale value at muted-foreground/60 (3.28:1),
  * "No plant manual log" at /50 (2.64:1) and the "Stale · Last manual log" line
  * at /70 (4.04:1). These are the words that tell a grower a reading is old or

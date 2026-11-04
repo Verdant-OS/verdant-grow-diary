@@ -32,10 +32,12 @@ import {
   type PanelTentInput,
 } from "@/lib/dashboardDailyGrowCheckPanelRules";
 import {
+  DAILY_CHECK_RETRY_EVENT,
   DAILY_CHECK_SUCCESS_EVENTS,
   ENTRY_CREATED_EVENT,
   SENSOR_READING_CREATED_EVENT,
   refreshDailyCheckQueries,
+  retryDailyCheckEvidence,
 } from "@/lib/dailyCheckRefreshRules";
 import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
 import { DASHBOARD_SAVED_WORK_LINK_CLASS } from "@/lib/dashboardSavedWorkLinkClass";
@@ -86,13 +88,18 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
     function onEntry() {
       refreshDailyCheckQueries(queryClient);
     }
+    function onRetry() {
+      retryDailyCheckEvidence(queryClient);
+    }
     for (const name of DAILY_CHECK_SUCCESS_EVENTS) {
       window.addEventListener(name, onEntry);
     }
+    window.addEventListener(DAILY_CHECK_RETRY_EVENT, onRetry);
     return () => {
       for (const name of DAILY_CHECK_SUCCESS_EVENTS) {
         window.removeEventListener(name, onEntry);
       }
+      window.removeEventListener(DAILY_CHECK_RETRY_EVENT, onRetry);
     };
   }, [queryClient]);
 
@@ -123,6 +130,7 @@ export default function DashboardDailyGrowCheckPanel({ scopedGrowId, className }
               readingsQuery.refetch(),
               diaryQuery.refetch(),
             ]);
+            retryDailyCheckEvidence(queryClient);
           }}
         >
           Try again

@@ -69,6 +69,41 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### GA-PROXY-SHARD25-SOCKET-HANG-UP
+
+```text
+TASK GA-PROXY-SHARD25-SOCKET-HANG-UP  priority: P2  status: OPEN
+goal: Stop the intermittent "socket hang up" in required check Full test suite (shard 25/32), test src/test/google-analytics-collection-host-proxy.test.ts.
+why: Red on unrelated docs PRs (PR 2831 at 01bac39, job 126290700551; PR 2827 at f3cf793, job 126328068392). A required check red across PRs is top priority.
+branch: claude/trusting-davinci-58hzpj
+base: verdant-grow-diary (merge base 484f8ace3069af94ed9444b07e1e18b8dfad3350)
+checkout: git fetch origin claude/trusting-davinci-58hzpj verdant-grow-diary && git switch claude/trusting-davinci-58hzpj && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2843 (ready for review, not draft; marked ready on Matthew's request 2026-11-04 03:36 UTC)
+head_sha: 07579c1c3f306ca2b795c1739b5d8c21540ca8f8 (verdant-ultra-bot base merge, 2026-11-04 06:40 UTC); this restore commit follows it, so read the current head from the PR. Earlier reviewed heads: dc0786bb0e92255b04aa559a24b6686da8acd169, e0754e855344f4701998acfe1223c413428a50c6.
+state: review. Every gate recorded at e0754e85 (Reviewer C APPROVE, 35/35 CI, Matthew merge and scorer-lock yeses) is void at the new head.
+current_step: Restore this block: the 07579c1c base merge resolved the HANDOFF_LOG conflict by dropping it. Restored on Matthew's yes (2026-11-04).
+next_action: Fresh exact-head reviews (Seats A, C, D), 35/35 CI and Matthew's yeses at the new head.
+post_merge_check: Full test suite (shard 25/32) stays green on later PRs; a socket hang up in src/test/google-analytics-collection-host-proxy.test.ts reopens this with the same owner.
+active_writer: Claude session_017UoYKzL7sYyUe1K8xMj3uo
+decisions: The refusal sends Connection: close and no longer calls req.destroy(). The refused set and allowlist are unchanged, and nothing is forwarded.
+tried_and_rejected: retries, longer timeouts, skips (forbidden). CPU load alone did not reproduce it (0/300 pinned to one CPU behind 8 spinners).
+cause: The proxy refused with a keep-alive 403 and then destroyed the socket. A keep-alive client may reuse that socket for its next request and get "socket hang up". Node 22.23.4 / 24.22.1 carry a hasPendingRead() guard that usually hides this. The shard job runs the runner image's default Node (version NOT_MEASURED). Under the Bun runtime the unmodified test fails 3/3 with the CI error.
+commands: bunx vitest run src/test/google-analytics-collection-host-proxy.test.ts ; bunx --bun vitest run src/test/google-analytics-collection-host-proxy.test.ts ; node scripts/scorer-lock.mjs --report --base 484f8ace
+files_touched: e2e/utils/googleAnalyticsCollectionHost.ts, src/test/google-analytics-collection-host-proxy.test.ts, docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: All gates must be redone at the new head. OWNERSHIP.md: the Steward session never queues a PR it base-merged, so if verdant-ultra-bot holds the Steward seat, another seat must queue. Matthew decides.
+open_questions: none
+gotchas: Unlock records are git-ignored, so a fresh checkout reports both code files as LOCKED modified. Local typecheck needs NODE_OPTIONS=--max-old-space-size=8192.
+links: Reviewer C https://github.com/Verdant-OS/verdant-grow-diary/pull/2843#pullrequestreview-5762938474 and #pullrequestreview-5763348990 ; Seat A #pullrequestreview-5763345015 ; Seat D #pullrequestreview-5763347818
+artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/2843 (PR body: RED/GREEN evidence); blocker report https://github.com/Verdant-OS/verdant-grow-diary/pull/2843#issuecomment-6625351805
+reviewer_seat: Seats A, C and D
+reviewer_sha: e0754e855344f4701998acfe1223c413428a50c6 (superseded twice; needs re-review)
+session_state: PR activity subscription and a safety-net check-in in the author session; no paused workflows
+claimed_by: Claude session_017UoYKzL7sYyUe1K8xMj3uo, 2026-11-03 22:48 CT
+owner: Claude
+last_updated: 2026-11-04 01:40 CT, by Claude
+```
+
 ### FIRST-VIEWPORT-TASK-FIRST-SPEC
 
 ```text

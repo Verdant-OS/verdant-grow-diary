@@ -95,9 +95,9 @@
     },
     "ecowitt-custom-upload": {
       "domain": "ingest",
-      "tables": ["ecowitt_custom_upload_claims", "sensor_readings"],
-      "rpcs": ["reserve_ecowitt_custom_upload_receipt"],
-      "justification": "Service role binds one claim and writes that tent's live readings. The claim token is the auth. No client-supplied user id."
+      "tables": ["ecowitt_custom_upload_claims", "sensor_readings", "tents"],
+      "rpcs": [],
+      "justification": "Service role looks up one claim by token hash, reads that tent's EcoWitt channel config, and commits the reserve, first-sender bind and live readings through the shared ports (_shared/ecowittCustomUploadSupabasePorts.ts names the RPCs). The claim token is the auth. No client-supplied user id."
     },
     "ecowitt-ingest": {
       "domain": "ingest",

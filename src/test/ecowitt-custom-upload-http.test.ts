@@ -226,6 +226,7 @@ describe("EcoWitt customized-upload HTTP handler", () => {
       },
       tentChannels: channels(),
     };
+    const logged: string[] = [];
     const mismatch = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
         method: "POST",
@@ -237,13 +238,18 @@ describe("EcoWitt customized-upload HTTP handler", () => {
           tempinf: "70",
         }).toString(),
       }),
-      ports,
+      { ...ports, recordRejection: (reason) => logged.push(reason) },
     );
-    expect(await mismatch.json()).toMatchObject({
+    const mismatchBody = (await mismatch.json()) as { reason: string };
+    expect(mismatch.status).toBe(200);
+    expect(mismatchBody).toMatchObject({
       accepted: false,
       reason: "rejected",
       stored: 0,
     });
+    expect(mismatchBody.reason).not.toBe("passkey_mismatch");
+    expect(logged).toEqual(["passkey_mismatch"]);
+    expect(JSON.stringify(mismatchBody)).not.toContain("cd".repeat(16));
     const oversized = await handleEcowittCustomUploadRequest(
       new Request(`https://example.test/ew/${TOKEN}`, {
         method: "POST",

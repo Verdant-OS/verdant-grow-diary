@@ -1,5 +1,9 @@
 # Verdant handoff log
 
+**New and updated entries go in `docs/agents/handoffs/<TASK-ID>.md`, not here.** See
+`docs/agents/handoffs/README.md`. This file keeps the template and existing blocks, and a
+task's own file wins over its block here. Read both before `SENTINEL_ACK`.
+
 Pointed to by AGENTS.md (Agent Handoff / Coverage). One block per in-flight task.
 Update daily and before stopping. Display newest last_updated first within each priority;
 selection follows AGENTS.md's priority order and oldest-update tie breaker.
@@ -101,6 +105,40 @@ session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
 last_updated: 2026-11-03 17:08 CT, by Claude
+```
+
+### FRESHNESS-LABEL-CONTRAST
+
+```text
+TASK FRESHNESS-LABEL-CONTRAST  priority: other  status: OPEN
+goal: Make the plant freshness card's stale and missing text meet WCAG AA.
+why: Live audit 2026-11-03 finding 12, measured in docs/specs/contrast-tokens.md section 2.3 (#2827): the stale value drew at muted-foreground/60 (3.28:1), "No plant manual log" at /50 (2.64:1) and the "Stale · Last manual log" line at /70 (4.04:1). These words tell a grower a reading is old or absent. File plan step 1 of that spec; needs neither D1 nor D2.
+branch: claude/freshness-label-contrast
+base: verdant-grow-diary
+checkout: git fetch origin claude/freshness-label-contrast verdant-grow-diary && git switch claude/freshness-label-contrast
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub
+state: implementation and test committed.
+current_step: draft PR open; reviewer and merge authority awaiting Matthew.
+next_action: Matthew names the reviewer and merge gate; then mark ready and route.
+post_merge_check: after Publish, open a plant with a stale manual reading on https://verdantgrowdiary.com and confirm the stale and missing lines read clearly. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: Full text-muted-foreground (6.59:1 on card). Stale stays distinct from fresh by colour (muted vs primary), the amber alert icon labelled "Stale", and the word "Stale" in the last-log line.
+tried_and_rejected: none
+commands: bunx vitest run src/test/plant-manual-sensor-freshness-contrast.test.tsx --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/components/PlantManualSensorFreshnessCard.tsx; src/test/plant-manual-sensor-freshness-contrast.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: reviewer and merge authority for this PR.
+gotchas: commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify).
+links: docs/specs/contrast-tokens.md (#2827)
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 17:41 CT, by Claude
 ```
 
 ### FIRST-VIEWPORT-TASK-FIRST-SPEC

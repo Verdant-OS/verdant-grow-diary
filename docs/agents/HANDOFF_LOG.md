@@ -243,6 +243,40 @@ owner: Claude
 last_updated: 2026-11-03, by Claude
 ```
 
+### PHOTO-VIEWER-CAPTION-TILES
+
+```text
+TASK PHOTO-VIEWER-CAPTION-TILES  priority: P1  status: OPEN
+goal: Timeline photo viewer caption shows the entry note, or the timeline local-time formatter when the note is blank, and plant Recent Photos, the plant hero, and Timeline Photo history open that viewer.
+why: Issue #2804. The caption joined stage and the raw UTC ISO and ignored the note. Those three tiles were not controls.
+branch: cursor/photo-viewer-caption-tiles-1ba3
+base: verdant-grow-diary
+checkout: git fetch origin cursor/photo-viewer-caption-tiles-1ba3 verdant-grow-diary && git switch cursor/photo-viewer-caption-tiles-1ba3
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2805
+head_sha: 71024e9d10201391d3143617911b3644b280916c
+state: pushed; required CI re-running after the null-safe plant photo wiring
+current_step: caption class, tile buttons, plant lightbox, and null-safe hero open
+next_action: confirm required CI at the pushed head. Do not merge, enqueue, or request review.
+post_merge_check: after Publish, open a photo from a plant Recent Photos tile and confirm the viewer caption is the note or a local time, never a raw ISO. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Grok cloud agent on this branch
+decisions: TimelinePhotoLightboxCaption.fromItem is the only caption path. Tiles are buttons. Focus returns to the opener when the viewer unmounts. Alt text still includes the raw entry instant because src/test/timeline-photo-lightbox-rules.test.ts is scorer-locked and pins that string.
+tried_and_rejected: rewriting the locked alt assertion. The scorer lock refused the edit.
+commands: bunx vitest run src/test/timeline-photo-caption-and-open.test.tsx src/test/timeline-photo-lightbox-component.test.tsx src/test/timeline-photo-lightbox-rules.test.ts --reporter=dot
+files_touched: src/lib/timelinePhotoLightboxRules.ts; src/components/TimelinePhotoLightbox.tsx; src/components/PhotoHistoryPanel.tsx; src/components/PlantDetailPhotoStrip.tsx; src/components/PlantPhoto.tsx; src/components/PlantPhotoView.tsx; src/pages/PlantDetail.tsx; src/pages/Timeline.tsx; src/test/timeline-photo-caption-and-open.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work
+open_questions: none
+gotchas: do not edit the locked alt-text test. Upload size warning is out of scope.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2804
+artifacts: local screenshots, not committed
+reviewer_seat: not requested; Moonbow routes review
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; auto-merge off
+claimed_by: Grok, 2026-11-03
+owner: Grok
+last_updated: 2026-11-02 23:20 CT, by Grok
+```
+
 ### QUICK-LOG-WATER-VOLUME-UNITS-IMPL
 
 ```text
@@ -311,6 +345,40 @@ owner: Claude
 last_updated: 2026-11-03, by Claude
 ```
 
+### POSTHOG-PUBLIC-CLIENT-KEY
+
+```text
+TASK POSTHOG-PUBLIC-CLIENT-KEY  priority: other  status: OPEN
+goal: Lovable production builds initialise PostHog from the committed public client key in VITE_POSTHOG_KEY after analytics consent.
+why: The live bundle reads VITE_POSTHOG_KEY and VITE_POSTHOG_HOST, and Lovable builds from the committed .env. Neither variable was set, so PostHog never initialised. Cheeko chose committing the public client key.
+branch: cursor/posthog-public-client-key-f411
+base: verdant-grow-diary
+checkout: git fetch origin cursor/posthog-public-client-key-f411 verdant-grow-diary && git switch cursor/posthog-public-client-key-f411
+pr: read the URL from GitHub after push
+head_sha: read git rev-parse HEAD after the push
+state: implementation in this commit; merge waits on Cheeko's own-words yes at the exact head SHA
+current_step: consent test waits on vi.dynamicImportSettled; committed env presence and per-directive CSP assertions added. Secret scan stays red until a separate base allowlist lands.
+next_action: confirm required CI is green at the head, then wait for Cheeko's yes at that SHA. Do not merge, enqueue, or publish.
+post_merge_check: after Publish, load https://verdantgrowdiary.com while signed out, grant analytics consent, and confirm a request to https://us.i.posthog.com. Before consent, that request must be absent. NOT_MEASURED until live /version.json reports this SHA.
+active_writer: Grok cloud agent on this branch
+decisions: Commit only VITE_POSTHOG_KEY and https://us.i.posthog.com in .env. CSP adds that host plus https://us-assets.i.posthog.com because posthog-js 1.444.0 RequestRouter loads /static from the region assets host when api_host is the US ingestion host and asset_host is unset. script-src lists the assets host; connect-src lists both. .env.example stays empty and says personal PostHog keys must never be committed.
+tried_and_rejected: none
+commands: bunx vitest run src/test/posthog-env-consent-startup.test.ts src/test/security-headers-rules.test.ts src/test/posthog-consent-client.test.ts --reporter=dot
+files_touched: .env; .env.example; src/lib/securityHeadersRules.ts; src/test/posthog-env-consent-startup.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: env/config gate — Cheeko's own-words yes at the exact head SHA before merge
+open_questions: none
+gotchas: do not commit a personal PostHog key. Do not edit workflows, wrangler, package.json, lockfiles, migrations, or auth. Existing posthog-consent-client.test.ts stays untouched; it stubs an empty key and injects a fixture reader.
+links: none yet
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production writes; auto-merge off
+claimed_by: Grok, 2026-11-03
+owner: Cheeko
+last_updated: 2026-11-02 20:40 CT, by Grok
+```
+
 ### HANDOFF-CONFIG
 
 ```text
@@ -343,6 +411,70 @@ session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
 last_updated: 2026-11-03 21:00 CT, by Claude
+```
+
+### CREATE-DIALOG-DISABLED-REASON
+
+```text
+TASK QUICK-LOG-TARGET-SAVE  priority: P1  status: OPEN
+goal: One draft PR for Quick Log target selection, one save, optional reading time, one time-label class, and correction temperature units.
+why: Issues 2778, 2779, 2780, 2781, and part of 2706. A tent open was resolving to the sole or recent plant, and a successful save left the sheet open.
+branch: cursor/quick-log-target-save-1baf
+base: verdant-grow-diary
+checkout: git fetch origin cursor/quick-log-target-save-1baf verdant-grow-diary && git switch cursor/quick-log-target-save-1baf
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2793 ready
+head_sha: d6b9abb71 is the implementation; 504ecc08c stamps this block; the pin-fix commit is the child of 504ecc08c. Read origin/cursor/quick-log-target-save-1baf for the exact head. This line cannot name that child.
+state: ready PR 2793, no auto-merge
+current_step: three CI pins updated after measured tap counts; required CI recheck follows the pin-fix push
+next_action: keep the PR draft until required checks are green at the exact head and Moonbow routes review
+post_merge_check: bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx
+active_writer: Grok cloud agent on cursor/quick-log-target-save-1baf
+decisions: tent context is never rewritten to a plant; last-used target applies only when the route has no tent or plant; success closes the sheet and names the target in the toast; reading time is sheet state wired to occurredAt; GrowerTimeLabel is the shared formatter; correction temperature displays the grower unit and converts once to Celsius on save
+tried_and_rejected: leaving the sole-plant pins unchanged would keep the bug
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx src/test/quick-log-v2-rules.test.ts src/test/quick-log-route-target-rules.test.ts src/test/mobile-quick-log-single-fab.test.ts src/test/app-shell-mobile-quick-log-routing.test.tsx src/test/quick-log-v2-sheet-watering.test.tsx src/test/quick-log-v2-sheet-feeding.test.tsx src/test/quick-log-v2-refresh-sheet.test.tsx src/test/quick-log-timeline-cta-integration.test.tsx
+files_touched: src/components/AppShell.tsx src/components/QuickLogEntryIntegrityControls.tsx src/components/QuickLogV2Sheet.tsx src/pages/TentDetail.tsx src/lib/quickLogV2Rules.ts src/lib/quickLogRouteTargetRules.ts src/lib/growerTimeLabel.ts src/lib/quickLogReadingTime.ts src/lib/timelineEntryTimestampFormat.ts src/lib/quickLogGroupedTimelineFilterViewModel.ts src/lib/quickLogSnapshotStripAdapter.ts src/lib/wateringCadenceHistoryRules.ts src/lib/growDiaryPdfExport.ts and the renegotiated tests named in the PR
+files_remaining: none for this slice
+blockers: none for repository work. Moonbow routes review and merge. No production write.
+open_questions: none
+gotchas: scorer pins that encoded sole-plant launch and a stay-open sheet were renegotiated in the same change. .claude/scorer-unlock.json is local only.
+links: issues 2778 2779 2780 2781 2706
+artifacts: src/test/quick-log-target-save-reading-time.test.tsx
+reviewer_seat: not requested
+reviewer_sha: none
+session_state: Grok implementation session
+claimed_by: Grok 2026-11-02
+owner: Grok
+last_updated: 2026-11-02 21:36 CT, by Grok
+
+TASK CREATE-DIALOG-DISABLED-REASON  priority: P2  status: OPEN
+goal: disabled primary buttons in New grow, New tent, and New plant state their reason, and each name field has a visible label that is its accessible name.
+why: Issue 3 (FA-F01, FA-F02, FA-F05). Cheeko approved building only (2026-10-31). Create tent and Create plant were disabled with no description, and the name fields were announced as their placeholders.
+branch: ultra/create-dialog-reasons
+base: verdant-grow-diary
+checkout: git fetch origin ultra/create-dialog-reasons verdant-grow-diary && git switch ultra/create-dialog-reasons
+pr: draft; read the URL from GitHub after push
+head_sha: the commit that adds this block; read git rev-parse HEAD after checkout
+state: local until pushed; draft only
+current_step: view-model, dialog wiring, and new unit tests are in the working tree
+next_action: confirm the draft PR stays draft; do not mark ready, request review, or merge
+post_merge_check: after Publish, open New tent on the fixture account, leave the name blank, and confirm the Create tent button is disabled with the visible reason "Enter a tent name." Type a name and confirm the button enables. NOT_MEASURED until live /version.json reports the SHA.
+active_writer: Grok cloud agent on this branch
+decisions: disabled-reason and helper copy live in src/lib/createDialogPrimaryButtonViewModel.ts. Create tent and Create plant keep their pinned disabled expressions. Create grow now disables until the name is non-blank, matching the other two dialogs. A plan limit replaces the "only a name" helper. An optional plant tent no longer says "Create a tent first." Invalid optional tent size is shown on the size field and does not change the pinned disable expression.
+tried_and_rejected: adding the size check to Create tent's disabled expression. Source scans pin that expression, and existing tests cannot be edited in this task.
+commands: bunx vitest run src/test/create-dialog-primary-button-view-model.test.ts --reporter=dot
+files_touched: src/lib/createDialogPrimaryButtonViewModel.ts; src/test/create-dialog-primary-button-view-model.test.ts; src/components/CreateTentDialog.tsx; src/components/CreatePlantDialog.tsx; src/pages/Grows.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none for repository work
+open_questions: none
+gotchas: do not edit the pinned disabled JSX in CreateTentDialog or CreatePlantDialog. Do not modify tests that already exist on the base.
+links: uploads brief Issue 3
+artifacts: accessibility captures are local to the agent run, not this repo
+reviewer_seat: not requested; this draft does not ask for review
+reviewer_sha: NOT_MEASURED
+session_state: no paused workflows; no production writes
+claimed_by: Grok, 2026-10-31
+owner: Grok
+last_updated: 2026-10-31 01:40 CT, by Grok
 ```
 
 ### VER-302-IMPORTED-HISTORY-TEMPERATURE-UNITS
@@ -502,6 +634,40 @@ last_updated: 2026-10-28 06:26 UTC, by Claude session_017UoYKxgRTFgtyQW6ka38Ec (
 - The existing 11 unrelated #2582 scorers and the two pre-existing #2565 scorer additions remain unchanged. No auth/store/query-key policy change is made. Fresh required CI and complete eligible outside acceptance must cover the resulting heads; this contributing session and advisory agents are excluded from acceptance. Owner account-switch busy decision remains open.
 - Latest observed deploy `ab4aaa2f3a648c28860c682ddec3ec0103347246` advances analytics/handoff work. Read-only merge-tree against it is clean; no unrelated base churn is needed for this repair. Preserve all prior handoff entries. #2582 inherits this patch by normal parent merge, with no retarget, rebase, force-push, PR merge or deployment.
 
+### SETUP-QUICKLOG-DRAFT-RETRY
+
+```text
+TASK SETUP-QUICKLOG-DRAFT-RETRY  priority: other  status: OPEN
+goal: Keep every typed field in Start Your Room and the first Quick Log observation when a save fails or the grower leaves mid-flow, show a plain error, and let Retry write that same save once. Advance only after the server confirms the save.
+why: A failed or abandoned setup step was dropping names and notes, and a second tap could start another write.
+branch: cursor/setup-quicklog-draft-retry-8b19
+base: verdant-grow-diary
+checkout: git fetch origin cursor/setup-quicklog-draft-retry-8b19 verdant-grow-diary && git switch cursor/setup-quicklog-draft-retry-8b19 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
+head_sha: 4c8b625c6db91502c161468608a4f241c869cc1e is the owner-switch repair. The branch tip is the handoff commit whose parent is that SHA; confirm with git rev-parse origin/cursor/setup-quicklog-draft-retry-8b19
+state: pushed draft
+current_step: Jack Herer review 5669691346 at bb54282818838544c0090493529a69f4274dd60d FAILed. The repair ignores a grow, tent, or plant save that finishes after the owner changes, and clears a tent or plant error when hydration falls back to the grow step. Quick Log was not changed.
+next_action: read the 35 required checks on https://github.com/Verdant-OS/verdant-grow-diary/pull/2541 at the post-repair head and do not merge. Review 5669691346 does not cover the new head.
+post_merge_check: Full test suite shards and Lint, typecheck, test, build on the merged deploy head; if a required check fails, reopen this task with the same owner
+active_writer: Grok cloud agent on cursor/setup-quicklog-draft-retry-8b19
+decisions: Drafts live in sessionStorage under verdant.session-form.1.{userId}.{formId} and clear only after a confirmed save. Start Your Room reuses one hierarchy row id until that confirmation and blanks a name in the stored draft once its id is set so a later empty form does not inherit a confirmed name. Confirmed Quick Log observation retries keep the same p_idempotency_key, including after remount, by storing that key on the draft. The open-sheet key mint line stays so the existing five-rotation source pin still matches; a stored key overwrites it when present. Viewport coverage is jsdom innerWidth 390 and 1280 because the sheet is not viewport-branched.
+tried_and_rejected: Editing src/test/start-your-room-enter-submits.test.tsx is refused by scripts/scorer-lock.mjs. Restoring confirmed names into sessionStorage made the next test read "Bound TentEnter Tent". Awaiting the first Retry click advanced the wizard before the second click. Treating two sequential Retry clicks as one RPC was wrong: the in-flight flag releases after a definitive rejection, so the second click is a second call with the same key. A remount that minted a new key was rejected because Retry would no longer be one logical save.
+commands: export PATH="$HOME/.bun/bin:$PATH"; NODE_OPTIONS="--max-old-space-size=8192" bun run typecheck; bunx vitest run src/test/start-your-room-draft-owner-switch.test.tsx src/test/start-your-room-draft-hydration.test.tsx src/test/start-your-room-draft-retry.test.tsx src/test/start-your-room-enter-submits.test.tsx src/test/start-your-room-resume.test.tsx --reporter=dot
+files_touched: src/pages/StartYourRoom.tsx src/components/QuickLogV2Sheet.tsx src/lib/sessionFormDraftRules.ts src/lib/sessionFormDraftStore.ts src/lib/startYourRoomDraftRules.ts src/lib/quickLogObservationDraftRules.ts src/test/start-your-room-draft-retry.test.tsx src/test/quick-log-observation-draft-retry.test.tsx src/test/start-your-room-draft-hydration.test.tsx src/test/start-your-room-draft-owner-switch.test.tsx docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none for the code change. Merge, auto-merge, publish, and production writes are out of scope.
+open_questions: none
+gotchas: Do not restore a confirmed grow, tent, or plant name into the stored draft. Do not add another saveIdempotencyKeyRef.current = newQuickLogSaveKey() assignment; quicklog-manual-idempotency-static.test.ts counts five outside the two abandonment functions. Hydrate Start Your Room only after growsLoading is false, and only restore step when draft.ids.growId is still in the grows list. Do not persist until draftHydratedFor matches the current owner and the hydrated state has committed. An owner change with no draft must reset the form, ids, pending row ids, error, and step before any write under the new key. After each save await, return without setIds or setStep when ownerIdRef no longer matches the owner captured before that await. A tent or plant save error is cleared when hydration falls back to the grow step because that grow is gone. src/test/start-your-room-draft-retry.test.tsx and src/test/start-your-room-draft-hydration.test.tsx are scorer-locked; owner-switch cases live in src/test/start-your-room-draft-owner-switch.test.tsx. Effects that read ownerId must be declared after const ownerId. Free plan still does not create a grow automatically.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
+artifacts: RED then GREEN on src/test/start-your-room-draft-owner-switch.test.tsx (2 failed, then 5 files / 18 passed including hydration, draft-retry, resume, and enter-submits). typecheck passed with NODE_OPTIONS=--max-old-space-size=8192.
+reviewer_seat: Jack Herer review 5669691346 FAILed bb54282818838544c0090493529a69f4274dd60d. That verdict does not cover the repair head.
+reviewer_sha: bb54282818838544c0090493529a69f4274dd60d (FAIL, superseded by the repair)
+session_state: Cursor cloud agent on cursor/setup-quicklog-draft-retry-8b19. No production smoke write.
+claimed_by: Grok, 2026-10-26 11:15 CT
+owner: Grok
+last_updated: 2026-10-27 10:30 CT, by Grok
+```
+
 ### ARCH-CONTRACT-RESTAMP-20261029
 
 ```text
@@ -637,6 +803,40 @@ owner: Claude session_017UoYKzLzTv1RAhx1Cc7Pme
 last_updated: 2026-10-27 18:20 CT, by Claude
 ```
 
+### GROWER-DEAD-ENDS-VER-287-VER-276
+
+```text
+TASK GROWER-DEAD-ENDS-VER-287-VER-276  priority: P2  status: OPEN
+goal: One draft PR. Dashboard recovers from one transient tent or plant read instead of sticking on "grow data unavailable". Onboarding renders when the grows list is null.
+why: VER-287 is an intermittent dashboard dead end after a single failed read. VER-276 is Sentry VERDANT-WEB-1, a TypeError on /onboarding whose message and stack are redacted.
+branch: cursor/grower-dead-end-retries-4922
+base: verdant-grow-diary
+checkout: git fetch origin cursor/grower-dead-end-retries-4922 verdant-grow-diary && git switch cursor/grower-dead-end-retries-4922 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2540 (draft)
+head_sha: 020c1d7da8285dfd7ff6a97722d0fde5fe0286c3
+state: pushed draft after the 12s budget cap. Jack Herer review 5669711049 FAILed b16b6277de4e2ab913086f943f2be232687dbf9f. Do not merge.
+current_step: Each tent and plant attempt is capped with growReadAttemptDeadlineMs. A hung read errors inside GROW_READ_BUDGET_MS. Onboarding calls refreshGrows only when it is present. A log-only commit may follow this head_sha.
+next_action: Confirm 35/35 required checks at the pushed head. Keep the PR draft. No merge, auto-merge, or deploy.
+post_merge_check: After merge, a signed-out check is NOT_APPLICABLE. On the next production deploy, confirm /onboarding renders for a new account and the dashboard does not stick on the unavailable card after one slow tent or plant read. Until that deploy, NOT_MEASURED.
+active_writer: Cursor Grok cloud agent
+decisions: Retry inside useGrowTents and useGrowPlants so the dashboard stays on the loading state until the bounded sequence finishes, then shows the existing Try again button. Do not retry permission or other non-retryable codes. Do not create a grow. Onboarding null-safety is local to the page because Sentry has no stack.
+tried_and_rejected: Sentry issue VERDANT-WEB-1 has no stacktrace and a redacted message, so a line-level production cause is unconfirmed. The grows list already retried; the card still appears when tents or plants fail once.
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/dashboard-transient-grow-read-retry.test.tsx src/test/onboarding-null-grows-render.test.tsx src/test/grow-data-deadline-late-meta.test.tsx --reporter=dot
+files_touched: src/lib/growsReadRetryRules.ts; src/hooks/useGrowData.ts; src/pages/Onboarding.tsx; src/test/dashboard-transient-grow-read-retry.test.tsx; src/test/onboarding-null-grows-render.test.tsx; src/test/grow-data-deadline-late-meta.test.tsx; src/test/slow-loading-screen-gates.test.tsx; src/test/tent-detail-plant-list-read-state.test.tsx; src/test/grow-data-retry-budget-hooks.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none planned
+blockers: none for the repository change. Independent exact-head review is not requested. GitHub comments stay unposted.
+open_questions: production cause of VER-287 is unconfirmed (one timed-out or dropped tent/plant read is the code path that matches the card). VERDANT-WEB-1 stack remains unavailable.
+gotchas: grow-data-deadline-late-meta now advances past the first deadline plus one backoff before it expects isError. Scorer unlock is local and git-ignored; name the pin in the PR body.
+links: https://linear.app/verdantgrowdiary/issue/VER-287 ; https://linear.app/verdantgrowdiary/issue/VER-276 ; https://verdant-grow-diary.sentry.io/issues/VERDANT-WEB-1
+artifacts: this block
+reviewer_seat: Jack Herer failed review 5669711049 at b16b6277de4e2ab913086f943f2be232687dbf9f. A new exact-head review is required after 020c1d7da8285dfd7ff6a97722d0fde5fe0286c3.
+reviewer_sha: NOT_MEASURED for 020c1d7da8285dfd7ff6a97722d0fde5fe0286c3
+session_state: Cursor cloud agent; no paused workflow
+claimed_by: Cursor Grok cloud agent, 2026-10-26
+owner: Cursor Grok cloud agent
+last_updated: 2026-10-27 10:28 CT, by Cursor Grok cloud agent
+```
+
 ### PR-CLEANUP-2026-10-27-INVENTORY
 
 ```text
@@ -703,6 +903,109 @@ session_state: refresh_race_regression authored only the new mounted test and va
 claimed_by: Codex coordinator by explicit current user assignment on 2026-10-27; no public claim comment is asserted.
 owner: Codex for the user-assigned same-scope repair and existing PR branch update; future acceptance must be independent.
 last_updated: 2026-10-27 10:49 CT, by Codex same-scope refresh repair session
+```
+
+### ACTIONS-BACKLOG-CONCURRENCY
+
+```text
+TASK ACTIONS-BACKLOG-CONCURRENCY  priority: P2  status: OPEN
+goal: Cut the hosted-runner queue by cancelling superseded pull_request runs, skipping heavy jobs on draft PRs, and capping ci.yml shard parallelism at 16.
+why: Sour Diesel review 5670841287 failed c20c42a76. The irrigation draft guard broke two folded if blocks. A skipped matrix does not post the 32 required shard names. GitHub Team allows 60 concurrent jobs.
+branch: cursor/actions-backlog-concurrency-58cd
+base: verdant-grow-diary
+checkout: git fetch origin cursor/actions-backlog-concurrency-58cd verdant-grow-diary && git switch cursor/actions-backlog-concurrency-58cd && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2555 (ready; founder approved ready at 7f88f400. Do not convert to draft or toggle ready.)
+head_sha: c82e2c9682d84835e6d7b2816867b798626f4f9d merged f39231c94. This merge of origin/verdant-grow-diary ecfa2b9115355349b17d9249989c1a49dc933e47 is the new head after push. Read the PR head; this commit cannot name its own SHA.
+state: ready, base merged
+current_step: Irrigation if expressions are folded blocks again. max-parallel is 16. The pin test rejects a bare >- inside any workflow if. The second HANDOFF_LOG conflict kept this block and the incoming AUTH-LOADING-SMOKE-TIMEOUT-25 block. auth-loading-smoke.yml kept the draft guard, pull-request-only cancel, and timeout-minutes 25.
+next_action: Do not convert the PR to draft, toggle ready, enqueue it, or merge it. A new review covers this merge head only.
+post_merge_check: After a separately authorized merge, confirm a ready PR and a merge_group run still report all 35 required contexts from ci.yml. A draft does not post those 32 shard names. NOT_MEASURED until merged.
+active_writer: Grok cloud agent on cursor/actions-backlog-concurrency-58cd
+decisions: Do not reduce the 32 shard matrix. Those names are the ruleset required checks. max-parallel is 16 under the Team plan's 60-job pool. A draft skip on the shard matrix does not emit the 32 context names; they stay Expected until ready_for_review or merge_group. Lint/typecheck/test/build does report Skipped on a draft. Irrigation draft guards use if: >- so the fold marker is the YAML syntax, not part of the expression. Leave Preflight and test:legal-seo unconditional. Leave security-regression unconditional. Cancel in progress only when github.event_name == pull_request.
+tried_and_rejected: Cutting the shard count was rejected because the ruleset expects Full test suite (shard N/32) for N=1..32. A missing name stays Expected and blocks the merge queue.
+commands: bunx vitest run src/test/ci-pr-concurrency.test.ts src/test/deployment-preview-status-classification.test.ts --reporter=dot; node scripts/scorer-lock.mjs --report --strict
+files_touched: .github/workflows listed in the PR; src/test/ci-pr-concurrency.test.ts; src/test/deployment-preview-status-classification.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none planned
+blockers: none in the merge. Independent exact-head review of this merge head is NOT_MEASURED.
+open_questions: none
+gotchas: HOLD #1250 files were not edited. A matrix job skipped by if does not report one check per shard. If ready_for_review never runs, the 32 shard contexts stay Expected and the merge queue stays blocked. Lint/typecheck/test/build Skipped on a draft is not the same as those shard contexts passing. max-parallel 16 also applies on deploy pushes and merge_group.
+links: config/required-status-checks.json; deploy CI runs 40461983713, 40468073006, 40458653770
+artifacts: scorer unlock is gitignored at .claude/scorer-unlock.json
+reviewer_seat: Sour Diesel review 5670841287 at c20c42a76de7bd3271e6f03232d43c9ec7750218 was FAIL 1/1/2. Review 5670970729 at 7f88f400 was 0/0/2 and covered the body only. Neither covers this merge head.
+reviewer_sha: NOT_MEASURED for this merge head
+session_state: no production action
+claimed_by: Grok, 2026-10-27 11:30 CT
+owner: Grok
+last_updated: 2026-10-27 15:05 CT, by Grok
+limits: No repo settings, rulesets, secrets, runner config, force-push, rebase, or bun.lock change. Do not convert #2555 to draft or toggle ready.
+```
+
+### AUTH-LOADING-SMOKE-TIMEOUT-25
+
+```text
+TASK AUTH-LOADING-SMOKE-TIMEOUT-25  priority: P2  status: OPEN
+goal: Raise the auth-loading-smoke job timeout from 15 to 25 minutes and keep the YAML comment accurate.
+why: Runs 40523498143 (#2545) and 40469789527 (#2526) spent about 10 minutes on Chromium --with-deps apt install, then the test step was cancelled about 4.5 minutes in by the 15-minute cap. Worst case is about 16.5 minutes, so 25 minutes leaves headroom.
+branch: cursor/auth-loading-smoke-timeout-618c
+base: verdant-grow-diary
+checkout: git fetch origin cursor/auth-loading-smoke-timeout-618c verdant-grow-diary && git switch cursor/auth-loading-smoke-timeout-618c && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2553
+head_sha: read origin/cursor/auth-loading-smoke-timeout-618c after the merge of origin/verdant-grow-diary f39231c948942ce50a583f023a8b3481aca3ed94; comment-fix parent is 0c2bdbdfe2fb3ffdc953fc0cfa0ac9dd43ffc12a
+state: base merged; ready state left as found (isDraft false before this merge)
+current_step: Merged origin/verdant-grow-diary f39231c94. Only docs/agents/HANDOFF_LOG.md conflicted. Both the AUTH-LOADING-SMOKE-TIMEOUT-25 block and the incoming Open blocks are kept. Timeout stays 25. Sour Diesel review 5670229495 at 40591809 does not cover this head.
+next_action: Do not change draft or ready state. Do not enqueue, merge, or deploy. Obtain a fresh independent exact-head review at the merge head.
+post_merge_check: The next Auth loading smoke (mocked) run on verdant-grow-diary finishes without a 15-minute cancellation. NOT_MEASURED until merged.
+active_writer: Grok session on cursor/auth-loading-smoke-timeout-618c
+decisions: Timeout stays 25. Comment states the test step was cancelled about 4.5 minutes in. Founder approval is recorded as approved by the founder in chat 2026-10-27 in the PR body, not in the workflow file.
+tried_and_rejected: The first comment said the tests then passed in about 4.5 minutes. Sour Diesel P2: in those two runs the test step was cancelled by the 15-minute cap.
+commands: bunx vitest run src/test/auth-loading-ci-safety.test.ts --reporter=dot
+files_touched: .github/workflows/auth-loading-smoke.yml; docs/agents/HANDOFF_LOG.md (this block only)
+files_remaining: none
+blockers: exact-head review at the new head is NOT_MEASURED
+open_questions: none
+gotchas: Do not force-push. Do not change bun.lock. Do not change timeout-minutes. The scorer lock treats the workflow as an existing check; a branch-scoped unlock is local and gitignored.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2553 ; review https://github.com/Verdant-OS/verdant-grow-diary/pull/2553#pullrequestreview-5670229495
+artifacts: none
+reviewer_seat: Sour Diesel reviewed 40591809fcc13992f96f07eade03881604ff75a3; that verdict does not cover the new head
+reviewer_sha: 40591809fcc13992f96f07eade03881604ff75a3 (superseded)
+session_state: PR #2553 was not draft (isDraft false) before this base merge. Do not convert it to draft and do not toggle ready. No enqueue or deploy.
+claimed_by: Grok, 2026-10-27
+owner: Grok
+last_updated: 2026-10-27 14:10 CT, by Grok
+```
+
+### PR-2554-CHART-TOOLTIP-ROUNDING
+
+```text
+TASK PR-2554-CHART-TOOLTIP-ROUNDING  priority: P2  status: OPEN
+goal: Round Environment chart tooltip display strings so they agree with the card, including soil at one decimal and unsigned zero.
+why: Hover showed the raw °C-to-°F float. Jack Herer PASS-pending-CI listed P3s; Cheeko set soil tooltip decimals to 1.
+branch: cursor/env-chart-tooltip-rounding-3fe4
+base: verdant-grow-diary
+checkout: git fetch origin cursor/env-chart-tooltip-rounding-3fe4 verdant-grow-diary && git switch cursor/env-chart-tooltip-rounding-3fe4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2554
+head_sha: read origin/cursor/env-chart-tooltip-rounding-3fe4 after the follow-up push
+state: pushed draft
+current_step: Soil displayDecimals is 1, negative zero is unsigned, fractional tooltip cases live in a new test file.
+next_action: Confirm the PR head and that the draft stays unqueued. Do not mark ready, merge, or deploy.
+post_merge_check: Environment chart tooltip on a Fahrenheit tent shows 75.0°F and soil 40.46 as 40.5%. NOT_MEASURED until after merge.
+active_writer: Grok cloud session on cursor/env-chart-tooltip-rounding-3fe4
+decisions: Soil tooltip is one decimal even though the Environment card does not render soil. New cases stay in a new test file so tracked pins are not edited again.
+tried_and_rejected: none on this follow-up
+commands: bunx vitest run src/test/sensor-chart-tooltip-fractional-display.test.ts src/test/sensor-chart-tooltip-display-rounding.test.ts --reporter=verbose
+files_touched: src/lib/sensorChartAxisRules.ts; src/test/sensor-chart-tooltip-fractional-display.test.ts; docs/agents/HANDOFF_LOG.md
+files_remaining: none planned
+blockers: none
+open_questions: none
+gotchas: displayDecimals is not tickDecimals. Card still does not show soil.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2554#pullrequestreview-5669825201
+artifacts: src/test/sensor-chart-tooltip-fractional-display.test.ts
+reviewer_seat: Jack Herer review 5669825201 was PASS-pending-CI at 1b260ffd40591e4671017e2e2f2281454c28b096 and does not cover the follow-up head
+reviewer_sha: NOT_MEASURED for the follow-up head
+session_state: follow-up on draft #2554; no merge, queue, or deploy
+claimed_by: Grok, 2026-10-27
+owner: Grok cloud session
+last_updated: 2026-10-27 10:35 CT, by Grok
 ```
 
 ### PADDLE-WIRE-001-NORMALIZATION
@@ -882,6 +1185,40 @@ last_updated: 2026-10-27 18:45 CT, by Codex PR #2507 conflict-repair session
 limits: User authorized merge only after exact-head independent PASS, no P1/P2, all 35 required checks successful and applicable supplemental gates. Use the merge queue with expectedHeadOid. No direct/admin merge, force-push, deployment, production write, GitHub comment, protected-file edit, dependency/lockfile change or takeover of #2028/#2023.
 ```
 
+### ATHENA-FEED-LOG-PUBLIC-GUIDE
+
+```text
+TASK ATHENA-FEED-LOG-PUBLIC-GUIDE  priority: other  status: OPEN
+goal: Ship the public Athena planned-vs-actual feed log at /guides/athena-feed-chart-log as a draft PR. No merge and no deploy.
+why: The standalone HTML log needs the same public-route, sitemap, and consent-gated analytics pattern as the Advanced Nutrients feed log, with no browser or server storage and no invented Athena dosages.
+branch: cursor/athena-feed-chart-log-431f
+base: verdant-grow-diary
+checkout: git fetch origin cursor/athena-feed-chart-log-431f verdant-grow-diary && git switch cursor/athena-feed-chart-log-431f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read the PR URL from GitHub after the first push
+head_sha: 2db14d480136d50737460569b2e7d62e9a496023, the formula-guard commit and the parent of the commit that records this line. Read origin/cursor/athena-feed-chart-log-431f for the exact PR head.
+state: pushed draft once this commit is on the remote
+current_step: APP_ROUTES lists /guides/athena-feed-chart-log before /guides/grow-stage-care-guide so the path sort matches Array.sort. The CSV download appends the anchor, clicks it without preventDefault, and revokes the object URL on the next turn. escapeCsvField prefixes a cell that starts with = + - @ tab or CR with a single quote. e2e/athena-feed-chart-log-csv.spec.ts runs from .github/workflows/mocked-e2e-unwired-closure.yml. The latest verdant-grow-diary was merged with a normal merge.
+next_action: read required CI on the new head. The pheno-comparison-v0 failure at 07f3de95 was the same unsorted manifest, because that workflow path-filters src/lib/appRouteManifest.ts. Do not merge. Do not deploy.
+post_merge_check: NOT_APPLICABLE until merge is requested. After a future merge, confirm https://verdantgrowdiary.com/guides/athena-feed-chart-log returns the page and /version.json reports the merge SHA.
+active_writer: Cursor Grok cloud agent on cursor/athena-feed-chart-log-431f
+decisions: Planned amounts start blank. The page does not embed Athena dosages. Tolerance default is 10% and is labeled as the grower's setting. Analytics events are feed_log_* and fire only when readAnalyticsConsent() is granted. All three CTAs use Link to /auth?mode=signup, the same href and cta_location click tracking as draft #2542. The Advanced Nutrients reverse link is not on this base; it needs to land with or after draft #2542. /vpd-chart is not a route on this base, so the VPD chart label points at /guides/grow-room-vpd-tracker.
+tried_and_rejected: Reusing src/lib/publicFeedLogRules.ts from #2542 was rejected because that module is not on verdant-grow-diary. Athena-specific modules avoid a hard dependency and keep the shared SEO edits additive.
+commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/athena-feed-log-rules.test.ts src/test/athena-feed-log-page.test.tsx src/test/athena-feed-log-analytics.test.ts src/test/verdant-seo-sitemap-robots.test.ts src/test/verdant-seo-guides-public-links.test.tsx src/test/route-indexation-matrix.test.ts src/test/static-public-seo-documents.test.ts
+files_touched: src/lib/athenaFeedLogRules.ts src/lib/athenaFeedLogAnalytics.ts src/pages/AthenaFeedLog.tsx src/routes/guides.athena-feed-chart-log.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts public/sitemap.xml docs/seo/route-indexation-matrix.md src/pages/GuidesIndex.tsx src/constants/verdantSeoContent.ts scripts/seo-runtime-smoke.mjs e2e/auth-route-protection-mobile.spec.ts e2e/athena-feed-chart-log-csv.spec.ts .github/workflows/mocked-e2e-unwired-closure.yml src/test/athena-feed-log-rules.test.ts src/test/athena-feed-log-page.test.tsx src/test/athena-feed-log-analytics.test.ts src/test/verdant-seo-sitemap-robots.test.ts src/test/verdant-seo-guides-public-links.test.tsx src/test/static-public-seo-documents.test.ts docs/agents/HANDOFF_LOG.md
+files_remaining: none for the draft
+blockers: required CI is NOT_MEASURED until the draft PR runs
+open_questions: Cheeko approval of the exact disclaimer wording before merge. Reverse link from /guides/advanced-nutrients-feeding-chart-log lands with #2542.
+gotchas: Do not set overflow-x hidden on body. Radio labels use min-h-11 (44px). The page does not load its own gtag snippet. CTA href is /auth?mode=signup with data-cta-location tool, article, and footer. No extra query params.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2542
+artifacts: src/test/athena-feed-log-rules.test.ts src/test/athena-feed-log-page.test.tsx src/test/athena-feed-log-analytics.test.ts
+reviewer_seat: an eligible independent session that did not author this PR
+reviewer_sha: NOT_MEASURED
+session_state: Cursor Grok cloud agent implementing the public guide; no paused workflow
+claimed_by: Cursor Grok cloud agent, 2026-10-26
+owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
+last_updated: 2026-10-27 10:22 CT, by Cursor Grok cloud agent
+```
+
 ### VER-285-PRESERVE-MISSING-STAGE
 
 ```text
@@ -914,6 +1251,40 @@ session_state: No subagents, review requests, production actions, or automations
 claimed_by: Codex VER-285, 2026-10-25 01:52 CT
 owner: Codex VER-285
 last_updated: 2026-10-25 01:52 CT, by Codex VER-285
+```
+
+### PLANT-HASH-SCROLL-OFFSET
+
+```text
+TASK PLANT-HASH-SCROLL-OFFSET  priority: other  status: OPEN
+goal: Give every plant-detail hash target the same sticky-header scroll offset (scroll-mt-16) before PR #2285 switches landings to scrollIntoView block start.
+why: Independent review of #2285 found #plant-harvest-evidence has no scroll-mt-16, and could not locate the plant-recent-activity target.
+branch: cursor/plant-hash-scroll-offset-509a
+base: verdant-grow-diary at a18cb8479
+checkout: git fetch origin cursor/plant-hash-scroll-offset-509a verdant-grow-diary && git switch cursor/plant-hash-scroll-offset-509a && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2544 (open, not draft; do not change draft or ready state)
+head_sha: reviewed parent 692573d19075cd731e66771414236d8032b4bea4. This repair commit cannot embed its own SHA. After the normal push, origin/cursor/plant-hash-scroll-offset-509a is the head.
+state: implemented and pushed; Sour Diesel review 5669691817 P2 fence and stale-block findings repaired in this commit
+current_step: HANDOFF_LOG outside this block matches base a18cb847 byte for byte. Product offset change is unchanged. PR is open and not draft. No queue, merge, or deploy.
+next_action: Leave the PR's ready and draft state unchanged. Do not queue, merge, or deploy. Do not touch claude/plant-hash-scroll-align-top or PR #2285.
+post_merge_check: bunx vitest run src/test/plant-detail-hash-scroll-offset.test.tsx — a failure reopens this slice with the same owner. NOT_MEASURED until merged.
+active_writer: Cursor Grok cloud agent (this session)
+decisions: plant-recent-activity renders on the Card in PlantRecentActivityPanel. Its offset is scroll-mt-16, matching the other mapped targets. The harvest-evidence disclosure trigger gets scroll-mt-16 only when it owns an anchor id. PLANT_DETAIL_KNOWN_ANCHOR_IDS drives the rendered-page regression. P3 1px header-border note left unchanged.
+tried_and_rejected: Rewriting neighboring fences was rejected; the merge had turned base fences into 4-backtick lines. This repair restores the base file and inserts only this block.
+commands: bunx vitest run src/test/plant-detail-hash-scroll-offset.test.tsx src/test/plant-detail-disclosure-section.test.tsx src/test/plant-detail-disclosure-rules.test.ts --reporter=dot
+files_touched: src/components/PlantDetailDisclosureSection.tsx; src/components/PlantRecentActivityPanel.tsx; src/lib/plantDetailDisclosureRules.ts; src/test/plant-detail-hash-scroll-offset.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: none
+open_questions: none
+gotchas: Do not edit claude/plant-hash-scroll-align-top. scroll-mt-16 is a 4rem offset; replacing scroll-mt-20 on the recent-activity card changes that margin by 1rem under center alignment. A reviewer noted scroll-mt-16 can leave 1px under the header border; that P3 was left as-is.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2544 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2544#pullrequestreview-5669691817 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2285
+artifacts: src/test/plant-detail-hash-scroll-offset.test.tsx
+reviewer_seat: Sour Diesel review 5669691817 recorded the P2s this commit repairs. This session authored the change and does not request a new review here.
+reviewer_sha: 692573d19075cd731e66771414236d8032b4bea4
+session_state: Cursor cloud agent; PR is open and not draft; no merge, queue, or deploy
+claimed_by: Cursor Grok cloud agent, 2026-10-26
+owner: Cursor Grok cloud agent
+last_updated: 2026-10-27 10:26 CT, by Cursor Grok cloud agent
 ```
 
 ### PR-2345-BASE-INTEGRATION
@@ -1158,38 +1529,38 @@ claimed_by: Claude, 2026-10-06 20:47 UTC (PR #1844 comment)
 last_updated: 2026-10-06 16:05 CT, by Claude
 ```
 
-### CLOSE-STALE-GROK-HANDOFF-BLOCKS
+### HANDOFF-CONTINUITY-20261024
 
 ```text
-TASK CLOSE-STALE-GROK-HANDOFF-BLOCKS  priority: other  status: OPEN
-goal: move eleven Grok-owned handoff blocks whose PRs already merged or closed from Open to Closed, each with its final SHA, so no live agent reads them as current claims
-why: Matthew, 2026-11-04 ~06:40 UTC, in Claude session_017UoYKv4arxJYBMGNNh1bvN: "take over all of Grok's work and close it out"; Grok is no longer active. Every Grok PR is merged, closed, or (#2751, #2752) already held by Claude session_017UoYKvcvohNxhmW342Lieo
-branch: claude/close-stale-grok-handoff-blocks
+TASK HANDOFF-CONTINUITY-20261024  priority: other  status: OPEN
+goal: Docs-only constitution amendment so a retired or out-of-token agent can be resumed immediately, including Cheeko's seven further gates (one writer, one-pass review, stale expiry, ship/money, repo-wide breakages, protected instruction files, post-merge loop).
+why: Unpushed session state and SHA-unbound passes leave the next agent unable to continue. Cheeko approved the continuity rules and the seven gates for this same draft.
+branch: cursor/handoff-continuity-a798
 base: verdant-grow-diary
-checkout: git fetch origin claude/close-stale-grok-handoff-blocks verdant-grow-diary && git switch claude/close-stale-grok-handoff-blocks
-pr: read the URL from GitHub (draft)
-head_sha: the commit carrying this block; base 484f8ace3069af94ed9444b07e1e18b8dfad3350
-state: pushed draft
-current_step: draft PR open; base merged after #2811 and #2818; waiting for Matthew to mark ready
-next_action: after #2811 merges, merge origin/verdant-grow-diary, confirm 35/35 required checks at that head, then route one independent exact-head review (not Claude session_017UoYKv4arxJYBMGNNh1bvN). Docs-only; Graft's low-risk lane applies (HANDOFF_LOG.md only)
-post_merge_check: on the merged deploy tip, none of the ten names below appears between "## Open" and the first "## Closed"; the file's fence lines pair up
-active_writer: Claude session_017UoYKv4arxJYBMGNNh1bvN
-decisions: closed blocks are appended at the end of the Closed list, not the top, because #2811 and #2858 both insert at the top of Closed. POSTHOG-PUBLIC-CLIENT-KEY (#2776 merged as cd0fe0cd) was held back until #2818 merged (it inserted HANDOFF-CONFIG directly after it); closed in the base merge after #2818 landed, where the HANDOFF-CONFIG conflict was resolved by keeping #2818's block. Only the TASK status, the first state line and the first next_action line of each block change; every other line is kept verbatim. #2751/#2752 blocks are not touched (held by another Claude session). VER-288-SERVED-BUILD-BASELINE (#2538) and FIX-2004-APP-DOCUMENT-TITLES (#2082) name a "Cursor cloud agent" without saying Grok and are left for an owner call
-tried_and_rejected: moving blocks to the top of Closed (collides with #2811 and #2858)
-commands: count the code-fence lines in docs/agents/HANDOFF_LOG.md (must be even and pair up); diff <(git show origin/verdant-grow-diary:docs/agents/HANDOFF_LOG.md | sort) <(sort docs/agents/HANDOFF_LOG.md) shows only the 30 rewritten status/state/next_action lines plus this block
-files_touched: docs/agents/HANDOFF_LOG.md
-files_remaining: none
-blockers: merge order (after #2811); Matthew's yes at the exact head
-open_questions: owner call on VER-288-SERVED-BUILD-BASELINE and FIX-2004-APP-DOCUMENT-TITLES
-gotchas: almost every open PR edits this file; re-check placement after each base merge
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2805 #2793 #2541 #2540 #2555 #2553 #2554 #2545 #2544 #2523
-artifacts: none
-reviewer_seat: NOT_MEASURED (eligible independent reviewer; author excluded)
-reviewer_sha: none
-session_state: Claude session_017UoYKv4arxJYBMGNNh1bvN; no paused workflows
-claimed_by: Claude session_017UoYKv4arxJYBMGNNh1bvN, 2026-11-04
-owner: Claude session_017UoYKv4arxJYBMGNNh1bvN
-last_updated: 2026-11-04, by Claude session_017UoYKv4arxJYBMGNNh1bvN
+checkout: git fetch origin cursor/handoff-continuity-a798 verdant-grow-diary && git switch cursor/handoff-continuity-a798 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: opened as a draft from this branch; read the PR URL from GitHub after the first push (a commit cannot name its own SHA or the PR number created after it)
+head_sha: read origin/cursor/handoff-continuity-a798 after push; this block is in the first commit
+state: pushed draft once this commit is on the remote
+current_step: 2026-10-24.6 names CURRENT_STATE.md in the environment note on draft #2523; prior independent PASS was d46e2a3c11f785f650f79f9f0b18a6390913c78e and does not carry
+next_action: Read AGENTS.md §0 through §17 and docs/agents/constitution/, then obtain a fresh independent exact-head review of the new head. Do not merge. Do not edit .github/pull_request_template.md.
+decisions: Fold rules into AGENTS.md Agent Handoff / Coverage and Release and Environment Rules instead of a second policy file. Stamp Sentinel-Version on all twelve governance files with scripts/sync-sentinel-mirror.mjs because AGENTS.md changed. Leave .github/pull_request_template.md unchanged and put the Release steps measured checkbox wording in CURRENT_STATE and the PR body. Do not backfill historical owner rows. Default inheritor is OG Kush (engineering lead). Crew-bell ring is a PR comment `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC`.
+tried_and_rejected: Editing only AGENTS.md was rejected because the sentinel parity gate requires all twelve files to share one version and GEMINI.md to mirror AGENTS.md. Editing the GitHub PR template was rejected for this PR because .github is left untouched; the checkbox is specified in CURRENT_STATE instead.
+commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-10-24.6 && node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary
+files_touched: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/*.md; docs/agents/HANDOFF_LOG.md; docs/agents/CURRENT_STATE.md
+files_remaining: none in this slice. .github/pull_request_template.md stays unchanged.
+blockers: independent exact-head review not yet requested; GitHub comment approval gate still applies to a resume-here comment unless Cheeko or Matthew allows it
+open_questions: none for the wording Cheeko approved
+gotchas: A new commit invalidates any review of an older SHA. CURRENT_STATE.md is exempt from Sentinel-Version. Do not force-push. Keep the PR draft.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523 ; PASS at d46e2a3c only: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523#pullrequestreview-5638407206
+artifacts: this block
+reviewer_seat: an eligible independent session that did not author this PR (not this Cursor Grok session)
+reviewer_sha: none yet
+session_state: Cursor cloud agent on cursor/handoff-continuity-a798; no paused workflow; no pending human decision beyond draft review
+post_merge_check: NOT_APPLICABLE (docs constitution; merge is not itself a feature release). After merge, confirm Sentinel-Version 2026-10-24.6 on verdant-grow-diary and that the handoff template heading is present in docs/agents/HANDOFF_LOG.md.
+active_writer: Cursor Grok cloud agent (this session)
+claimed_by: Cursor Grok cloud agent, 2026-10-24 13:10 UTC
+owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
+last_updated: 2026-10-24 13:50 UTC, by Cursor Grok cloud agent
 ```
 
 ### FIX-2004-APP-DOCUMENT-TITLES
@@ -2728,411 +3099,6 @@ reviewer_seat: Critical Mass (no .tsx outside src/test/, not P1, not a publish g
 claimed_by: Claude, 2026-10-02 18:20 CT (owner instruction in session: "Build the three gaps as a draft PR")
 last_updated: 2026-10-06 15:35 CT, by Claude. Earlier entry: 2026-10-02 20:58 CT, by Claude
 closure: Merged via #1866 as 1d12e5a51afd3999064049f0c1057d303d6844cc (squash through the merge queue, 2026-10-05 18:21 UTC / 13:21 CT) from final head ef931932d30e8939ab0b67bf360f3a52307ae70e, merged by the owner. Nine files, 2631 insertions, no deletions; no src/ product code, supabase/, workflow, lockfile or governance file. The deploy tip at closure time is cfe09322e (#1839). Moved from Open to Closed 2026-10-06 by Claude; no Sentinel-Version bump (the log is not a versioned governance file).
-```
-
-### PHOTO-VIEWER-CAPTION-TILES
-
-```text
-TASK PHOTO-VIEWER-CAPTION-TILES  priority: P1  status: CLOSED
-goal: Timeline photo viewer caption shows the entry note, or the timeline local-time formatter when the note is blank, and plant Recent Photos, the plant hero, and Timeline Photo history open that viewer.
-why: Issue #2804. The caption joined stage and the raw UTC ISO and ignored the note. Those three tiles were not controls.
-branch: cursor/photo-viewer-caption-tiles-1ba3
-base: verdant-grow-diary
-checkout: git fetch origin cursor/photo-viewer-caption-tiles-1ba3 verdant-grow-diary && git switch cursor/photo-viewer-caption-tiles-1ba3
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2805
-head_sha: 71024e9d10201391d3143617911b3644b280916c
-state: CLOSED. Merged as 2ebdd2e005be8415e5e80cc8c1cf2e629e5486ae (#2805) on 2026-11-03T18:37:43Z. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
-current_step: caption class, tile buttons, plant lightbox, and null-safe hero open
-next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
-post_merge_check: after Publish, open a photo from a plant Recent Photos tile and confirm the viewer caption is the note or a local time, never a raw ISO. NOT_MEASURED until live /version.json reports the SHA.
-active_writer: Grok cloud agent on this branch
-decisions: TimelinePhotoLightboxCaption.fromItem is the only caption path. Tiles are buttons. Focus returns to the opener when the viewer unmounts. Alt text still includes the raw entry instant because src/test/timeline-photo-lightbox-rules.test.ts is scorer-locked and pins that string.
-tried_and_rejected: rewriting the locked alt assertion. The scorer lock refused the edit.
-commands: bunx vitest run src/test/timeline-photo-caption-and-open.test.tsx src/test/timeline-photo-lightbox-component.test.tsx src/test/timeline-photo-lightbox-rules.test.ts --reporter=dot
-files_touched: src/lib/timelinePhotoLightboxRules.ts; src/components/TimelinePhotoLightbox.tsx; src/components/PhotoHistoryPanel.tsx; src/components/PlantDetailPhotoStrip.tsx; src/components/PlantPhoto.tsx; src/components/PlantPhotoView.tsx; src/pages/PlantDetail.tsx; src/pages/Timeline.tsx; src/test/timeline-photo-caption-and-open.test.tsx; docs/agents/HANDOFF_LOG.md
-files_remaining: none
-blockers: none for repository work
-open_questions: none
-gotchas: do not edit the locked alt-text test. Upload size warning is out of scope.
-links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2804
-artifacts: local screenshots, not committed
-reviewer_seat: not requested; Moonbow routes review
-reviewer_sha: NOT_MEASURED
-session_state: no production writes; auto-merge off
-claimed_by: Grok, 2026-11-03
-owner: Grok
-last_updated: 2026-11-02 23:20 CT, by Grok
-```
-
-### CREATE-DIALOG-DISABLED-REASON
-
-```text
-TASK QUICK-LOG-TARGET-SAVE  priority: P1  status: OPEN
-goal: One draft PR for Quick Log target selection, one save, optional reading time, one time-label class, and correction temperature units.
-why: Issues 2778, 2779, 2780, 2781, and part of 2706. A tent open was resolving to the sole or recent plant, and a successful save left the sheet open.
-branch: cursor/quick-log-target-save-1baf
-base: verdant-grow-diary
-checkout: git fetch origin cursor/quick-log-target-save-1baf verdant-grow-diary && git switch cursor/quick-log-target-save-1baf
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2793 ready
-head_sha: d6b9abb71 is the implementation; 504ecc08c stamps this block; the pin-fix commit is the child of 504ecc08c. Read origin/cursor/quick-log-target-save-1baf for the exact head. This line cannot name that child.
-state: CLOSED. Merged as d3b25a5d7154cb257cbf94b9f2ee8eaf02b208ee (#2793) on 2026-11-03T19:31:34Z. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
-current_step: three CI pins updated after measured tap counts; required CI recheck follows the pin-fix push
-next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
-post_merge_check: bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx
-active_writer: Grok cloud agent on cursor/quick-log-target-save-1baf
-decisions: tent context is never rewritten to a plant; last-used target applies only when the route has no tent or plant; success closes the sheet and names the target in the toast; reading time is sheet state wired to occurredAt; GrowerTimeLabel is the shared formatter; correction temperature displays the grower unit and converts once to Celsius on save
-tried_and_rejected: leaving the sole-plant pins unchanged would keep the bug
-commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/quick-log-target-save-reading-time.test.tsx src/test/quick-log-v2-rules.test.ts src/test/quick-log-route-target-rules.test.ts src/test/mobile-quick-log-single-fab.test.ts src/test/app-shell-mobile-quick-log-routing.test.tsx src/test/quick-log-v2-sheet-watering.test.tsx src/test/quick-log-v2-sheet-feeding.test.tsx src/test/quick-log-v2-refresh-sheet.test.tsx src/test/quick-log-timeline-cta-integration.test.tsx
-files_touched: src/components/AppShell.tsx src/components/QuickLogEntryIntegrityControls.tsx src/components/QuickLogV2Sheet.tsx src/pages/TentDetail.tsx src/lib/quickLogV2Rules.ts src/lib/quickLogRouteTargetRules.ts src/lib/growerTimeLabel.ts src/lib/quickLogReadingTime.ts src/lib/timelineEntryTimestampFormat.ts src/lib/quickLogGroupedTimelineFilterViewModel.ts src/lib/quickLogSnapshotStripAdapter.ts src/lib/wateringCadenceHistoryRules.ts src/lib/growDiaryPdfExport.ts and the renegotiated tests named in the PR
-files_remaining: none for this slice
-blockers: none for repository work. Moonbow routes review and merge. No production write.
-open_questions: none
-gotchas: scorer pins that encoded sole-plant launch and a stay-open sheet were renegotiated in the same change. .claude/scorer-unlock.json is local only.
-links: issues 2778 2779 2780 2781 2706
-artifacts: src/test/quick-log-target-save-reading-time.test.tsx
-reviewer_seat: not requested
-reviewer_sha: none
-session_state: Grok implementation session
-claimed_by: Grok 2026-11-02
-owner: Grok
-last_updated: 2026-11-02 21:36 CT, by Grok
-
-TASK CREATE-DIALOG-DISABLED-REASON  priority: P2  status: CLOSED
-goal: disabled primary buttons in New grow, New tent, and New plant state their reason, and each name field has a visible label that is its accessible name.
-why: Issue 3 (FA-F01, FA-F02, FA-F05). Cheeko approved building only (2026-10-31). Create tent and Create plant were disabled with no description, and the name fields were announced as their placeholders.
-branch: ultra/create-dialog-reasons
-base: verdant-grow-diary
-checkout: git fetch origin ultra/create-dialog-reasons verdant-grow-diary && git switch ultra/create-dialog-reasons
-pr: draft; read the URL from GitHub after push
-head_sha: the commit that adds this block; read git rev-parse HEAD after checkout
-state: local until pushed; draft only
-current_step: view-model, dialog wiring, and new unit tests are in the working tree
-next_action: confirm the draft PR stays draft; do not mark ready, request review, or merge
-post_merge_check: after Publish, open New tent on the fixture account, leave the name blank, and confirm the Create tent button is disabled with the visible reason "Enter a tent name." Type a name and confirm the button enables. NOT_MEASURED until live /version.json reports the SHA.
-active_writer: Grok cloud agent on this branch
-decisions: disabled-reason and helper copy live in src/lib/createDialogPrimaryButtonViewModel.ts. Create tent and Create plant keep their pinned disabled expressions. Create grow now disables until the name is non-blank, matching the other two dialogs. A plan limit replaces the "only a name" helper. An optional plant tent no longer says "Create a tent first." Invalid optional tent size is shown on the size field and does not change the pinned disable expression.
-tried_and_rejected: adding the size check to Create tent's disabled expression. Source scans pin that expression, and existing tests cannot be edited in this task.
-commands: bunx vitest run src/test/create-dialog-primary-button-view-model.test.ts --reporter=dot
-files_touched: src/lib/createDialogPrimaryButtonViewModel.ts; src/test/create-dialog-primary-button-view-model.test.ts; src/components/CreateTentDialog.tsx; src/components/CreatePlantDialog.tsx; src/pages/Grows.tsx; docs/agents/HANDOFF_LOG.md
-files_remaining: none
-blockers: none for repository work
-open_questions: none
-gotchas: do not edit the pinned disabled JSX in CreateTentDialog or CreatePlantDialog. Do not modify tests that already exist on the base.
-links: uploads brief Issue 3
-artifacts: accessibility captures are local to the agent run, not this repo
-reviewer_seat: not requested; this draft does not ask for review
-reviewer_sha: NOT_MEASURED
-session_state: no paused workflows; no production writes
-claimed_by: Grok, 2026-10-31
-owner: Grok
-last_updated: 2026-10-31 01:40 CT, by Grok
-```
-
-### SETUP-QUICKLOG-DRAFT-RETRY
-
-```text
-TASK SETUP-QUICKLOG-DRAFT-RETRY  priority: other  status: CLOSED
-goal: Keep every typed field in Start Your Room and the first Quick Log observation when a save fails or the grower leaves mid-flow, show a plain error, and let Retry write that same save once. Advance only after the server confirms the save.
-why: A failed or abandoned setup step was dropping names and notes, and a second tap could start another write.
-branch: cursor/setup-quicklog-draft-retry-8b19
-base: verdant-grow-diary
-checkout: git fetch origin cursor/setup-quicklog-draft-retry-8b19 verdant-grow-diary && git switch cursor/setup-quicklog-draft-retry-8b19 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
-head_sha: 4c8b625c6db91502c161468608a4f241c869cc1e is the owner-switch repair. The branch tip is the handoff commit whose parent is that SHA; confirm with git rev-parse origin/cursor/setup-quicklog-draft-retry-8b19
-state: CLOSED. Closed unmerged on 2026-11-01T21:23:55Z (#2541; superseded by #2565, see SETUP-QUICKLOG-DRAFT-P2S-SUPERSEDES-2541); final head cba472675a5d1307b8745abf7a38a970aa08ce4a. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
-current_step: Jack Herer review 5669691346 at bb54282818838544c0090493529a69f4274dd60d FAILed. The repair ignores a grow, tent, or plant save that finishes after the owner changes, and clears a tent or plant error when hydration falls back to the grow step. Quick Log was not changed.
-next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
-post_merge_check: Full test suite shards and Lint, typecheck, test, build on the merged deploy head; if a required check fails, reopen this task with the same owner
-active_writer: Grok cloud agent on cursor/setup-quicklog-draft-retry-8b19
-decisions: Drafts live in sessionStorage under verdant.session-form.1.{userId}.{formId} and clear only after a confirmed save. Start Your Room reuses one hierarchy row id until that confirmation and blanks a name in the stored draft once its id is set so a later empty form does not inherit a confirmed name. Confirmed Quick Log observation retries keep the same p_idempotency_key, including after remount, by storing that key on the draft. The open-sheet key mint line stays so the existing five-rotation source pin still matches; a stored key overwrites it when present. Viewport coverage is jsdom innerWidth 390 and 1280 because the sheet is not viewport-branched.
-tried_and_rejected: Editing src/test/start-your-room-enter-submits.test.tsx is refused by scripts/scorer-lock.mjs. Restoring confirmed names into sessionStorage made the next test read "Bound TentEnter Tent". Awaiting the first Retry click advanced the wizard before the second click. Treating two sequential Retry clicks as one RPC was wrong: the in-flight flag releases after a definitive rejection, so the second click is a second call with the same key. A remount that minted a new key was rejected because Retry would no longer be one logical save.
-commands: export PATH="$HOME/.bun/bin:$PATH"; NODE_OPTIONS="--max-old-space-size=8192" bun run typecheck; bunx vitest run src/test/start-your-room-draft-owner-switch.test.tsx src/test/start-your-room-draft-hydration.test.tsx src/test/start-your-room-draft-retry.test.tsx src/test/start-your-room-enter-submits.test.tsx src/test/start-your-room-resume.test.tsx --reporter=dot
-files_touched: src/pages/StartYourRoom.tsx src/components/QuickLogV2Sheet.tsx src/lib/sessionFormDraftRules.ts src/lib/sessionFormDraftStore.ts src/lib/startYourRoomDraftRules.ts src/lib/quickLogObservationDraftRules.ts src/test/start-your-room-draft-retry.test.tsx src/test/quick-log-observation-draft-retry.test.tsx src/test/start-your-room-draft-hydration.test.tsx src/test/start-your-room-draft-owner-switch.test.tsx docs/agents/HANDOFF_LOG.md
-files_remaining: none for this slice
-blockers: none for the code change. Merge, auto-merge, publish, and production writes are out of scope.
-open_questions: none
-gotchas: Do not restore a confirmed grow, tent, or plant name into the stored draft. Do not add another saveIdempotencyKeyRef.current = newQuickLogSaveKey() assignment; quicklog-manual-idempotency-static.test.ts counts five outside the two abandonment functions. Hydrate Start Your Room only after growsLoading is false, and only restore step when draft.ids.growId is still in the grows list. Do not persist until draftHydratedFor matches the current owner and the hydrated state has committed. An owner change with no draft must reset the form, ids, pending row ids, error, and step before any write under the new key. After each save await, return without setIds or setStep when ownerIdRef no longer matches the owner captured before that await. A tent or plant save error is cleared when hydration falls back to the grow step because that grow is gone. src/test/start-your-room-draft-retry.test.tsx and src/test/start-your-room-draft-hydration.test.tsx are scorer-locked; owner-switch cases live in src/test/start-your-room-draft-owner-switch.test.tsx. Effects that read ownerId must be declared after const ownerId. Free plan still does not create a grow automatically.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2541
-artifacts: RED then GREEN on src/test/start-your-room-draft-owner-switch.test.tsx (2 failed, then 5 files / 18 passed including hydration, draft-retry, resume, and enter-submits). typecheck passed with NODE_OPTIONS=--max-old-space-size=8192.
-reviewer_seat: Jack Herer review 5669691346 FAILed bb54282818838544c0090493529a69f4274dd60d. That verdict does not cover the repair head.
-reviewer_sha: bb54282818838544c0090493529a69f4274dd60d (FAIL, superseded by the repair)
-session_state: Cursor cloud agent on cursor/setup-quicklog-draft-retry-8b19. No production smoke write.
-claimed_by: Grok, 2026-10-26 11:15 CT
-owner: Grok
-last_updated: 2026-10-27 10:30 CT, by Grok
-```
-
-### GROWER-DEAD-ENDS-VER-287-VER-276
-
-```text
-TASK GROWER-DEAD-ENDS-VER-287-VER-276  priority: P2  status: CLOSED
-goal: One draft PR. Dashboard recovers from one transient tent or plant read instead of sticking on "grow data unavailable". Onboarding renders when the grows list is null.
-why: VER-287 is an intermittent dashboard dead end after a single failed read. VER-276 is Sentry VERDANT-WEB-1, a TypeError on /onboarding whose message and stack are redacted.
-branch: cursor/grower-dead-end-retries-4922
-base: verdant-grow-diary
-checkout: git fetch origin cursor/grower-dead-end-retries-4922 verdant-grow-diary && git switch cursor/grower-dead-end-retries-4922 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2540 (draft)
-head_sha: 020c1d7da8285dfd7ff6a97722d0fde5fe0286c3
-state: CLOSED. Merged as d590b2c105435cb2b22d1f265a4dea48948ccd3a (#2540) on 2026-10-28T07:02:38Z. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
-current_step: Each tent and plant attempt is capped with growReadAttemptDeadlineMs. A hung read errors inside GROW_READ_BUDGET_MS. Onboarding calls refreshGrows only when it is present. A log-only commit may follow this head_sha.
-next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
-post_merge_check: After merge, a signed-out check is NOT_APPLICABLE. On the next production deploy, confirm /onboarding renders for a new account and the dashboard does not stick on the unavailable card after one slow tent or plant read. Until that deploy, NOT_MEASURED.
-active_writer: Cursor Grok cloud agent
-decisions: Retry inside useGrowTents and useGrowPlants so the dashboard stays on the loading state until the bounded sequence finishes, then shows the existing Try again button. Do not retry permission or other non-retryable codes. Do not create a grow. Onboarding null-safety is local to the page because Sentry has no stack.
-tried_and_rejected: Sentry issue VERDANT-WEB-1 has no stacktrace and a redacted message, so a line-level production cause is unconfirmed. The grows list already retried; the card still appears when tents or plants fail once.
-commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/dashboard-transient-grow-read-retry.test.tsx src/test/onboarding-null-grows-render.test.tsx src/test/grow-data-deadline-late-meta.test.tsx --reporter=dot
-files_touched: src/lib/growsReadRetryRules.ts; src/hooks/useGrowData.ts; src/pages/Onboarding.tsx; src/test/dashboard-transient-grow-read-retry.test.tsx; src/test/onboarding-null-grows-render.test.tsx; src/test/grow-data-deadline-late-meta.test.tsx; src/test/slow-loading-screen-gates.test.tsx; src/test/tent-detail-plant-list-read-state.test.tsx; src/test/grow-data-retry-budget-hooks.test.tsx; docs/agents/HANDOFF_LOG.md
-files_remaining: none planned
-blockers: none for the repository change. Independent exact-head review is not requested. GitHub comments stay unposted.
-open_questions: production cause of VER-287 is unconfirmed (one timed-out or dropped tent/plant read is the code path that matches the card). VERDANT-WEB-1 stack remains unavailable.
-gotchas: grow-data-deadline-late-meta now advances past the first deadline plus one backoff before it expects isError. Scorer unlock is local and git-ignored; name the pin in the PR body.
-links: https://linear.app/verdantgrowdiary/issue/VER-287 ; https://linear.app/verdantgrowdiary/issue/VER-276 ; https://verdant-grow-diary.sentry.io/issues/VERDANT-WEB-1
-artifacts: this block
-reviewer_seat: Jack Herer failed review 5669711049 at b16b6277de4e2ab913086f943f2be232687dbf9f. A new exact-head review is required after 020c1d7da8285dfd7ff6a97722d0fde5fe0286c3.
-reviewer_sha: NOT_MEASURED for 020c1d7da8285dfd7ff6a97722d0fde5fe0286c3
-session_state: Cursor cloud agent; no paused workflow
-claimed_by: Cursor Grok cloud agent, 2026-10-26
-owner: Cursor Grok cloud agent
-last_updated: 2026-10-27 10:28 CT, by Cursor Grok cloud agent
-```
-
-### ACTIONS-BACKLOG-CONCURRENCY
-
-```text
-TASK ACTIONS-BACKLOG-CONCURRENCY  priority: P2  status: CLOSED
-goal: Cut the hosted-runner queue by cancelling superseded pull_request runs, skipping heavy jobs on draft PRs, and capping ci.yml shard parallelism at 16.
-why: Sour Diesel review 5670841287 failed c20c42a76. The irrigation draft guard broke two folded if blocks. A skipped matrix does not post the 32 required shard names. GitHub Team allows 60 concurrent jobs.
-branch: cursor/actions-backlog-concurrency-58cd
-base: verdant-grow-diary
-checkout: git fetch origin cursor/actions-backlog-concurrency-58cd verdant-grow-diary && git switch cursor/actions-backlog-concurrency-58cd && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2555 (ready; founder approved ready at 7f88f400. Do not convert to draft or toggle ready.)
-head_sha: c82e2c9682d84835e6d7b2816867b798626f4f9d merged f39231c94. This merge of origin/verdant-grow-diary ecfa2b9115355349b17d9249989c1a49dc933e47 is the new head after push. Read the PR head; this commit cannot name its own SHA.
-state: CLOSED. Merged as 7f2f974aa51dc1d32a08d7d3a97b5af6d6e3a4ae (#2555) on 2026-10-27T20:43:47Z. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
-current_step: Irrigation if expressions are folded blocks again. max-parallel is 16. The pin test rejects a bare >- inside any workflow if. The second HANDOFF_LOG conflict kept this block and the incoming AUTH-LOADING-SMOKE-TIMEOUT-25 block. auth-loading-smoke.yml kept the draft guard, pull-request-only cancel, and timeout-minutes 25.
-next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
-post_merge_check: After a separately authorized merge, confirm a ready PR and a merge_group run still report all 35 required contexts from ci.yml. A draft does not post those 32 shard names. NOT_MEASURED until merged.
-active_writer: Grok cloud agent on cursor/actions-backlog-concurrency-58cd
-decisions: Do not reduce the 32 shard matrix. Those names are the ruleset required checks. max-parallel is 16 under the Team plan's 60-job pool. A draft skip on the shard matrix does not emit the 32 context names; they stay Expected until ready_for_review or merge_group. Lint/typecheck/test/build does report Skipped on a draft. Irrigation draft guards use if: >- so the fold marker is the YAML syntax, not part of the expression. Leave Preflight and test:legal-seo unconditional. Leave security-regression unconditional. Cancel in progress only when github.event_name == pull_request.
-tried_and_rejected: Cutting the shard count was rejected because the ruleset expects Full test suite (shard N/32) for N=1..32. A missing name stays Expected and blocks the merge queue.
-commands: bunx vitest run src/test/ci-pr-concurrency.test.ts src/test/deployment-preview-status-classification.test.ts --reporter=dot; node scripts/scorer-lock.mjs --report --strict
-files_touched: .github/workflows listed in the PR; src/test/ci-pr-concurrency.test.ts; src/test/deployment-preview-status-classification.test.ts; docs/agents/HANDOFF_LOG.md (this block only)
-files_remaining: none planned
-blockers: none in the merge. Independent exact-head review of this merge head is NOT_MEASURED.
-open_questions: none
-gotchas: HOLD #1250 files were not edited. A matrix job skipped by if does not report one check per shard. If ready_for_review never runs, the 32 shard contexts stay Expected and the merge queue stays blocked. Lint/typecheck/test/build Skipped on a draft is not the same as those shard contexts passing. max-parallel 16 also applies on deploy pushes and merge_group.
-links: config/required-status-checks.json; deploy CI runs 40461983713, 40468073006, 40458653770
-artifacts: scorer unlock is gitignored at .claude/scorer-unlock.json
-reviewer_seat: Sour Diesel review 5670841287 at c20c42a76de7bd3271e6f03232d43c9ec7750218 was FAIL 1/1/2. Review 5670970729 at 7f88f400 was 0/0/2 and covered the body only. Neither covers this merge head.
-reviewer_sha: NOT_MEASURED for this merge head
-session_state: no production action
-claimed_by: Grok, 2026-10-27 11:30 CT
-owner: Grok
-last_updated: 2026-10-27 15:05 CT, by Grok
-limits: No repo settings, rulesets, secrets, runner config, force-push, rebase, or bun.lock change. Do not convert #2555 to draft or toggle ready.
-```
-
-### AUTH-LOADING-SMOKE-TIMEOUT-25
-
-```text
-TASK AUTH-LOADING-SMOKE-TIMEOUT-25  priority: P2  status: CLOSED
-goal: Raise the auth-loading-smoke job timeout from 15 to 25 minutes and keep the YAML comment accurate.
-why: Runs 40523498143 (#2545) and 40469789527 (#2526) spent about 10 minutes on Chromium --with-deps apt install, then the test step was cancelled about 4.5 minutes in by the 15-minute cap. Worst case is about 16.5 minutes, so 25 minutes leaves headroom.
-branch: cursor/auth-loading-smoke-timeout-618c
-base: verdant-grow-diary
-checkout: git fetch origin cursor/auth-loading-smoke-timeout-618c verdant-grow-diary && git switch cursor/auth-loading-smoke-timeout-618c && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2553
-head_sha: read origin/cursor/auth-loading-smoke-timeout-618c after the merge of origin/verdant-grow-diary f39231c948942ce50a583f023a8b3481aca3ed94; comment-fix parent is 0c2bdbdfe2fb3ffdc953fc0cfa0ac9dd43ffc12a
-state: CLOSED. Merged as 183aa3a02426239e7b0c2445bb9b8b4cfcaee8bb (#2553) on 2026-10-27T19:49:56Z. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
-current_step: Merged origin/verdant-grow-diary f39231c94. Only docs/agents/HANDOFF_LOG.md conflicted. Both the AUTH-LOADING-SMOKE-TIMEOUT-25 block and the incoming Open blocks are kept. Timeout stays 25. Sour Diesel review 5670229495 at 40591809 does not cover this head.
-next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
-post_merge_check: The next Auth loading smoke (mocked) run on verdant-grow-diary finishes without a 15-minute cancellation. NOT_MEASURED until merged.
-active_writer: Grok session on cursor/auth-loading-smoke-timeout-618c
-decisions: Timeout stays 25. Comment states the test step was cancelled about 4.5 minutes in. Founder approval is recorded as approved by the founder in chat 2026-10-27 in the PR body, not in the workflow file.
-tried_and_rejected: The first comment said the tests then passed in about 4.5 minutes. Sour Diesel P2: in those two runs the test step was cancelled by the 15-minute cap.
-commands: bunx vitest run src/test/auth-loading-ci-safety.test.ts --reporter=dot
-files_touched: .github/workflows/auth-loading-smoke.yml; docs/agents/HANDOFF_LOG.md (this block only)
-files_remaining: none
-blockers: exact-head review at the new head is NOT_MEASURED
-open_questions: none
-gotchas: Do not force-push. Do not change bun.lock. Do not change timeout-minutes. The scorer lock treats the workflow as an existing check; a branch-scoped unlock is local and gitignored.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2553 ; review https://github.com/Verdant-OS/verdant-grow-diary/pull/2553#pullrequestreview-5670229495
-artifacts: none
-reviewer_seat: Sour Diesel reviewed 40591809fcc13992f96f07eade03881604ff75a3; that verdict does not cover the new head
-reviewer_sha: 40591809fcc13992f96f07eade03881604ff75a3 (superseded)
-session_state: PR #2553 was not draft (isDraft false) before this base merge. Do not convert it to draft and do not toggle ready. No enqueue or deploy.
-claimed_by: Grok, 2026-10-27
-owner: Grok
-last_updated: 2026-10-27 14:10 CT, by Grok
-```
-
-### PR-2554-CHART-TOOLTIP-ROUNDING
-
-```text
-TASK PR-2554-CHART-TOOLTIP-ROUNDING  priority: P2  status: CLOSED
-goal: Round Environment chart tooltip display strings so they agree with the card, including soil at one decimal and unsigned zero.
-why: Hover showed the raw °C-to-°F float. Jack Herer PASS-pending-CI listed P3s; Cheeko set soil tooltip decimals to 1.
-branch: cursor/env-chart-tooltip-rounding-3fe4
-base: verdant-grow-diary
-checkout: git fetch origin cursor/env-chart-tooltip-rounding-3fe4 verdant-grow-diary && git switch cursor/env-chart-tooltip-rounding-3fe4 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2554
-head_sha: read origin/cursor/env-chart-tooltip-rounding-3fe4 after the follow-up push
-state: CLOSED. Merged as 434362540ffa361cb2e3c7936b25ba996af3cb36 (#2554) on 2026-10-27T21:39:01Z. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
-current_step: Soil displayDecimals is 1, negative zero is unsigned, fractional tooltip cases live in a new test file.
-next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
-post_merge_check: Environment chart tooltip on a Fahrenheit tent shows 75.0°F and soil 40.46 as 40.5%. NOT_MEASURED until after merge.
-active_writer: Grok cloud session on cursor/env-chart-tooltip-rounding-3fe4
-decisions: Soil tooltip is one decimal even though the Environment card does not render soil. New cases stay in a new test file so tracked pins are not edited again.
-tried_and_rejected: none on this follow-up
-commands: bunx vitest run src/test/sensor-chart-tooltip-fractional-display.test.ts src/test/sensor-chart-tooltip-display-rounding.test.ts --reporter=verbose
-files_touched: src/lib/sensorChartAxisRules.ts; src/test/sensor-chart-tooltip-fractional-display.test.ts; docs/agents/HANDOFF_LOG.md
-files_remaining: none planned
-blockers: none
-open_questions: none
-gotchas: displayDecimals is not tickDecimals. Card still does not show soil.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2554#pullrequestreview-5669825201
-artifacts: src/test/sensor-chart-tooltip-fractional-display.test.ts
-reviewer_seat: Jack Herer review 5669825201 was PASS-pending-CI at 1b260ffd40591e4671017e2e2f2281454c28b096 and does not cover the follow-up head
-reviewer_sha: NOT_MEASURED for the follow-up head
-session_state: follow-up on draft #2554; no merge, queue, or deploy
-claimed_by: Grok, 2026-10-27
-owner: Grok cloud session
-last_updated: 2026-10-27 10:35 CT, by Grok
-```
-
-### ATHENA-FEED-LOG-PUBLIC-GUIDE
-
-```text
-TASK ATHENA-FEED-LOG-PUBLIC-GUIDE  priority: other  status: CLOSED
-goal: Ship the public Athena planned-vs-actual feed log at /guides/athena-feed-chart-log as a draft PR. No merge and no deploy.
-why: The standalone HTML log needs the same public-route, sitemap, and consent-gated analytics pattern as the Advanced Nutrients feed log, with no browser or server storage and no invented Athena dosages.
-branch: cursor/athena-feed-chart-log-431f
-base: verdant-grow-diary
-checkout: git fetch origin cursor/athena-feed-chart-log-431f verdant-grow-diary && git switch cursor/athena-feed-chart-log-431f && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: opened as a draft from this branch; read the PR URL from GitHub after the first push
-head_sha: 2db14d480136d50737460569b2e7d62e9a496023, the formula-guard commit and the parent of the commit that records this line. Read origin/cursor/athena-feed-chart-log-431f for the exact PR head.
-state: CLOSED. Merged as f39231c948942ce50a583f023a8b3481aca3ed94 (#2545) on 2026-10-27T19:07:42Z. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
-current_step: APP_ROUTES lists /guides/athena-feed-chart-log before /guides/grow-stage-care-guide so the path sort matches Array.sort. The CSV download appends the anchor, clicks it without preventDefault, and revokes the object URL on the next turn. escapeCsvField prefixes a cell that starts with = + - @ tab or CR with a single quote. e2e/athena-feed-chart-log-csv.spec.ts runs from .github/workflows/mocked-e2e-unwired-closure.yml. The latest verdant-grow-diary was merged with a normal merge.
-next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
-post_merge_check: NOT_APPLICABLE until merge is requested. After a future merge, confirm https://verdantgrowdiary.com/guides/athena-feed-chart-log returns the page and /version.json reports the merge SHA.
-active_writer: Cursor Grok cloud agent on cursor/athena-feed-chart-log-431f
-decisions: Planned amounts start blank. The page does not embed Athena dosages. Tolerance default is 10% and is labeled as the grower's setting. Analytics events are feed_log_* and fire only when readAnalyticsConsent() is granted. All three CTAs use Link to /auth?mode=signup, the same href and cta_location click tracking as draft #2542. The Advanced Nutrients reverse link is not on this base; it needs to land with or after draft #2542. /vpd-chart is not a route on this base, so the VPD chart label points at /guides/grow-room-vpd-tracker.
-tried_and_rejected: Reusing src/lib/publicFeedLogRules.ts from #2542 was rejected because that module is not on verdant-grow-diary. Athena-specific modules avoid a hard dependency and keep the shared SEO edits additive.
-commands: NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; bunx vitest run src/test/athena-feed-log-rules.test.ts src/test/athena-feed-log-page.test.tsx src/test/athena-feed-log-analytics.test.ts src/test/verdant-seo-sitemap-robots.test.ts src/test/verdant-seo-guides-public-links.test.tsx src/test/route-indexation-matrix.test.ts src/test/static-public-seo-documents.test.ts
-files_touched: src/lib/athenaFeedLogRules.ts src/lib/athenaFeedLogAnalytics.ts src/pages/AthenaFeedLog.tsx src/routes/guides.athena-feed-chart-log.tsx src/routeTree.gen.ts src/lib/appRouteManifest.ts src/lib/build/staticPublicSeoDocuments.ts public/sitemap.xml docs/seo/route-indexation-matrix.md src/pages/GuidesIndex.tsx src/constants/verdantSeoContent.ts scripts/seo-runtime-smoke.mjs e2e/auth-route-protection-mobile.spec.ts e2e/athena-feed-chart-log-csv.spec.ts .github/workflows/mocked-e2e-unwired-closure.yml src/test/athena-feed-log-rules.test.ts src/test/athena-feed-log-page.test.tsx src/test/athena-feed-log-analytics.test.ts src/test/verdant-seo-sitemap-robots.test.ts src/test/verdant-seo-guides-public-links.test.tsx src/test/static-public-seo-documents.test.ts docs/agents/HANDOFF_LOG.md
-files_remaining: none for the draft
-blockers: required CI is NOT_MEASURED until the draft PR runs
-open_questions: Cheeko approval of the exact disclaimer wording before merge. Reverse link from /guides/advanced-nutrients-feeding-chart-log lands with #2542.
-gotchas: Do not set overflow-x hidden on body. Radio labels use min-h-11 (44px). The page does not load its own gtag snippet. CTA href is /auth?mode=signup with data-cta-location tool, article, and footer. No extra query params.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2542
-artifacts: src/test/athena-feed-log-rules.test.ts src/test/athena-feed-log-page.test.tsx src/test/athena-feed-log-analytics.test.ts
-reviewer_seat: an eligible independent session that did not author this PR
-reviewer_sha: NOT_MEASURED
-session_state: Cursor Grok cloud agent implementing the public guide; no paused workflow
-claimed_by: Cursor Grok cloud agent, 2026-10-26
-owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
-last_updated: 2026-10-27 10:22 CT, by Cursor Grok cloud agent
-```
-
-### PLANT-HASH-SCROLL-OFFSET
-
-```text
-TASK PLANT-HASH-SCROLL-OFFSET  priority: other  status: CLOSED
-goal: Give every plant-detail hash target the same sticky-header scroll offset (scroll-mt-16) before PR #2285 switches landings to scrollIntoView block start.
-why: Independent review of #2285 found #plant-harvest-evidence has no scroll-mt-16, and could not locate the plant-recent-activity target.
-branch: cursor/plant-hash-scroll-offset-509a
-base: verdant-grow-diary at a18cb8479
-checkout: git fetch origin cursor/plant-hash-scroll-offset-509a verdant-grow-diary && git switch cursor/plant-hash-scroll-offset-509a && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2544 (open, not draft; do not change draft or ready state)
-head_sha: reviewed parent 692573d19075cd731e66771414236d8032b4bea4. This repair commit cannot embed its own SHA. After the normal push, origin/cursor/plant-hash-scroll-offset-509a is the head.
-state: CLOSED. Merged as c7288b50c3f255f4275e6eab8522c7aaa576c583 (#2544) on 2026-10-27T18:56:11Z. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
-current_step: HANDOFF_LOG outside this block matches base a18cb847 byte for byte. Product offset change is unchanged. PR is open and not draft. No queue, merge, or deploy.
-next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
-post_merge_check: bunx vitest run src/test/plant-detail-hash-scroll-offset.test.tsx — a failure reopens this slice with the same owner. NOT_MEASURED until merged.
-active_writer: Cursor Grok cloud agent (this session)
-decisions: plant-recent-activity renders on the Card in PlantRecentActivityPanel. Its offset is scroll-mt-16, matching the other mapped targets. The harvest-evidence disclosure trigger gets scroll-mt-16 only when it owns an anchor id. PLANT_DETAIL_KNOWN_ANCHOR_IDS drives the rendered-page regression. P3 1px header-border note left unchanged.
-tried_and_rejected: Rewriting neighboring fences was rejected; the merge had turned base fences into 4-backtick lines. This repair restores the base file and inserts only this block.
-commands: bunx vitest run src/test/plant-detail-hash-scroll-offset.test.tsx src/test/plant-detail-disclosure-section.test.tsx src/test/plant-detail-disclosure-rules.test.ts --reporter=dot
-files_touched: src/components/PlantDetailDisclosureSection.tsx; src/components/PlantRecentActivityPanel.tsx; src/lib/plantDetailDisclosureRules.ts; src/test/plant-detail-hash-scroll-offset.test.tsx; docs/agents/HANDOFF_LOG.md
-files_remaining: none
-blockers: none
-open_questions: none
-gotchas: Do not edit claude/plant-hash-scroll-align-top. scroll-mt-16 is a 4rem offset; replacing scroll-mt-20 on the recent-activity card changes that margin by 1rem under center alignment. A reviewer noted scroll-mt-16 can leave 1px under the header border; that P3 was left as-is.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2544 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2544#pullrequestreview-5669691817 ; https://github.com/Verdant-OS/verdant-grow-diary/pull/2285
-artifacts: src/test/plant-detail-hash-scroll-offset.test.tsx
-reviewer_seat: Sour Diesel review 5669691817 recorded the P2s this commit repairs. This session authored the change and does not request a new review here.
-reviewer_sha: 692573d19075cd731e66771414236d8032b4bea4
-session_state: Cursor cloud agent; PR is open and not draft; no merge, queue, or deploy
-claimed_by: Cursor Grok cloud agent, 2026-10-26
-owner: Cursor Grok cloud agent
-last_updated: 2026-10-27 10:26 CT, by Cursor Grok cloud agent
-```
-
-### HANDOFF-CONTINUITY-20261024
-
-```text
-TASK HANDOFF-CONTINUITY-20261024  priority: other  status: CLOSED
-goal: Docs-only constitution amendment so a retired or out-of-token agent can be resumed immediately, including Cheeko's seven further gates (one writer, one-pass review, stale expiry, ship/money, repo-wide breakages, protected instruction files, post-merge loop).
-why: Unpushed session state and SHA-unbound passes leave the next agent unable to continue. Cheeko approved the continuity rules and the seven gates for this same draft.
-branch: cursor/handoff-continuity-a798
-base: verdant-grow-diary
-checkout: git fetch origin cursor/handoff-continuity-a798 verdant-grow-diary && git switch cursor/handoff-continuity-a798 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: opened as a draft from this branch; read the PR URL from GitHub after the first push (a commit cannot name its own SHA or the PR number created after it)
-head_sha: read origin/cursor/handoff-continuity-a798 after push; this block is in the first commit
-state: CLOSED. Merged as c14f1b0d18ddedeaeffb7c569789968df3d8d852 (#2523) on 2026-10-24T20:41:08Z. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
-current_step: 2026-10-24.6 names CURRENT_STATE.md in the environment note on draft #2523; prior independent PASS was d46e2a3c11f785f650f79f9f0b18a6390913c78e and does not carry
-next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
-decisions: Fold rules into AGENTS.md Agent Handoff / Coverage and Release and Environment Rules instead of a second policy file. Stamp Sentinel-Version on all twelve governance files with scripts/sync-sentinel-mirror.mjs because AGENTS.md changed. Leave .github/pull_request_template.md unchanged and put the Release steps measured checkbox wording in CURRENT_STATE and the PR body. Do not backfill historical owner rows. Default inheritor is OG Kush (engineering lead). Crew-bell ring is a PR comment `handed off: <agent>, <YYYY-MM-DD HH:MM> UTC`.
-tried_and_rejected: Editing only AGENTS.md was rejected because the sentinel parity gate requires all twelve files to share one version and GEMINI.md to mirror AGENTS.md. Editing the GitHub PR template was rejected for this PR because .github is left untouched; the checkbox is specified in CURRENT_STATE instead.
-commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-10-24.6 && node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary
-files_touched: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md; docs/agents/HANDOFF_PROTOCOL.md; docs/agents/roles/*.md; docs/agents/HANDOFF_LOG.md; docs/agents/CURRENT_STATE.md
-files_remaining: none in this slice. .github/pull_request_template.md stays unchanged.
-blockers: independent exact-head review not yet requested; GitHub comment approval gate still applies to a resume-here comment unless Cheeko or Matthew allows it
-open_questions: none for the wording Cheeko approved
-gotchas: A new commit invalidates any review of an older SHA. CURRENT_STATE.md is exempt from Sentinel-Version. Do not force-push. Keep the PR draft.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523 ; PASS at d46e2a3c only: https://github.com/Verdant-OS/verdant-grow-diary/pull/2523#pullrequestreview-5638407206
-artifacts: this block
-reviewer_seat: an eligible independent session that did not author this PR (not this Cursor Grok session)
-reviewer_sha: none yet
-session_state: Cursor cloud agent on cursor/handoff-continuity-a798; no paused workflow; no pending human decision beyond draft review
-post_merge_check: NOT_APPLICABLE (docs constitution; merge is not itself a feature release). After merge, confirm Sentinel-Version 2026-10-24.6 on verdant-grow-diary and that the handoff template heading is present in docs/agents/HANDOFF_LOG.md.
-active_writer: Cursor Grok cloud agent (this session)
-claimed_by: Cursor Grok cloud agent, 2026-10-24 13:10 UTC
-owner: Cursor Grok cloud agent; on retirement transfer to OG Kush if no successor is named
-last_updated: 2026-10-24 13:50 UTC, by Cursor Grok cloud agent
-```
-
-### POSTHOG-PUBLIC-CLIENT-KEY
-
-```text
-TASK POSTHOG-PUBLIC-CLIENT-KEY  priority: other  status: CLOSED
-goal: Lovable production builds initialise PostHog from the committed public client key in VITE_POSTHOG_KEY after analytics consent.
-why: The live bundle reads VITE_POSTHOG_KEY and VITE_POSTHOG_HOST, and Lovable builds from the committed .env. Neither variable was set, so PostHog never initialised. Cheeko chose committing the public client key.
-branch: cursor/posthog-public-client-key-f411
-base: verdant-grow-diary
-checkout: git fetch origin cursor/posthog-public-client-key-f411 verdant-grow-diary && git switch cursor/posthog-public-client-key-f411
-pr: read the URL from GitHub after push
-head_sha: read git rev-parse HEAD after the push
-state: CLOSED. Merged as cd0fe0cd4353c0145eae9d1855b54427240c1f3a (#2776) on 2026-11-03T03:08:14Z. Closed in the handoff log 2026-11-04 by Claude session_017UoYKv4arxJYBMGNNh1bvN on Matthew's instruction (Grok no longer active).
-current_step: consent test waits on vi.dynamicImportSettled; committed env presence and per-directive CSP assertions added. Secret scan stays red until a separate base allowlist lands.
-next_action: none; closed. Any post_merge_check above still applies to its recorded owner.
-post_merge_check: after Publish, load https://verdantgrowdiary.com while signed out, grant analytics consent, and confirm a request to https://us.i.posthog.com. Before consent, that request must be absent. NOT_MEASURED until live /version.json reports this SHA.
-active_writer: Grok cloud agent on this branch
-decisions: Commit only VITE_POSTHOG_KEY and https://us.i.posthog.com in .env. CSP adds that host plus https://us-assets.i.posthog.com because posthog-js 1.444.0 RequestRouter loads /static from the region assets host when api_host is the US ingestion host and asset_host is unset. script-src lists the assets host; connect-src lists both. .env.example stays empty and says personal PostHog keys must never be committed.
-tried_and_rejected: none
-commands: bunx vitest run src/test/posthog-env-consent-startup.test.ts src/test/security-headers-rules.test.ts src/test/posthog-consent-client.test.ts --reporter=dot
-files_touched: .env; .env.example; src/lib/securityHeadersRules.ts; src/test/posthog-env-consent-startup.test.ts; docs/agents/HANDOFF_LOG.md
-files_remaining: none
-blockers: env/config gate — Cheeko's own-words yes at the exact head SHA before merge
-open_questions: none
-gotchas: do not commit a personal PostHog key. Do not edit workflows, wrangler, package.json, lockfiles, migrations, or auth. Existing posthog-consent-client.test.ts stays untouched; it stubs an empty key and injects a fixture reader.
-links: none yet
-artifacts: none
-reviewer_seat: not requested
-reviewer_sha: NOT_MEASURED
-session_state: no production writes; auto-merge off
-claimed_by: Grok, 2026-11-03
-owner: Cheeko
-last_updated: 2026-11-02 20:40 CT, by Grok
 ```
 
 ## Coverage not yet imported

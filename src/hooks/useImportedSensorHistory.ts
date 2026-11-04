@@ -19,7 +19,7 @@ import { useAuth } from "@/store/auth";
 export const IMPORTED_SENSOR_HISTORY_QUERY_LIMIT = 200;
 
 export const IMPORTED_SENSOR_HISTORY_SELECT =
-  "id,tent_id,source,metric,value,quality,ts,captured_at,created_at,source_app:raw_payload->>source_app,csv_import:raw_payload->>csv_import,suspicious:raw_payload->>suspicious,suspicious_flags:raw_payload->suspicious_flags" as const;
+  "id,tent_id,source,metric,value,quality,ts,captured_at,created_at,source_app:raw_payload->>source_app,csv_import:raw_payload->>csv_import,suspicious:raw_payload->>suspicious,suspicious_flags:raw_payload->suspicious_flags,vpd_source:raw_payload->>vpd_source" as const;
 
 export type ImportedSensorHistoryRow = Pick<
   SensorReadingRow,

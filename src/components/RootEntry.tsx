@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense } from "react";
+import { useHydrated } from "@/hooks/useHydrated";
 import { useAuth } from "@/store/auth";
 import {
   resolveRootEntrySurface,
@@ -29,14 +30,13 @@ function RootEntryLoader() {
  */
 export default function RootEntry() {
   const { user, loading } = useAuth();
-  // SSR has no trusted session, so both the server and first client pass render
+  // SSR has no trusted session, so both the server and the hydration pass render
   // the public landing surface. AuthProvider may restore a cached session
-  // before hydration finishes; waiting for this effect keeps those two passes
-  // byte-identical. The existing auth resolver takes over on the next render.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  // before hydration finishes; useHydrated() is false only for SSR and that
+  // hydration pass, which keeps them byte-identical. A later client-side mount
+  // (e.g. /onboarding handing a grower to `/`) reads true at once, so a signed-in
+  // grower never renders or lazy-loads Landing first (grower bug item 11).
+  const hydrated = useHydrated();
 
   const rootEntryState = {
     authLoading: loading,

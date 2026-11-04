@@ -1,7 +1,8 @@
 /**
  * Station card for one tent's EcoWitt customized-upload readings.
  *
- * Pure. Shows only source `live` rows. Missing metrics stay blank.
+ * Pure. Shows only source `live` rows the custom-upload planner stamped with
+ * its `ingest_path`. Missing metrics stay blank.
  * Temperature is stored Celsius and displayed Fahrenheit.
  * Stale means the last packet is older than three gateway intervals.
  */
@@ -9,6 +10,7 @@
 import { ECOWITT_CUSTOM_UPLOAD_COPY } from "@/constants/ecowittCustomUploadCopy";
 import {
   ECOWITT_CUSTOM_UPLOAD_DEFAULT_INTERVAL_SECONDS,
+  ECOWITT_CUSTOM_UPLOAD_INGEST_PATH,
   isCustomUploadPacketStale,
 } from "@/lib/ecowittCustomUploadIngestRules";
 import { isSensorTestbenchProvenance } from "@/lib/sensorTestbenchIndicatorRules";
@@ -34,6 +36,12 @@ export interface EcowittStationReadingInput {
   readonly confidence?: string | null;
   readonly reportedVerdantSource?: string | null;
   readonly gatewayMarkerCount?: number;
+  /**
+   * `raw_payload->>ingest_path`. Only rows the custom-upload planner stamped
+   * belong to this card. Bridge rows and old rows without it are hidden here
+   * (they stay visible everywhere else), never shown as custom-upload Live.
+   */
+  readonly ingestPath?: string | null;
 }
 
 export interface EcowittStationCardInput {
@@ -201,6 +209,7 @@ export function ecowittStationFenceFromListRow(row: object): {
   confidence: string | null;
   reportedVerdantSource: string | null;
   gatewayMarkerCount: number;
+  ingestPath: string | null;
 } {
   const loose = row as Record<string, unknown>;
   return {
@@ -211,6 +220,7 @@ export function ecowittStationFenceFromListRow(row: object): {
       const value = loose[key];
       return value !== null && value !== undefined && value !== "";
     }).length,
+    ingestPath: stringOrNull(loose.ingest_path),
   };
 }
 
@@ -237,6 +247,7 @@ function latestLive(
   for (const reading of readings) {
     if (reading.tentId !== tentId) continue;
     if (reading.source !== "live") continue;
+    if (reading.ingestPath !== ECOWITT_CUSTOM_UPLOAD_INGEST_PATH) continue;
     if (isTestbenchReading(reading)) continue;
     if (reading.quality !== "ok" && reading.quality !== "degraded") continue;
     if (reading.metric !== metric || !isLiveMetric(reading.metric)) continue;

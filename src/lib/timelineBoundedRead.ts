@@ -36,6 +36,8 @@ export class TimelineBoundedRead {
     "gateway_runtime:raw_payload->metadata->raw_payload->>runtime",
     "gateway_wh65batt:raw_payload->metadata->raw_payload->>wh65batt",
     "gateway_wh25batt:raw_payload->metadata->raw_payload->>wh25batt",
+    // Which pathway wrote the row; the custom-upload station card reads it (#2732 P3-1).
+    "ingest_path:raw_payload->>ingest_path",
   ].join(",");
 
   /** CSV history fields the AI Doctor vendor and suspicious-flag summary reads. */

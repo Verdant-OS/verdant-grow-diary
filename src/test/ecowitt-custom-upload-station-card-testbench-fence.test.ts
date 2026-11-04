@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ECOWITT_CUSTOM_UPLOAD_INGEST_PATH } from "@/lib/ecowittCustomUploadIngestRules";
 import {
   buildEcowittCustomUploadStationCard,
   type EcowittStationReadingInput,
@@ -16,7 +17,16 @@ function live(
   value: number,
   extra: Partial<EcowittStationReadingInput> = {},
 ): EcowittStationReadingInput {
-  return { tentId: TENT, metric, value, source: "live", quality: "ok", capturedAt: AT, ...extra };
+  return {
+    tentId: TENT,
+    metric,
+    value,
+    source: "live",
+    quality: "ok",
+    capturedAt: AT,
+    ingestPath: ECOWITT_CUSTOM_UPLOAD_INGEST_PATH,
+    ...extra,
+  };
 }
 
 function card(readings: EcowittStationReadingInput[], claimState: "active" | "unbound" | "none") {
@@ -99,12 +109,14 @@ describe("ecowittStationFenceFromListRow", () => {
       confidence: "test",
       reportedVerdantSource: "live",
       gatewayMarkerCount: 2,
+      ingestPath: null,
     });
     expect(ecowittStationFenceFromListRow({ raw_payload: { vendor: "x" } })).toEqual({
       vendor: null,
       confidence: null,
       reportedVerdantSource: null,
       gatewayMarkerCount: 0,
+      ingestPath: null,
     });
   });
 });

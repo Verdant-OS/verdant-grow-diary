@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ECOWITT_CUSTOM_UPLOAD_COPY } from "@/constants/ecowittCustomUploadCopy";
+import { ECOWITT_CUSTOM_UPLOAD_INGEST_PATH } from "@/lib/ecowittCustomUploadIngestRules";
 import { buildEcowittCustomUploadStationCard } from "@/lib/ecowittCustomUploadStationCardViewModel";
 
 const NOW = new Date("2026-11-02T18:00:30.000Z");
@@ -22,6 +23,7 @@ describe("EcoWitt customized-upload station card view model", () => {
           metric: "temperature_c",
           value: 22.222222,
           source: "live",
+          ingestPath: ECOWITT_CUSTOM_UPLOAD_INGEST_PATH,
           quality: "ok",
           capturedAt: "2026-11-02T18:00:00.000Z",
         },
@@ -30,6 +32,7 @@ describe("EcoWitt customized-upload station card view model", () => {
           metric: "humidity_pct",
           value: 55,
           source: "live",
+          ingestPath: ECOWITT_CUSTOM_UPLOAD_INGEST_PATH,
           quality: "ok",
           capturedAt: "2026-11-02T18:00:00.000Z",
         },
@@ -38,6 +41,7 @@ describe("EcoWitt customized-upload station card view model", () => {
           metric: "soil_moisture_pct",
           value: 40,
           source: "live",
+          ingestPath: ECOWITT_CUSTOM_UPLOAD_INGEST_PATH,
           quality: "ok",
           capturedAt: "2026-11-02T18:00:00.000Z",
         },
@@ -46,6 +50,7 @@ describe("EcoWitt customized-upload station card view model", () => {
           metric: "co2_ppm",
           value: 800,
           source: "live",
+          ingestPath: ECOWITT_CUSTOM_UPLOAD_INGEST_PATH,
           quality: "ok",
           capturedAt: "2026-11-02T18:00:00.000Z",
         },
@@ -100,6 +105,7 @@ describe("EcoWitt customized-upload station card view model", () => {
           metric: "temperature_c",
           value: 20,
           source: "live",
+          ingestPath: ECOWITT_CUSTOM_UPLOAD_INGEST_PATH,
           quality: "ok",
           capturedAt: "2026-11-02T17:50:00.000Z",
         },
@@ -124,6 +130,7 @@ describe("EcoWitt customized-upload station card view model", () => {
           metric: "temperature_c",
           value: "22.2",
           source: "live",
+          ingestPath: ECOWITT_CUSTOM_UPLOAD_INGEST_PATH,
           quality: "ok",
           capturedAt: "2026-11-02T18:00:00.000Z",
         },
@@ -132,6 +139,7 @@ describe("EcoWitt customized-upload station card view model", () => {
           metric: "humidity_pct",
           value: "55",
           source: "live",
+          ingestPath: ECOWITT_CUSTOM_UPLOAD_INGEST_PATH,
           quality: "ok",
           capturedAt: "2026-11-02T18:00:00.000Z",
         },
@@ -157,6 +165,7 @@ describe("EcoWitt customized-upload station card view model", () => {
           metric: "soil_moisture_pct",
           value: 0,
           source: "live",
+          ingestPath: ECOWITT_CUSTOM_UPLOAD_INGEST_PATH,
           quality: "degraded",
           capturedAt: "2026-11-02T18:00:00.000Z",
         },

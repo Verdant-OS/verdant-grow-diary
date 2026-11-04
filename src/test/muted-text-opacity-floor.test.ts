@@ -45,12 +45,6 @@ function isStaticallyHidden(attr: ts.JsxAttribute): boolean {
   return false;
 }
 
-/**
- * PlantManualSensorFreshnessCard's stale and missing labels are fixed in #2830
- * (claude/freshness-label-contrast). Remove this entry once that PR merges.
- */
-const PENDING = new Set(["src/components/PlantManualSensorFreshnessCard.tsx"]);
-
 function files(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
@@ -81,7 +75,6 @@ function offenders(): string[] {
     ...files(resolve(cwd, "src/pages")),
   ]) {
     const rel = relative(cwd, file);
-    if (PENDING.has(rel)) continue;
     const sf = ts.createSourceFile(
       file,
       readFileSync(file, "utf8"),

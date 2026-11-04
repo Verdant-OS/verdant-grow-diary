@@ -14,6 +14,8 @@ This spec measures it from the theme tokens in `src/styles.css` on the deploy br
   - the default dark theme in `:root`, lines 116–151
   - the light `.customer-mode` theme, lines 198–214
 - Contrast ratio is WCAG 2.x: (L1 + 0.05) / (L2 + 0.05), using sRGB relative luminance.
+- "White" means `--destructive-foreground`, `0 0% 98%`, not pure white. Pure white reads about
+  0.2 higher against the reds below.
 - Opacity variants such as `text-muted-foreground/70` are alpha-blended over their background
   before the ratio is taken.
 - `.glass` cards use `--gradient-glass` (line 176). The worst case is its lightest stop,
@@ -50,23 +52,28 @@ The audit's main worry, muted gray on dark green, does **not** hold for the base
 
 `--destructive: 0 70% 55%` (line 139) serves two jobs. It is the error text colour
 (`text-destructive`, 310 uses) and the danger button and badge fill (`bg-destructive`, 127 uses,
-including `src/components/ui/button.tsx:13` and `src/components/ui/badge.tsx:15`).
+including `src/components/ui/button.tsx:13` and `src/components/ui/badge.tsx:15`). Most of those
+127 are translucent tints such as `bg-destructive/10`. Only 9 non-test uses at `c03f64a` were solid
+fills.
 
 | Pair                                                           | Ratio | AA text  |
 | -------------------------------------------------------------- | ----- | -------- |
 | `text-destructive` on `--background`                           | 4.30  | **FAIL** |
 | `text-destructive` on `--card`                                 | 4.00  | **FAIL** |
 | `text-destructive` on glass (lightest stop)                    | 3.47  | **FAIL** |
-| `--destructive-foreground` (white) on `--destructive` (button) | 4.40  | **FAIL** |
+| `--destructive-foreground` (white) on `--destructive` (button) | 4.21  | **FAIL** |
 
 One token cannot pass both jobs. Lighter helps the text but hurts the button. The two numbers
 pull in opposite directions:
 
 | `--destructive` lightness | text on card | white on button |
 | ------------------------- | ------------ | --------------- |
-| 55% (today)               | 4.00         | 4.40            |
-| 60%                       | 4.60         | 3.82            |
-| 65%                       | 5.41         | 3.25            |
+| 55% (today)               | 4.00         | 4.21            |
+| 60%                       | 4.60         | 3.66            |
+| 65%                       | 5.41         | 3.11            |
+
+The light `.customer-mode` theme fails too. There the 55% token measures 4.11 on `--background`
+and 4.40 on `--card`.
 
 Error text is safety copy. Examples are `tent-create-size-error` at 11 px, save errors, and
 read-failure notices. A grower must be able to read it.
@@ -125,10 +132,12 @@ There are 41 uses at /70 or below in `src/components` and `src/pages`:
 
 - **(a) Split it (recommended).** Add `--destructive-text: 0 85% 68%` for text, which measures
   6.29 on background, 5.85 on card and 5.08 on glass. Darken the fill to `--destructive: 0 70% 48%`,
-  which gives white text 5.06. `text-destructive` maps to the text token and `bg-destructive` to
-  the fill. The visible change: error text gets a little lighter, danger buttons a little darker.
+  which gives white text 5.06. As shipped in #2839, `--color-destructive` points at the text token,
+  so `text-destructive`, borders, tints and plain `bg-destructive` all use it. Solid fills use a
+  separate `bg-destructive-fill` utility, because Tailwind maps one colour to each name. The light
+  theme gets its own `--destructive-text: 0 70% 45%`, at 5.48 on background and 5.87 on card. The visible change: error text gets a little lighter, danger buttons a little darker.
 - **(b) Keep one token at 58%.** Text measures 4.67 on background but 4.34 on card, so it still
-  fails, and the button drops to 4.05. Not recommended.
+  fails, and the button drops to 3.88. Not recommended.
 
 **D2: muted opacity policy.**
 
@@ -150,7 +159,8 @@ sweep. The freshness card (§8 step 1) is already in #2830, so the D2 sweep leav
 3. The freshness card's stale and missing labels are ≥ 4.5 on card and glass, and still say
    "Stale" or "Missing". (R3, F1, F2)
 4. Under D2(a): no `text-muted-foreground/[1-7]0` on an element without `aria-hidden`. (R2)
-5. The light theme still passes everything in §2.1. (R4)
+5. The light theme still passes everything in §2.1, and its error text is ≥ 4.5 on background
+   and card. (R1, R4)
 
 ## 7. Out of scope
 

@@ -13,10 +13,12 @@ Measured on the deploy branch `verdant-grow-diary` at `c03f64a`.
 ## 1. Collision check
 
 Four EcoWitt and MQTT PRs are open: #2732, #2751, #2752 and #2757. None of them edits
-`src/pages/Sensors.tsx`. #2732 changes the EcoWitt station cards that the page mounts
-(`EcowittCustomUploadStationCard`, `EcowittCustomUploadStationMount`, `EcowittTentSnapshotV0Card`).
-This spec treats those cards as opaque units and moves them only as whole components. The
-implementation slice should still land after #2732, or rebase onto it.
+`src/pages/Sensors.tsx`, and the page mounts none of the EcoWitt station cards that #2732
+changes. `EcowittTentSnapshotV0Card` mounts only at `src/pages/TentDetail.tsx:762`.
+`EcowittCustomUploadStationCard` and `EcowittCustomUploadStationMount` are new files in #2732 and
+are not on base. The EcoWitt blocks Sensors does mount are `EcowittBridgeTroubleshootingPanel`
+(`src/pages/Sensors.tsx:986`), `EcowittLiveProofPanel` (`:1033`) and
+`EcowittIngestAuditProofPanel` (`:1039`); this spec moves them only as whole components.
 
 ## 2. What renders today (source-traced)
 
@@ -71,7 +73,8 @@ store pH, EC/TDS…" matches the form's own copy.
   **Connect & diagnostics**.
   - Daily readings: current values, source labels, and the manual reading form.
   - History & import: charts, the trend chart and CSV import.
-  - Connect & diagnostics: the testbench, EcoWitt cards and operator diagnostics.
+  - Connect & diagnostics: the testbench, the EcoWitt bridge troubleshooting, live-proof and
+    ingest-audit panels, and operator diagnostics.
 - **R2:** per D2, Daily readings is first and open by default. The manual reading form is reachable
   without scrolling past charts at 390 × 844.
 - **R3:** Connect & diagnostics is closed by default and keeps its gates (F3). A grower whose live
@@ -107,7 +110,7 @@ store pH, EC/TDS…" matches the form's own copy.
 7. The existing Sensors tests pass, or pins are renegotiated only where structure was asked to
    change.
 
-## 8. File plan (after D1 to D3, and after #2732 lands)
+## 8. File plan (after D1 to D3)
 
 1. A pure section-assignment table in a new `src/lib/sensorsPageSectionRules.ts`, with tests.
 2. Section wrappers in `src/pages/Sensors.tsx`, using the existing collapsible primitive. Mount

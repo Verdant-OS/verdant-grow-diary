@@ -1062,7 +1062,7 @@ export default function ManualSensorReadingCard({
               </ul>
             )}
             {(isCorrection || hasEditedReading) && validation.errors.length > 0 && (
-              <ul className="space-y-1" data-testid="manual-reading-errors">
+              <ul className="space-y-1" role="alert" data-testid="manual-reading-errors">
                 {validation.errors.map((e, i) => (
                   <li key={i} className="flex items-start gap-2 text-xs text-destructive">
                     <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />

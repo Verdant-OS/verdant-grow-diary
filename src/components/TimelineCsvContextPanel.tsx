@@ -16,6 +16,7 @@ import { CsvTimelineEnvironmentChip } from "@/components/CsvTimelineEnvironmentC
 import { Button } from "@/components/ui/button";
 import {
   buildCsvTimelineContext,
+  keepOneCsvChipPerSnapshot,
   type CsvSensorReadingRow,
   type CsvTimelineContextEntry,
 } from "@/lib/environmentCsvTimelineContextViewModel";
@@ -204,8 +205,9 @@ export function TimelineCsvContextPanel(props: TimelineCsvContextPanelProps) {
         growId,
         tentId,
       });
-      for (const c of ctx) {
-        if (c.snapshot) out.set(c.diaryEntryId, c);
+      const entryAtById = new Map(tentEntries.map((e) => [e.id, e.occurred_at]));
+      for (const c of keepOneCsvChipPerSnapshot(ctx, entryAtById)) {
+        out.set(c.diaryEntryId, c);
       }
     }
     return out;

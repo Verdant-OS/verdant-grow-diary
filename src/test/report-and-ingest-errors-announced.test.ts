@@ -12,8 +12,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import ts from "typescript";
 import { createElement } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import EmptyState from "@/components/EmptyState";
+import { MemoryRouter } from "@/lib/react-router-compat";
+import SensorsIngestNormalizer from "@/pages/SensorsIngestNormalizer";
 
 const FILES = [
   "src/pages/PostGrowLearningReport.tsx",
@@ -108,6 +110,19 @@ describe("report and ingest error messages are announced", () => {
       }),
     );
     expect(screen.getByRole("alert").textContent).toBe("This grow report could not be loaded.");
+  });
+
+  it("the ingest normalizer's payload errors appear inside an alert", () => {
+    // A polite status region that mounts together with its text is often not read out, so this
+    // block, which only appears after a parse, has to be an alert.
+    render(createElement(MemoryRouter, null, createElement(SensorsIngestNormalizer)));
+    fireEvent.change(screen.getByTestId("webhook-normalizer-textarea"), {
+      target: { value: "{}" },
+    });
+    fireEvent.click(screen.getByTestId("webhook-normalizer-parse"));
+    const block = screen.getByTestId("webhook-normalizer-payload-errors");
+    expect(block.getAttribute("role")).toBe("alert");
+    expect(within(block).getByText("source required")).toBeTruthy();
   });
 
   it("EmptyState without descriptionRole announces nothing (other callers unchanged)", () => {

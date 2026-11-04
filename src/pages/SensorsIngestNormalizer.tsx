@@ -277,7 +277,7 @@ function NormalizationResult({ explanation }: { explanation: WebhookNormalizatio
         <div
           className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
           data-testid="webhook-normalizer-payload-errors"
-          role="status"
+          role="alert"
         >
           <h3 className="mb-2 text-sm font-semibold">Payload errors</h3>
           <ul className="list-disc space-y-1 pl-5 text-xs">

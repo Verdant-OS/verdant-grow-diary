@@ -269,6 +269,13 @@ import {
   getTemperatureUnitSymbol,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+import {
+  buildStructuredReadings,
+  EMPTY_STRUCTURED_READING_INPUT,
+  STRUCTURED_READING_COPY,
+  STRUCTURED_READING_FIELDS,
+  type StructuredReadingTextInput,
+} from "@/lib/quickLogStructuredReadingRules";
 import { typedTemperatureToCelsiusInput } from "@/lib/quickLogTypedTemperatureRules";
 
 /**
@@ -591,6 +598,21 @@ function QuickLogV2SheetForOwner({
   // query cannot hide options on the next open.
   const [targetFilterQuery, setTargetFilterQuery] = useState("");
   const [readingTimeLocal, setReadingTimeLocal] = useState("");
+  // Structured soil/light readings for Note saves (grower bug item 14).
+  const [structuredInput, setStructuredInput] = useState<StructuredReadingTextInput>(
+    EMPTY_STRUCTURED_READING_INPUT,
+  );
+  const structuredReadings = useMemo(
+    () =>
+      buildStructuredReadings({
+        ...structuredInput,
+        soilTempUnit: temperatureUnit === "fahrenheit" ? "F" : "C",
+      }),
+    [structuredInput, temperatureUnit],
+  );
+  // A structured reading alone is content for a Note (both content checks use this).
+  const structuredHasContent =
+    form.action === "note" && Object.keys(structuredReadings.values).length > 0;
   // One-shot tent-scoped plant auto-select per open (sole plant / recent-in-tent).
   const [tentPlantAutoApplied, setTentPlantAutoApplied] = useState(false);
   const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(
@@ -1142,11 +1164,17 @@ function QuickLogV2SheetForOwner({
   const feedWaterTemperatureMessage = retryPending
     ? null
     : (feedingWaterTemperatureGate?.message ?? null);
+  // Structured soil/light readings (item 14): a non-number blocks Save while typed.
+  const structuredFieldMessage =
+    form.action === "note" && structuredReadings.errors.length > 0
+      ? STRUCTURED_READING_COPY.fixBeforeSave
+      : null;
   const waterFieldMessage = retryPending
     ? null
     : (waterSaveGate?.footerMessage ??
       waterTemperatureMessage ??
       snapshotGate?.footerMessage ??
+      structuredFieldMessage ??
       null);
   // #2159: a negative feeding EC is named under its field and blocks Save
   // while typed, not only when the save is attempted.
@@ -1169,7 +1197,7 @@ function QuickLogV2SheetForOwner({
     vpdKpa: form.vpdKpa,
     hasPhoto: photoFile !== null,
     hasVideo: videoFile !== null,
-    hasMaturityEvidence: hasQuickLogMaturityEvidence(maturityEvidenceForm),
+    hasMaturityEvidence: hasQuickLogMaturityEvidence(maturityEvidenceForm) || structuredHasContent,
   });
   const showMaturityEvidence =
     form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
@@ -1362,6 +1390,7 @@ function QuickLogV2SheetForOwner({
       setRecentSuggestionDismissed(false);
       setTargetFilterQuery("");
       setReadingTimeLocal("");
+      setStructuredInput(EMPTY_STRUCTURED_READING_INPUT);
       setTentPlantAutoApplied(false);
       resetPhotoSelection();
     } else {
@@ -2110,7 +2139,8 @@ function QuickLogV2SheetForOwner({
         vpdKpa: form.vpdKpa,
         hasPhoto: photoFile !== null,
         hasVideo: videoFile !== null,
-        hasMaturityEvidence: hasQuickLogMaturityEvidence(maturityEvidenceForm),
+        hasMaturityEvidence:
+          hasQuickLogMaturityEvidence(maturityEvidenceForm) || structuredHasContent,
       })
     ) {
       setLocalError(QUICK_LOG_V2_EMPTY_CONTENT_HELPER);
@@ -2447,6 +2477,10 @@ function QuickLogV2SheetForOwner({
 
     let exactManualSubmission = pendingManualSubmission;
     if (!wateringPayload && !exactManualSubmission) {
+      if (form.action === "note" && structuredReadings.errors.length > 0) {
+        setLocalError(STRUCTURED_READING_COPY.fixBeforeSave);
+        return;
+      }
       const built = buildQuickLogV2SavePayload({
         resolved,
         action: form.action,
@@ -2471,6 +2505,7 @@ function QuickLogV2SheetForOwner({
         maturityEvidenceForm,
         hasCompanionMedia: Boolean(photoFile || videoFile),
         idempotencyKey: saveIdempotencyKeyRef.current,
+        structuredReadings: form.action === "note" ? structuredReadings.values : null,
       });
       if (built.ok !== true) {
         setLocalError(reasonToMessage(built.reason));
@@ -3226,6 +3261,7 @@ function QuickLogV2SheetForOwner({
       action: prev.action,
     }));
     setReadingTimeLocal("");
+    setStructuredInput(EMPTY_STRUCTURED_READING_INPUT);
     setVisitMode("fast_check");
     manualTempEntryUnitRef.current = null;
     // Same reason as the open reset: "Log another" begins a new draft, and its
@@ -4090,6 +4126,53 @@ function QuickLogV2SheetForOwner({
                   )}
                 </div>
               </div>
+              {form.action === "note" && (
+                <div
+                  className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3"
+                  data-testid="qlv2-structured-readings"
+                >
+                  {STRUCTURED_READING_FIELDS.map((field) => {
+                    const id = `qlv2-${field.input}`;
+                    const error = structuredReadings.errors.find((e) => e.key === field.key);
+                    const flag = structuredReadings.flags.find((f) => f.key === field.key);
+                    const unit = field.unit ?? getTemperatureUnitSymbol(temperatureUnit);
+                    return (
+                      <div key={field.key}>
+                        <Label htmlFor={id}>
+                          {field.label} ({unit})
+                        </Label>
+                        <Input
+                          id={id}
+                          data-testid={id}
+                          inputMode="decimal"
+                          value={structuredInput[field.input]}
+                          disabled={submissionLocked}
+                          aria-invalid={Boolean(error) || undefined}
+                          onChange={(e) =>
+                            setStructuredInput((prev) => ({
+                              ...prev,
+                              [field.input]: e.target.value,
+                            }))
+                          }
+                        />
+                        {error ? (
+                          <p
+                            className="mt-1 text-sm text-destructive"
+                            role="alert"
+                            data-testid={`${id}-error`}
+                          >
+                            {error.message}
+                          </p>
+                        ) : flag ? (
+                          <p className="mt-1 text-sm text-amber-500" data-testid={`${id}-flag`}>
+                            {flag.chip}. {STRUCTURED_READING_COPY.checkValue}
+                          </p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               <p className="mt-2 text-sm text-muted-foreground">
                 Source: manual. Leave blank to skip.
               </p>

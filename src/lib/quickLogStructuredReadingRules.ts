@@ -10,7 +10,7 @@
  */
 import { classifyManualMetric } from "@/lib/sensorTruthRules";
 import { isPpfdValid } from "@/lib/ppfdRules";
-import { fahrenheitToCelsius } from "@/lib/temperatureUnitPreference";
+import { celsiusToFahrenheit, fahrenheitToCelsius } from "@/lib/temperatureUnitPreference";
 
 export const STRUCTURED_READING_KEYS = [
   "soil_temp_c",
@@ -24,7 +24,31 @@ export type StructuredReadingKey = (typeof STRUCTURED_READING_KEYS)[number];
 export const STRUCTURED_READING_COPY = {
   notANumber: "Enter a number",
   invalidPpfd: "Invalid PPFD",
+  checkValue: "Saved as entered — check value",
+  fixBeforeSave: "Fix the soil and light readings before saving.",
 } as const;
+
+/** Field labels, in display order. Soil temp's unit follows the temperature preference. */
+export const STRUCTURED_READING_FIELDS = [
+  { key: "soil_temp_c", input: "soilTemp", label: "Soil temp", unit: null },
+  { key: "soil_moisture_pct", input: "vwcPct", label: "Water content", unit: "% VWC" },
+  { key: "soil_ec_ms_cm", input: "soilEcMsCm", label: "Soil EC", unit: "mS/cm" },
+  { key: "co2_ppm", input: "co2Ppm", label: "CO₂", unit: "ppm" },
+  { key: "ppfd", input: "ppfd", label: "PPFD", unit: "µmol/m²/s" },
+] as const;
+
+export type StructuredReadingTextInput = Record<
+  (typeof STRUCTURED_READING_FIELDS)[number]["input"],
+  string
+>;
+
+export const EMPTY_STRUCTURED_READING_INPUT: StructuredReadingTextInput = {
+  soilTemp: "",
+  vwcPct: "",
+  soilEcMsCm: "",
+  co2Ppm: "",
+  ppfd: "",
+};
 
 export interface StructuredReadingInput {
   soilTemp?: string | null;
@@ -92,4 +116,37 @@ export function buildStructuredReadings(input: StructuredReadingInput): Structur
     if (!truth.valid) result.flags.push({ key, chip: truth.chip ?? "Check value" });
   }
   return result;
+}
+
+export interface StructuredReadingChip {
+  readonly label: string;
+  readonly value: string;
+  /** Stored value that cannot be a real reading; shown flagged, never as plausible. */
+  readonly invalid: boolean;
+}
+
+/**
+ * Display chips for a saved `details.manual_sensor_snapshot`. Requires the
+ * literal `source: "manual"`; ignores non-finite values. Soil temp is shown in
+ * the viewer's unit (stored canonical °C).
+ */
+export function structuredReadingChips(
+  snapshot: unknown,
+  tempUnit: "F" | "C",
+): StructuredReadingChip[] {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return [];
+  const rec = snapshot as Record<string, unknown>;
+  if (rec.source !== "manual") return [];
+  const chips: StructuredReadingChip[] = [];
+  for (const field of STRUCTURED_READING_FIELDS) {
+    const raw = rec[field.key];
+    if (typeof raw !== "number" || !Number.isFinite(raw)) continue;
+    const invalid =
+      field.key === "ppfd" ? !isPpfdValid(raw) : !classifyManualMetric(field.key, raw).valid;
+    const shown =
+      field.key === "soil_temp_c" && tempUnit === "F" ? round2(celsiusToFahrenheit(raw)) : raw;
+    const unit = field.unit ?? (tempUnit === "F" ? "°F" : "°C");
+    chips.push({ label: field.label, value: `${shown} ${unit}`, invalid });
+  }
+  return chips;
 }

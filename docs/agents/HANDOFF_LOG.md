@@ -80,8 +80,8 @@ base: verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2820
 head_sha: read the current head on GitHub
 state: pushed draft
-current_step: item 14 Option A chosen by founder. Spec corrected to existing metric names (soil_temp_c, soil_moisture_pct, soil_ec_ms_cm, co2_ppm, ppfd) and validators; pure rules src/lib/quickLogStructuredReadingRules.ts + tests landed. UI wiring NOT started: blocked on the read-only production check in spec section 3 step 2 (live quicklog_save_manual_pre_logged_at body vs source; CURRENT_STATE delegate md5 mismatch ef7bdf19)
-next_action: owner runs the two read-only SQL lines in docs/specs/quick-log-structured-sensor-readings.md section 3 step 2 on production; if the live body keeps details keys, wire the five fields into QuickLogV2Sheet's reading section per spec
+current_step: item 14 Option A wired: owner confirmed live quicklog_save_manual_pre_logged_at matches source (2026-11-04). Note action gets soil temp, VWC, soil EC, CO2, PPFD inputs saved to p_details.manual_sensor_snapshot (source manual, captured_at); invalid text blocks Save; implausible values are kept and flagged; Recent Quick Logs shows them as manual chips. Corrections cannot edit the new keys yet (correction RPC keeps them untouched)
+next_action: independent review of PR #2820 at its head; founder approval of #2828; follow-up slice for correcting the new keys (needs correction RPC migration)
 post_merge_check: on verdantgrowdiary.com, the fixture plant page shows "Grow: <name>" and Timeline Recent Quick Logs rows show "Plant: ... · Tent: ..."
 active_writer: Claude session claude/new-session-azpsz3
 decisions: no migration/RLS/auth edits (held); items 2,4,5,6 fixed by #2794; item 3 not reproduced (in-flight guard + idempotency key; duplicates 6.5 h apart); item 7 fixed by f2d6ca2; names never guessed (unknown id reads "name unavailable")
@@ -98,7 +98,7 @@ reviewer_sha: none yet
 session_state: one self check-in armed (send_later) for PR #2820 CI
 claimed_by: Claude, 2026-11-03 16:45 CT
 owner: Claude
-last_updated: 2026-11-03 19:05 CT, by Claude
+last_updated: 2026-11-03 19:40 CT, by Claude
 ```
 
 ### QUICK-LOG-WATER-VOLUME-UNITS-SPEC

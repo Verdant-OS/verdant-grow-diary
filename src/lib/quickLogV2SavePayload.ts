@@ -13,6 +13,7 @@ import type { QuickLogMaturityEvidenceFormState } from "./quickLogMaturityEviden
 import { buildManualSensorProvenance } from "./manualSensorProvenanceRules";
 import { withQuickLogNoteMarker } from "./quickLogActivityRules";
 import { assessWaterVolumeText } from "./quickLogWaterVolumeWarningRules";
+import type { StructuredReadingKey } from "./quickLogStructuredReadingRules";
 
 export interface QuickLogV2SavePayload {
   p_target_type: "tent" | "plant";
@@ -60,6 +61,12 @@ export interface BuildQuickLogV2PayloadInput {
   hasCompanionMedia?: boolean;
   /** Optional maturity form; non-empty evidence also satisfies the content gate. */
   maturityEvidenceForm?: QuickLogMaturityEvidenceFormState | null;
+  /**
+   * Structured readings (soil temp, VWC, soil EC, CO2, PPFD) from
+   * buildStructuredReadings, stored in details.manual_sensor_snapshot with
+   * source "manual" (grower bug item 14). Non-empty readings are content.
+   */
+  structuredReadings?: Partial<Record<StructuredReadingKey, number>> | null;
 }
 
 export type BuildResult =
@@ -126,7 +133,12 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
   }
 
   const note = (input.note ?? "").trim();
+  const structured =
+    input.structuredReadings && Object.keys(input.structuredReadings).length > 0
+      ? input.structuredReadings
+      : null;
   const hasMaturityEvidence =
+    structured != null ||
     input.details != null ||
     (input.maturityEvidenceForm != null && hasQuickLogMaturityEvidence(input.maturityEvidenceForm));
   if (
@@ -146,10 +158,21 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
 
   // Metadata belongs to the existing diary companion. Do not duplicate the
   // measurements: the RPC already creates their environment event sibling.
+  const withStructured: Record<string, unknown> | null | undefined = structured
+    ? {
+        ...input.details,
+        manual_sensor_snapshot: {
+          ...(input.details?.manual_sensor_snapshot as Record<string, unknown> | undefined),
+          ...structured,
+          source: "manual",
+          captured_at: input.occurredAt ?? null,
+        },
+      }
+    : input.details;
   const measuredDetails =
-    t !== null || h !== null || v !== null
-      ? { ...input.details, manual_provenance: buildManualSensorProvenance() }
-      : input.details;
+    t !== null || h !== null || v !== null || structured
+      ? { ...withStructured, manual_provenance: buildManualSensorProvenance() }
+      : withStructured;
   // A new note carries the note marker so saved entries can tell it from an
   // issue. Legacy environment-check envelopes keep their own identity.
   const details =

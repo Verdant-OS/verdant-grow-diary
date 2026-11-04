@@ -55,6 +55,7 @@ import RetractedQuickLogPanel from "@/components/RetractedQuickLogPanel";
 import { quickLogRecentEmptyCopy } from "@/lib/quickLogRecentEmptyStateRules";
 import { cn } from "@/lib/utils";
 import { resolveEffectiveQuickLogCareType } from "@/lib/environmentCheckTimelineViewModel";
+import { structuredReadingChips } from "@/lib/quickLogStructuredReadingRules";
 import {
   resolveQuickLogRowTargetLabel,
   type QuickLogTargetNameDirectory,
@@ -234,7 +235,11 @@ function buildRecentDiaryPdfInput(
 }
 
 export function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
-  const items = buildManualReadingChips(row.manualHandheld);
+  const temperatureUnit = useTemperatureUnitPreference();
+  const items = [
+    ...buildManualReadingChips(row.manualHandheld),
+    ...structuredReadingChips(row.structuredSnapshot, temperatureUnit === "fahrenheit" ? "F" : "C"),
+  ];
   if (items.length === 0) return null;
   return (
     <div

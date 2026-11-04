@@ -78,7 +78,7 @@ why: 81 first-parent merges since the 479cadb3 stamp changed 26 cited files, inc
 branch: claude/architecture-contract-restamp-af6a416d
 base: verdant-grow-diary
 checkout: git fetch origin claude/architecture-contract-restamp-af6a416d verdant-grow-diary && git switch claude/architecture-contract-restamp-af6a416d && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft PR from claude/architecture-contract-restamp-af6a416d to verdant-grow-diary; URL added by the next commit on this branch
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2864 (draft)
 head_sha: the commit carrying this block (first push 2026-11-04); read the PR head for the full SHA
 state: pushed draft
 current_step: restamp written, prettier/docs-safety run, draft PR opened, independent review routed to a non-contributing Grok session
@@ -93,7 +93,7 @@ files_remaining: none in this slice. Follow-ups for other slices: CLAUDE.md and 
 blockers: independent exact-head review; 35/35 required checks; founder's per-item yes at the exact head
 open_questions: whether ServiceUnavailablePage's cultivar-specific copy on every SSR 503 is intended (src/lib/serviceUnavailablePage.ts:11,24-25); where the Lovable Stripe route lives, since the deploy tree does not hold it
 gotchas: verdant-ultra-bot base merges dropped HANDOFF_LOG blocks twice on 2026-11-04 (#2853, #2843); after any base merge into this branch, check that this block is still present under ## Open before pushing. The script that relocates cites skips cites without a directory (for example Settings.tsx:341) and bare :NN list items; re-read those by hand. node_modules in the scratchpad worktree is a symlink: stage with explicit paths, not git add -A. Commits need NODE_OPTIONS=--max-old-space-size=8192 for the pre-commit full tsc.
-links: https://github.com/Verdant-OS/verdant-grow-diary/pulls?q=head%3Aclaude/architecture-contract-restamp-af6a416d
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2864
 artifacts: docs/architecture-contract.md header stamp and §15.1 row dated 2026-11-04
 reviewer_seat: route to a non-contributing Grok session; excluded as author: Claude session_017UoYKywiErQ3bEQMo9dYGe
 reviewer_sha: none yet

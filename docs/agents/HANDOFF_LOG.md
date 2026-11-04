@@ -1,5 +1,9 @@
 # Verdant handoff log
 
+**New and updated entries go in `docs/agents/handoffs/<TASK-ID>.md`, not here.** See
+`docs/agents/handoffs/README.md`. This file keeps the template and existing blocks, and a
+task's own file wins over its block here. Read both before `SENTINEL_ACK`.
+
 Pointed to by AGENTS.md (Agent Handoff / Coverage). One block per in-flight task.
 Update daily and before stopping. Display newest last_updated first within each priority;
 selection follows AGENTS.md's priority order and oldest-update tie breaker.
@@ -76,11 +80,11 @@ TASK GA-PROXY-SHARD25-SOCKET-HANG-UP  priority: P2  status: OPEN
 goal: Stop the intermittent "socket hang up" in required check Full test suite (shard 25/32), test src/test/google-analytics-collection-host-proxy.test.ts.
 why: Red on unrelated docs PRs (PR 2831 at 01bac39, job 126290700551; PR 2827 at f3cf793, job 126328068392). A required check red across PRs is top priority.
 branch: claude/trusting-davinci-58hzpj
-base: verdant-grow-diary (merge base 484f8ace3069af94ed9444b07e1e18b8dfad3350)
+base: verdant-grow-diary (merge base cae980f53c938c45dc260f9ced13fb38e5b3e242)
 checkout: git fetch origin claude/trusting-davinci-58hzpj verdant-grow-diary && git switch claude/trusting-davinci-58hzpj && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2843 (ready for review, not draft; marked ready on Matthew's request 2026-11-04 03:36 UTC)
-head_sha: 07579c1c3f306ca2b795c1739b5d8c21540ca8f8 (verdant-ultra-bot base merge, 2026-11-04 06:40 UTC); this restore commit follows it, so read the current head from the PR. Earlier reviewed heads: dc0786bb0e92255b04aa559a24b6686da8acd169, e0754e855344f4701998acfe1223c413428a50c6.
-state: review. Every gate recorded at e0754e85 (Reviewer C APPROVE, 35/35 CI, Matthew merge and scorer-lock yeses) is void at the new head.
+head_sha: the base merge of cae980f5 into c90c3b03d3300d7bb6fb75fa748fdccd57003d29 (made after the merge queue removed the PR for MERGE_CONFLICT, 2026-11-04 09:12 UTC); read the current head from the PR. Earlier reviewed heads: dc0786bb0e92255b04aa559a24b6686da8acd169, e0754e855344f4701998acfe1223c413428a50c6, c90c3b03d3300d7bb6fb75fa748fdccd57003d29.
+state: review. Every gate recorded at c90c3b03 (reviews, 35/35 CI, Matthew yeses) is void at the new head.
 current_step: Restore this block: the 07579c1c base merge resolved the HANDOFF_LOG conflict by dropping it. Restored on Matthew's yes (2026-11-04).
 next_action: Fresh exact-head reviews (Seats A, C, D), 35/35 CI and Matthew's yeses at the new head.
 post_merge_check: Full test suite (shard 25/32) stays green on later PRs; a socket hang up in src/test/google-analytics-collection-host-proxy.test.ts reopens this with the same owner.
@@ -97,11 +101,45 @@ gotchas: Unlock records are git-ignored, so a fresh checkout reports both code f
 links: Reviewer C https://github.com/Verdant-OS/verdant-grow-diary/pull/2843#pullrequestreview-5762938474 and #pullrequestreview-5763348990 ; Seat A #pullrequestreview-5763345015 ; Seat D #pullrequestreview-5763347818
 artifacts: https://github.com/Verdant-OS/verdant-grow-diary/pull/2843 (PR body: RED/GREEN evidence); blocker report https://github.com/Verdant-OS/verdant-grow-diary/pull/2843#issuecomment-6625351805
 reviewer_seat: Seats A, C and D
-reviewer_sha: e0754e855344f4701998acfe1223c413428a50c6 (superseded twice; needs re-review)
+reviewer_sha: c90c3b03d3300d7bb6fb75fa748fdccd57003d29 (superseded; needs re-review)
 session_state: PR activity subscription and a safety-net check-in in the author session; no paused workflows
 claimed_by: Claude session_017UoYKzL7sYyUe1K8xMj3uo, 2026-11-03 22:48 CT
 owner: Claude
-last_updated: 2026-11-04 01:40 CT, by Claude
+last_updated: 2026-11-04 03:15 CT, by Claude
+```
+
+### FRESHNESS-LABEL-CONTRAST
+
+```text
+TASK FRESHNESS-LABEL-CONTRAST  priority: other  status: OPEN
+goal: Make the plant freshness card's stale and missing text meet WCAG AA.
+why: Live audit 2026-11-03 finding 12, measured in docs/specs/contrast-tokens.md section 2.3 (#2827): the stale value drew at muted-foreground/60 (3.28:1), "No plant manual log" at /50 (2.64:1) and the "Stale · Last manual log" line at /70 (4.04:1). These words tell a grower a reading is old or absent. File plan step 1 of that spec; needs neither D1 nor D2.
+branch: claude/freshness-label-contrast
+base: verdant-grow-diary
+checkout: git fetch origin claude/freshness-label-contrast verdant-grow-diary && git switch claude/freshness-label-contrast
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub
+state: implementation and test committed.
+current_step: draft PR open; reviewer and merge authority awaiting Matthew.
+next_action: Matthew names the reviewer and merge gate; then mark ready and route.
+post_merge_check: after Publish, open a plant with a stale manual reading on https://verdantgrowdiary.com and confirm the stale and missing lines read clearly. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: Full text-muted-foreground (6.59:1 on card). Stale stays distinct from fresh by colour (muted vs primary), the amber alert icon labelled "Stale", and the word "Stale" in the last-log line.
+tried_and_rejected: none
+commands: bunx vitest run src/test/plant-manual-sensor-freshness-contrast.test.tsx --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/components/PlantManualSensorFreshnessCard.tsx; src/test/plant-manual-sensor-freshness-contrast.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: reviewer and merge authority for this PR.
+gotchas: commit with NODE_OPTIONS=--max-old-space-size=8192 (never --no-verify).
+links: docs/specs/contrast-tokens.md (#2827)
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 17:41 CT, by Claude
 ```
 
 ### FIRST-VIEWPORT-TASK-FIRST-SPEC
@@ -1578,6 +1616,40 @@ session_state: none
 claimed_by: Claude, 2026-10-28 23:10 UTC
 owner: Claude
 last_updated: 2026-10-29 18:40 UTC, by Claude (pr link and ready state recorded)
+```
+
+### RETIRE-PR2702-STRIPE-EDGE-PATH
+
+```text
+TASK RETIRE-PR2702-STRIPE-EDGE-PATH  priority: P2  status: OPEN
+goal: remove the PR #2702 / issue #2669 Stripe test-mode Edge Function lane (create-checkout-session, stripe-webhook, its rules, mirror copies, tests, pgTAP workflow, docs and config entries) in one PR; the never-applied migration file 20261101180000 stays in history unchanged (AGENTS.md section 5)
+why: Matthew decided 2026-11-03 that Lovable's payments integration owns Stripe (route /api/public/payments/webhook, public.subscriptions.billing_provider); he answered "Yes" on 2026-11-03 ~13:16 CT to removing #2702 as a second Stripe writer for the same table. Migration 20261101180000 was never applied (source claim: its header and CURRENT_STATE) and its CHECK constraint conflicts with the live Lovable row shape.
+branch: claude/retire-pr2702-stripe-edge-path
+base: verdant-grow-diary
+checkout: git fetch origin claude/retire-pr2702-stripe-edge-path verdant-grow-diary && git switch claude/retire-pr2702-stripe-edge-path && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2811 (ready for review, not draft)
+head_sha: the commit carrying this block; removal commit f93b4c5247792eeb5cc7549a4ea82d90c82f4f65 (base ac10d68e); last reviewed head ac837e1913a26c584f038c02a07858ae3ec29795
+state: ready for review; dequeued 2026-11-03 23:04 UTC (MERGE_CONFLICT on HANDOFF_LOG.md), base re-merged; Seat A review 5760749999 P2-1..P2-4 addressed in the follow-up commit
+current_step: fresh-session review 5760578571 PASS and Seat A review 5760749999 PASS-with-P2 0/4/1, both at ac837e19; this head restores the two locked guards Seat A flagged and fixes this block; Matthew's yes at ac837e19 is void because the head moved
+next_action: read the 35 required checks at the new head; route a re-review at the new full SHA to an eligible seat that is neither session_017UoYKxCwUMi8bpS1ph7KLn nor session_017UoYKvcvohNxhmW342Lieo; then Matthew's new per-item yes at that SHA before any queueing
+post_merge_check: on the merged deploy tip, `git ls-tree -r --name-only origin/verdant-grow-diary | grep -cE "create-checkout-session/|stripe-webhook/|stripeWebhook|stripeCheckoutSession|stripeTestModeCatalog"` returns 0, and `node scripts/sync-edge-shared.mjs --check` passes
+active_writer: Claude session_017UoYKvcvohNxhmW342Lieo (took over from session_017UoYKxCwUMi8bpS1ph7KLn, which stops pushing)
+decisions: migration 20261101180000 file and its scripts/required-money-migrations.mjs filename-firewall entry are KEPT byte-identical: AGENTS.md section 5 makes merged migrations permanent and forbids deleting or no-oping them; it stays unapplied and must never be applied (its CHECK conflicts with the live Lovable row shape). Remove the rest whole, not partially: no other source file imports these modules (git grep on ac10d68e); Lovable restore at lovable-sync-1793724974 f0680d3d imports none of them. Keep src/test/core-link-form-census-rules.test.ts unchanged: it classifies the edge-function NAME create-checkout-session as mutating, which stays true and is not part of #2702.
+tried_and_rejected: none
+commands: node scripts/sync-edge-shared.mjs --check; NODE_OPTIONS=--max-old-space-size=4096 bun run typecheck; bunx vitest run <tests referencing stripe|supabase/migrations|supabase/functions|.github/workflows|.env.example>
+files_touched: 27 files deleted (including the supabase/functions/_shared/lib/constants/pricing.ts mirror); 2 tests re-added under new names (src/test/retired-stripe-migration-firewall.test.ts, src/test/founder-entitlement-preserved.test.ts); .env.example; supabase/config.toml; supabase/functions/_shared/lib/.sync-manifest.json; migration 20261101180000 kept byte-identical
+files_remaining: none known
+blockers: money gate: Matthew's yes at the exact head SHA before queueing
+open_questions: whether to add an operator note that 20261101180000 must never be applied (CURRENT_STATE row, owner's call)
+gotchas: local results: typecheck exit 0; mirror check OK 107 files; 400 related test files -> 392 passed, 2 skipped, 6 failed (local-Postgres *-db suites, same failure on base ac10d68e: "BLOCKED: run as a non-root Unix user with PostgreSQL server tools")
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/new/claude/retire-pr2702-stripe-edge-path
+artifacts: none beyond the branch
+reviewer_seat: fresh Claude review session session_017UoYKv4arxJYBMGNNh1bvN (review 5760578571 PASS) and Seat A (review 5760749999 PASS-with-P2), both at ac837e19; re-review owed at the new head
+reviewer_sha: ac837e1913a26c584f038c02a07858ae3ec29795 (superseded by this head)
+session_state: Claude session_017UoYKvcvohNxhmW342Lieo holds the branch; previous holder session_017UoYKxCwUMi8bpS1ph7KLn; both are contributors and ineligible for independent acceptance; no paused workflows
+claimed_by: Claude session_017UoYKvcvohNxhmW342Lieo, 2026-11-03 (takeover)
+owner: Claude session_017UoYKvcvohNxhmW342Lieo
+last_updated: 2026-11-03, by Claude session_017UoYKvcvohNxhmW342Lieo (takeover + base merge)
 ```
 
 ## Closed

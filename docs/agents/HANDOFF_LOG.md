@@ -69,38 +69,38 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### RETIRE-PR2702-STRIPE-EDGE-PATH
+### FIRST-VIEWPORT-TASK-FIRST-SPEC
 
 ```text
-TASK RETIRE-PR2702-STRIPE-EDGE-PATH  priority: P2  status: OPEN
-goal: remove the PR #2702 / issue #2669 Stripe test-mode Edge Function lane (create-checkout-session, stripe-webhook, its rules, mirror copies, tests, pgTAP workflow, docs and config entries) in one PR; the never-applied migration file 20261101180000 stays in history unchanged (AGENTS.md section 5)
-why: Matthew decided 2026-11-03 that Lovable's payments integration owns Stripe (route /api/public/payments/webhook, public.subscriptions.billing_provider); he answered "Yes" on 2026-11-03 ~13:16 CT to removing #2702 as a second Stripe writer for the same table. Migration 20261101180000 was never applied (source claim: its header and CURRENT_STATE) and its CHECK constraint conflicts with the live Lovable row shape.
-branch: claude/retire-pr2702-stripe-edge-path
+TASK FIRST-VIEWPORT-TASK-FIRST-SPEC  priority: other  status: OPEN
+goal: Spec how Timeline, AI Doctor, Action Queue and Reports put the grower's task before explanation, with founder decisions D1-D4.
+why: Live audit 2026-11-03 finding 2 (remaining parts) and the layout half of finding 11. Source-traced: about 25 blocks precede the first Timeline entry; the One-Tent Loop next-step card ("Review alerts") sits above the AI Doctor plant picker; Action Queue renders a landing box, header, filters and pagination before its empty state; Reports orders empty learning cards first.
+branch: claude/first-viewport-task-first-spec
 base: verdant-grow-diary
-checkout: git fetch origin claude/retire-pr2702-stripe-edge-path verdant-grow-diary && git switch claude/retire-pr2702-stripe-edge-path && git merge origin/verdant-grow-diary
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2811 (ready for review, not draft)
-head_sha: the commit carrying this block; removal commit f93b4c5247792eeb5cc7549a4ea82d90c82f4f65 (base ac10d68e); last reviewed head ac837e1913a26c584f038c02a07858ae3ec29795
-state: ready for review; dequeued 2026-11-03 23:04 UTC (MERGE_CONFLICT on HANDOFF_LOG.md), base re-merged; Seat A review 5760749999 P2-1..P2-4 addressed in the follow-up commit
-current_step: fresh-session review 5760578571 PASS and Seat A review 5760749999 PASS-with-P2 0/4/1, both at ac837e19; this head restores the two locked guards Seat A flagged and fixes this block; Matthew's yes at ac837e19 is void because the head moved
-next_action: read the 35 required checks at the new head; route a re-review at the new full SHA to an eligible seat that is neither session_017UoYKxCwUMi8bpS1ph7KLn nor session_017UoYKvcvohNxhmW342Lieo; then Matthew's new per-item yes at that SHA before any queueing
-post_merge_check: on the merged deploy tip, `git ls-tree -r --name-only origin/verdant-grow-diary | grep -cE "create-checkout-session/|stripe-webhook/|stripeWebhook|stripeCheckoutSession|stripeTestModeCatalog"` returns 0, and `node scripts/sync-edge-shared.mjs --check` passes
-active_writer: Claude session_017UoYKvcvohNxhmW342Lieo (took over from session_017UoYKxCwUMi8bpS1ph7KLn, which stops pushing)
-decisions: migration 20261101180000 file and its scripts/required-money-migrations.mjs filename-firewall entry are KEPT byte-identical: AGENTS.md section 5 makes merged migrations permanent and forbids deleting or no-oping them; it stays unapplied and must never be applied (its CHECK conflicts with the live Lovable row shape). Remove the rest whole, not partially: no other source file imports these modules (git grep on ac10d68e); Lovable restore at lovable-sync-1793724974 f0680d3d imports none of them. Keep src/test/core-link-form-census-rules.test.ts unchanged: it classifies the edge-function NAME create-checkout-session as mutating, which stays true and is not part of #2702.
-tried_and_rejected: none
-commands: node scripts/sync-edge-shared.mjs --check; NODE_OPTIONS=--max-old-space-size=4096 bun run typecheck; bunx vitest run <tests referencing stripe|supabase/migrations|supabase/functions|.github/workflows|.env.example>
-files_touched: 27 files deleted (including the supabase/functions/_shared/lib/constants/pricing.ts mirror); 2 tests re-added under new names (src/test/retired-stripe-migration-firewall.test.ts, src/test/founder-entitlement-preserved.test.ts); .env.example; supabase/config.toml; supabase/functions/_shared/lib/.sync-manifest.json; migration 20261101180000 kept byte-identical
-files_remaining: none known
-blockers: money gate: Matthew's yes at the exact head SHA before queueing
-open_questions: whether to add an operator note that 20261101180000 must never be applied (CURRENT_STATE row, owner's call)
-gotchas: local results: typecheck exit 0; mirror check OK 107 files; 400 related test files -> 392 passed, 2 skipped, 6 failed (local-Postgres *-db suites, same failure on base ac10d68e: "BLOCKED: run as a non-root Unix user with PostgreSQL server tools")
-links: https://github.com/Verdant-OS/verdant-grow-diary/pull/new/claude/retire-pr2702-stripe-edge-path
-artifacts: none beyond the branch
-reviewer_seat: fresh Claude review session session_017UoYKv4arxJYBMGNNh1bvN (review 5760578571 PASS) and Seat A (review 5760749999 PASS-with-P2), both at ac837e19; re-review owed at the new head
-reviewer_sha: ac837e1913a26c584f038c02a07858ae3ec29795 (superseded by this head)
-session_state: Claude session_017UoYKvcvohNxhmW342Lieo holds the branch; previous holder session_017UoYKxCwUMi8bpS1ph7KLn; both are contributors and ineligible for independent acceptance; no paused workflows
-claimed_by: Claude session_017UoYKvcvohNxhmW342Lieo, 2026-11-03 (takeover)
-owner: Claude session_017UoYKvcvohNxhmW342Lieo
-last_updated: 2026-11-03, by Claude session_017UoYKvcvohNxhmW342Lieo (takeover + base merge)
+checkout: git fetch origin claude/first-viewport-task-first-spec verdant-grow-diary && git switch claude/first-viewport-task-first-spec
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2826 (ready for review)
+head_sha: read the current head on GitHub
+state: spec committed; D1-D4 awaiting Matthew.
+current_step: Seat A P2-1/P2-2 (b6b711a) fixed; awaiting Grok exact-head review.
+next_action: record Matthew's D1-D4 answers in section 6, then route for review; implementation follows in four slices (section 9).
+post_merge_check: none (docs only).
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: Safety fences F1-F5 keep truth notices (partial read, history limit, RPC unavailable), approval-required wording, no auto-start or preselect on AI Doctor, no remembered target, and sensor source labels.
+tried_and_rejected: a read-only search subagent for the page map ran out of context on startup instructions; mapped directly with targeted greps instead.
+commands: none (docs only)
+files_touched: docs/specs/first-viewport-task-first.md; docs/agents/HANDOFF_LOG.md
+files_remaining: none for the spec
+blockers: founder decisions D1-D4
+open_questions: D1 next-step card placement; D2 AI Doctor Review alerts; D3 Action Queue landing box; D4 Reports order.
+gotchas: src/test/action-queue-ux.test.ts:125-134 pins source order between filters, pagination and no-results; the Action Queue slice must renegotiate it.
+links: none
+artifacts: none
+reviewer_seat: Grok (Matthew's gate); Seat A reviewed b6b711a: PASS-with-P2 0/2/1
+reviewer_sha: b6b711a (Seat A); new head needs review
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 18:55 CT, by Claude
 ```
 
 ### AI-DOCTOR-REPORT-PREVIEW-FOCUS
@@ -237,6 +237,40 @@ session_state: no production writes; auto-merge off
 claimed_by: Grok, 2026-11-03
 owner: Grok
 last_updated: 2026-11-02 23:20 CT, by Grok
+```
+
+### QUICK-LOG-WATER-VOLUME-UNITS-IMPL
+
+```text
+TASK QUICK-LOG-WATER-VOLUME-UNITS-IMPL  priority: other  status: OPEN
+goal: Implement ml / L / gal entry for Quick Log Water volume and runoff per docs/specs/quick-log-water-volume-units.md (spec PR #2813; D1 b, D2 yes, D3 b).
+why: Live audit 2026-11-03 finding 4: Water accepted millilitres only.
+branch: claude/quick-log-water-volume-units-impl
+base: verdant-grow-diary
+checkout: git fetch origin claude/quick-log-water-volume-units-impl verdant-grow-diary && git switch claude/quick-log-water-volume-units-impl
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2814 (ready for review)
+head_sha: read the current head on GitHub (this block rides the first commit)
+state: implemented and tested locally; draft PR, awaiting CI and independent review.
+current_step: Seat A P2s at 54715ba fixed (body test counts; this timestamp); awaiting re-review at the new head.
+next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ). Signed-in visual check of the Water form at 393px is NOT_MEASURED.
+post_merge_check: after Publish, on https://verdantgrowdiary.com with the fixture account, choose gal, enter 1, save a tagged [smoke <timestamp>] Water entry, and confirm the Timeline shows 3785 ml. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: storage stays volume_ml / runoff_ml; typed text converts once (exact rational, rounded once to whole ml); form keeps canonical volumeMl/runoffMl plus optional volumeEntryUnit/volumeEntryText/runoffEntryText; switching unit reinterprets typed text, never a prefilled or restored amount; a preset sets ml without changing the remembered unit; the prefill clears stale typed text.
+tried_and_rejected: per-unit copies of the 50,000 ml gate (two gates could disagree).
+commands: bunx vitest run src/test/quick-log-water-volume-units-rules.test.ts src/test/quick-log-water-volume-units-ui.test.tsx --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/lib/quickLogWaterVolumeUnitRules.ts; src/lib/waterVolumeEntryUnitPreference.ts; src/constants/quickLogWaterVolumeUnitCopy.ts; src/lib/quickLogWateringFormViewModel.ts; src/components/QuickLogWateringForm.tsx; src/components/QuickLogV2Sheet.tsx; src/test/quick-log-water-volume-units-rules.test.ts; src/test/quick-log-water-volume-units-ui.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: none
+gotchas: commit with NODE_OPTIONS=--max-old-space-size=8192 (pre-commit tsc). The spec file lives in #2813, not on this branch, until #2813 merges.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2813
+artifacts: none
+reviewer_seat: Grok (Matthew's gate); Seat A reviewed 54715ba: PASS-with-P2 0/2/1
+reviewer_sha: 54715ba (new head needs review)
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 21:10 CT, by Claude
 ```
 
 ### PHENO-LOCAL-DRAFT-LABELS
@@ -1509,6 +1543,40 @@ session_state: none
 claimed_by: Claude, 2026-10-28 23:10 UTC
 owner: Claude
 last_updated: 2026-10-29 18:40 UTC, by Claude (pr link and ready state recorded)
+```
+
+### RETIRE-PR2702-STRIPE-EDGE-PATH
+
+```text
+TASK RETIRE-PR2702-STRIPE-EDGE-PATH  priority: P2  status: OPEN
+goal: remove the PR #2702 / issue #2669 Stripe test-mode Edge Function lane (create-checkout-session, stripe-webhook, its rules, mirror copies, tests, pgTAP workflow, docs and config entries) in one PR; the never-applied migration file 20261101180000 stays in history unchanged (AGENTS.md section 5)
+why: Matthew decided 2026-11-03 that Lovable's payments integration owns Stripe (route /api/public/payments/webhook, public.subscriptions.billing_provider); he answered "Yes" on 2026-11-03 ~13:16 CT to removing #2702 as a second Stripe writer for the same table. Migration 20261101180000 was never applied (source claim: its header and CURRENT_STATE) and its CHECK constraint conflicts with the live Lovable row shape.
+branch: claude/retire-pr2702-stripe-edge-path
+base: verdant-grow-diary
+checkout: git fetch origin claude/retire-pr2702-stripe-edge-path verdant-grow-diary && git switch claude/retire-pr2702-stripe-edge-path && git merge origin/verdant-grow-diary
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2811 (ready for review, not draft)
+head_sha: the commit carrying this block; removal commit f93b4c5247792eeb5cc7549a4ea82d90c82f4f65 (base ac10d68e); last reviewed head ac837e1913a26c584f038c02a07858ae3ec29795
+state: ready for review; dequeued 2026-11-03 23:04 UTC (MERGE_CONFLICT on HANDOFF_LOG.md), base re-merged; Seat A review 5760749999 P2-1..P2-4 addressed in the follow-up commit
+current_step: fresh-session review 5760578571 PASS and Seat A review 5760749999 PASS-with-P2 0/4/1, both at ac837e19; this head restores the two locked guards Seat A flagged and fixes this block; Matthew's yes at ac837e19 is void because the head moved
+next_action: read the 35 required checks at the new head; route a re-review at the new full SHA to an eligible seat that is neither session_017UoYKxCwUMi8bpS1ph7KLn nor session_017UoYKvcvohNxhmW342Lieo; then Matthew's new per-item yes at that SHA before any queueing
+post_merge_check: on the merged deploy tip, `git ls-tree -r --name-only origin/verdant-grow-diary | grep -cE "create-checkout-session/|stripe-webhook/|stripeWebhook|stripeCheckoutSession|stripeTestModeCatalog"` returns 0, and `node scripts/sync-edge-shared.mjs --check` passes
+active_writer: Claude session_017UoYKvcvohNxhmW342Lieo (took over from session_017UoYKxCwUMi8bpS1ph7KLn, which stops pushing)
+decisions: migration 20261101180000 file and its scripts/required-money-migrations.mjs filename-firewall entry are KEPT byte-identical: AGENTS.md section 5 makes merged migrations permanent and forbids deleting or no-oping them; it stays unapplied and must never be applied (its CHECK conflicts with the live Lovable row shape). Remove the rest whole, not partially: no other source file imports these modules (git grep on ac10d68e); Lovable restore at lovable-sync-1793724974 f0680d3d imports none of them. Keep src/test/core-link-form-census-rules.test.ts unchanged: it classifies the edge-function NAME create-checkout-session as mutating, which stays true and is not part of #2702.
+tried_and_rejected: none
+commands: node scripts/sync-edge-shared.mjs --check; NODE_OPTIONS=--max-old-space-size=4096 bun run typecheck; bunx vitest run <tests referencing stripe|supabase/migrations|supabase/functions|.github/workflows|.env.example>
+files_touched: 27 files deleted (including the supabase/functions/_shared/lib/constants/pricing.ts mirror); 2 tests re-added under new names (src/test/retired-stripe-migration-firewall.test.ts, src/test/founder-entitlement-preserved.test.ts); .env.example; supabase/config.toml; supabase/functions/_shared/lib/.sync-manifest.json; migration 20261101180000 kept byte-identical
+files_remaining: none known
+blockers: money gate: Matthew's yes at the exact head SHA before queueing
+open_questions: whether to add an operator note that 20261101180000 must never be applied (CURRENT_STATE row, owner's call)
+gotchas: local results: typecheck exit 0; mirror check OK 107 files; 400 related test files -> 392 passed, 2 skipped, 6 failed (local-Postgres *-db suites, same failure on base ac10d68e: "BLOCKED: run as a non-root Unix user with PostgreSQL server tools")
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/new/claude/retire-pr2702-stripe-edge-path
+artifacts: none beyond the branch
+reviewer_seat: fresh Claude review session session_017UoYKv4arxJYBMGNNh1bvN (review 5760578571 PASS) and Seat A (review 5760749999 PASS-with-P2), both at ac837e19; re-review owed at the new head
+reviewer_sha: ac837e1913a26c584f038c02a07858ae3ec29795 (superseded by this head)
+session_state: Claude session_017UoYKvcvohNxhmW342Lieo holds the branch; previous holder session_017UoYKxCwUMi8bpS1ph7KLn; both are contributors and ineligible for independent acceptance; no paused workflows
+claimed_by: Claude session_017UoYKvcvohNxhmW342Lieo, 2026-11-03 (takeover)
+owner: Claude session_017UoYKvcvohNxhmW342Lieo
+last_updated: 2026-11-03, by Claude session_017UoYKvcvohNxhmW342Lieo (takeover + base merge)
 ```
 
 ## Closed

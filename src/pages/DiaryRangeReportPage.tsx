@@ -304,7 +304,11 @@ export default function DiaryRangeReportPage() {
           Apply range
         </Button>
         {!draftValid && (
-          <p className="text-xs text-destructive" data-testid="diary-range-report-range-error">
+          <p
+            className="text-xs text-destructive"
+            role="alert"
+            data-testid="diary-range-report-range-error"
+          >
             Start date must be on or before end date.
           </p>
         )}

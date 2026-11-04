@@ -102,6 +102,11 @@ export const KNOWN_MONEY_MIGRATIONS = new Set([
   // so production needs no apply, and the applied probe must not demand a
   // schema_migrations row for it.
   "20261104184500_record_live_stripe_billing_schema.sql",
+  // Revokes client privileges on stripe_payment_receipts (authenticated keeps
+  // SELECT for the owner-read policy). Known, not required: its absence leaves
+  // privileges loose but regresses no money behaviour, and the applied probe
+  // reads schema_migrations, which raw-SQL applies do not write.
+  "20261104233500_stripe_payment_receipts_billing_privileges.sql",
   // billing / paddle foundation
   "20260620234500_add_paddle_event_processing.sql",
   "20260621003000_paddle_event_processing_operator_audit.sql",

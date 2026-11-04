@@ -127,6 +127,9 @@ const diaryRow = (tentId: string, iso: string, temp: number, rh: number): Row =>
 const sensorCalls = () =>
   io.from.mock.calls.filter(([table]) => table === "sensor_readings_effective").length;
 const diaryCalls = () => io.from.mock.calls.filter(([table]) => table === "diary_entries").length;
+// Warm-cache pins: no snapshot read (sensor or diary). The Quick Log manual read
+// (`grow_events`, #2821) is a separate source and is pinned in its own test.
+const snapshotReadCalls = () => sensorCalls() + diaryCalls();
 
 function snapshotFor(tentId: string, temp: number): SensorSnapshot {
   return {
@@ -183,7 +186,7 @@ describe("useLatestSensorSnapshotsByTent (warm cache)", () => {
     );
     expect(result.current[TENT_A]).toMatchObject({ status: "ok", snapshot: { temp: 21 } });
     expect(result.current[TENT_B]).toMatchObject({ status: "ok", snapshot: { temp: 25 } });
-    expect(io.from).not.toHaveBeenCalled();
+    expect(snapshotReadCalls()).toBe(0);
   });
 
   it("shares each tent's cache entry with useLatestSensorSnapshot", () => {
@@ -195,7 +198,7 @@ describe("useLatestSensorSnapshotsByTent (warm cache)", () => {
     );
     const single = renderHook(() => useLatestSensorSnapshot(GROW, [TENT_A]), { wrapper });
     expect(page.result.current[TENT_A].snapshot).toBe(single.result.current.snapshot);
-    expect(io.from).not.toHaveBeenCalled();
+    expect(snapshotReadCalls()).toBe(0);
   });
 
   it("is idle for a tent without a grow and never queries it", () => {
@@ -210,7 +213,7 @@ describe("useLatestSensorSnapshotsByTent (warm cache)", () => {
     );
     expect(result.current[TENT_C]).toMatchObject({ status: "idle", snapshot: EMPTY_SNAPSHOT });
     expect(result.current[TENT_A].status).toBe("ok");
-    expect(io.from).not.toHaveBeenCalled();
+    expect(snapshotReadCalls()).toBe(0);
   });
 
   it("returns an empty record for no tents", () => {

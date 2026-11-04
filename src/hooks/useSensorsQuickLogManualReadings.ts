@@ -49,7 +49,7 @@ export function buildSensorsQuickLogManualReadingsQueryKey(
   ] as const;
 }
 
-async function fetchManualEvents(tentId: string): Promise<RawGrowEventRow[]> {
+export async function fetchManualEvents(tentId: string): Promise<RawGrowEventRow[]> {
   const { data, error } = await supabase
     .from("grow_events")
     .select(GROW_EVENT_SELECT)

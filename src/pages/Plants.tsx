@@ -596,6 +596,7 @@ export default function Plants() {
                 {plantsAsyncState.primaryRefreshFailed && (
                   <li
                     data-testid="plants-primary-refresh-error"
+                    aria-live="polite"
                     className="flex flex-wrap items-center justify-between gap-2"
                   >
                     <span>Plant list refresh unavailable.</span>

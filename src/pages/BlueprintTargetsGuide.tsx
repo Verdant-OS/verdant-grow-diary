@@ -127,7 +127,7 @@ export default function BlueprintTargetsGuide() {
                           <th scope="row" className="py-2 pr-4 font-normal text-muted-foreground">
                             {row.label}
                             {row.note ? (
-                              <span className="block text-xs text-muted-foreground/70">
+                              <span className="block text-xs text-muted-foreground">
                                 {row.note}
                               </span>
                             ) : null}

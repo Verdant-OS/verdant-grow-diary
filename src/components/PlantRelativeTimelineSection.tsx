@@ -227,7 +227,7 @@ function TimelineRow({
           <span
             data-testid="relative-timeline-timestamp"
             data-fallback={detail.timestampIsFallback ? "true" : "false"}
-            className={cn(detail.timestampIsFallback && "italic text-muted-foreground/70")}
+            className={cn(detail.timestampIsFallback && "italic text-muted-foreground")}
           >
             {detail.timestampLabel}
           </span>
@@ -428,7 +428,7 @@ export default function PlantRelativeTimelineSection({
                   data-testid="relative-timeline-header-last-updated"
                   className={cn(
                     "text-muted-foreground",
-                    header.lastUpdatedIsFallback && "italic text-muted-foreground/70",
+                    header.lastUpdatedIsFallback && "italic text-muted-foreground",
                   )}
                 >
                   {header.lastUpdatedLabel}
@@ -527,7 +527,7 @@ export default function PlantRelativeTimelineSection({
                       chip.selected
                         ? "bg-primary text-primary-foreground border-primary"
                         : isMuted
-                          ? "bg-muted/30 text-muted-foreground/60 border-border/30 hover:bg-muted/40"
+                          ? "bg-muted/30 text-muted-foreground border-border/30 hover:bg-muted/40"
                           : "bg-secondary/40 text-foreground border-border/40 hover:bg-secondary/60",
                     )}
                   >

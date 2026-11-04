@@ -276,7 +276,7 @@ export default function QuickLogSensorSnapshotStrip({
               key={m.label}
               data-testid={`quicklog-sensor-snapshot-metric-${m.label.toLowerCase()}`}
             >
-              <span className="text-muted-foreground/70">{m.label}</span>{" "}
+              <span className="text-muted-foreground">{m.label}</span>{" "}
               <span className="text-foreground">{m.value}</span>
             </span>
           ))}

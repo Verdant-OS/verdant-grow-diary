@@ -18,12 +18,12 @@ const REQUIRED_VARS = [
   "E2E_FIXTURE_MODE",
   "E2E_FIXTURE_EXPECTED_TENT_NAME",
   "E2E_FIXTURE_EXPECTED_PLANT_NAME",
+  "E2E_FIXTURE_EXPECTED_ACCOUNT_HINT",
 ] as const;
 
 const OPTIONAL_VARS = [
   "E2E_FIXTURE_EXPECTED_GROW_NAME",
   "E2E_GROW_1_SECOND_PLANT_NAME",
-  "E2E_FIXTURE_EXPECTED_ACCOUNT_HINT",
   "E2E_ALLOW_FIXTURE_BOOTSTRAP",
 ] as const;
 
@@ -46,8 +46,10 @@ push("Optional variables:");
 for (const v of OPTIONAL_VARS) push(`  - vars.${v}`);
 push();
 push("Production-only Quick Log fixture checklist:");
-push("  1. Sign in through normal /auth as cheekhimself@gmail.com.");
-push("     Never use matt@verdantgrowdiary.com, the KEEP account or customer data.");
+push("  1. Sign in through normal /auth as the disposable test account named in");
+push("     vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT. Never cheekhimself@gmail.com,");
+push("     matt@verdantgrowdiary.com, the KEEP account or customer data: the guard");
+push("     refuses the owner's personal accounts (grower bug item 20).");
 push("  2. Use an existing disposable grow owned by that account, with its own");
 push("     active tent and plant. Each exact name must contain E2E, Test or QA.");
 push("     Ownership of all three records is verified from normal app reads.");
@@ -60,7 +62,7 @@ push("     Grow name is optional: when absent, it comes only from the verified")
 push("     owned grow read, with E2E/Test/QA markers. A configured name must match.");
 push("  5. Configure a second plant in the same tent/grow: 'E2E Test Plant 2',");
 push("     or its exact fixture name through E2E_GROW_1_SECOND_PLANT_NAME.");
-push("     If an account hint is configured, use cheekhimself@gmail.com only.");
+push("     E2E_FIXTURE_EXPECTED_ACCOUNT_HINT is required and must be that disposable account.");
 push("     NEVER put a password or token in a variable or checklist.");
 push("  6. Keep optional bootstrap off; its generic production-host refusal");
 push("     is unchanged. Missing or contradictory ownership blocks both saves.");

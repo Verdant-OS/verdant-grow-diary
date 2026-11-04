@@ -1,0 +1,420 @@
+/**
+ * Station card for one tent's EcoWitt customized-upload readings.
+ *
+ * Pure. Shows only source `live` rows. Missing metrics stay blank.
+ * Temperature is stored Celsius and displayed Fahrenheit.
+ * Stale means the last packet is older than three gateway intervals.
+ */
+
+import { ECOWITT_CUSTOM_UPLOAD_COPY } from "@/constants/ecowittCustomUploadCopy";
+import {
+  ECOWITT_CUSTOM_UPLOAD_DEFAULT_INTERVAL_SECONDS,
+  isCustomUploadPacketStale,
+} from "@/lib/ecowittCustomUploadIngestRules";
+import { isSensorTestbenchProvenance } from "@/lib/sensorTestbenchIndicatorRules";
+import { celsiusToFahrenheit } from "@/lib/temperatureUnits";
+
+export type EcowittStationClaimState = "none" | "unbound" | "active" | "revoked";
+
+export interface EcowittStationReadingInput {
+  readonly tentId: string;
+  readonly metric: string;
+  /** PostgREST numeric columns arrive as strings. Both forms are live values. */
+  readonly value: number | string;
+  readonly source: string;
+  readonly quality: string;
+  readonly capturedAt: string | null;
+  /**
+   * Provenance fence fields from the bounded list read (`raw_payload->>vendor`,
+   * `raw_payload->metadata->>confidence`, `->>reported_verdant_source`, and the
+   * count of nested gateway marker columns). Optional so older callers and old
+   * rows keep working; a row they mark as testbench never renders as live.
+   */
+  readonly vendor?: string | null;
+  readonly confidence?: string | null;
+  readonly reportedVerdantSource?: string | null;
+  readonly gatewayMarkerCount?: number;
+}
+
+export interface EcowittStationCardInput {
+  readonly tentId: string | null;
+  readonly readings: readonly EcowittStationReadingInput[];
+  readonly now: Date;
+  readonly intervalSeconds?: number;
+  readonly lastReceivedAt: string | null;
+  readonly claimState: EcowittStationClaimState;
+  readonly claimId?: string | null;
+  /** Raw token from the create call in this session. Never invented here. */
+  readonly justCreatedToken: string | null;
+  readonly createError?: string | null;
+  /** Pending means the open-claim read for this tent has not finished. */
+  readonly claimLookup?: "pending" | "ready";
+}
+
+export interface EcowittLoadedClaim {
+  readonly id: string;
+  readonly boundAt: string | null;
+  readonly revokedAt: string | null;
+  readonly lastReceivedAt: string | null;
+  readonly intervalSeconds: number;
+}
+
+export type EcowittStationSession =
+  | { readonly kind: "created" | "rotated"; readonly claimId: string; readonly token: string }
+  | { readonly kind: "revoked" };
+
+export function ecowittStationClaimState(
+  row: { readonly boundAt: string | null; readonly revokedAt: string | null } | null,
+): EcowittStationClaimState {
+  if (row === null) return "none";
+  if (row.revokedAt !== null) return "revoked";
+  if (row.boundAt === null) return "unbound";
+  return "active";
+}
+
+export function resolveEcowittStationMountClaim(input: {
+  readonly loaded: EcowittLoadedClaim | null;
+  readonly session: EcowittStationSession | null;
+}): {
+  readonly claimId: string | null;
+  readonly claimState: EcowittStationClaimState;
+  readonly justCreatedToken: string | null;
+  readonly lastReceivedAt: string | null;
+  readonly intervalSeconds: number | undefined;
+} {
+  if (input.session?.kind === "revoked") {
+    return {
+      claimId: null,
+      claimState: "revoked",
+      justCreatedToken: null,
+      lastReceivedAt: input.loaded?.lastReceivedAt ?? null,
+      intervalSeconds: input.loaded?.intervalSeconds,
+    };
+  }
+  if (input.session?.kind === "created") {
+    return {
+      claimId: input.session.claimId,
+      claimState: "unbound",
+      justCreatedToken: input.session.token,
+      lastReceivedAt: null,
+      intervalSeconds: undefined,
+    };
+  }
+  if (input.session?.kind === "rotated") {
+    const claimState = ecowittStationClaimState(
+      input.loaded === null
+        ? { boundAt: null, revokedAt: null }
+        : { boundAt: input.loaded.boundAt, revokedAt: null },
+    );
+    return {
+      claimId: input.session.claimId,
+      claimState: claimState === "none" ? "unbound" : claimState,
+      justCreatedToken: input.session.token,
+      lastReceivedAt: input.loaded?.lastReceivedAt ?? null,
+      intervalSeconds: input.loaded?.intervalSeconds,
+    };
+  }
+  if (input.loaded === null || input.loaded.revokedAt !== null) {
+    return {
+      claimId: null,
+      claimState: input.loaded === null ? "none" : "revoked",
+      justCreatedToken: null,
+      lastReceivedAt: input.loaded?.lastReceivedAt ?? null,
+      intervalSeconds: input.loaded?.intervalSeconds,
+    };
+  }
+  return {
+    claimId: input.loaded.id,
+    claimState: ecowittStationClaimState(input.loaded),
+    justCreatedToken: null,
+    lastReceivedAt: input.loaded.lastReceivedAt,
+    intervalSeconds: input.loaded.intervalSeconds,
+  };
+}
+
+export interface EcowittStationSetting {
+  readonly label: string;
+  readonly value: string;
+}
+
+export interface EcowittStationCardModel {
+  readonly sectionLabel: string;
+  readonly emptyMessage: string | null;
+  readonly freshness: "none" | "live" | "stale";
+  readonly freshnessLabel: string | null;
+  readonly edgeNote: string | null;
+  readonly indoorTempF: string | null;
+  readonly indoorRh: string | null;
+  readonly soil1: string | null;
+  readonly co2: string | null;
+  readonly lastReadingLabel: string | null;
+  readonly settingsTitle: string;
+  readonly settings: readonly EcowittStationSetting[];
+  readonly tokenOnceNote: string;
+  readonly createLinkLabel: string;
+  readonly createError: string | null;
+  readonly canCreateLink: boolean;
+  readonly revoked: boolean;
+  readonly claimId: string | null;
+  readonly canRevoke: boolean;
+  readonly canRotate: boolean;
+  readonly revokeLinkLabel: string;
+  readonly rotateLinkLabel: string;
+}
+
+const LIVE_METRICS = ["temperature_c", "humidity_pct", "soil_moisture_pct", "co2_ppm"] as const;
+type LiveMetric = (typeof LIVE_METRICS)[number];
+
+function isLiveMetric(metric: string): metric is LiveMetric {
+  return (LIVE_METRICS as readonly string[]).includes(metric);
+}
+
+function finiteReadingValue(value: number | string): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+const GATEWAY_MARKER_COLUMNS = [
+  "gateway_stationtype",
+  "gateway_model",
+  "gateway_dateutc",
+  "gateway_freq",
+  "gateway_runtime",
+  "gateway_wh65batt",
+  "gateway_wh25batt",
+] as const;
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+/**
+ * Reads the provenance fence columns that `TimelineBoundedRead.sensorListSelect`
+ * flattens out of `raw_payload`. The generated row type does not name them, so
+ * they are read loosely; missing columns (old rows, other selects) yield nulls.
+ */
+export function ecowittStationFenceFromListRow(row: object): {
+  vendor: string | null;
+  confidence: string | null;
+  reportedVerdantSource: string | null;
+  gatewayMarkerCount: number;
+} {
+  const loose = row as Record<string, unknown>;
+  return {
+    vendor: stringOrNull(loose.vendor),
+    confidence: stringOrNull(loose.confidence),
+    reportedVerdantSource: stringOrNull(loose.reported_verdant_source),
+    gatewayMarkerCount: GATEWAY_MARKER_COLUMNS.filter((key) => {
+      const value = loose[key];
+      return value !== null && value !== undefined && value !== "";
+    }).length,
+  };
+}
+
+/** Same shared fence the base EcoWitt snapshot card applies (#2732 P2-1). */
+function isTestbenchReading(reading: EcowittStationReadingInput): boolean {
+  const reported = reading.reportedVerdantSource ?? null;
+  return isSensorTestbenchProvenance({
+    vendor: reading.vendor ?? null,
+    confidence: reading.confidence ?? null,
+    verdantSource: reported,
+    physicalGatewayEvidence:
+      reported?.trim().toLowerCase() === "live" && (reading.gatewayMarkerCount ?? 0) >= 2,
+  });
+}
+
+function latestLive(
+  readings: readonly EcowittStationReadingInput[],
+  tentId: string,
+  metric: LiveMetric,
+  freshWithin: { intervalSeconds: number; now: Date } | null,
+): EcowittStationReadingInput | null {
+  let best: EcowittStationReadingInput | null = null;
+  let bestMs = Number.NEGATIVE_INFINITY;
+  for (const reading of readings) {
+    if (reading.tentId !== tentId) continue;
+    if (reading.source !== "live") continue;
+    if (isTestbenchReading(reading)) continue;
+    if (reading.quality !== "ok" && reading.quality !== "degraded") continue;
+    if (reading.metric !== metric || !isLiveMetric(reading.metric)) continue;
+    if (finiteReadingValue(reading.value) === null) continue;
+    if (reading.capturedAt === null) continue;
+    const ms = Date.parse(reading.capturedAt);
+    if (!Number.isFinite(ms)) continue;
+    // A metric older than three gateway intervals is not current, even when
+    // another metric keeps the packet fresh (#2732 review 5761010782 P2-1).
+    if (
+      freshWithin !== null &&
+      isCustomUploadPacketStale(reading.capturedAt, freshWithin.intervalSeconds, freshWithin.now)
+    ) {
+      continue;
+    }
+    if (ms >= bestMs) {
+      best = reading;
+      bestMs = ms;
+    }
+  }
+  return best;
+}
+
+function formatTempF(celsius: number): string {
+  return `${celsiusToFahrenheit(celsius).toFixed(1)} °F`;
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value)} %`;
+}
+
+function formatCo2(value: number): string {
+  return `${Math.round(value)} ppm`;
+}
+
+function pathValue(token: string | null): string {
+  if (token !== null && /^[0-9a-f]{32,128}$/.test(token)) return `ew/${token}`;
+  return ECOWITT_CUSTOM_UPLOAD_COPY.pathPlaceholder;
+}
+
+export function buildEcowittCustomUploadStationCard(
+  input: EcowittStationCardInput,
+): EcowittStationCardModel {
+  const interval = input.intervalSeconds ?? ECOWITT_CUSTOM_UPLOAD_DEFAULT_INTERVAL_SECONDS;
+  const claimId = input.claimId ?? null;
+  const openClaim =
+    input.tentId !== null &&
+    claimId !== null &&
+    (input.claimState === "active" || input.claimState === "unbound");
+  const settings: EcowittStationSetting[] = [
+    { label: "Upload", value: ECOWITT_CUSTOM_UPLOAD_COPY.uploadMode },
+    { label: "Protocol", value: ECOWITT_CUSTOM_UPLOAD_COPY.protocol },
+    { label: "Path", value: pathValue(input.justCreatedToken) },
+    { label: "Port", value: ECOWITT_CUSTOM_UPLOAD_COPY.port },
+    { label: "Interval", value: ECOWITT_CUSTOM_UPLOAD_COPY.interval },
+    { label: "State", value: ECOWITT_CUSTOM_UPLOAD_COPY.enable },
+  ];
+  const base = {
+    sectionLabel: ECOWITT_CUSTOM_UPLOAD_COPY.sectionLabel,
+    settingsTitle: ECOWITT_CUSTOM_UPLOAD_COPY.settingsTitle,
+    settings,
+    tokenOnceNote: ECOWITT_CUSTOM_UPLOAD_COPY.tokenOnce,
+    createLinkLabel: ECOWITT_CUSTOM_UPLOAD_COPY.createLink,
+    createError: input.createError ?? null,
+    canCreateLink:
+      input.claimLookup !== "pending" &&
+      input.tentId !== null &&
+      input.claimState !== "active" &&
+      input.claimState !== "unbound",
+    revoked: input.claimState === "revoked",
+    claimId,
+    canRevoke: openClaim,
+    canRotate: openClaim,
+    revokeLinkLabel: ECOWITT_CUSTOM_UPLOAD_COPY.revokeLink,
+    rotateLinkLabel: ECOWITT_CUSTOM_UPLOAD_COPY.rotateLink,
+  };
+
+  if (input.tentId === null) {
+    return {
+      ...base,
+      emptyMessage: ECOWITT_CUSTOM_UPLOAD_COPY.empty,
+      freshness: "none",
+      freshnessLabel: null,
+      edgeNote: null,
+      indoorTempF: null,
+      indoorRh: null,
+      soil1: null,
+      co2: null,
+      lastReadingLabel: null,
+      canCreateLink: false,
+    };
+  }
+
+  // Values belong to this station only once its claim is bound. An unbound or
+  // missing claim has received no packet, so any live row for the tent came
+  // from another pathway and must not be shown here (#2732 P2-1).
+  if (input.claimState !== "active") {
+    return {
+      ...base,
+      emptyMessage: ECOWITT_CUSTOM_UPLOAD_COPY.empty,
+      freshness: "none",
+      freshnessLabel: null,
+      edgeNote: null,
+      indoorTempF: null,
+      indoorRh: null,
+      soil1: null,
+      co2: null,
+      lastReadingLabel: null,
+    };
+  }
+
+  // Per-metric freshness (#2732 review 5761010782 P2-1): when any metric is
+  // current, older metrics are dropped instead of riding along under "Live".
+  // When none is current, the newest values are shown but always labelled stale.
+  const tentId = input.tentId;
+  const pick = (window: { intervalSeconds: number; now: Date } | null) =>
+    LIVE_METRICS.map((metric) => latestLive(input.readings, tentId, metric, window));
+  const fresh = pick({ intervalSeconds: interval, now: input.now });
+  const anyFresh = fresh.some((reading) => reading !== null);
+  const [temp, humidity, soil, co2] = anyFresh ? fresh : pick(null);
+  const present = [temp, humidity, soil, co2].filter(
+    (reading): reading is EcowittStationReadingInput => reading !== null,
+  );
+
+  if (present.length === 0) {
+    return {
+      ...base,
+      emptyMessage: ECOWITT_CUSTOM_UPLOAD_COPY.empty,
+      freshness: "none",
+      freshnessLabel: null,
+      edgeNote: null,
+      indoorTempF: null,
+      indoorRh: null,
+      soil1: null,
+      co2: null,
+      lastReadingLabel: null,
+    };
+  }
+
+  let newest: string | null = null;
+  let newestMs = Number.NEGATIVE_INFINITY;
+  for (const reading of present) {
+    const captured = reading.capturedAt;
+    if (captured === null) continue;
+    const ms = Date.parse(captured);
+    if (!Number.isFinite(ms) || ms < newestMs) continue;
+    newest = captured;
+    newestMs = ms;
+  }
+  if (newest === null) {
+    return {
+      ...base,
+      emptyMessage: ECOWITT_CUSTOM_UPLOAD_COPY.empty,
+      freshness: "none",
+      freshnessLabel: null,
+      edgeNote: null,
+      indoorTempF: null,
+      indoorRh: null,
+      soil1: null,
+      co2: null,
+      lastReadingLabel: null,
+    };
+  }
+  const packetAt = input.lastReceivedAt ?? newest;
+  const stale = !anyFresh || isCustomUploadPacketStale(packetAt, interval, input.now);
+
+  return {
+    ...base,
+    emptyMessage: null,
+    freshness: stale ? "stale" : "live",
+    freshnessLabel: stale ? ECOWITT_CUSTOM_UPLOAD_COPY.stale : ECOWITT_CUSTOM_UPLOAD_COPY.live,
+    edgeNote: present.some((reading) => reading.quality === "degraded")
+      ? ECOWITT_CUSTOM_UPLOAD_COPY.edgeRail
+      : null,
+    indoorTempF: temp ? formatTempF(finiteReadingValue(temp.value) ?? Number.NaN) : null,
+    indoorRh: humidity ? formatPercent(finiteReadingValue(humidity.value) ?? Number.NaN) : null,
+    soil1: soil ? formatPercent(finiteReadingValue(soil.value) ?? Number.NaN) : null,
+    co2: co2 ? formatCo2(finiteReadingValue(co2.value) ?? Number.NaN) : null,
+    lastReadingLabel: `${ECOWITT_CUSTOM_UPLOAD_COPY.lastReading}: ${newest}`,
+  };
+}

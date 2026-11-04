@@ -91,6 +91,11 @@ import {
 import { scopeTimelineQuickLogLaneRows } from "@/lib/timelineQuickLogLaneScopeRules";
 import DiaryCalendarSection from "@/components/DiaryCalendarSection";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
+import { TimelineGrowSwitcher } from "@/components/TimelineGrowSwitcher";
+import {
+  buildTimelineGrowSwitcher,
+  timelineGrowSwitchSearch,
+} from "@/lib/timelineGrowSwitcherRules";
 import {
   actionDetailPath,
   alertDetailPath,
@@ -663,6 +668,18 @@ export default function Timeline() {
   const [searchQuery, setSearchQuery] = useState("");
   const plantFilter = parseTimelinePlantIdParam(searchParams.get(SENSOR_PLANT_PARAM)) ?? "";
   const [tentFilter, setTentFilter] = useState("");
+  // Visible grow switcher (grower bug item 16). The URL growId wins over the
+  // stored active grow, so switching rewrites only the URL; the tent filter is
+  // local state and belongs to the old grow.
+  const growSwitcher = useMemo(
+    () => buildTimelineGrowSwitcher({ grows, activeGrowId }),
+    [grows, activeGrowId],
+  );
+  function switchTimelineGrow(growId: string) {
+    if (growId === activeGrowId) return;
+    setTentFilter("");
+    setSearchParams(timelineGrowSwitchSearch(searchParams, growId));
+  }
   // Tent remains a one-shot continuity seed. Plant scope is canonical URL
   // state and is mirrored below so source-summary links, filter edits, and
   // clear actions stay in sync.
@@ -2353,6 +2370,11 @@ export default function Timeline() {
           description="Trace observations, evidence, and decisions across this grow."
           icon={<Sprout className="size-5" aria-hidden="true" />}
           meta={<TimelineGrowDayLabel startedAt={activeGrow.started_at} stage={activeGrow.stage} />}
+          actions={
+            growSwitcher ? (
+              <TimelineGrowSwitcher switcher={growSwitcher} onChange={switchTimelineGrow} />
+            ) : undefined
+          }
         />
       )}
 

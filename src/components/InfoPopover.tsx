@@ -29,7 +29,7 @@ export default function InfoPopover({ title, body, testKey, ariaLabel, className
           aria-label={ariaLabel ?? `${title} help`}
           data-testid={`info-popover-trigger-${testKey}`}
           className={cn(
-            "inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition",
+            "inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition",
             className,
           )}
         >

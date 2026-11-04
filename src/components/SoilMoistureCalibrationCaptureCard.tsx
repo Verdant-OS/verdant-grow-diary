@@ -110,7 +110,10 @@ export function SoilMoistureCalibrationCaptureCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground" data-testid="soil-moisture-calibration-unit-hint">
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="soil-moisture-calibration-unit-hint"
+        >
           {SOIL_MOISTURE_RAW_UNIT_HINT}
           {tentName ? ` · Tent: ${tentName}` : ""}
         </p>
@@ -126,10 +129,15 @@ export function SoilMoistureCalibrationCaptureCard({
               {" · "}
               {activeSelection.source} · {activeSelection.matchScope}
             </p>
-            <p className="text-muted-foreground">Saving replaces this active tent-level baseline.</p>
+            <p className="text-muted-foreground">
+              Saving replaces this active tent-level baseline.
+            </p>
           </div>
         ) : activeSelection.status === "unavailable" ? (
-          <p className="text-xs text-amber-700 dark:text-amber-400" data-testid="soil-moisture-calibration-active-invalid">
+          <p
+            className="text-xs text-amber-700 dark:text-amber-400"
+            data-testid="soil-moisture-calibration-active-invalid"
+          >
             Active baseline is invalid (dry and wet must differ). Save a new pair to replace it.
           </p>
         ) : (
@@ -140,7 +148,10 @@ export function SoilMoistureCalibrationCaptureCard({
         )}
 
         {!scopeReady ? (
-          <p className="text-sm text-muted-foreground" data-testid="soil-moisture-calibration-need-tent">
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="soil-moisture-calibration-need-tent"
+          >
             Select a tent with a grow before saving calibration.
           </p>
         ) : (
@@ -150,6 +161,7 @@ export function SoilMoistureCalibrationCaptureCard({
                 <Label htmlFor="soil-cal-dry">Dry raw point</Label>
                 <Input
                   id="soil-cal-dry"
+                  aria-describedby={preview.errors.dryRaw ? "soil-cal-dry-error" : undefined}
                   inputMode="decimal"
                   value={dryRaw}
                   onChange={(e) => setDryRaw(e.target.value)}
@@ -158,7 +170,12 @@ export function SoilMoistureCalibrationCaptureCard({
                   className="min-h-11"
                 />
                 {preview.errors.dryRaw ? (
-                  <p className="text-xs text-destructive" data-testid="soil-moisture-calibration-dry-error">
+                  <p
+                    id="soil-cal-dry-error"
+                    role="alert"
+                    className="text-xs text-destructive"
+                    data-testid="soil-moisture-calibration-dry-error"
+                  >
                     {soilMoistureCalibrationFieldErrorCopy("dryRaw", preview.errors.dryRaw)}
                   </p>
                 ) : null}
@@ -180,6 +197,7 @@ export function SoilMoistureCalibrationCaptureCard({
                 <Label htmlFor="soil-cal-wet">Wet raw point</Label>
                 <Input
                   id="soil-cal-wet"
+                  aria-describedby={preview.errors.wetRaw ? "soil-cal-wet-error" : undefined}
                   inputMode="decimal"
                   value={wetRaw}
                   onChange={(e) => setWetRaw(e.target.value)}
@@ -188,7 +206,12 @@ export function SoilMoistureCalibrationCaptureCard({
                   className="min-h-11"
                 />
                 {preview.errors.wetRaw ? (
-                  <p className="text-xs text-destructive" data-testid="soil-moisture-calibration-wet-error">
+                  <p
+                    id="soil-cal-wet-error"
+                    role="alert"
+                    className="text-xs text-destructive"
+                    data-testid="soil-moisture-calibration-wet-error"
+                  >
                     {soilMoistureCalibrationFieldErrorCopy("wetRaw", preview.errors.wetRaw)}
                   </p>
                 ) : null}

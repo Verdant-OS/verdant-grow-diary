@@ -537,6 +537,7 @@ export default function PlantMergeDialog({ source, trigger }: Props) {
               {!validation.ok && targetId && (
                 <p
                   className="text-xs text-destructive mt-1 flex items-center gap-1"
+                  role="alert"
                   data-testid="plant-merge-validation-error"
                 >
                   <AlertTriangle className="h-3.5 w-3.5" /> {validation.reason}

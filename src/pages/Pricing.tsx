@@ -1391,7 +1391,7 @@ function CellValue({ value, accent }: { value: boolean | string; accent?: boolea
     );
   }
   if (value === false) {
-    return <Minus className="h-4 w-4 mx-auto text-muted-foreground/60" aria-label="Not included" />;
+    return <Minus className="h-4 w-4 mx-auto text-muted-foreground" aria-label="Not included" />;
   }
   return <span className={accent ? "text-primary font-medium" : ""}>{value}</span>;
 }

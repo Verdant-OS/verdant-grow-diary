@@ -147,7 +147,11 @@ function CopyPreviewSummary({
         </span>
       )}
       {copyError && (
-        <span className="text-xs text-amber-300" data-testid="ai-doctor-check-in-copy-error">
+        <span
+          className="text-xs text-amber-300"
+          role="status"
+          data-testid="ai-doctor-check-in-copy-error"
+        >
           Copy unavailable. You can manually select the preview text.
         </span>
       )}
@@ -352,7 +356,11 @@ function SavePreviewToDiary({
               </p>
             ) : null}
             {outcome.kind === "error" ? (
-              <p className="text-xs text-amber-300" data-testid="ai-doctor-manual-save-error">
+              <p
+                className="text-xs text-amber-300"
+                role="alert"
+                data-testid="ai-doctor-manual-save-error"
+              >
                 {AI_DOCTOR_MANUAL_SAVE_FAILURE_MESSAGE}
               </p>
             ) : null}

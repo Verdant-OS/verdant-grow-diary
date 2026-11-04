@@ -233,7 +233,7 @@ export default function PhenoStabilityLedger({
                   disabled={saving}
                   aria-label={`Remove grow-out ${r.runLabel}`}
                   data-testid={`pheno-stability-run-remove-${keeperId}-${i}`}
-                  className="shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
                   <X className="h-3 w-3" />
                 </button>

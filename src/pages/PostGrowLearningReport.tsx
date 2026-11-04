@@ -281,6 +281,7 @@ export default function PostGrowLearningReport() {
           icon={<Leaf className="h-6 w-6" />}
           title="Report unavailable"
           description={error ?? "This grow report could not be loaded."}
+          descriptionRole="alert"
         />
         <Button type="button" variant="outline" onClick={() => void reload()}>
           Retry report

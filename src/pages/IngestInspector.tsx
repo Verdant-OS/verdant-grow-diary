@@ -247,7 +247,7 @@ export default function IngestInspector() {
               data-testid="ingest-inspector-error"
               className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm"
             >
-              <p>Couldn’t load recent sensor observations.</p>
+              <p role="alert">Couldn’t load recent sensor observations.</p>
               <Button
                 variant="outline"
                 size="sm"

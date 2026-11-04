@@ -1013,6 +1013,7 @@ export default function AiDoctorSessionsIndex() {
                 {saveError ? (
                   <span
                     className="text-xs text-destructive"
+                    role="alert"
                     data-testid="ai-doctor-sessions-saved-views-error"
                   >
                     {saveError === "empty-label"
@@ -1122,6 +1123,7 @@ export default function AiDoctorSessionsIndex() {
                   {importError ? (
                     <span
                       className="text-xs text-destructive"
+                      role="alert"
                       data-testid="ai-doctor-sessions-saved-views-import-error"
                     >
                       {importError === "empty-input"

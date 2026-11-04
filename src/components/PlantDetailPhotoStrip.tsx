@@ -138,6 +138,7 @@ export default function PlantDetailPhotoStrip({
       ) : photosUnavailable ? (
         <div
           data-testid="plant-detail-photo-strip-error"
+          role="status"
           className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-3 text-sm text-muted-foreground flex items-center justify-between gap-3"
         >
           <span className="inline-flex items-center gap-2">

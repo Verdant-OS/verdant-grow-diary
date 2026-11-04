@@ -180,6 +180,7 @@ export function TentIrrigationHistoryPanel({
           {isOlderError ? (
             <div
               data-testid="irrigation-older-error"
+              role="status"
               className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 flex flex-wrap items-center justify-between gap-2"
             >
               <span className="min-w-0 break-words">

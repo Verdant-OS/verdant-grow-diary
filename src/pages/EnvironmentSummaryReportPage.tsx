@@ -423,7 +423,7 @@ export default function EnvironmentSummaryReportPage() {
           Apply
         </Button>
         {!rangeValid && (
-          <p data-testid="env-report-range-error" className="text-xs text-amber-300">
+          <p data-testid="env-report-range-error" role="alert" className="text-xs text-amber-300">
             Start date must be on or before end date.
           </p>
         )}

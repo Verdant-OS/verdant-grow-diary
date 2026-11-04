@@ -174,7 +174,7 @@ export default function PlantQuickStatusStrip({
       ) : view.timelineLoading ? (
         <span
           data-testid="plant-quick-status-last-update-loading"
-          className="inline-flex items-center gap-1.5 text-muted-foreground/70"
+          className="inline-flex items-center gap-1.5 text-muted-foreground"
         >
           <Clock className="h-3.5 w-3.5" aria-hidden />
           {view.lastUpdateLabel}
@@ -198,7 +198,7 @@ export default function PlantQuickStatusStrip({
           </span>
           <span
             data-testid="plant-quick-status-alerts-loading"
-            className="inline-flex items-center gap-1.5 italic text-muted-foreground/70"
+            className="inline-flex items-center gap-1.5 italic text-muted-foreground"
           >
             <Bell className="h-3.5 w-3.5" aria-hidden /> {view.alertsStatusLabel}
           </span>
@@ -231,7 +231,7 @@ export default function PlantQuickStatusStrip({
           </span>
           <span
             data-testid="plant-quick-status-alerts-unavailable"
-            className="inline-flex items-center gap-1.5 italic text-muted-foreground/70"
+            className="inline-flex items-center gap-1.5 italic text-muted-foreground"
           >
             <Bell className="h-3.5 w-3.5" aria-hidden /> {view.alertsStatusLabel}
           </span>
@@ -245,7 +245,7 @@ export default function PlantQuickStatusStrip({
           </span>
           <span
             data-testid="plant-quick-status-actions-loading"
-            className="inline-flex items-center gap-1.5 italic text-muted-foreground/70"
+            className="inline-flex items-center gap-1.5 italic text-muted-foreground"
           >
             <ListTodo className="h-3.5 w-3.5" aria-hidden /> {view.actionsStatusLabel}
           </span>
@@ -270,7 +270,7 @@ export default function PlantQuickStatusStrip({
           </span>
           <span
             data-testid="plant-quick-status-actions-unavailable"
-            className="inline-flex items-center gap-1.5 italic text-muted-foreground/70"
+            className="inline-flex items-center gap-1.5 italic text-muted-foreground"
           >
             <ListTodo className="h-3.5 w-3.5" aria-hidden /> {view.actionsStatusLabel}
           </span>
@@ -291,12 +291,12 @@ export default function PlantQuickStatusStrip({
             role="link"
             aria-label={view.alertsLink.ariaLabel}
             title={view.alertsLink.disabledReason ?? undefined}
-            className="inline-flex cursor-not-allowed items-center gap-1 italic text-muted-foreground/70"
+            className="inline-flex cursor-not-allowed items-center gap-1 italic text-muted-foreground"
           >
             <span>{view.alertsLink.label}</span>
             <span
               data-testid="plant-quick-status-alerts-link-reason"
-              className="text-muted-foreground/60 not-italic text-[11px]"
+              className="text-muted-foreground not-italic text-[11px]"
             >
               ({view.alertsLink.disabledReason})
             </span>
@@ -322,12 +322,12 @@ export default function PlantQuickStatusStrip({
             role="link"
             aria-label={view.actionsLink.ariaLabel}
             title={view.actionsLink.disabledReason ?? undefined}
-            className="inline-flex cursor-not-allowed items-center gap-1 italic text-muted-foreground/70"
+            className="inline-flex cursor-not-allowed items-center gap-1 italic text-muted-foreground"
           >
             <span>{view.actionsLink.label}</span>
             <span
               data-testid="plant-quick-status-actions-link-reason"
-              className="text-muted-foreground/60 not-italic text-[11px]"
+              className="text-muted-foreground not-italic text-[11px]"
             >
               ({view.actionsLink.disabledReason})
             </span>
@@ -353,13 +353,13 @@ export default function PlantQuickStatusStrip({
             role="button"
             aria-label={view.viewLatestEntry.ariaLabel}
             title={view.viewLatestEntry.disabledReason ?? undefined}
-            className="inline-flex cursor-not-allowed items-center gap-1 italic text-muted-foreground/70"
+            className="inline-flex cursor-not-allowed items-center gap-1 italic text-muted-foreground"
           >
             <ArrowDownToLine className="h-3.5 w-3.5" aria-hidden />
             <span>{view.viewLatestEntry.label}</span>
             <span
               data-testid="plant-quick-status-view-latest-reason"
-              className="text-muted-foreground/60 not-italic text-[11px]"
+              className="text-muted-foreground not-italic text-[11px]"
             >
               ({view.viewLatestEntry.disabledReason})
             </span>

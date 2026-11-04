@@ -117,7 +117,7 @@ export default function Glossary() {
                 className={`rounded border px-2 py-1 font-medium ${
                   enabled
                     ? "border-border bg-background text-foreground hover:bg-muted"
-                    : "cursor-not-allowed border-border/40 text-muted-foreground/50"
+                    : "cursor-not-allowed border-border/40 text-muted-foreground"
                 }`}
               >
                 {letter}

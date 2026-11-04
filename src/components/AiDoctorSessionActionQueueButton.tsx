@@ -132,6 +132,7 @@ export function AiDoctorSessionActionQueueButton({
       {state.kind === "error" ? (
         <p
           className="text-xs text-destructive"
+          role="alert"
           data-testid="ai-doctor-session-detail-add-to-action-queue-error"
         >
           {ERROR_COPY}

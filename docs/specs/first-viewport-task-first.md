@@ -124,7 +124,7 @@ Sensor Context and Timeline Activity, come last.
 - **R6:** per D4, Reports orders cards so that cards with data come first. Ties keep today's
   order. Empty learning cards and the empty review queue collapse into one compact "Not enough
   data yet" group.
-- **R7:** Timeline's per-type history panels (2891–2979) collapse behind one "History by type"
+- **R7:** Timeline's per-type history panels (2913–2965) collapse behind one "History by type"
   disclosure, closed by default. Diary entries come right after the filters.
 
 ## 5. Out of scope

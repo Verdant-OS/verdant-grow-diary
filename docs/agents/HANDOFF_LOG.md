@@ -78,10 +78,10 @@ why: Live audit 2026-11-03 finding 2 (remaining parts) and the layout half of fi
 branch: claude/first-viewport-task-first-spec
 base: verdant-grow-diary
 checkout: git fetch origin claude/first-viewport-task-first-spec verdant-grow-diary && git switch claude/first-viewport-task-first-spec
-pr: opened as a draft after this commit; read the URL from GitHub
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2826 (ready for review)
 head_sha: read the current head on GitHub
 state: spec committed; D1-D4 awaiting Matthew.
-current_step: draft PR open.
+current_step: Seat A P2-1/P2-2 (b6b711a) fixed; awaiting Grok exact-head review.
 next_action: record Matthew's D1-D4 answers in section 6, then route for review; implementation follows in four slices (section 9).
 post_merge_check: none (docs only).
 active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
@@ -95,12 +95,12 @@ open_questions: D1 next-step card placement; D2 AI Doctor Review alerts; D3 Acti
 gotchas: src/test/action-queue-ux.test.ts:125-134 pins source order between filters, pagination and no-results; the Action Queue slice must renegotiate it.
 links: none
 artifacts: none
-reviewer_seat: not requested
-reviewer_sha: NOT_MEASURED
+reviewer_seat: Grok (Matthew's gate); Seat A reviewed b6b711a: PASS-with-P2 0/2/1
+reviewer_sha: b6b711a (Seat A); new head needs review
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-03 17:25 CT, by Claude
+last_updated: 2026-11-03 18:55 CT, by Claude
 ```
 
 ### QUICK-LOG-WATER-VOLUME-UNITS-SPEC

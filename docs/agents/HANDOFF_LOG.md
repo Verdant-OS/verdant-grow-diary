@@ -80,9 +80,9 @@ base: verdant-grow-diary
 checkout: git fetch origin claude/contrast-measurements-spec verdant-grow-diary && git switch claude/contrast-measurements-spec
 pr: opened as a draft after this commit; read the URL from GitHub
 head_sha: read the current head on GitHub
-state: spec committed; D1 and D2 awaiting Matthew.
+state: spec committed; Matthew decided D1 (a) and D2 (a) on 2026-11-04.
 current_step: draft PR open.
-next_action: record D1/D2; the freshness-card stale/missing fix (file plan step 1) needs no decision and can ship first.
+next_action: route an exact-head review; implementation slices follow (D1 tokens + guard, then the D2 sweep).
 post_merge_check: none (docs only).
 active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
 decisions: Token measurements only; rendered contrast over images and tinted panels is NOT_MEASURED. Recommend D1(a) split --destructive into a text token (0 85% 68%) and a darker fill (0 70% 48%), and D2(a) a /80 floor for meaningful muted text.
@@ -90,8 +90,8 @@ tried_and_rejected: a single --destructive lightness (no value passes both text 
 commands: none (docs only)
 files_touched: docs/specs/contrast-tokens.md; docs/agents/HANDOFF_LOG.md
 files_remaining: none for the spec
-blockers: founder decisions D1 and D2
-open_questions: D1 destructive token split; D2 muted opacity policy.
+blockers: none
+open_questions: none (D1 a, D2 a)
 gotchas: text-destructive has 310 uses and bg-destructive 127; the split must map both utilities in the Tailwind theme block of src/styles.css (lines 40-41).
 links: none
 artifacts: none
@@ -100,7 +100,7 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-03 17:34 CT, by Claude
+last_updated: 2026-11-03 18:45 CT, by Claude
 ```
 
 ### QUICK-LOG-WATER-VOLUME-UNITS-SPEC

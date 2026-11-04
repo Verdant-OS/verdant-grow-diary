@@ -1,6 +1,6 @@
 # Text contrast: measured, with two token decisions
 
-Status: draft spec. Needs founder decisions D1 and D2 (§5). Spec only, no application code.
+Status: decided. Matthew chose D1 (a) and D2 (a) on 2026-11-04 (§5). Spec only, no application code.
 
 Source: live grower audit 2026-11-03, finding 12. The audit flagged "muted gray text on dark green"
 as a risk but could not measure it: "screenshots alone cannot establish WCAG conformance."
@@ -137,6 +137,10 @@ There are 41 uses at /70 or below in `src/components` and `src/pages`:
   lint or test guard.
 - **(b) Fix only the sensor-truth uses now.** That means the freshness card and the snapshot strip
   labels. The rest goes later.
+
+**Decisions (Matthew, 2026-11-04):** D1 (a), split the token. D2 (a), floor meaningful muted text
+at /80, with a guard. Implementation follows §8: the D1 tokens and guard test first, then the D2
+sweep. The freshness card (§8 step 1) is already in #2830, so the D2 sweep leaves that file to it.
 
 ## 6. Acceptance tests
 

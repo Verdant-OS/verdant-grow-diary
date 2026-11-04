@@ -80,8 +80,8 @@ base: verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2820
 head_sha: read the current head on GitHub
 state: pushed draft
-current_step: item 14 Option A wired: owner confirmed live quicklog_save_manual_pre_logged_at matches source (2026-11-04). Note action gets soil temp, VWC, soil EC, CO2, PPFD inputs saved to p_details.manual_sensor_snapshot (source manual, captured_at); invalid text blocks Save; implausible values are kept and flagged; Recent Quick Logs shows them as manual chips. Corrections cannot edit the new keys yet (correction RPC keeps them untouched)
-next_action: independent review of PR #2820 at its head; founder approval of #2828; follow-up slice for correcting the new keys (needs correction RPC migration)
+current_step: item 15 not reproduced at HEAD: fixed by #2778 (d6b9abb, 2026-11-03 02:10 UTC, tent targets kept, sheet closes on save). Regression test src/test/quick-log-whole-tent-target-everywhere.test.tsx pins whole-tent targets from the global and plant Quick Log. #2778 also fixed item 3's stay-open half (showTimelineConfirmation closes the sheet)
+next_action: founder picks the next item (remaining: 9, 10, 11, 16, 19, 20); independent review of #2820; founder approval of #2828
 post_merge_check: on verdantgrowdiary.com, the fixture plant page shows "Grow: <name>" and Timeline Recent Quick Logs rows show "Plant: ... · Tent: ..."
 active_writer: Claude session claude/new-session-azpsz3
 decisions: no migration/RLS/auth edits (held); items 2,4,5,6 fixed by #2794; item 3 not reproduced (in-flight guard + idempotency key; duplicates 6.5 h apart); item 7 fixed by f2d6ca2; names never guessed (unknown id reads "name unavailable")
@@ -98,7 +98,7 @@ reviewer_sha: none yet
 session_state: one self check-in armed (send_later) for PR #2820 CI
 claimed_by: Claude, 2026-11-03 16:45 CT
 owner: Claude
-last_updated: 2026-11-03 19:40 CT, by Claude
+last_updated: 2026-11-03 19:55 CT, by Claude
 ```
 
 ### QUICK-LOG-WATER-VOLUME-UNITS-SPEC

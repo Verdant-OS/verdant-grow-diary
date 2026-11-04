@@ -69,6 +69,40 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
+### REA-LIFECYCLE-MARKER-RACE
+
+```text
+TASK REA-LIFECYCLE-MARKER-RACE  priority: other  status: OPEN
+goal: Remove the read race in scripts/rea/tests/lifecycle.test.mjs that intermittently fails the required "Lint, typecheck, test, build" check.
+why: The test waited only for the marker file to exist, then read once; the fixture (fixtures/stubborn-child.mjs) rewrites it every 10 ms with writeFileSync, which truncates first, so a read could see ''. Failed required CI on #2818 (job 126276128198). Reproduced locally 1/60.
+branch: claude/rea-lifecycle-marker-race
+base: verdant-grow-diary
+checkout: git fetch origin claude/rea-lifecycle-marker-race verdant-grow-diary && git switch claude/rea-lifecycle-marker-race
+pr: opened as a draft after this commit; read the URL from GitHub
+head_sha: read the current head on GitHub
+state: fix committed; scorer-locked test renegotiated through scripts/scorer-lock.mjs --unlock (reason recorded) and re-locked.
+current_step: draft PR open; gate awaiting Matthew (it changes a scorer-locked test).
+next_action: Matthew names reviewers and the gate; #2815 precedent for locked-test changes was A, C, D PASS plus his yes at the final SHA.
+post_merge_check: required CI stops failing on this test; NOT_MEASURED until several post-merge runs.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: Fix the test, not the fixture: poll until content is "alive" within the same 4 s deadline; assertions unchanged.
+tried_and_rejected: a 60 ms widened fixture for RED proof (left almost no "alive" window, unrealistic); used 4 ms of each 10 ms cycle instead.
+commands: node --test scripts/rea/tests/*.test.mjs; for i in $(seq 1 100); do node --test --test-name-pattern="owned process cleanup" scripts/rea/tests/lifecycle.test.mjs; done
+files_touched: scripts/rea/tests/lifecycle.test.mjs; .claude/scorer-unlock.json (if tracked); docs/agents/HANDOFF_LOG.md
+files_remaining: none
+blockers: gate decision for a scorer-locked test change
+open_questions: reviewers and gate.
+gotchas: run scorer-lock --lock after committing.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2818
+artifacts: none
+reviewer_seat: not requested
+reviewer_sha: NOT_MEASURED
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
+owner: Claude
+last_updated: 2026-11-03 18:22 CT, by Claude
+```
+
 ### QUICK-LOG-WATER-VOLUME-UNITS-SPEC
 
 ```text

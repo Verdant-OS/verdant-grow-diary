@@ -9,16 +9,36 @@ import { isCurrentStateStale } from "@/lib/sensorTruthCanon";
 import { leastTrustedStatus, refreshSensorReadingStatus } from "@/lib/growAdapters";
 import type { SensorReading } from "@/mock";
 import { readObservedSensorMetric } from "@/lib/sensorReadingSelectionRules";
+import { calculateVPD } from "@/lib/sensors/calculateVPD";
 import {
   celsiusToFahrenheit,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 
 const CSV_HEADER_CELSIUS =
-  "Timestamp (UTC),Temperature (°C),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At (UTC)";
+  "Timestamp (UTC),Temperature (°C),Humidity (%),VPD (kPa),Calculated VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At (UTC)";
 
 const CSV_HEADER_FAHRENHEIT =
-  "Timestamp (UTC),Temperature (°F),Humidity (%),VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At (UTC)";
+  "Timestamp (UTC),Temperature (°F),Humidity (%),VPD (kPa),Calculated VPD (kPa),CO₂ (ppm),Soil Moisture (%),PPFD (µmol/m²/s),Source,Status,Captured At (UTC)";
+
+/**
+ * "Calculated VPD (kPa)" export column. The "VPD (kPa)" column stays
+ * observed/recorded only; a value derived from temperature and humidity is
+ * never placed there.
+ */
+export class SensorCalculatedVpdExport {
+  /**
+   * VPD computed from the stored Celsius temperature and humidity, only for a
+   * row with no observed VPD. Null when VPD was observed or an input is missing.
+   */
+  static kpa(reading: SensorReading): number | null {
+    if (readObservedSensorMetric(reading, "vpd") !== null) return null;
+    const tempC = readObservedSensorMetric(reading, "temp");
+    const rh = readObservedSensorMetric(reading, "rh");
+    if (tempC === null || rh === null) return null;
+    return calculateVPD(tempC, rh);
+  }
+}
 
 function resolveExportTemperatureUnit(
   unit?: TemperatureUnitPreference | "F" | "C",
@@ -140,7 +160,8 @@ export function buildSensorReadingsCsv(
   temperatureUnit?: TemperatureUnitPreference | "F" | "C",
   options?: BuildSensorReadingsCsvOptions,
 ): string {
-  const exportable = readings.filter((reading) => reading.vpdPointKind !== "calculated");
+  // Calculated chart points are real rows (real source); only their VPD is derived.
+  const exportable = readings;
   const resolvedUnit = resolveExportTemperatureUnit(temperatureUnit);
   const distinctTents = new Set(exportable.map(resolveReadingTentId).filter(Boolean));
   const includeTent =
@@ -173,6 +194,7 @@ export function buildSensorReadingsCsv(
       formatExportTemperature(readObservedSensorMetric(r, "temp"), resolvedUnit),
       readObservedSensorMetric(r, "rh"),
       readObservedSensorMetric(r, "vpd"),
+      SensorCalculatedVpdExport.kpa(r),
       readObservedSensorMetric(r, "co2"),
       readObservedSensorMetric(r, "soil"),
       readObservedSensorMetric(r, "ppfd"),

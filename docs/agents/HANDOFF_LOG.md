@@ -69,36 +69,39 @@ active checkout has the branch open; inspect worktree ownership before selecting
 
 ## Open
 
-### GROWER-BUGS-10
+### FIRST-VIEWPORT-TASK-FIRST-SPEC
 
-````text
-TASK GROWER-BUGS-10  priority: P1  status: OPEN
-goal: grower bug brief 2026-11-03 item 10 / issue #2785 - plant, tent and timeline tabs crash or hang; per-plant Timeline worst
-why: measured in mocked Chromium at verdant-grow-diary 773635e: 100 Timeline entries with 12 MP photos took the renderer to ~1,509 MB after scrolling (no photos ~419 MB, 800x600 photos ~646 MB); JS heap ~56-75 MB in all runs; zero REST calls after settle (no refetch loop). Cause: every entry photo renders the original camera file
-branch: claude/grower-bugs-10 (founder-named, 2026-11-04)
+```text
+TASK FIRST-VIEWPORT-TASK-FIRST-SPEC  priority: other  status: OPEN
+goal: Spec how Timeline, AI Doctor, Action Queue and Reports put the grower's task before explanation, with founder decisions D1-D4.
+why: Live audit 2026-11-03 finding 2 (remaining parts) and the layout half of finding 11. Source-traced: about 25 blocks precede the first Timeline entry; the One-Tent Loop next-step card ("Review alerts") sits above the AI Doctor plant picker; Action Queue renders a landing box, header, filters and pagination before its empty state; Reports orders empty learning cards first.
+branch: claude/first-viewport-task-first-spec
 base: verdant-grow-diary
-pr: opened as a draft after this commit; read the URL from GitHub
+checkout: git fetch origin claude/first-viewport-task-first-spec verdant-grow-diary && git switch claude/first-viewport-task-first-spec
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2826 (ready for review)
 head_sha: read the current head on GitHub
-state: pushed draft
-current_step: fix shipped - only the newest 20 photo entries load their photo; older ones show "Show photo" and load that one photo on tap (src/lib/timelinePhotoDeferralRules.ts, Timeline card). Same mock after the fix: ~951-1,049 MB, bounded at ~23 unique photos however far you scroll
-next_action: independent review; post-merge production recheck of #2785 on a phone
-post_merge_check: on verdantgrowdiary.com, a plant with more than 20 photo entries shows photos on the newest 20 and "Show photo" on older ones; tapping loads that photo; tab no longer crashes when scrolled to the end
-active_writer: Claude session claude/grower-bugs-10
-decisions: founder chose tap-to-load (2026-11-04) over server image transformation (plan feature, unverifiable here) and an upload display copy (new photos only); limit 20 by render order, text entries do not use a slot; revealed ids persist for the page session
-tried_and_rejected: CSS content-visibility:auto on cards (1,489 MB, no gain); removing src from far off-screen images after scroll (1,468 MB, RSS not released)
-commands: bunx vitest run src/test/timeline-photo-deferral.test.tsx src/test/timeline-photo-deferral-rules.test.ts --reporter=dot
-files_touched: src/lib/timelinePhotoDeferralRules.ts, src/pages/Timeline.tsx, src/test/timeline-photo-deferral.test.tsx, src/test/timeline-photo-deferral-rules.test.ts, docs/agents/HANDOFF_LOG.md
-files_remaining: none for this slice
-blockers: none
-open_questions: Photo history (24) and Recent Quick Logs (10) thumbnails also load originals at 48 px; they overlap the newest photos so they add little, but a thumbnail source would cut more. Tent page "shell for several seconds" not measured in this slice
-gotchas: PR #2820 and #2842 also edit src/pages/Timeline.tsx; expect small merges. The measurement script is scratch only (not committed)
-links: https://github.com/Verdant-OS/verdant-grow-diary/issues/2785
-reviewer_seat: eligible non-contributing reviewer per OWNERSHIP.md 4.3
-reviewer_sha: none yet
-session_state: Claude session also watches PRs #2820, #2828, #2842
-claimed_by: Claude, 2026-11-04 02:45 UTC
+state: spec committed; D1-D4 awaiting Matthew.
+current_step: Seat A P2-1/P2-2 (b6b711a) fixed; awaiting Grok exact-head review.
+next_action: record Matthew's D1-D4 answers in section 6, then route for review; implementation follows in four slices (section 9).
+post_merge_check: none (docs only).
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: Safety fences F1-F5 keep truth notices (partial read, history limit, RPC unavailable), approval-required wording, no auto-start or preselect on AI Doctor, no remembered target, and sensor source labels.
+tried_and_rejected: a read-only search subagent for the page map ran out of context on startup instructions; mapped directly with targeted greps instead.
+commands: none (docs only)
+files_touched: docs/specs/first-viewport-task-first.md; docs/agents/HANDOFF_LOG.md
+files_remaining: none for the spec
+blockers: founder decisions D1-D4
+open_questions: D1 next-step card placement; D2 AI Doctor Review alerts; D3 Action Queue landing box; D4 Reports order.
+gotchas: src/test/action-queue-ux.test.ts:125-134 pins source order between filters, pagination and no-results; the Action Queue slice must renegotiate it.
+links: none
+artifacts: none
+reviewer_seat: Grok (Matthew's gate); Seat A reviewed b6b711a: PASS-with-P2 0/2/1
+reviewer_sha: b6b711a (Seat A); new head needs review
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-04 02:45 UTC, by Claude
+last_updated: 2026-11-03 18:55 CT, by Claude
+```
 
 ### AI-DOCTOR-REPORT-PREVIEW-FOCUS
 
@@ -234,6 +237,40 @@ session_state: no production writes; auto-merge off
 claimed_by: Grok, 2026-11-03
 owner: Grok
 last_updated: 2026-11-02 23:20 CT, by Grok
+```
+
+### QUICK-LOG-WATER-VOLUME-UNITS-IMPL
+
+```text
+TASK QUICK-LOG-WATER-VOLUME-UNITS-IMPL  priority: other  status: OPEN
+goal: Implement ml / L / gal entry for Quick Log Water volume and runoff per docs/specs/quick-log-water-volume-units.md (spec PR #2813; D1 b, D2 yes, D3 b).
+why: Live audit 2026-11-03 finding 4: Water accepted millilitres only.
+branch: claude/quick-log-water-volume-units-impl
+base: verdant-grow-diary
+checkout: git fetch origin claude/quick-log-water-volume-units-impl verdant-grow-diary && git switch claude/quick-log-water-volume-units-impl
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2814 (ready for review)
+head_sha: read the current head on GitHub (this block rides the first commit)
+state: implemented and tested locally; draft PR, awaiting CI and independent review.
+current_step: Seat A P2s at 54715ba fixed (body test counts; this timestamp); awaiting re-review at the new head.
+next_action: route an independent exact-head review (not Claude session_017UoYKwwZkbqmWvtCRMw1DZ). Signed-in visual check of the Water form at 393px is NOT_MEASURED.
+post_merge_check: after Publish, on https://verdantgrowdiary.com with the fixture account, choose gal, enter 1, save a tagged [smoke <timestamp>] Water entry, and confirm the Timeline shows 3785 ml. NOT_MEASURED until live /version.json reports the merge SHA.
+active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
+decisions: storage stays volume_ml / runoff_ml; typed text converts once (exact rational, rounded once to whole ml); form keeps canonical volumeMl/runoffMl plus optional volumeEntryUnit/volumeEntryText/runoffEntryText; switching unit reinterprets typed text, never a prefilled or restored amount; a preset sets ml without changing the remembered unit; the prefill clears stale typed text.
+tried_and_rejected: per-unit copies of the 50,000 ml gate (two gates could disagree).
+commands: bunx vitest run src/test/quick-log-water-volume-units-rules.test.ts src/test/quick-log-water-volume-units-ui.test.tsx --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/lib/quickLogWaterVolumeUnitRules.ts; src/lib/waterVolumeEntryUnitPreference.ts; src/constants/quickLogWaterVolumeUnitCopy.ts; src/lib/quickLogWateringFormViewModel.ts; src/components/QuickLogWateringForm.tsx; src/components/QuickLogV2Sheet.tsx; src/test/quick-log-water-volume-units-rules.test.ts; src/test/quick-log-water-volume-units-ui.test.tsx; docs/agents/HANDOFF_LOG.md
+files_remaining: none for this slice
+blockers: none
+open_questions: none
+gotchas: commit with NODE_OPTIONS=--max-old-space-size=8192 (pre-commit tsc). The spec file lives in #2813, not on this branch, until #2813 merges.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2813
+artifacts: none
+reviewer_seat: Grok (Matthew's gate); Seat A reviewed 54715ba: PASS-with-P2 0/2/1
+reviewer_sha: 54715ba (new head needs review)
+session_state: no production access
+claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
+owner: Claude
+last_updated: 2026-11-03 21:10 CT, by Claude
 ```
 
 ### PHENO-LOCAL-DRAFT-LABELS

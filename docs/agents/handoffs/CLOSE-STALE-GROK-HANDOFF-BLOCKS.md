@@ -21,11 +21,11 @@ files_touched: docs/agents/handoffs/{PHOTO-VIEWER-CAPTION-TILES,QUICK-LOG-TARGET
 files_remaining: none
 blockers: independent re-review; Matthew's yes at the exact head
 open_questions: owner call on VER-288-SERVED-BUILD-BASELINE and FIX-2004-APP-DOCUMENT-TITLES
-gotchas: the first version of #2862 mapped CREATE-DIALOG-DISABLED-REASON to #2793; #2793 belongs to QUICK-LOG-TARGET-SAVE in the same heading, and CREATE-DIALOG-DISABLED-REASON merged as #2648
+gotchas: the first version of #2862 mapped CREATE-DIALOG-DISABLED-REASON to #2793; #2793 belongs to QUICK-LOG-TARGET-SAVE in the same heading, and CREATE-DIALOG-DISABLED-REASON merged as #2648. GROWER-DEAD-ENDS-VER-287-VER-276 (#2540) landed through replacement #2562 as d590b2c1, not as #2540 itself (Codex review comment 4472436492); its file says so
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2862#pullrequestreview-5774520693
 artifacts: none
-reviewer_seat: fresh Claude reviewer session_017UoYKyDyFmmRqwAGfNHt1d gave FAIL at 0aa8da154e2f6854c8da9a2250ea4723f22e4e67; re-review needed at the new head
-reviewer_sha: 0aa8da154e2f6854c8da9a2250ea4723f22e4e67 (FAIL; superseded)
+reviewer_seat: fresh Claude reviewer session_017UoYKyDyFmmRqwAGfNHt1d: FAIL at 0aa8da15, then PASS 5774608643 at f1d97858; Matthew's yes at f1d97858 was recorded. This head fixes Codex's #2540 provenance finding, so both need renewing at the new head
+reviewer_sha: f1d97858214e8e3325892fc5f37983d7e9fb74cd (PASS; superseded by this head)
 session_state: Claude session_017UoYKv4arxJYBMGNNh1bvN; no paused workflows
 claimed_by: Claude session_017UoYKv4arxJYBMGNNh1bvN, 2026-11-04
 owner: Claude session_017UoYKv4arxJYBMGNNh1bvN

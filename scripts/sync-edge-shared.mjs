@@ -40,6 +40,14 @@ const DRY_RUN = process.argv.includes("--dry-run");
 const ALLOWED_SRC_ROOTS = ["lib", "constants"];
 const ALLOWED_EXACT_FILES = [path.join("integrations", "supabase", "types.ts")];
 
+/** Byte copies that are not edge-import mirrors. Both paths stay in the manifest. */
+const BYTE_TWINS = [
+  {
+    source: "src/lib/ecowittPlainHttpRouteRules.ts",
+    copy: "cloudflare/ecowitt-plain-http-ingest.ts",
+  },
+];
+
 /** Alias prefixes and their src-relative root. */
 const ALLOWED_ALIAS_PREFIXES = [
   { prefix: "@/lib/", srcRoot: "lib" },
@@ -52,6 +60,33 @@ const ALLOWED_ALIAS_EXACT = {
 const IMPORT_RE = /((?:^|\n)\s*(?:import|export)(?:\s+[\s\S]*?\s+from)?\s*["'])([^"']+)(["'])/g;
 const DYNAMIC_IMPORT_RE = /(\bimport\s*\(\s*["'])([^"']+)(["']\s*\))/g;
 const INLINE_TYPE_IMPORT_RE = /(import\(\s*["'])([^"']+)(["']\s*\))/g;
+
+async function readByteTwins() {
+  const problems = [];
+  const byteTwins = {};
+  for (const twin of BYTE_TWINS) {
+    let sourceText = null;
+    let copyText = null;
+    try {
+      sourceText = await fs.readFile(path.join(ROOT, twin.source), "utf8");
+    } catch {
+      problems.push(`BYTE TWIN MISSING: ${twin.source}`);
+    }
+    try {
+      copyText = await fs.readFile(path.join(ROOT, twin.copy), "utf8");
+    } catch {
+      problems.push(`BYTE TWIN MISSING: ${twin.copy}`);
+    }
+    if (sourceText === null || copyText === null) continue;
+    const sourceHash = sha256(normalizeTextLineEndings(sourceText));
+    const copyHash = sha256(normalizeTextLineEndings(copyText));
+    if (sourceHash !== copyHash) {
+      problems.push(`BYTE TWIN DRIFT: ${twin.copy} differs from ${twin.source}`);
+    }
+    byteTwins[twin.copy] = { source: twin.source, sha256: sourceHash };
+  }
+  return { byteTwins, problems };
+}
 
 function sha256(buf) {
   // Normalize CRLF so Windows (autocrlf) checkouts hash identically to the
@@ -366,10 +401,12 @@ async function main() {
     Object.entries(sourceHashes).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
   );
 
+  const twinState = await readByteTwins();
   const manifest = {
     generator: "scripts/sync-edge-shared.mjs",
     sourceCount: mirrorFiles.size,
     sourceHashes: sortedSourceHashes,
+    byteTwins: twinState.byteTwins,
   };
 
   if (CHECK) {
@@ -426,6 +463,12 @@ async function main() {
         );
       if (canonical(committedManifest.sourceHashes) !== canonical(sourceHashes)) {
         drift.push("DRIFT: .sync-manifest.json sourceHashes differ");
+      }
+      for (const problem of twinState.problems) drift.push(problem);
+      if (
+        JSON.stringify(committedManifest.byteTwins ?? null) !== JSON.stringify(twinState.byteTwins)
+      ) {
+        drift.push("DRIFT: .sync-manifest.json byteTwins differ");
       }
     } catch {
       drift.push("MISSING .sync-manifest.json");
@@ -507,6 +550,11 @@ async function main() {
       `\nRun without --dry-run to apply. Total mirrored files planned: ${mirrorFiles.size}.`,
     );
     return;
+  }
+
+  if (twinState.problems.length) {
+    for (const problem of twinState.problems) console.error(problem);
+    process.exit(1);
   }
 
   await fs.rm(MIRROR_ABS, { recursive: true, force: true });

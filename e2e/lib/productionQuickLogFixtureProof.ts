@@ -8,11 +8,10 @@ import {
   validateProductionFixtureTarget,
   validateProductionQuickLogEnv,
   QUICKLOG_SMOKE_BACKEND_ORIGIN,
-  resolveProductionWriteAccount,
+  QUICKLOG_SMOKE_ACCOUNT_EMAIL,
   type FixtureIdentity,
   type FixtureOwnedRow,
   type FixtureTarget,
-  type ProductionFixtureExpected,
 } from "./productionQuickLogFixtureRules";
 
 /** Observe normal app reads only. No new requests, credentials, storage reads or writes. */
@@ -127,7 +126,7 @@ export function observeProductionQuickLogFixture(page: Page) {
 
   async function check(
     target: FixtureTarget,
-    expected: ProductionFixtureExpected,
+    expected: FixtureEnvValidation["expected"],
     plantName?: string,
   ) {
     // A response can land while an earlier capture is awaited; drain until quiet.
@@ -184,9 +183,7 @@ export function observeProductionQuickLogFixture(page: Page) {
         errors = result.errors;
         if (
           invalidated ||
-          (identity &&
-            identity.email.toLowerCase() !==
-              resolveProductionWriteAccount((config.expected as ProductionFixtureExpected).account))
+          (identity && identity.email.toLowerCase() !== QUICKLOG_SMOKE_ACCOUNT_EMAIL)
         )
           break;
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -195,7 +192,7 @@ export function observeProductionQuickLogFixture(page: Page) {
     },
     async assertTarget(
       target: FixtureTarget,
-      expected: ProductionFixtureExpected,
+      expected: FixtureEnvValidation["expected"],
       plantName: string,
     ) {
       const result = await check(target, expected, plantName);

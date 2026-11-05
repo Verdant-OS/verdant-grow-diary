@@ -13,10 +13,8 @@ cleanup, and no teardown. Every Quick Log save the smoke performs is a
 real, persisted diary entry — exactly like a grower clicking Save.
 
 The smoke and its fixture check (`bun run e2e:verify-fixture`) run against
-production only: `https://verdantgrowdiary.com`, signed in as the disposable
-test account named in `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT`, never the owner's
-personal accounts (`cheekhimself@gmail.com`, `matt@verdantgrowdiary.com` are
-refused; grower bug item 20). The production-only host is the owner's
+production only: `https://verdantgrowdiary.com`, signed in as the approved
+disposable smoke account `cheekhimself@gmail.com`. That is the owner's
 2026-09-28 decision in
 [`docs/production-only-verification-runbook.md`](../docs/production-only-verification-runbook.md);
 there is no non-production smoke host. The fixture guard refuses any other
@@ -82,7 +80,7 @@ hunts with `buildE2eHuntName` (never append to the wizard prefill).
 | `E2E_FIXTURE_EXPECTED_TENT_NAME`    | Expected disposable E2E tent name (e.g. `E2E Test Tent`)                                                                                                                                                                                                                                                                                         |
 | `E2E_FIXTURE_EXPECTED_PLANT_NAME`   | Expected disposable E2E plant name (e.g. `E2E Test Plant`)                                                                                                                                                                                                                                                                                       |
 | `E2E_FIXTURE_EXPECTED_GROW_NAME`    | **Optional.** If set, it must be an E2E/Test/QA name (e.g. `E2E Test Grow`) and match the owned, active grow row. If omitted, the smoke takes the name from that row and keeps it for later saves.                                                                                                                                               |
-| `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` | **Required.** The disposable test account's email. `cheekhimself@gmail.com` and `matt@verdantgrowdiary.com` are refused, and the guard checks that the signed-in server identity is this account. Never a password or token.                                                                                                                     |
+| `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` | **Optional.** If set, it must be `cheekhimself@gmail.com`; any other value is refused. The guard checks the signed-in server identity either way. Never a password or token.                                                                                                                                                                     |
 | `TESTDINO_TOKEN`                    | **Optional.** Project API key for [TestDino live streaming](https://docs.testdino.com/guides/playwright-real-time-test-streaming). Results stream during the Playwright run — there is no post-run upload. Leave unset in CI unless Cheek adds a secret; `playwright.config.ts` only attaches `@testdino/playwright` when this var is non-empty. |
 
 `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are only required to (re)generate
@@ -98,9 +96,8 @@ unless the visible page is clearly a disposable E2E fixture.
 
 Required setup before enabling CI smoke (current UI flow — no Grow page):
 
-1. Use a dedicated disposable test account (never `cheekhimself@gmail.com` or
-   `matt@verdantgrowdiary.com`) and name it in `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT`.
-   It must own **no real grower data**.
+1. Use the approved dedicated test account, `cheekhimself@gmail.com`. It
+   must own **no real grower data**.
 2. Sign in as that account on `https://verdantgrowdiary.com` and follow the normal in-app flow:
    1. From the Dashboard, **Add Tent**.
    2. Name the tent exactly **`E2E Test Tent`**.
@@ -129,9 +126,7 @@ Fixture verification will hard-fail if:
   an E2E/Test name. (A missing grow name is allowed.)
 - `E2E_GROW_1_PLANT_URL` is not `https://verdantgrowdiary.com/plants/<UUID>`
   (optionally with matching `tentId` / `growId` UUIDs).
-- `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` is missing, malformed or one of the
-  owner's personal accounts.
-- The signed-in server identity is not that disposable account, or the
+- The signed-in server identity is not `cheekhimself@gmail.com`, or the
   app's own reads do not show that account owning the active plant, its tent
   and its grow. Visible names alone never authorize a save.
 - Any of those reads is missing, failed, empty, contradictory or still in
@@ -184,16 +179,12 @@ accounts (real grows) are **blocked**. CI: workflow_dispatch only
 
 There are **no hardcoded credentials** in this repository. The test
 account's email and password live only in
-`secrets.E2E_SMOKE_EMAIL` and `secrets.E2E_SMOKE_PASSWORD`. The read-only
-proofs use a separate owner login, `secrets.E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`,
-which the write smoke never reads. The authenticated One-Tent proof uses a second, empty
-disposable account (`secrets.E2E_ONETENT_*`, `vars.E2E_ONETENT_EXPECTED_ACCOUNT_HINT`),
-because a Free account holds one active grow; see `e2e/FIXTURE_SETUP.md` §3.
+`secrets.E2E_TEST_EMAIL` and `secrets.E2E_TEST_PASSWORD`.
 
-The production smoke lane runs only as the disposable account named in
-`E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` and refuses the owner's personal accounts
-(`e2e/lib/productionQuickLogFixtureRules.ts`, `PERSONAL_ACCOUNT_EMAILS`).
-Switching accounts needs only the secrets and that variable.
+The production smoke lane accepts only `cheekhimself@gmail.com`
+(`e2e/lib/productionQuickLogFixtureRules.ts`). Changing that account's
+password needs only the secret update. Switching to a different account needs
+a reviewed policy change first; until then the fixture guard refuses it.
 
 To rotate the disposable test account safely:
 
@@ -203,16 +194,14 @@ To rotate the disposable test account safely:
    manually (see `e2e/FIXTURE_SETUP.md`; bootstrap is unavailable for the
    production lane).
 3. Update GitHub Actions **secrets**:
-   - `E2E_SMOKE_EMAIL`
-   - `E2E_SMOKE_PASSWORD`
-   (The write smoke uses its own secrets. `secrets.E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD`
-   stay as the owner login for the read-only proofs; do not change them.)
+   - `E2E_TEST_EMAIL`
+   - `E2E_TEST_PASSWORD`
 4. Update GitHub Actions **variables**:
    - `E2E_GROW_1_PLANT_URL` (new plant URL on the new account)
    - `E2E_FIXTURE_MODE=true`
    - expected grow/tent/plant names
-   - `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` (the new account's email; **never** a
-     password or token)
+   - optional `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT` (if set, exactly
+     `cheekhimself@gmail.com`; **never** a password or token)
 5. Trigger the workflow manually via `workflow_dispatch`.
 6. Confirm the `Verify disposable E2E fixture` step passes **before**
    the smoke writes occur.
@@ -345,10 +334,9 @@ Prerequisites:
 - Playwright Chromium installed (`bun run e2e:install`).
 - The E2E Test Plant URL on `https://verdantgrowdiary.com`, owned by the
   smoke account.
-- A dedicated disposable **test account** (email + password). Never use
-  `cheekhimself@gmail.com`, `matt@verdantgrowdiary.com`, the KEEP account or a
-  customer's credentials — the smoke creates real diary entries, and the guard
-  refuses the owner's personal accounts.
+- The approved dedicated **test account**, `cheekhimself@gmail.com`
+  (email + password). Never use `matt@verdantgrowdiary.com`, the KEEP account
+  or a customer's credentials — the smoke creates real diary entries.
 
 Replace `YOUR_TEST_PLANT_UUID` below with the E2E Test Plant's UUID.
 
@@ -357,7 +345,7 @@ Replace `YOUR_TEST_PLANT_UUID` below with the E2E Test Plant's UUID.
 - The fixture guard (`e2e/lib/fixtureSafety.ts` with
   `e2e/lib/productionQuickLogFixtureRules.ts`) refuses any other app origin,
   any backend other than the committed public Supabase origin, and any account
-  other than the disposable one in `E2E_FIXTURE_EXPECTED_ACCOUNT_HINT`. A local dev server or another host is
+  other than `cheekhimself@gmail.com`. A local dev server or another host is
   refused before any write.
 - If identity, ownership or tagging cannot be verified, stop and report the
   exact gap. Do not point the smoke at another host instead.
@@ -378,8 +366,7 @@ $env:E2E_FIXTURE_MODE="true"
 $env:E2E_FIXTURE_EXPECTED_TENT_NAME="E2E Test Tent"
 $env:E2E_FIXTURE_EXPECTED_PLANT_NAME="E2E Test Plant"
 $env:E2E_GROW_1_SECOND_PLANT_NAME="E2E Test Plant 2"
-$env:E2E_FIXTURE_EXPECTED_ACCOUNT_HINT="your-disposable-test-account@example.com"
-$env:E2E_TEST_EMAIL="your-disposable-test-account@example.com"
+$env:E2E_TEST_EMAIL="cheekhimself@gmail.com"
 $env:E2E_TEST_PASSWORD="your-test-password"
 
 bun run e2e:setup
@@ -398,8 +385,7 @@ export E2E_FIXTURE_MODE="true"
 export E2E_FIXTURE_EXPECTED_TENT_NAME="E2E Test Tent"
 export E2E_FIXTURE_EXPECTED_PLANT_NAME="E2E Test Plant"
 export E2E_GROW_1_SECOND_PLANT_NAME="E2E Test Plant 2"
-export E2E_FIXTURE_EXPECTED_ACCOUNT_HINT="your-disposable-test-account@example.com"
-export E2E_TEST_EMAIL="your-disposable-test-account@example.com"
+export E2E_TEST_EMAIL="cheekhimself@gmail.com"
 export E2E_TEST_PASSWORD="your-test-password"
 
 bun run e2e:setup

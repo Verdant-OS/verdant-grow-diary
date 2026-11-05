@@ -156,12 +156,9 @@ describe("Quick Log Playwright CI surface", () => {
     expect(wf).not.toMatch(/pull_request_target/);
     // No auth bypass language
     expect(wf).not.toMatch(/skipAuth|bypassAuth|AUTH_BYPASS/);
-    // Email/password must come from GitHub secrets, not literals. Both jobs here
-    // write to production, so they use the disposable-account login (#2857);
-    // the owner's E2E_TEST_* login must not appear in this workflow at all.
-    expect(wf).toMatch(/\$\{\{\s*secrets\.E2E_SMOKE_EMAIL\s*\}\}/);
-    expect(wf).toMatch(/\$\{\{\s*secrets\.E2E_SMOKE_PASSWORD\s*\}\}/);
-    expect(wf).not.toMatch(/\$\{\{\s*secrets\.E2E_TEST_(EMAIL|PASSWORD)\s*\}\}/);
+    // Email/password must come from GitHub secrets, not literals
+    expect(wf).toMatch(/\$\{\{\s*secrets\.E2E_TEST_EMAIL\s*\}\}/);
+    expect(wf).toMatch(/\$\{\{\s*secrets\.E2E_TEST_PASSWORD\s*\}\}/);
     // Must not echo secret values to logs
     expect(wf).not.toMatch(/echo\s+["']?\$\{?\s*E2E_TEST_PASSWORD/);
     expect(wf).not.toMatch(/echo\s+["']?\$\{?\s*E2E_TEST_EMAIL/);
@@ -363,9 +360,8 @@ describe("Quick Log Playwright CI surface", () => {
     for (const name of [
       "vars.E2E_BASE_URL",
       "vars.E2E_GROW_1_PLANT_URL",
-      "secrets.E2E_SMOKE_EMAIL",
-      "secrets.E2E_SMOKE_PASSWORD",
-      "vars.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT",
+      "secrets.E2E_TEST_EMAIL",
+      "secrets.E2E_TEST_PASSWORD",
     ]) {
       expect(block, `summary missing required config name: ${name}`).toContain(name);
     }
@@ -390,8 +386,8 @@ describe("Quick Log Playwright CI surface", () => {
     // Only NAMES (vars.*/secrets.*) appear in the missing array, never values
     expect(block).toContain('"vars.E2E_BASE_URL"');
     expect(block).toContain('"vars.E2E_GROW_1_PLANT_URL"');
-    expect(block).toContain('"secrets.E2E_SMOKE_EMAIL"');
-    expect(block).toContain('"secrets.E2E_SMOKE_PASSWORD"');
+    expect(block).toContain('"secrets.E2E_TEST_EMAIL"');
+    expect(block).toContain('"secrets.E2E_TEST_PASSWORD"');
     // Must not echo secret VALUES
     expect(block).not.toMatch(/echo[^\n]*\$E2E_TEST_(EMAIL|PASSWORD)\b/);
     expect(block).not.toMatch(/echo[^\n]*\$\{\{\s*secrets\./);

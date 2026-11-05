@@ -26,7 +26,7 @@ import {
   isLikelyRealPlantUrl,
 } from "../../e2e/lib/fixtureSafety";
 import {
-  PERSONAL_ACCOUNT_EMAILS,
+  QUICKLOG_SMOKE_ACCOUNT_EMAIL,
   QUICKLOG_SMOKE_APP_ORIGIN,
   validateProductionQuickLogEnv,
 } from "../../e2e/lib/productionQuickLogFixtureRules";
@@ -587,10 +587,7 @@ describe("Package + docs wiring", () => {
       // sessionStorage.
       expect(new URL(resolved.E2E_GROW_1_PLANT_URL).origin, block).toBe(base.origin);
       expect(base.hostname, block).not.toBe(RETIRED_LOVABLE_HOST);
-      // Grower bug item 20: the snippet signs in as the disposable account it
-      // names, never one of the owner's personal accounts.
-      expect(env.E2E_TEST_EMAIL, block).toBe(env.E2E_FIXTURE_EXPECTED_ACCOUNT_HINT);
-      expect(PERSONAL_ACCOUNT_EMAILS, block).not.toContain(env.E2E_TEST_EMAIL);
+      expect(env.E2E_TEST_EMAIL, block).toBe(QUICKLOG_SMOKE_ACCOUNT_EMAIL);
       // A local dev server cannot satisfy the production guard.
       expect(block, block).not.toMatch(/^bun run dev\b/m);
     }

@@ -31,6 +31,7 @@ describe("import guide copy matches the CSV parser", () => {
         "2026-01-01 00:05:00,200,60,1.2,800",
         "2026-01-01 00:10:00,25,140,1.2,800",
       ].join("\n"),
+      { sourceTimeZone: "UTC" },
     );
     expect(parsed.isAmbiguous).toBe(false);
     expect(parsed.validRows).toHaveLength(1);
@@ -47,16 +48,19 @@ describe("import guide copy matches the CSV parser", () => {
     expect(
       parseEnvironmentCSVText(
         ["timestamp,Temperature,humidity", "2026-01-01 00:00:00,22,55"].join("\n"),
+        { sourceTimeZone: "UTC" },
       ).isAmbiguous,
     ).toBe(true);
     expect(
       parseEnvironmentCSVText(
         ["timestamp,Temperature,humidity", "2026-01-01 00:00:00,80,55"].join("\n"),
+        { sourceTimeZone: "UTC" },
       ).validRows[0]?.raw_temp_unit,
     ).toBe("F");
     expect(
       parseEnvironmentCSVText(
         ["timestamp,Temperature,humidity", "2026-01-01 00:00:00,-5,55"].join("\n"),
+        { sourceTimeZone: "UTC" },
       ).validRows[0]?.raw_temp_unit,
     ).toBe("C");
   });

@@ -10,7 +10,7 @@
  *  - Never renders a "Live" badge for CSV. Never derives Live VPD anywhere.
  *  - Cancel never inserts.
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { Link, useInRouterContext } from "@/lib/react-router-compat";
 import {
   Dialog,
@@ -26,13 +26,25 @@ import {
   applyUnitChoice,
   buildCoveragePreview,
   buildCsvImportDoneMessage,
+  buildTimePreview,
+  canConfirmImport,
   cancelImport,
+  excludeUnresolvedTimeRows,
+  hasUnresolvedTime,
+  timeBlocksWrite,
+  undoTimeExclusion,
   reduceParseResult,
+  reopenTimeZoneChoice,
   rowsToPersist,
   startParsingState,
   type ImportState,
 } from "@/lib/environmentCsvImportViewModel";
-import { parseEnvironmentCSV, type ParsedEnvironmentRow } from "@/lib/csvParser";
+import { listSourceTimeZones } from "@/lib/csvTimestampRules";
+import {
+  CSV_SOIL_ONLY_MESSAGE,
+  parseEnvironmentCSV,
+  type ParsedEnvironmentRow,
+} from "@/lib/csvParser";
 import {
   UNKNOWN_CSV_HISTORY_WINDOW,
   buildCsvHistoryWindowPreview,
@@ -46,7 +58,20 @@ import {
   CSV_IMPORT_HISTORICAL_CONTEXT_NOTE,
   CSV_IMPORT_READING_COPY,
   CSV_IMPORT_VIEW_HISTORY_LABEL,
+  CSV_TIME_FROM_FILE_NOTE,
+  CSV_TIME_ZONE_CHANGE_LABEL,
+  CSV_TIME_ZONE_CONTINUE_LABEL,
+  CSV_TIME_ZONE_HELP,
+  CSV_TIME_ZONE_PLACEHOLDER,
+  CSV_TIME_ZONE_PROMPT,
+  CSV_TIME_ZONE_SELECT_LABEL,
   buildCsvImportFailureMessage,
+  buildCsvExcludeUnresolvedLabel,
+  buildCsvExcludedRowsNote,
+  buildCsvUnresolvedTimeMessage,
+  csvTimeZoneNote,
+  csvSoilMeaningNote,
+  csvUnsupportedColumnsNote,
   mergeCsvImportFailureReceipts,
   type CsvImportFailureReceipt,
   type CsvImportFailureReason,
@@ -93,7 +118,26 @@ const ERROR_COPY: Record<string, string> = {
   damaged_file: "This CSV looks empty or damaged.",
   no_sensor_data: "We couldn’t read sensor data from this file.",
   file_too_large: "File is too large to import safely. Try a shorter date range.",
+  invalid_time_zone: "That time zone isn’t recognized.",
 };
+
+/** IANA zones from the runtime, device zone first. Listing it is not choosing it. */
+function listTimeZones(): { deviceZone: string | null; zones: string[] } {
+  let deviceZone: string | null = null;
+  try {
+    deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+  } catch {
+    deviceZone = null;
+  }
+  const supported =
+    typeof (Intl as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf ===
+    "function"
+      ? (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf(
+          "timeZone",
+        )
+      : null;
+  return { deviceZone, zones: listSourceTimeZones(deviceZone, supported) };
+}
 
 export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps) {
   const {
@@ -111,11 +155,20 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
   const inRouter = useInRouterContext();
   const [state, setState] = useState<ImportState>(INITIAL_IMPORT_STATE);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileRef = useRef<File | null>(null);
+  // Bumped on every new parse, file choice and reset; a stale parse never lands.
+  const parseGenRef = useRef(0);
+  const [zoneChoice, setZoneChoice] = useState("");
+  const zoneSelectId = useId();
+  const { deviceZone, zones } = useMemo(listTimeZones, []);
 
   const inFlightRef = useRef(false);
   const failureReceiptRef = useRef<CsvImportFailureReceipt | null>(null);
   const reset = useCallback(() => {
     failureReceiptRef.current = null;
+    parseGenRef.current += 1;
+    fileRef.current = null;
+    setZoneChoice("");
     setState(cancelImport());
   }, []);
 
@@ -131,8 +184,22 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
 
   const handleFile = useCallback(async (file: File | undefined) => {
     if (!file) return;
+    const gen = ++parseGenRef.current;
+    fileRef.current = file;
+    setZoneChoice("");
     setState(startParsingState());
     const result = await parseEnvironmentCSV(file);
+    if (gen !== parseGenRef.current) return;
+    setState((prev) => reduceParseResult(prev, result));
+  }, []);
+
+  const handleTimeZone = useCallback(async (zone: string) => {
+    const file = fileRef.current;
+    if (!file || !zone) return;
+    const gen = ++parseGenRef.current;
+    setState(startParsingState());
+    const result = await parseEnvironmentCSV(file, { sourceTimeZone: zone });
+    if (gen !== parseGenRef.current || fileRef.current !== file) return;
     setState((prev) => reduceParseResult(prev, result));
   }, []);
 
@@ -142,7 +209,8 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
 
   const handleConfirm = useCallback(async () => {
     if (inFlightRef.current) return;
-    const rows = rowsToPersist(state.parsed);
+    if (!canConfirmImport(state)) return;
+    const rows = rowsToPersist(state.parsed, state.timeExclusion);
     if (rows.length === 0) return;
     inFlightRef.current = true;
     setState((prev) => ({ ...prev, phase: "inserting" }));
@@ -187,9 +255,19 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
     } finally {
       inFlightRef.current = false;
     }
-  }, [state.parsed, onConfirm]);
+  }, [state, onConfirm]);
 
   const coverage = buildCoveragePreview(state.parsed);
+  const timePreview = buildTimePreview(state.parsed);
+  const timeUnresolved = hasUnresolvedTime(state.parsed);
+  const timeBlocked = timeBlocksWrite(state.parsed, state.timeExclusion);
+  const canOfferExclusion = timeBlocked && (state.parsed?.validRows.length ?? 0) > 0;
+  const unsupportedNote = csvUnsupportedColumnsNote(state.parsed?.unsupportedColumns ?? []);
+  const parsedRows = state.parsed?.validRows ?? [];
+  const soilNote = csvSoilMeaningNote(
+    parsedRows.some((r) => r.soil_moisture_pct != null),
+    parsedRows.some((r) => r.soil_ec != null),
+  );
   const windowPreview = buildCsvHistoryWindowPreview(
     state.parsed?.validRows ?? [],
     historyWindow,
@@ -239,6 +317,56 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
           <p data-testid="csv-import-parsing" className="text-sm">
             {CSV_IMPORT_READING_COPY}
           </p>
+        ) : null}
+
+        {state.phase === "time_confirm" ? (
+          <form
+            data-testid="csv-import-time-confirm"
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleTimeZone(zoneChoice);
+            }}
+          >
+            <p className="text-sm font-medium">{CSV_TIME_ZONE_PROMPT}</p>
+            <p className="text-xs text-muted-foreground">{CSV_TIME_ZONE_HELP}</p>
+            {state.parsed?.unresolvedTimeRows?.[0] ? (
+              <p className="text-xs" data-testid="csv-import-time-example">
+                Example from row {state.parsed.unresolvedTimeRows[0].rowNumber}:{" "}
+                <span className="font-mono">{state.parsed.unresolvedTimeRows[0].sourceText}</span>
+              </p>
+            ) : null}
+            <label htmlFor={zoneSelectId} className="block text-xs font-medium">
+              {CSV_TIME_ZONE_SELECT_LABEL}
+            </label>
+            <select
+              id={zoneSelectId}
+              data-testid="csv-import-time-zone-select"
+              className="w-full rounded-md border bg-background px-2 py-2 text-sm"
+              value={zoneChoice}
+              onChange={(e) => setZoneChoice(e.target.value)}
+            >
+              <option value="">{CSV_TIME_ZONE_PLACEHOLDER}</option>
+              {zones.map((z) => (
+                <option key={z} value={z}>
+                  {z === deviceZone ? `${z} (this device)` : z}
+                </option>
+              ))}
+            </select>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleClose}
+                data-testid="csv-import-time-cancel"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!zoneChoice} data-testid="csv-import-time-continue">
+                {CSV_TIME_ZONE_CONTINUE_LABEL}
+              </Button>
+            </DialogFooter>
+          </form>
         ) : null}
 
         {state.phase === "unit_confirm" ? (
@@ -298,6 +426,109 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
                 {coverage.partialMessage}
               </div>
             ) : null}
+            {soilNote ? (
+              <p data-testid="csv-import-soil-meaning" className="text-xs" role="note">
+                {soilNote}
+              </p>
+            ) : null}
+            {unsupportedNote ? (
+              <p data-testid="csv-import-unsupported-columns" className="text-xs" role="note">
+                {unsupportedNote}
+              </p>
+            ) : null}
+            <div data-testid="csv-import-time-preview" className="space-y-1 text-xs">
+              <p>
+                {timePreview.sourceTimeZone
+                  ? csvTimeZoneNote(timePreview.sourceTimeZone)
+                  : CSV_TIME_FROM_FILE_NOTE}
+              </p>
+              {timePreview.samples.length > 0 ? (
+                <ul className="space-y-0.5 font-mono" data-testid="csv-import-time-samples">
+                  {timePreview.samples.map((t) => (
+                    <li key={t.rowNumber}>
+                      Row {t.rowNumber}: {t.sourceText} ({t.zoneLabel}, UTC{t.utcOffset}) →{" "}
+                      {t.observedAt}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {timePreview.sourceTimeZone ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setState((prev) => reopenTimeZoneChoice(prev))}
+                  data-testid="csv-import-time-change"
+                >
+                  {CSV_TIME_ZONE_CHANGE_LABEL}
+                </Button>
+              ) : null}
+            </div>
+            {timeBlocked ? (
+              <div
+                role="alert"
+                data-testid="csv-import-time-blocked"
+                className="space-y-1 rounded-md border border-destructive/50 px-3 py-2 text-xs"
+              >
+                <p>
+                  {buildCsvUnresolvedTimeMessage(
+                    timePreview.sourceTimeZone,
+                    timePreview.ambiguousCount,
+                    timePreview.nonexistentCount,
+                  )}
+                </p>
+                <ul className="font-mono">
+                  {timePreview.unresolvedExamples.map((u) => (
+                    <li key={u.rowNumber}>
+                      Row {u.rowNumber}: {u.sourceText}
+                    </li>
+                  ))}
+                  {timePreview.unresolvedCount > timePreview.unresolvedExamples.length ? (
+                    <li>
+                      …and {timePreview.unresolvedCount - timePreview.unresolvedExamples.length}{" "}
+                      more
+                    </li>
+                  ) : null}
+                </ul>
+                {canOfferExclusion ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setState((prev) => excludeUnresolvedTimeRows(prev))}
+                    data-testid="csv-import-time-exclude"
+                  >
+                    {buildCsvExcludeUnresolvedLabel(
+                      timePreview.unresolvedCount,
+                      state.parsed?.validRows.length ?? 0,
+                    )}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            {timeUnresolved && !timeBlocked && state.timeExclusion ? (
+              <div
+                role="status"
+                data-testid="csv-import-time-excluded"
+                className="space-y-1 rounded-md border px-3 py-2 text-xs"
+              >
+                <p>
+                  {buildCsvExcludedRowsNote(
+                    state.timeExclusion.rowNumbers,
+                    state.parsed?.validRows.length ?? 0,
+                  )}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setState((prev) => undoTimeExclusion(prev))}
+                  data-testid="csv-import-time-exclude-undo"
+                >
+                  Undo
+                </Button>
+              </div>
+            ) : null}
             <ul
               data-testid="csv-import-row-preview"
               className="max-h-32 space-y-1 overflow-auto text-xs text-muted-foreground"
@@ -310,7 +541,11 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
               <Button variant="ghost" onClick={handleClose} data-testid="csv-import-cancel">
                 Cancel
               </Button>
-              <Button onClick={handleConfirm} data-testid="csv-import-confirm">
+              <Button
+                onClick={handleConfirm}
+                disabled={!canConfirmImport(state)}
+                data-testid="csv-import-confirm"
+              >
                 {CSV_IMPORT_CONFIRM_LABEL}
               </Button>
             </DialogFooter>
@@ -330,6 +565,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
                 state.insertedCount,
                 state.duplicateCount,
                 state.contributedSensorRowCount ?? undefined,
+                state.timeExclusion?.rowNumbers.length ?? 0,
               )}
             </p>
             <p className="text-xs text-muted-foreground" data-testid="csv-import-historical-note">
@@ -358,7 +594,11 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
         {state.phase === "error" ? (
           <div data-testid="csv-import-error" className="space-y-2">
             <p className="text-sm text-destructive">
-              {(state.errorCode && ERROR_COPY[state.errorCode]) ||
+              {/* The parser's soil-only reason is more useful than the generic copy. */}
+              {(state.errorCode === "no_sensor_data" && state.errorMessage === CSV_SOIL_ONLY_MESSAGE
+                ? CSV_SOIL_ONLY_MESSAGE
+                : null) ||
+                (state.errorCode && ERROR_COPY[state.errorCode]) ||
                 (state.errorCode === "insert_failed"
                   ? (state.errorMessage ??
                     buildCsvImportFailureMessage(state.insertedCount, state.partialWrite))

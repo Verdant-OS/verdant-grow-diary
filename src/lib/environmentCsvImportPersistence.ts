@@ -23,6 +23,7 @@ import {
   CSV_HISTORY_DEDUPE_CONFLICT_COPY,
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
+import { interpretCsvTimestamp } from "@/lib/csvTimestampRules";
 import {
   buildCsvImportFailureMessage,
   type CsvImportFailureReason,
@@ -30,7 +31,19 @@ import {
 
 export const CSV_SENSOR_SOURCE = "csv" as const;
 
-type CsvSensorMetric = "temperature_c" | "humidity_pct" | "vpd_kpa" | "co2_ppm" | "ppfd";
+type CsvSensorMetric =
+  | "temperature_c"
+  | "humidity_pct"
+  | "vpd_kpa"
+  | "co2_ppm"
+  | "ppfd"
+  | "soil_temp_c"
+  | "soil_moisture_pct"
+  | "ec";
+
+/** Provenance for soil values whose meaning the CSV does not state. */
+export const CSV_SOIL_MOISTURE_BASIS = "vendor_reading_uncalibrated" as const;
+export const CSV_SOIL_EC_UNIT_ASSUMED = "mS/cm" as const;
 
 export interface CsvInsertScope {
   user_id: string;
@@ -57,7 +70,48 @@ export interface SensorReadingInsert {
     vpd_source?: "derived" | "csv";
     source_app?: "ac_infinity" | "spider_farmer" | "vivosun" | null;
     import_file_name?: string | null;
+    time_provenance?: ParsedEnvironmentRow["time_provenance"];
+    soil_moisture_basis?: typeof CSV_SOIL_MOISTURE_BASIS;
+    ec_unit_assumed?: typeof CSV_SOIL_EC_UNIT_ASSUMED;
   };
+}
+
+/** Grower copy when the write boundary refuses rows with unsettled times. */
+export const CSV_TIME_UNRESOLVED_COPY =
+  "Nothing was saved. Some observation times in this file aren’t settled yet. Choose the time zone the file was recorded in and try again." as const;
+
+/**
+ * Write-boundary time check, independent of the UI. A row is write-eligible
+ * only when captured_at is a canonical UTC instant and, when the row carries
+ * time provenance, re-reading its source text under that provenance yields
+ * exactly that instant. Returns the indexes of rows that fail.
+ */
+export function findRowsWithUnverifiedTime(rows: readonly ParsedEnvironmentRow[]): number[] {
+  const bad: number[] = [];
+  rows.forEach((r, i) => {
+    const ms = typeof r?.captured_at === "string" ? Date.parse(r.captured_at) : NaN;
+    if (!Number.isFinite(ms) || new Date(ms).toISOString() !== r.captured_at) {
+      bad.push(i);
+      return;
+    }
+    const p = r.time_provenance;
+    if (p === undefined) return;
+    const zone =
+      p?.basis === "source_time_zone"
+        ? p.source_time_zone
+        : p?.basis === "explicit_offset"
+          ? null
+          : undefined;
+    if (zone === undefined || (p.basis === "source_time_zone" && !zone)) {
+      bad.push(i);
+      return;
+    }
+    const again = interpretCsvTimestamp(p.source_text, zone);
+    if (again.kind !== "resolved" || again.basis !== p.basis || again.iso !== r.captured_at) {
+      bad.push(i);
+    }
+  });
+  return bad;
 }
 
 /**
@@ -81,6 +135,7 @@ export function buildSensorReadingInserts(
       raw_temp_unit: r.raw_temp_unit,
       raw_row: r.raw_payload,
       ...(r.source_app ? { source_app: r.source_app } : {}),
+      ...(r.time_provenance ? { time_provenance: r.time_provenance } : {}),
     } as const;
 
     function pushMetric(
@@ -107,6 +162,11 @@ export function buildSensorReadingInserts(
     pushMetric("vpd_kpa", r.vpd_kpa, r.vpd_source ? { vpd_source: r.vpd_source } : {});
     pushMetric("co2_ppm", r.co2_ppm);
     pushMetric("ppfd", r.ppfd);
+    pushMetric("soil_temp_c", r.soil_temp_c ?? null);
+    pushMetric("soil_moisture_pct", r.soil_moisture_pct ?? null, {
+      soil_moisture_basis: CSV_SOIL_MOISTURE_BASIS,
+    });
+    pushMetric("ec", r.soil_ec ?? null, { ec_unit_assumed: CSV_SOIL_EC_UNIT_ASSUMED });
   });
   return out;
 }
@@ -163,6 +223,16 @@ export async function persistCsvEnvironmentRows(
   client: InsertClient,
   chunkSize = 500,
 ): Promise<PersistResult> {
+  // snip:prod — fail closed at the write boundary; a UI gate alone is not enough.
+  if (findRowsWithUnverifiedTime(rows).length > 0) {
+    return {
+      insertedCount: 0,
+      duplicateCount: 0,
+      contributedSensorRowCount: 0,
+      partialWrite: false,
+      error: CSV_TIME_UNRESOLVED_COPY,
+    };
+  }
   const inserts = buildSensorReadingInserts(rows, scope);
   if (inserts.length === 0) {
     return {

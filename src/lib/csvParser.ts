@@ -14,12 +14,22 @@
  */
 
 import { CsvImportVendorIdentity } from "@/lib/csvImportVendorIdentity";
+import {
+  interpretCsvTimestamp,
+  isValidIanaTimeZone,
+  type CsvTimeBasis,
+} from "@/lib/csvTimestampRules";
 
 export const CSV_SOURCE_TAG = "csv" as const;
 export const MAX_CSV_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export type ParseErrorCode =
-  "wrong_file_type" | "file_too_large" | "empty_file" | "damaged_file" | "no_sensor_data";
+  | "wrong_file_type"
+  | "file_too_large"
+  | "empty_file"
+  | "damaged_file"
+  | "no_sensor_data"
+  | "invalid_time_zone";
 
 export interface ParseError {
   code: ParseErrorCode;
@@ -36,6 +46,37 @@ export type SkippedReason =
 export interface SkippedRow {
   rowNumber: number; // 1-based, header-excluded
   reason: SkippedReason;
+}
+
+/**
+ * Why a row with a readable timestamp and metrics still has no observation
+ * instant. These rows are never write-eligible.
+ *  - needs_source_time_zone: wall-clock time and no source zone was chosen
+ *  - ambiguous_local_time: the wall time happened twice in the chosen zone (DST fold)
+ *  - nonexistent_local_time: the wall time never happened in the chosen zone (DST gap)
+ */
+export type UnresolvedTimeReason =
+  "needs_source_time_zone" | "ambiguous_local_time" | "nonexistent_local_time";
+
+export interface UnresolvedTimeRow {
+  rowNumber: number; // 1-based, header-excluded
+  sourceText: string;
+  reason: UnresolvedTimeReason;
+}
+
+/** How a row's captured_at was derived from the file's own text. */
+export interface CsvTimeProvenance {
+  source_text: string;
+  basis: CsvTimeBasis;
+  /** IANA zone the grower confirmed; null when the text carried its own offset. */
+  source_time_zone: string | null;
+  /** Offset applied to this row, e.g. "-05:00". */
+  utc_offset: string;
+}
+
+export interface ParseEnvironmentCsvOptions {
+  /** IANA zone the grower explicitly confirmed for wall-clock timestamps. */
+  sourceTimeZone?: string | null;
 }
 
 export type RawTempUnit = "F" | "C" | "unknown";
@@ -60,11 +101,23 @@ export interface ParsedEnvironmentRow {
   vpd_kpa: number | null;
   co2_ppm: number | null;
   ppfd: number | null;
+  /**
+   * Root-zone readings. Optional only for rows built elsewhere; the parser
+   * always sets them (null when the file has no such column or the cell is
+   * blank or out of range). Never derived from or mixed with air metrics.
+   */
+  soil_temp_c?: number | null;
+  /** The controller's own moisture %, not calibrated water content. */
+  soil_moisture_pct?: number | null;
+  /** Soil EC as written in the file. Unit is not stated by the export. */
+  soil_ec?: number | null;
   // raw preserved
   raw_temperature: number | null;
   raw_temp_unit: RawTempUnit;
   raw_payload: Record<string, string>;
   vpd_source: "csv" | "derived" | null;
+  /** Set on every parser-built row. Optional only for rows built elsewhere. */
+  time_provenance?: CsvTimeProvenance;
   // source — hardcoded
   source_tag: typeof CSV_SOURCE_TAG;
   /** Presentation vendor. Never written to sensor_readings.source. */
@@ -80,10 +133,17 @@ export interface ParseEnvironmentCsvResult {
   detectedColumns: DetectedColumns;
   /**
    * Header names this parser recognizes but does not import (today: soil
-   * columns), in file order. They are never mapped to an air metric. Always
+   * columns other than soil temperature, soil moisture and soil EC), in file order. They are never mapped to an air metric. Always
    * set by the parser; absent only on results built elsewhere.
    */
   unsupportedColumns?: readonly string[];
+  /**
+   * Rows whose metrics are readable but whose observation instant is not
+   * established. While any exist the file is not write-eligible.
+   */
+  unresolvedTimeRows?: readonly UnresolvedTimeRow[];
+  /** The source zone this result was parsed with, or null. */
+  sourceTimeZone?: string | null;
   errors: ParseError[];
 }
 
@@ -93,7 +153,10 @@ export const CSV_SOIL_ONLY_MESSAGE =
 
 // ---------- public API ----------
 
-export async function parseEnvironmentCSV(file: File): Promise<ParseEnvironmentCsvResult> {
+export async function parseEnvironmentCSV(
+  file: File,
+  options: ParseEnvironmentCsvOptions = {},
+): Promise<ParseEnvironmentCsvResult> {
   const empty = emptyResult();
 
   if (!file || typeof file.name !== "string") {
@@ -116,7 +179,7 @@ export async function parseEnvironmentCSV(file: File): Promise<ParseEnvironmentC
   } catch {
     return withError(empty, "damaged_file", "This CSV looks empty or damaged.");
   }
-  return stampCsvVendor(parseEnvironmentCSVText(text), file.name);
+  return stampCsvVendor(parseEnvironmentCSVText(text, options), file.name);
 }
 
 function stampCsvVendor(
@@ -160,8 +223,16 @@ async function readFileAsText(file: File): Promise<string> {
   });
 }
 
-export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult {
+export function parseEnvironmentCSVText(
+  text: string,
+  options: ParseEnvironmentCsvOptions = {},
+): ParseEnvironmentCsvResult {
   const empty = emptyResult();
+  const sourceTimeZone = options.sourceTimeZone ?? null;
+  if (sourceTimeZone !== null && !isValidIanaTimeZone(sourceTimeZone)) {
+    return withError(empty, "invalid_time_zone", "That time zone isn’t recognized.");
+  }
+  empty.sourceTimeZone = sourceTimeZone;
   if (!text || !text.trim()) {
     return withError(empty, "empty_file", "This CSV looks empty or damaged.");
   }
@@ -177,7 +248,7 @@ export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult
     return withError(empty, "empty_file", "This CSV looks empty or damaged.");
   }
 
-  const { detected, unsupported } = detectColumns(headers);
+  const { detected, unsupported, soil } = detectColumns(headers);
   empty.unsupportedColumns = unsupported;
   const soilOnlyMessage = unsupported.length > 0 ? CSV_SOIL_ONLY_MESSAGE : null;
   const hasTimeCol =
@@ -189,7 +260,10 @@ export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult
     detected.humidity !== null ||
     detected.vpd !== null ||
     detected.co2 !== null ||
-    detected.ppfd !== null;
+    detected.ppfd !== null ||
+    soil.temperature !== null ||
+    soil.moisture !== null ||
+    soil.ec !== null;
   if (!hasTimeCol || !hasMetricCol) {
     return withError(
       empty,
@@ -218,6 +292,7 @@ export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult
 
   const validRows: ParsedEnvironmentRow[] = [];
   const skipped: SkippedRow[] = [];
+  const unresolvedTime: UnresolvedTimeRow[] = [];
   let minTs = Number.POSITIVE_INFINITY;
   let maxTs = Number.NEGATIVE_INFINITY;
 
@@ -225,8 +300,9 @@ export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult
     const rowNumber = idx + 1;
     const rec = rowRecord(headers, cells);
 
-    const captured = resolveCapturedAt(rec, detected);
-    if (!captured) {
+    const timeText = readTimestampText(rec, detected);
+    const time = timeText ? interpretCsvTimestamp(timeText, sourceTimeZone) : null;
+    if (!timeText || !time || time.kind === "invalid") {
       skipped.push({
         rowNumber,
         reason: rec[detected.timestamp ?? detected.date ?? ""]
@@ -281,12 +357,44 @@ export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult
           ? computeVpdKpa(tempC, rh)
           : null;
     const co2Ppm = detected.co2 ? parseMetric(rec[detected.co2], 0, 10_000) : null;
+    // Soil bounds: soil_temp_c matches the DB trigger (-20..80 °C).
+    const soilTempC = soil.temperature
+      ? soil.temperatureUnit === "F"
+        ? fToCInRange(rec[soil.temperature])
+        : parseMetric(rec[soil.temperature], -20, 80)
+      : null;
+    const soilMoisture = soil.moisture ? parseMetric(rec[soil.moisture], 0, 100) : null;
+    const soilEc = soil.ec ? parseMetric(rec[soil.ec], 0, 20) : null;
     const ppfd = detected.ppfd ? parseMetric(rec[detected.ppfd], 0, 2_500) : null;
 
-    if (tempC == null && rh == null && vpd == null && co2Ppm == null && ppfd == null) {
+    if (
+      tempC == null &&
+      rh == null &&
+      vpd == null &&
+      co2Ppm == null &&
+      ppfd == null &&
+      soilTempC == null &&
+      soilMoisture == null &&
+      soilEc == null
+    ) {
       skipped.push({ rowNumber, reason: "no_metrics" });
       return;
     }
+
+    if (time.kind !== "resolved") {
+      unresolvedTime.push({
+        rowNumber,
+        sourceText: timeText,
+        reason:
+          time.kind === "needs_zone"
+            ? "needs_source_time_zone"
+            : time.kind === "ambiguous"
+              ? "ambiguous_local_time"
+              : "nonexistent_local_time",
+      });
+      return;
+    }
+    const captured = time.iso;
 
     const tMs = Date.parse(captured);
     if (Number.isFinite(tMs)) {
@@ -302,15 +410,24 @@ export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult
       vpd_kpa: vpd,
       co2_ppm: co2Ppm,
       ppfd,
+      soil_temp_c: soilTempC,
+      soil_moisture_pct: soilMoisture,
+      soil_ec: soilEc,
       raw_temperature: rawTemp,
       raw_temp_unit: tempHeader ? inferredUnit : "unknown",
       raw_payload: rec,
       vpd_source: csvVpd != null ? "csv" : vpd != null ? "derived" : null,
+      time_provenance: {
+        source_text: timeText,
+        basis: time.basis,
+        source_time_zone: time.zone,
+        utc_offset: time.offset,
+      },
       source_tag: CSV_SOURCE_TAG,
     });
   });
 
-  if (validRows.length === 0) {
+  if (validRows.length === 0 && unresolvedTime.length === 0) {
     const onlySoilHadValues =
       soilOnlyMessage !== null &&
       skipped.length > 0 &&
@@ -326,6 +443,8 @@ export function parseEnvironmentCSVText(text: string): ParseEnvironmentCsvResult
     validRows,
     skippedRows: skipped,
     unsupportedColumns: unsupported,
+    unresolvedTimeRows: unresolvedTime,
+    sourceTimeZone,
     dateRange:
       minTs <= maxTs
         ? { start: new Date(minTs).toISOString(), end: new Date(maxTs).toISOString() }
@@ -394,6 +513,8 @@ function emptyResult(): ParseEnvironmentCsvResult {
       ppfd: null,
     },
     unsupportedColumns: [],
+    unresolvedTimeRows: [],
+    sourceTimeZone: null,
     errors: [],
   };
 }
@@ -470,11 +591,67 @@ function isSoilHeader(normalized: string): boolean {
   return /soil/.test(normalized);
 }
 
+interface SoilColumns {
+  temperature: string | null;
+  temperatureUnit: "C" | "F";
+  moisture: string | null;
+  ec: string | null;
+}
+
+/**
+ * Soil headers are matched only against soil metrics, never air ones. A °C
+ * soil temperature column wins over a °F duplicate; the duplicate is still a
+ * recognized column, not an unsupported one.
+ */
+function classifySoilHeaders(soilHeaders: readonly string[]): {
+  soil: SoilColumns;
+  unsupported: string[];
+} {
+  const soil: SoilColumns = { temperature: null, temperatureUnit: "C", moisture: null, ec: null };
+  let tempC: string | null = null;
+  let tempF: string | null = null;
+  const unsupported: string[] = [];
+  for (const h of soilHeaders) {
+    const k = normalizeHeader(h);
+    if (/temp/.test(k)) {
+      // The unit must be stated in the header. A soil temperature column
+      // with no unit is never guessed as Celsius; it stays not imported.
+      const unit = soilTempUnitFromHeader(k);
+      if (unit === "F" && tempF == null) tempF = h;
+      else if (unit === "C" && tempC == null) tempC = h;
+      else unsupported.push(h);
+    } else if (soil.moisture == null && /humidity|moisture|vwc|water/.test(k)) {
+      soil.moisture = h;
+    } else if (soil.ec == null && /(^|[^a-z])ec([^a-z]|$)|conductiv/.test(k)) {
+      soil.ec = h;
+    } else {
+      unsupported.push(h);
+    }
+  }
+  soil.temperature = tempC ?? tempF;
+  soil.temperatureUnit = tempC ? "C" : "F";
+  return { soil, unsupported };
+}
+
+function soilTempUnitFromHeader(k: string): "C" | "F" | null {
+  if (/°f|℉|\(f\)|_f\b|[\s_-]f$|fahrenheit/.test(k)) return "F";
+  if (/°c|℃|\(c\)|_c\b|[\s_-]c$|celsius/.test(k)) return "C";
+  return null;
+}
+
+function fToCInRange(input: string | undefined): number | null {
+  const f = parseNumber(input ?? "");
+  if (f == null) return null;
+  const c = Math.round(((f - 32) * 5 * 10) / 9) / 10;
+  return c >= -20 && c <= 80 ? c : null;
+}
+
 function detectColumns(headers: string[]): {
   detected: DetectedColumns;
   unsupported: string[];
+  soil: SoilColumns;
 } {
-  const unsupported: string[] = [];
+  const soilHeaders: string[] = [];
   const out: DetectedColumns = {
     timestamp: null,
     date: null,
@@ -491,7 +668,7 @@ function detectColumns(headers: string[]): {
   for (const h of headers) {
     const k = normalizeHeader(h);
     if (isSoilHeader(k)) {
-      unsupported.push(h);
+      soilHeaders.push(h);
       continue;
     }
     if (
@@ -533,7 +710,8 @@ function detectColumns(headers: string[]): {
   }
 
   out.temperature = chooseTemperatureColumn(temperatureCandidates);
-  return { detected: out, unsupported };
+  const { soil, unsupported } = classifySoilHeaders(soilHeaders);
+  return { detected: out, unsupported, soil };
 }
 
 function normalizeHeader(header: string): string {
@@ -585,59 +763,20 @@ function unitFromValues(sample: number[]): { unit: RawTempUnit; ambiguous: boole
   return { unit: "C", ambiguous: false };
 }
 
-function resolveCapturedAt(rec: Record<string, string>, detected: DetectedColumns): string | null {
+/** The row's raw timestamp text, or null when the time cell is blank. */
+function readTimestampText(rec: Record<string, string>, detected: DetectedColumns): string | null {
   if (detected.timestamp) {
     const v = (rec[detected.timestamp] ?? "").trim();
-    if (!v) return null;
-    return parseFlexibleDate(v);
+    return v || null;
   }
   if (detected.date && detected.time) {
     const d = (rec[detected.date] ?? "").trim();
     const t = (rec[detected.time] ?? "").trim();
-    if (!d) return null;
-    return parseFlexibleDate(`${d} ${t}`.trim());
+    return d ? `${d} ${t}`.trim() : null;
   }
   if (detected.date) {
     const d = (rec[detected.date] ?? "").trim();
-    if (!d) return null;
-    return parseFlexibleDate(d);
-  }
-  return null;
-}
-
-function parseFlexibleDate(input: string): string | null {
-  if (!input) return null;
-
-  // Explicit Spider Farmer / common export format: YYYY-MM-DD HH:mm[:ss]
-  const ymd = input.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-  if (ymd) {
-    const [, yr, mo, da, hh, mm, ss] = ymd;
-    const d = new Date(
-      Date.UTC(
-        Number(yr),
-        Number(mo) - 1,
-        Number(da),
-        Number(hh ?? 0),
-        Number(mm ?? 0),
-        Number(ss ?? 0),
-      ),
-    );
-    return Number.isFinite(d.getTime()) ? d.toISOString() : null;
-  }
-
-  // Try ISO / native for timezone-marked strings.
-  const direct = Date.parse(input);
-  if (Number.isFinite(direct)) return new Date(direct).toISOString();
-
-  // Try MM/DD/YYYY HH:mm[:ss]
-  const m = input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-  if (m) {
-    const [, mo, da, yrStr, hh, mm, ss] = m;
-    const yr = yrStr.length === 2 ? 2000 + Number(yrStr) : Number(yrStr);
-    const d = new Date(
-      Date.UTC(yr, Number(mo) - 1, Number(da), Number(hh ?? 0), Number(mm ?? 0), Number(ss ?? 0)),
-    );
-    return Number.isFinite(d.getTime()) ? d.toISOString() : null;
+    return d || null;
   }
   return null;
 }

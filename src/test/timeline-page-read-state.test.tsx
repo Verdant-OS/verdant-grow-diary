@@ -25,7 +25,7 @@ const harness = vi.hoisted(() => ({
 }));
 
 interface QueryFilter {
-  op: "eq" | "is" | "not" | "gte" | "lte" | "lt";
+  op: "eq" | "is" | "not" | "gte" | "lte" | "lt" | "or";
   column: string;
   value: unknown;
 }
@@ -74,6 +74,11 @@ vi.mock("@/integrations/supabase/client", () => {
       },
       lt(column: string, value: unknown) {
         spec.filters.push({ op: "lt", column, value });
+        return query;
+      },
+      // Timeline's "Load older" keyset filter (#2890): one PostgREST or() on entry_at.
+      or(filter: string) {
+        spec.filters.push({ op: "or", column: "entry_at", value: filter });
         return query;
       },
       in() {
@@ -254,7 +259,7 @@ function growIdFrom(spec: QuerySpec): string | null {
 }
 
 function isOlderPage(spec: QuerySpec): boolean {
-  return spec.filters.some((item) => item.op === "lt" && item.column === "entry_at");
+  return spec.filters.some((item) => item.op === "or" && item.column === "entry_at");
 }
 
 function defaultResult(spec: QuerySpec): QueryResult {

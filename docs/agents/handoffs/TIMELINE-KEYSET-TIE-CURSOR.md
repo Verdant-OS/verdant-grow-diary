@@ -7,27 +7,27 @@ why: Deep audit 2026-11-05 at deploy tip e4c2fc02dda02d28bab3529f62ba311df6570a5
 branch: claude/new-session-mhz52l
 base: verdant-grow-diary
 checkout: git fetch origin claude/new-session-mhz52l verdant-grow-diary && git switch claude/new-session-mhz52l
-pr: opened as a draft after this commit; read the URL from GitHub
+pr: Verdant-OS/verdant-grow-diary#2890 (marked ready for review by cheekhimself 2026-11-05 09:48 UTC)
 head_sha: read the current head on GitHub
-state: pushed draft
-current_step: draft PR open; Matthew lifted the GitHub posting hold 2026-11-05; reviewer routing pending.
-next_action: route an eligible independent reviewer under OWNERSHIP.md §4.3 (two existing tests were edited, so not the Graft low-risk lane); PR body names the two renegotiated checks.
+state: ready for review; CI repair pushed
+current_step: Full test suite (shard 12/32) failed at 43231dc8454a56faeec9958015f6a77da5f8c9b6 on timeline-load-older-sensor-siblings (its client mock had no or() and detected the older page by op lt). A local sweep of the 45 Timeline-rendering and Load-older tests found two more pinned the same way (timeline-removal-pagination-interleaving, timeline-page-read-state). All three renegotiated: mock gains or(), older page detected by op or, the interleaving cursor is read from the or() string. 45 files / 285 tests pass locally. Reviewer C [ROUTE] posted; the new head supersedes it.
+next_action: wait for 35/35 at the new head; re-request Reviewer C at the new head (five existing tests were edited, so not the Graft low-risk lane); PR body names all five renegotiated checks.
 post_merge_check: on https://verdantgrowdiary.com, in a grow with more than 100 diary entries where several share one reading time at the page edge, "Load older entries" loads them and the control clears. NOT_MEASURED until live /version.json reports the merge SHA.
 active_writer: Claude session_017UoYKy4m7tV5CyJMwrFb2X
 decisions: Composite keyset (entry_at, id) expressed as one PostgREST or() filter with double-quoted values, mirroring useTentIrrigationLedger.ts. Pure helpers isOlderThanCursor and filterOlderThanCursor live in src/lib/timelineQueryOrderRules.ts next to orderNewestFirstStable. projectTimelineDiaryPage keeps oldestFetchedEntryAt (existing pins) and adds oldestFetchedCursor. No schema change.
 tried_and_rejected: a client-side backfill of tied rows after each page (would hide the predicate defect instead of fixing it).
-commands: bunx vitest run src/test/timeline-keyset-cursor-ties.test.ts src/test/timeline-quicklog-dedupe-pagination.test.tsx src/test/timeline-local-day-query-integration.test.tsx src/test/timeline-stable-order.test.ts --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; node scripts/scorer-lock.mjs --report --strict
-files_touched: src/lib/timelineQueryOrderRules.ts; src/lib/timelineQuickLogPlaceholderDedupeRules.ts; src/pages/Timeline.tsx; src/test/timeline-keyset-cursor-ties.test.ts (new, RED before the fix: 5 of 6 failing); src/test/timeline-quicklog-dedupe-pagination.test.tsx (renegotiated: query mock gains or(), empty-page expectation gains oldestFetchedCursor); src/test/timeline-local-day-query-integration.test.tsx (renegotiated: query mock gains or(), keyset page detected by op "or"); docs/agents/handoffs/TIMELINE-KEYSET-TIE-CURSOR.md
+commands: bunx vitest run src/test/timeline-keyset-cursor-ties.test.ts src/test/timeline-quicklog-dedupe-pagination.test.tsx src/test/timeline-local-day-query-integration.test.tsx src/test/timeline-load-older-sensor-siblings.test.tsx src/test/timeline-removal-pagination-interleaving.test.tsx src/test/timeline-page-read-state.test.tsx src/test/timeline-stable-order.test.ts --reporter=dot; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck; node scripts/scorer-lock.mjs --report --strict
+files_touched: src/lib/timelineQueryOrderRules.ts; src/lib/timelineQuickLogPlaceholderDedupeRules.ts; src/pages/Timeline.tsx; src/test/timeline-keyset-cursor-ties.test.ts (new, RED before the fix: 5 of 6 failing); src/test/timeline-quicklog-dedupe-pagination.test.tsx (renegotiated: query mock gains or(), empty-page expectation gains oldestFetchedCursor); src/test/timeline-local-day-query-integration.test.tsx (renegotiated: query mock gains or(), keyset page detected by op "or"); src/test/timeline-load-older-sensor-siblings.test.tsx, src/test/timeline-page-read-state.test.tsx (renegotiated the same way after shard 12/32 failed); src/test/timeline-removal-pagination-interleaving.test.tsx (renegotiated: mock gains or(), the captured cursor is the first quoted entry_at inside the or() string); docs/agents/handoffs/TIMELINE-KEYSET-TIE-CURSOR.md
 files_remaining: none for this slice
 blockers: none
 open_questions: none
-gotchas: Both renegotiated tests are locked scorers; the unlock was declared with scripts/scorer-lock.mjs and the PR body must name them. Commit with NODE_OPTIONS=--max-old-space-size=8192; never --no-verify. Do not whole-file-format Timeline.tsx beyond the touched hunks.
+gotchas: All five renegotiated tests are locked scorers; any Timeline test whose client mock lacks or() and clicks Load older will fail the same way; the unlock was declared with scripts/scorer-lock.mjs and the PR body must name them. Commit with NODE_OPTIONS=--max-old-space-size=8192; never --no-verify. Do not whole-file-format Timeline.tsx beyond the touched hunks.
 links: audit report in the authoring session's scratchpad (not in the repository); audit finding F-01
 artifacts: none in the repository besides the test
-reviewer_seat: not requested
+reviewer_seat: Reviewer C [ROUTE] at 43231dc8454a56faeec9958015f6a77da5f8c9b6, superseded by the CI-repair head; re-request pending
 reviewer_sha: NOT_MEASURED
 session_state: no production access; no Supabase access used
 claimed_by: Claude session_017UoYKy4m7tV5CyJMwrFb2X, 2026-11-05 09:05 UTC
 owner: Claude
-last_updated: 2026-11-05 03:35 CT, by Claude
+last_updated: 2026-11-05 03:56 CT, by Claude
 ```

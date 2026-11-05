@@ -4,7 +4,7 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface QueryFilter {
-  op: "eq" | "is" | "not" | "gte" | "lte" | "lt";
+  op: "eq" | "is" | "not" | "gte" | "lte" | "lt" | "or";
   column: string;
   value: unknown;
 }
@@ -73,6 +73,11 @@ vi.mock("@/integrations/supabase/client", () => {
       },
       lt(column: string, value: unknown) {
         spec.filters.push({ op: "lt", column, value });
+        return query;
+      },
+      // Timeline's "Load older" keyset filter (#2890): one PostgREST or() on entry_at.
+      or(filter: string) {
+        spec.filters.push({ op: "or", column: "entry_at", value: filter });
         return query;
       },
       in(column: string, value: unknown) {
@@ -187,7 +192,7 @@ describe("Timeline loadOlder sensor siblings", () => {
   it("loads the linked root, then the environment companion that shares its created_at", async () => {
     harness.executeQuery.mockImplementation((spec) => {
       if (spec.table === "diary_entries") {
-        if (spec.filters.some((f) => f.op === "lt" && f.column === "entry_at")) {
+        if (spec.filters.some((f) => f.op === "or" && f.column === "entry_at")) {
           return {
             data: [
               {

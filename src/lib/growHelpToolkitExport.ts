@@ -4,6 +4,7 @@ import {
   type ExpenseUnitCosts,
 } from "./expenseCalc";
 import type { GrowHelpToolkitState } from "./growHelpToolkitState";
+import { escapeCsvCell } from "./csvCellEscapeRules";
 import {
   MEASURED_MIXED_EC_SOURCE,
   MEASURED_MIXED_EC_SOURCE_LABEL,
@@ -781,10 +782,7 @@ export function createGrowHelpExportSnapshot(
   };
 }
 
-function escapeCsv(value: string | number): string {
-  const text = String(value);
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
+const escapeCsv = escapeCsvCell;
 
 function escapeHtml(value: string | number): string {
   return String(value)

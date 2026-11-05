@@ -267,6 +267,22 @@ export function consumeBoundedPublicAssetResponse({
   });
 }
 
+/**
+ * Cloudflare Web Analytics injects one beacon module at the edge. It is not part
+ * of the build, so it must not count as a second entry. Narrow on purpose: the
+ * exact Cloudflare host AND the data-cf-beacon marker; any other extra script
+ * still fails the count.
+ */
+function isCloudflareWebAnalyticsBeacon(attributes, src) {
+  if (!/(?:^|\s)data-cf-beacon\s*=/iu.test(attributes)) return false;
+  try {
+    const url = new URL(src);
+    return url.protocol === "https:" && url.hostname === "static.cloudflareinsights.com";
+  } catch {
+    return false;
+  }
+}
+
 /** Resolve exactly one same-origin hashed Vite entry module from bounded HTML. */
 export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
   if (typeof html !== "string" || typeof publicOrigin !== "string") {
@@ -295,7 +311,9 @@ export function resolvePublicMainModuleAsset({ html, publicOrigin } = {}) {
     const attributes = match[1];
     const type = attributes.match(/(?:^|\s)type\s*=\s*(["'])module\1/iu);
     const source = attributes.match(/(?:^|\s)src\s*=\s*(["'])([^"']+)\1/iu);
-    if (type && source) sources.push(source[2]);
+    if (type && source && !isCloudflareWebAnalyticsBeacon(attributes, source[2])) {
+      sources.push(source[2]);
+    }
     if (sources.length > 1) {
       return { ok: false, reason: "public_main_asset_count_invalid" };
     }

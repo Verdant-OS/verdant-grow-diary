@@ -491,6 +491,28 @@ describe("temporary authenticated One-Tent Actions lane", () => {
       ok: true,
       url: "https://verdantgrowdiary.com/assets/index-clean.js",
     });
+    const beacon =
+      `<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vabc" data-cf-beacon='{"token":"x"}' crossorigin="anonymous"></script>`;
+    expect(
+      resolvePublicMainModuleAsset({
+        html: `<script type="module" async="" src="/assets/index-clean.js"></script>${beacon}`,
+        publicOrigin: "https://verdantgrowdiary.com",
+      }),
+    ).toEqual({ ok: true, url: "https://verdantgrowdiary.com/assets/index-clean.js" });
+    // Not loosened: beacon host without the marker, marker on another host, or a
+    // second same-origin entry still fail the exactly-one rule.
+    for (const extra of [
+      '<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js"></script>',
+      '<script type="module" src="https://example.invalid/x.js" data-cf-beacon="{}"></script>',
+      '<script type="module" src="/assets/other.js"></script>',
+    ]) {
+      expect(
+        resolvePublicMainModuleAsset({
+          html: `<script type="module" src="/assets/index-clean.js"></script>${extra}`,
+          publicOrigin: "https://verdantgrowdiary.com",
+        }),
+      ).toEqual({ ok: false, reason: "public_main_asset_count_invalid" });
+    }
     expect(
       evaluatePublicPaddleBundle({
         canonicalToken: sandboxToken,

@@ -413,8 +413,12 @@ jobs:
 
           attestPublicVersion()
             .then(() => console.log("public_version_attestation=verified"))
-            .catch(() => {
-              console.error("public_version_attestation=failed");
+            .catch((error) => {
+              // Reason codes are fixed snake_case tokens; never echo anything else.
+              const reason = /^[a-z0-9_]{1,64}$/u.test(String(error?.message))
+                ? error.message
+                : "unclassified";
+              console.error(`public_version_attestation=failed reason=${reason}`);
               process.exitCode = 1;
             });
           NODE

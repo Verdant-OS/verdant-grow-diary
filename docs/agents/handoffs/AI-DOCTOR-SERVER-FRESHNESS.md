@@ -7,8 +7,8 @@ why: AI-DOCTOR-EDGE-AUDIT (read-only, 2026-11-05, HEAD cd6f8fab13a950c73033b91cd
 branch: claude/new-session-6pvzau
 base: verdant-grow-diary
 checkout: git fetch origin claude/new-session-6pvzau verdant-grow-diary && git switch claude/new-session-6pvzau
-pr: draft PR on GitHub for branch claude/new-session-6pvzau (number recorded on the PR itself)
-head_sha: see the PR; the parent is cd6f8fab13a950c73033b91cdb130a6ef9ee35c1
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2899 (draft)
+head_sha: code commit ef7b89d0ac06cc453562ce9edccb575f86202fc1 (PR head is the newest commit on the branch); parent cd6f8fab13a950c73033b91cdb130a6ef9ee35c1
 state: OPEN. Draft. Not reviewed, not merged, not deployed.
 current_step: implementation pushed; awaiting required CI and an independent exact-head review.
 next_action: route an eligible independent reviewer (OWNERSHIP.md §4.3; this session authored the change and is excluded). Matthew's per-item yes is required before merge; Edge deploy is a separate founder decision.

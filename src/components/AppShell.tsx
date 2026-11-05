@@ -31,6 +31,7 @@ import { readQuickLogStartEventType } from "@/lib/globalSearchQuickLogFallbackRu
 import { readGuidePhenoQuickLogPrefill } from "@/lib/guidePhenoQuickLogHandoffRules";
 import { isEmailVerificationPending } from "@/lib/emailVerificationRules";
 import {
+  readQuickLogRouteGrowContextId,
   resolveMobileQuickLogTarget,
   resolvePlantQuickLogRouteTarget,
 } from "@/lib/quickLogRouteTargetRules";
@@ -531,6 +532,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           }}
           defaultTargetKey={structuredOpenIntent?.targetKey ?? mobileLaunchTargetKey}
           defaultAction={structuredOpenIntent?.action ?? "note"}
+          growContextId={readQuickLogRouteGrowContextId(location.search)}
         />
 
         <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />

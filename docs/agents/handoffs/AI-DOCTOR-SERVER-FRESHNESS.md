@@ -8,9 +8,9 @@ branch: claude/new-session-6pvzau
 base: verdant-grow-diary
 checkout: git fetch origin claude/new-session-6pvzau verdant-grow-diary && git switch claude/new-session-6pvzau
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2899 (draft)
-head_sha: code commit ef7b89d0ac06cc453562ce9edccb575f86202fc1 (PR head is the newest commit on the branch); parent cd6f8fab13a950c73033b91cdb130a6ef9ee35c1
-state: OPEN. Draft. Not reviewed, not merged, not deployed.
-current_step: implementation pushed; awaiting required CI and an independent exact-head review.
+head_sha: PR head is the newest commit on the branch (this handoff update). Last code commit 77c533d67971de634ee56e85a1affaa4aeb4e6c2; rule commit ef7b89d0ac06cc453562ce9edccb575f86202fc1; parent cd6f8fab13a950c73033b91cdb130a6ef9ee35c1
+state: OPEN. Readied by cheekhimself 2026-11-05 18:56 UTC. Not reviewed, not merged, not deployed.
+current_step: 35/35 required contexts SUCCESS at 77c533d6 (ci.yml run 42089648285, read 19:14 UTC). Shard 5/32 had failed at d34cc553 in gemini-direct-review-fixes (stale fixture), fixed in 77c533d6. Awaiting an independent exact-head review; CI re-runs at this handoff-only head.
 next_action: route an eligible independent reviewer (OWNERSHIP.md §4.3; this session authored the change and is excluded). Matthew's per-item yes is required before merge; Edge deploy is a separate founder decision.
 post_merge_check: after the edge function is deployed and live /version.json reports the merge SHA, run one AI Doctor review on the fixture grow whose newest live snapshot is older than 15 minutes, and confirm the result lists a fresh live snapshot under Missing information and does not call the environment stable or healthy. NOT_MEASURED until then.
 active_writer: Claude session_017UoYKwpKSGr91xWT3yFtTS
@@ -19,18 +19,18 @@ behavior_change: a browser that sends a manual snapshot plus hasFreshLiveSensorR
 tried_and_rejected: rejecting packets with a snapshot but no annotation (owner chose not-live); re-deriving the source label (needs a server read of the stored reading; out of scope).
 remaining_limit: whether a "live" label is true at all is still client-asserted. Verifying it needs the edge to read the stored reading by id; candidate follow-up slice.
 commands: bunx vitest run src/test/ai-doctor-packet-server-freshness.test.ts src/test/ai-doctor-review-server-stage-grading.test.ts src/test/ai-doctor-live-review-static-safety.test.ts src/test/ai-doctor-review-grounding-edge-static.test.ts src/test/ai-doctor-packet-stage-targets.test.ts src/test/ai-doctor-review-request-packet-validation-rules.test.ts src/test/ai-doctor-review-request-packet.test.ts src/test/ai-doctor-review-grounding-rules.test.ts; node scripts/sync-edge-shared.mjs --check; node scripts/verify-edge-shared-in-sync.mjs; node scripts/check-no-src-lib-imports.mjs; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
-files_touched: src/lib/aiDoctorPacketServerFreshnessRules.ts (new); src/test/ai-doctor-packet-server-freshness.test.ts (new); supabase/functions/_shared/aiDoctorPacketServerFreshnessRules.ts (new shim); supabase/functions/_shared/lib/lib/aiDoctorPacketServerFreshnessRules.ts (generated); supabase/functions/_shared/lib/.sync-manifest.json (generated); supabase/functions/ai-doctor-review/index.ts; supabase/functions/ai-doctor-review/stageTargetGrading.test.ts; src/test/ai-doctor-review-server-stage-grading.test.ts; src/test/ai-doctor-live-review-static-safety.test.ts; docs/agents/handoffs/AI-DOCTOR-SERVER-FRESHNESS.md
-renegotiated_checks: ai-doctor-live-review-static-safety (pins the two-step order instead of the one-step line); ai-doctor-review-server-stage-grading (order now validate -> freshness -> grade, plus a commented-out freshness step must fail); stageTargetGrading.test.ts (three Deno cases added, none changed); .sync-manifest.json (generated). All declared with scripts/scorer-lock.mjs --unlock before commit.
+files_touched: src/test/gemini-direct-review-fixes.test.ts; src/lib/aiDoctorPacketServerFreshnessRules.ts (new); src/test/ai-doctor-packet-server-freshness.test.ts (new); supabase/functions/_shared/aiDoctorPacketServerFreshnessRules.ts (new shim); supabase/functions/_shared/lib/lib/aiDoctorPacketServerFreshnessRules.ts (generated); supabase/functions/_shared/lib/.sync-manifest.json (generated); supabase/functions/ai-doctor-review/index.ts; supabase/functions/ai-doctor-review/stageTargetGrading.test.ts; src/test/ai-doctor-review-server-stage-grading.test.ts; src/test/ai-doctor-live-review-static-safety.test.ts; docs/agents/handoffs/AI-DOCTOR-SERVER-FRESHNESS.md
+renegotiated_checks: ai-doctor-live-review-static-safety (pins the two-step order instead of the one-step line); ai-doctor-review-server-stage-grading (order now validate -> freshness -> grade, plus a commented-out freshness step must fail); gemini-direct-review-fixes (HMAC-frame handler fixture: capture time 1 min before the test clock, canned review discloses a missing fresh snapshot without the banned word 'live'; HMAC, v2 contract and 429-refund assertions unchanged); stageTargetGrading.test.ts (three Deno cases added, none changed); .sync-manifest.json (generated). All declared with scripts/scorer-lock.mjs --unlock before commit.
 files_remaining: none for this slice
 blockers: none
 open_questions: none
-gotchas: Deno is not installed in the authoring container and a hook blocked downloading it, so the three new Deno cases are NOT_MEASURED locally; CI runs that file (ci.yml edge Deno step). A new mirrored module needs its shim to import ../../../src/lib/<file>.ts first; scripts/sync-edge-shared.mjs then rewrites it to ./lib/lib/<file>.ts.
+gotchas: ci.yml required contexts skip draft PRs (ci.yml:106,726,824), so they ran only after the PR was readied. Deno is not installed in the authoring container and a hook blocked downloading it; the Deno cases ran in CI only. The AI Doctor result contract bans the word "live" in output, so a canned review discloses a missing live snapshot as "A fresh sensor snapshot is needed." A new mirrored module needs its shim to import ../../../src/lib/<file>.ts first; scripts/sync-edge-shared.mjs then rewrites it to ./lib/lib/<file>.ts.
 links: AI-DOCTOR-EDGE-AUDIT report (session chat, 2026-11-05)
 artifacts: none in the repository besides the tests
-reviewer_seat: not routed yet
+reviewer_seat: not routed yet (GitHub comments need Matthew's approval). Automated Codex code and security reviews at d34cc553 reported no findings; they are not the independent review.
 reviewer_sha: NOT_MEASURED
 session_state: no production access; no Supabase CLI, SQL, deploy or secret access used
 claimed_by: Claude session_017UoYKwpKSGr91xWT3yFtTS, 2026-11-05 18:20 UTC (assigned by Matthew)
 owner: Claude
-last_updated: 2026-11-05 12:20 CT, by Claude
+last_updated: 2026-11-05 13:15 CT, by Claude
 ```

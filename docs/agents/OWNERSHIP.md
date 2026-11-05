@@ -263,7 +263,7 @@ current actor, reviewer, repair-only role and hold are the named assignment abov
 - **Post tags.** Every post names the PR and the full SHA:
   ```
   [CI]       #N @sha PASS|FAIL                      (webhook)
-  [PRECHECK] #N @sha READY | NOT READY (reason) | STALLED   (Chemdawg)
+  [PRECHECK] #N @sha READY | NOT READY (reason) | STALLED   (Merge Readiness)
   [ROUTE]    #N @sha -> <eligible reviewer session/role> (scope, exclusions, reason)   (bot / GDP)
   [CLAIM]    <reviewer> claims #N @sha
   [VERDICT]  <reviewer>: #N @sha PASS | PASS-with-P2 | FAIL | BLOCKED | NOT_MEASURED

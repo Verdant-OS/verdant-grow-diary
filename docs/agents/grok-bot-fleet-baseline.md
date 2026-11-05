@@ -3,9 +3,10 @@
 Read-only audit of the Ultra fleet docs as merged in #2897 (deploy tip `66134ba4ac5aed841ef882e1537a5a315e809a01`),
 written on Matthew's 2026-11-05 approval to (1) prepare an exact consistency patch for the roster and
 the Ultra Fixer (Brachs) instructions after verifying the wake wiring, and (3) set a baseline from the
-current routine definitions and one evidenced end-to-end handoff. **Nothing in this file changes a seat,
-routine, bot description or rule.** The patch in §3 is a proposal; it lands only through its own reviewed
-PR with Matthew's per-item yes, and the live bots must then re-save their descriptions and routines.
+current routine definitions and one evidenced end-to-end handoff. The §1 and §2 tables record the
+state at `66134ba4`, before any fix. Matthew's 2026-11-05 answers (§4) put the §3 patch, D1, D2 and the
+Projects Manager decision into the same PR (#2904); it lands only after review and Matthew's per-item yes
+at the exact head, and the live bots must then re-save their descriptions and routines.
 
 Scope limit: this session reads GitHub and the repository only. It cannot read the Grok Bot account, so
 every statement about live bots or live routines is `NOT_MEASURED`.
@@ -64,7 +65,7 @@ Baseline result: the handoff record itself is cold-resumable (PASS); two gate-or
 Ultra seat; enqueue before the PASS was posted) and one unrecorded yes. A later handoff counts as better
 than this baseline only when all three are PASS on GitHub.
 
-## 3. Proposed consistency patch (not applied)
+## 3. Consistency patch (applied in #2904)
 
 Mechanical, sourced only from text already in the repo. Each hunk is independent.
 
@@ -89,18 +90,20 @@ Mechanical, sourced only from text already in the repo. Each hunk is independent
 +| Reconciliation pass, LAPSED check (claimed task, no GitHub activity for 24 h), summary, `WAITING ON MATTHEW:` line |
 ```
 
-Apply in one docs PR; mirror R6 into `grok-bot-fleet-manifest.json`. None of these files is one of the
+Applied in #2904, with R3 and R6 mirrored into `grok-bot-fleet-manifest.json`. None of these files is one of the
 eighteen sentinel-versioned files, so no version bump. After merge, each affected bot re-saves its
 description and routine (creating or editing a routine needs Matthew's approval under the fleet's Auto
 Review rules).
 
-## 4. Decisions only Matthew can make
+## 4. Decisions only Matthew can make (answers 2026-11-05)
 
-- **D1 (W1).** Relay yes intake: keep the chat intake as the one named exception to "GitHub only", or
-  have yeses typed on the PR only.
-- **D2 (W3).** How R3 tells an edit yes from a merge yes: wake the Fixer on every `[YES]` and let it act
-  only when the quoted scope names an edit, or have the Relay add a seat address outside the quote.
+- **D1 (W1). Decided: keep chat intake** as the one named exception to "GitHub only"; recorded in
+  `grok-bot-fleet.md`.
+- **D2 (W3). Decided: read the scope.** R3 wakes the Fixer on any `[YES]` on an Ultra PR; it acts only
+  when Matthew's quoted scope names a repair; recorded in `ultra-fixer.md`, the R3 row and the manifest.
 - **D3 (W9).** Roster line 41: does the Relay edit handoff files (on whose branch), or only check them
   and post `[HANDOFF]`?
 - **D4 (W7).** Whether to keep R2's author filter or match on the head branch name pattern instead;
-  needs one live drill either way.
+  needs one live drill either way. Still open.
+- **Item 2. Decided: Projects Manager has no Verdant delivery seat**; recorded in the roster. D3 stays
+  open.

@@ -1,6 +1,6 @@
 # Role — Graft: Exact-Head Reviewer and Open-PR Backlog Owner
 
-**Sentinel-Version: 2026-11-05.1**
+**Sentinel-Version: 2026-11-05.2**
 
 Graft reviews pull requests at an exact head SHA and owns the open-PR backlog
 (Matthew Cheek, 2026-10-10).

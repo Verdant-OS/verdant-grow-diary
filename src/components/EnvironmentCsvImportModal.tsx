@@ -39,6 +39,7 @@ import {
   startParsingState,
   type ImportState,
 } from "@/lib/environmentCsvImportViewModel";
+import { listSourceTimeZones } from "@/lib/csvTimestampRules";
 import {
   CSV_SOIL_ONLY_MESSAGE,
   parseEnvironmentCSV,
@@ -134,10 +135,8 @@ function listTimeZones(): { deviceZone: string | null; zones: string[] } {
       ? (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf(
           "timeZone",
         )
-      : [];
-  // snip: runtime list; add a curated fallback if a target browser lacks supportedValuesOf
-  const zones = [...new Set([...(deviceZone ? [deviceZone] : []), ...supported, "UTC"])];
-  return { deviceZone, zones };
+      : null;
+  return { deviceZone, zones: listSourceTimeZones(deviceZone, supported) };
 }
 
 export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps) {

@@ -14,6 +14,7 @@
  *  - `YYYY-MM-DD[ T]HH:mm[:ss[.fff]]` followed by `Z`, `±HH:MM` or `±HHMM` → instant
  *  - `YYYY-MM-DD[ T]HH:mm[:ss[.fff]]` → wall clock
  *  - `YYYY-MM-DD` → wall clock at 00:00 that day
+ *  - `YYYY/MM/DD[ HH:mm[:ss]]` (e.g. Vivosun) → wall clock
  *  - `MM/DD/YYYY[ HH:mm[:ss]]` (US month-first, two-digit years are 20YY) → wall clock
  * Calendar parts are validated strictly: Feb 30, month 13 or hour 25 are invalid,
  * never rolled over.
@@ -44,6 +45,7 @@ const EXPLICIT_RE =
   /^(\d{4})-(\d{1,2})-(\d{1,2})[T ](\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?\s*(Z|[+-]\d{2}:?\d{2})$/i;
 const NAIVE_ISO_RE =
   /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?)?$/i;
+const YMD_SLASH_RE = /^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/;
 const US_SLASH_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/;
 
 const formatterCache = new Map<string, Intl.DateTimeFormat>();
@@ -149,6 +151,8 @@ function parseExplicitOffset(token: string): number | null {
 function parseWallClock(text: string): WallClock | null | "not_wall" {
   const iso = text.match(NAIVE_ISO_RE);
   if (iso) return buildWall(iso[1], iso[2], iso[3], iso[4], iso[5], iso[6], iso[7]);
+  const ymd = text.match(YMD_SLASH_RE);
+  if (ymd) return buildWall(ymd[1], ymd[2], ymd[3], ymd[4], ymd[5], ymd[6]);
   const us = text.match(US_SLASH_RE);
   if (us) {
     const year = us[3].length === 2 ? String(2000 + Number(us[3])) : us[3];
@@ -224,4 +228,65 @@ export function interpretCsvTimestamp(
     zone: sourceTimeZone,
     offset: formatUtcOffset(wallMs - instants[0]),
   };
+}
+
+/**
+ * Zones offered when the runtime can't enumerate them (no
+ * Intl.supportedValuesOf). Each is still validated against this runtime.
+ */
+export const CSV_FALLBACK_TIME_ZONES = [
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Phoenix",
+  "America/Los_Angeles",
+  "America/Anchorage",
+  "Pacific/Honolulu",
+  "America/Halifax",
+  "America/St_Johns",
+  "America/Toronto",
+  "America/Vancouver",
+  "America/Mexico_City",
+  "America/Bogota",
+  "America/Sao_Paulo",
+  "America/Argentina/Buenos_Aires",
+  "Europe/London",
+  "Europe/Dublin",
+  "Europe/Lisbon",
+  "Europe/Madrid",
+  "Europe/Paris",
+  "Europe/Amsterdam",
+  "Europe/Berlin",
+  "Europe/Rome",
+  "Europe/Prague",
+  "Europe/Athens",
+  "Europe/Helsinki",
+  "Africa/Johannesburg",
+  "Asia/Jerusalem",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Bangkok",
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Asia/Seoul",
+  "Australia/Perth",
+  "Australia/Adelaide",
+  "Australia/Brisbane",
+  "Australia/Sydney",
+  "Pacific/Auckland",
+] as const;
+
+/**
+ * Zone choices for the source-zone step: the device zone first (listed, never
+ * preselected), then the runtime's own list, or the fallback list when the
+ * runtime can't enumerate zones, then UTC. Only zones this runtime accepts.
+ */
+export function listSourceTimeZones(
+  deviceZone: string | null,
+  runtimeZones: readonly string[] | null,
+): string[] {
+  const base = runtimeZones && runtimeZones.length > 0 ? runtimeZones : CSV_FALLBACK_TIME_ZONES;
+  return [...new Set([...(deviceZone ? [deviceZone] : []), ...base, "UTC"])].filter(
+    isValidIanaTimeZone,
+  );
 }

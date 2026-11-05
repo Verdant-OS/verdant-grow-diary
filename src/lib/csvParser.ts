@@ -614,9 +614,11 @@ function classifySoilHeaders(soilHeaders: readonly string[]): {
   for (const h of soilHeaders) {
     const k = normalizeHeader(h);
     if (/temp/.test(k)) {
-      const isF = /°f|\(f\)|_f\b|fahrenheit/.test(k);
-      if (isF && tempF == null) tempF = h;
-      else if (!isF && tempC == null) tempC = h;
+      // The unit must be stated in the header. A soil temperature column
+      // with no unit is never guessed as Celsius; it stays not imported.
+      const unit = soilTempUnitFromHeader(k);
+      if (unit === "F" && tempF == null) tempF = h;
+      else if (unit === "C" && tempC == null) tempC = h;
       else unsupported.push(h);
     } else if (soil.moisture == null && /humidity|moisture|vwc|water/.test(k)) {
       soil.moisture = h;
@@ -629,6 +631,12 @@ function classifySoilHeaders(soilHeaders: readonly string[]): {
   soil.temperature = tempC ?? tempF;
   soil.temperatureUnit = tempC ? "C" : "F";
   return { soil, unsupported };
+}
+
+function soilTempUnitFromHeader(k: string): "C" | "F" | null {
+  if (/°f|℉|\(f\)|_f\b|[\s_-]f$|fahrenheit/.test(k)) return "F";
+  if (/°c|℃|\(c\)|_c\b|[\s_-]c$|celsius/.test(k)) return "C";
+  return null;
 }
 
 function fToCInRange(input: string | undefined): number | null {

@@ -157,3 +157,70 @@ Add a dated section under **Register** naming the source, the evidence actually 
 a decision per component: adopted, adapted (with the Verdant file), reference only, deferred
 (with what would close it) or rejected (with the reason). Keep unmeasured claims labelled
 `NOT_MEASURED` or `missing evidence`.
+
+### `cloudflare/security-audit-skill` (reviewed 2026-11-05 UTC)
+
+**Verdict: use its guidance mode as a manual review method; do not install it with
+`npx skills add`, and do not run its full multi-agent audit mode until the session preamble is
+small enough for its sub-agents to work.**
+
+- **Source:** `https://github.com/cloudflare/security-audit-skill` at commit
+  `c1c8a8c1471069fb0e188eeaff69b8e8db6564a8` (2026-09-14), MIT (`LICENSE` read from the
+  clone). Pinned by a read-only shallow clone outside the repository. No text was copied
+  into this repository.
+- **What it is:** one skill (`skills/security-audit/`) of 15 Markdown method files, a JSON
+  report schema and two zero-dependency Node validators with tests. No hooks, no install
+  scripts, no `.github` directory. Full audit mode orchestrates many sub-agents
+  (reconnaissance, hunters, coverage critics, verifiers) and writes run artifacts outside the
+  target; guidance mode is the default and writes nothing.
+- **Read:** `README.md` and `SKILL.md` in full. The two validators were checked for side
+  effects, not read line by line: they import only `fs`, `path` and `util` and call only
+  `openSync`, `readSync`, `readFileSync`, `fstatSync` and `closeSync` (no writes, network or
+  child processes). The 13 companion method files were not read.
+- **Fit:** its evidence bar (a named lower-trust principal, crossed boundary and concrete
+  result; defense-in-depth gaps are not findings; `needs_validation` for facts outside source;
+  no live or production probing; the checker is never the finder; severity only for
+  confirmed records) matches this repository's evidence and safety rules.
+
+**Trial, 2026-11-05 UTC.** A scoped, source-only review of the AI Doctor review path at deploy
+commit `e6bf9a55210659fc28bec0f9da7d1afe8eb0caee`. No target code was run and nothing outside
+the checkout was contacted.
+
+- Three read-only hunter sub-agents (identity and authorization, credit metering, prompt and
+  output handling) each stopped after about three tool calls: the fixed session preamble
+  (about 147k tokens per sub-agent, `practical observation`) consumed their context budget
+  before the hunt. Their partial evidence is kept below; their coverage is `NOT_MEASURED`.
+- The open questions were then checked directly in source. Held at that commit (source only;
+  whether production has these migrations applied is `NOT_MEASURED`):
+  - caller identity comes from `auth.getUser()` on the caller's JWT
+    (`supabase/functions/ai-doctor-review/index.ts:330-347`), and every credit and session RPC
+    receives that server-derived id;
+  - the prompt is assembled only from the caller's own validated request packet; the function
+    reads no stored rows into prompt context, so it cannot pull another user's data into a
+    prompt;
+  - the model and tier are server constants; model output is forced through one tool schema,
+    parsed as data, and written only through RPCs (no direct table writes, no Action Queue or
+    device writes in the function);
+  - `ai_credit_spend` (latest body in `20260728090736_ai_credit_pack_portability.sql`) rejects a
+    grow the caller does not own, serialises spends per user with an advisory lock, scopes
+    idempotency keys to the user, derives weight from the server tier and reads the plan from
+    `subscriptions`;
+  - `ai_credit_spend`, `ai_credit_refund`, `ai_doctor_finalize_review` and
+    `record_ai_doctor_review_completion` are granted EXECUTE to `service_role` only, with
+    `anon` and `authenticated` revoked (`20260826020443_harden_secdef_rpc_grants_group_a_b.sql`).
+- **Result:** no candidate met the skill's evidence bar on what was read. Not covered: the
+  refund and finalize RPC bodies, the result-cache table's keying and RLS, the `_shared`
+  prompt-assembly, grounding and image modules, and the client components that render the
+  result. This is a partial review, not a clean bill.
+
+Decisions by component:
+
+- **Guidance mode and the evidence bar:** **adopted as a manual review method.** A reviewer
+  applies it by hand, in one session, to a named boundary.
+- **The two validators:** **acceptable** to run from the pinned copy, outside the repository,
+  on the run's own output files.
+- **Full audit mode:** **deferred.** Would close with: a session whose preamble leaves a
+  sub-agent enough context to read its scope (measure the baseline first), an explicit agent
+  budget, and an authorized task naming the scope.
+- **`npx skills add` (project or `--global`):** **not run.** It writes into the agent's
+  configuration directories and adds another always-listed skill to every session.

@@ -128,6 +128,7 @@ import {
   filterQuickLogV2TargetOptions,
   formatQuickLogV2TargetOptionLabel,
   isStaleQuickLogV2TargetSelection,
+  partitionQuickLogV2TargetOptionsForGrow,
   partitionQuickLogV2TargetOptionsForTent,
   resolveQuickLogV2Target,
   resolveQuickLogV2TentContextId,
@@ -295,6 +296,8 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   defaultTargetKey?: string | null;
   defaultAction?: QuickLogV2Action;
+  /** Grow carried by the current route; orders targets only, never selects one. */
+  growContextId?: string | null;
 }
 
 interface QuickLogVideoMeta {
@@ -422,6 +425,7 @@ function QuickLogV2SheetForOwner({
   onOpenChange,
   defaultTargetKey,
   defaultAction = "note",
+  growContextId = null,
 }: Props) {
   const restoreOpenerFocus = useDialogOpenerRestore(open);
   const { user } = useAuth();
@@ -898,6 +902,21 @@ function QuickLogV2SheetForOwner({
     if (!tentContextId) return filteredTargetOptions;
     return filterQuickLogV2TargetOptions(tentScopedPartitions.other, targetFilterQuery);
   }, [tentContextId, tentScopedPartitions.other, targetFilterQuery, filteredTargetOptions]);
+
+  // Grow context from the route (for example /timeline?growId=…) only groups
+  // that grow's targets first when no tent context applies. It never selects.
+  const growScopedPartitions = useMemo(
+    () => partitionQuickLogV2TargetOptionsForGrow(tentContextId ? [] : options, growContextId),
+    [options, tentContextId, growContextId],
+  );
+  const filteredInGrowTargets = useMemo(
+    () => filterQuickLogV2TargetOptions(growScopedPartitions.inGrow, targetFilterQuery),
+    [growScopedPartitions.inGrow, targetFilterQuery],
+  );
+  const filteredOtherGrowTargets = useMemo(
+    () => filterQuickLogV2TargetOptions(growScopedPartitions.other, targetFilterQuery),
+    [growScopedPartitions.other, targetFilterQuery],
+  );
 
   const showTargetFilter = options.length > QUICK_LOG_V2_TARGET_FILTER_THRESHOLD;
 
@@ -3513,6 +3532,29 @@ function QuickLogV2SheetForOwner({
                       <SelectGroup data-testid="qlv2-target-group-other">
                         <SelectLabel>Other</SelectLabel>
                         {filteredOtherTargets.map((o) => (
+                          <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                            {formatQuickLogV2TargetOptionLabel(o, tentNameById)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </>
+                ) : growScopedPartitions.growId ? (
+                  <>
+                    {filteredInGrowTargets.length > 0 && (
+                      <SelectGroup data-testid="qlv2-target-group-in-grow">
+                        <SelectLabel>In this grow</SelectLabel>
+                        {filteredInGrowTargets.map((o) => (
+                          <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                            {formatQuickLogV2TargetOptionLabel(o, tentNameById)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {filteredOtherGrowTargets.length > 0 && (
+                      <SelectGroup data-testid="qlv2-target-group-other-grows">
+                        <SelectLabel>Other grows</SelectLabel>
+                        {filteredOtherGrowTargets.map((o) => (
                           <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
                             {formatQuickLogV2TargetOptionLabel(o, tentNameById)}
                           </SelectItem>

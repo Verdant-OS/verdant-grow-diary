@@ -110,3 +110,15 @@ export function resolvePlantQuickLogRouteTarget(pathname: unknown): string | nul
   if (typeof pathname !== "string") return null;
   return resolveDetailRouteId(pathname, PLANT_DETAIL_PATH);
 }
+
+/**
+ * Read the grow carried by the current route's `?growId=` (the key
+ * `withGrowId` writes). It only orders the Quick Log target list; it is never
+ * a target and never selects one. Malformed values fail closed.
+ */
+export function readQuickLogRouteGrowContextId(search: unknown): string | null {
+  if (typeof search !== "string" || search.length === 0) return null;
+  const raw = new URLSearchParams(search).get("growId");
+  const growId = raw?.trim().toLowerCase() ?? "";
+  return isUuid(growId) ? growId : null;
+}

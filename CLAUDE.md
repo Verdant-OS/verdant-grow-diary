@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-11-05.1**
+**Sentinel-Version: 2026-11-05.2**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
@@ -241,8 +241,8 @@ so you recognise it rather than copy it:
   `publicQuickLogStarterRules.ts`, `sensorDiagnosticsExportRules.ts`). Those modules are not
   deterministic and not time-injectable. Inject the clock and seed in new code; do not cite
   these as precedent.
-- One root-level `*Rules.ts` imports the Supabase client: `cultivarSlugRouteRules.ts`, since
-  #2777 (2026-11-03). It is I/O, not a pure rule; do not copy it. Two others
+- No root-level `*Rules.ts` imports the Supabase client (re-checked 2026-11-05, after #2883
+  moved the cultivar slug route's read into `cultivarSlugRouteService.ts`). Two
   (`sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`) import the generated
   `TablesInsert` type only — a type import, not I/O (contract AC-3.2).
 - Some components and pages import `@/integrations/supabase/client` directly instead of going

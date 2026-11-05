@@ -27,7 +27,8 @@ const FUNCTIONS = resolve(__dirname, "../../supabase/functions");
 const ENTRY_SOURCE = readFileSync(resolve(FUNCTIONS, "ai-doctor-review/index.ts"), "utf8");
 const ENTRY = executableTsSource(ENTRY_SOURCE);
 
-const GRADE_CALL = "applyStageTargetSeverityToPacket(normalizedPacket)";
+const FRESHNESS_CALL = "applyServerFreshnessToPacket(normalizedPacket, new Date())";
+const GRADE_CALL = "applyStageTargetSeverityToPacket(freshnessCheckedPacket)";
 const LATER_STEPS = [
   ["acceptance check", "isAiDoctorReviewEvidenceAcceptanceCoherentWithPacket("],
   ["evidence receipt", "buildAiDoctorReviewEvidenceReceiptSnapshot("],
@@ -38,17 +39,33 @@ const LATER_STEPS = [
 /** Every way the entry's step order breaks the contract; [] when it holds. */
 function gradingOrderProblems(code: string): string[] {
   const problems: string[] = [];
-  if (!/const validatedPacket = applyStageTargetSeverityToPacket\(normalizedPacket\);/.test(code)) {
+  if (
+    !/const validatedPacket = applyStageTargetSeverityToPacket\(freshnessCheckedPacket\);/.test(
+      code,
+    )
+  ) {
     problems.push("validatedPacket is not the graded packet");
   }
+  if (
+    !/const freshnessCheckedPacket = applyServerFreshnessToPacket\(normalizedPacket, new Date\(\)\);/.test(
+      code,
+    )
+  ) {
+    problems.push("the graded packet is not the freshness-checked packet");
+  }
   const validate = code.indexOf("validateAndNormalizeAiDoctorReviewRequestPacket(request.packet)");
+  const freshness = code.indexOf(FRESHNESS_CALL);
   const grade = code.indexOf(GRADE_CALL);
   if (validate <= 0) problems.push("no server validation");
-  if (grade <= validate) problems.push("grading does not follow validation");
+  if (freshness <= validate) problems.push("freshness check does not follow validation");
+  if (grade <= freshness) problems.push("grading does not follow the freshness check");
   for (const [name, needle] of LATER_STEPS) {
     if (code.indexOf(needle) <= grade) problems.push(`${name} does not follow grading`);
   }
-  if (grade >= 0 && /normalizedPacket/.test(code.slice(grade + GRADE_CALL.length))) {
+  if (freshness >= 0 && /normalizedPacket/.test(code.slice(freshness + FRESHNESS_CALL.length))) {
+    problems.push("the unchecked packet is used after the freshness check");
+  }
+  if (grade >= 0 && /freshnessCheckedPacket/.test(code.slice(grade + GRADE_CALL.length))) {
     problems.push("the ungraded packet is used after grading");
   }
   return problems;
@@ -205,7 +222,7 @@ describe("server-side stage-target grading covers every field the grounding chec
   });
 });
 
-describe("ai-doctor-review grades before the receipt, the prompt and the credit spend", () => {
+describe("ai-doctor-review checks freshness, then grades, before the receipt, the prompt and the credit spend", () => {
   it("imports the rule through a _shared shim over the generated mirror", () => {
     expect(ENTRY).toMatch(
       /import \{ applyStageTargetSeverityToPacket \} from "\.\.\/_shared\/aiDoctorPacketStageTargetRules\.ts";/,
@@ -220,12 +237,26 @@ describe("ai-doctor-review grades before the receipt, the prompt and the credit 
     ).toBe(true);
   });
 
+  it("imports the server freshness rule through a _shared shim over the generated mirror", () => {
+    expect(ENTRY).toMatch(
+      /import \{ applyServerFreshnessToPacket \} from "\.\.\/_shared\/aiDoctorPacketServerFreshnessRules\.ts";/,
+    );
+    const shim = resolve(FUNCTIONS, "_shared/aiDoctorPacketServerFreshnessRules.ts");
+    expect(readFileSync(shim, "utf8")).toMatch(
+      /export \* from "\.\/lib\/lib\/aiDoctorPacketServerFreshnessRules\.ts";/,
+    );
+    expect(
+      existsSync(resolve(FUNCTIONS, "_shared/lib/lib/aiDoctorPacketServerFreshnessRules.ts")),
+    ).toBe(true);
+  });
+
   it("runs right after validation, ahead of every use of the packet", () => {
     expect(gradingOrderProblems(ENTRY)).toEqual([]);
   });
 
   it("does not count a grading step that survives only in a comment", () => {
-    const step = "const validatedPacket = applyStageTargetSeverityToPacket(normalizedPacket);";
+    const step =
+      "const validatedPacket = applyStageTargetSeverityToPacket(freshnessCheckedPacket);";
     expect(ENTRY_SOURCE).toContain(step);
     const commentedOut = ENTRY_SOURCE.replace(
       step,
@@ -233,6 +264,19 @@ describe("ai-doctor-review grades before the receipt, the prompt and the credit 
     );
     expect(gradingOrderProblems(executableTsSource(commentedOut))).toContain(
       "validatedPacket is not the graded packet",
+    );
+  });
+
+  it("does not count a freshness step that survives only in a comment", () => {
+    const step =
+      "const freshnessCheckedPacket = applyServerFreshnessToPacket(normalizedPacket, new Date());";
+    expect(ENTRY_SOURCE).toContain(step);
+    const commentedOut = ENTRY_SOURCE.replace(
+      step,
+      `const freshnessCheckedPacket = normalizedPacket; // was: ${step}`,
+    );
+    expect(gradingOrderProblems(executableTsSource(commentedOut))).toContain(
+      "the graded packet is not the freshness-checked packet",
     );
   });
 });

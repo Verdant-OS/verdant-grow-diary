@@ -41,6 +41,7 @@ import { buildAiDoctorPromptMessages } from "../_shared/aiDoctorPromptAssembly.t
 import { parseAiDoctorReviewRequestEnvelope } from "../_shared/aiDoctorReviewRequestTransportRules.ts";
 import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../_shared/aiDoctorReviewRequestPacketValidationRules.ts";
 import { applyStageTargetSeverityToPacket } from "../_shared/aiDoctorPacketStageTargetRules.ts";
+import { applyServerFreshnessToPacket } from "../_shared/aiDoctorPacketServerFreshnessRules.ts";
 import { validateAiDoctorReviewGrounding } from "../_shared/aiDoctorReviewGroundingRules.ts";
 import {
   buildAiDoctorReviewEvidenceReceiptSnapshot,
@@ -414,12 +415,18 @@ export async function handleAiDoctorReviewRequest(
     if (!normalizedPacket) {
       return calmFailure("shape");
     }
+    // The browser's stale/trust/missing-live labels are claims, not evidence.
+    // Re-derive freshness from the capture time and this server's clock,
+    // downgrade-only, so an old reading sent as fresh live cannot be called
+    // current (AI-DOCTOR-EDGE-AUDIT gap G1). Grading below then words any
+    // breach on a stale reading as historical.
+    const freshnessCheckedPacket = applyServerFreshnessToPacket(normalizedPacket, new Date());
     // Grade the current reading against the plant's stage targets here too.
     // The client does this before send (BUG-008), but a direct caller could
     // send an out-of-target reading as "ok", and the grounding rules would let
     // the model call it stable (Codex review on #1683). Idempotent for a packet
     // the client already graded; everything below sees only the graded packet.
-    const validatedPacket = applyStageTargetSeverityToPacket(normalizedPacket);
+    const validatedPacket = applyStageTargetSeverityToPacket(freshnessCheckedPacket);
 
     // Server resolves grow scope from an untrusted transport envelope; the
     // atomic credit RPC re-checks ownership. `request.packet` is deliberately

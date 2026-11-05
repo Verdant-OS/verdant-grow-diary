@@ -1,0 +1,36 @@
+# AI-DOCTOR-SERVER-FRESHNESS
+
+```text
+TASK AI-DOCTOR-SERVER-FRESHNESS  priority: P2  status: OPEN
+goal: ai-doctor-review stops trusting the browser's sensor freshness labels. The server re-derives stale/trust/missing-live from the snapshot capture time and its own clock, downgrade-only, before any credit is spent.
+why: AI-DOCTOR-EDGE-AUDIT (read-only, 2026-11-05, HEAD cd6f8fab13a950c73033b91cdb130a6ef9ee35c1), gap G1. The edge validated recentSensorSnapshotAnnotation.stale/trust and missingLiveSensorReadings for type only. A direct caller could send an old reading labeled source=live, stale=false, trust=high with missingLiveSensorReadings=false; every server gate passed, the model could call the environment healthy, and the evidence receipt recorded the client's claim. Matthew approved the slice and named the Edge action in this session (2026-11-05): "Build it, draft PR"; a snapshot with no source label is treated as not live.
+branch: claude/new-session-6pvzau
+base: verdant-grow-diary
+checkout: git fetch origin claude/new-session-6pvzau verdant-grow-diary && git switch claude/new-session-6pvzau
+pr: draft PR on GitHub for branch claude/new-session-6pvzau (number recorded on the PR itself)
+head_sha: see the PR; the parent is cd6f8fab13a950c73033b91cdb130a6ef9ee35c1
+state: OPEN. Draft. Not reviewed, not merged, not deployed.
+current_step: implementation pushed; awaiting required CI and an independent exact-head review.
+next_action: route an eligible independent reviewer (OWNERSHIP.md §4.3; this session authored the change and is excluded). Matthew's per-item yes is required before merge; Edge deploy is a separate founder decision.
+post_merge_check: after the edge function is deployed and live /version.json reports the merge SHA, run one AI Doctor review on the fixture grow whose newest live snapshot is older than 15 minutes, and confirm the result lists a fresh live snapshot under Missing information and does not call the environment stable or healthy. NOT_MEASURED until then.
+active_writer: Claude session_017UoYKwpKSGr91xWT3yFtTS
+decisions: (1) One pure rule src/lib/aiDoctorPacketServerFreshnessRules.ts, mirrored to supabase/functions/_shared, now injected. (2) Only live and manual annotations that claim stale=false are re-checked: the Sensor Truth Canon windows (live 15 min, manual 24 h, strict >), a capture time more than SENSOR_TRUTH_FUTURE_SKEW_MS (5 min) ahead of the server clock, or an unparseable time all become stale=true, trust=low, with the browser builder's stale line suffix and a safety note; the source label is never changed. (3) missingLiveSensorReadings is true unless a snapshot exists AND its annotation is fresh live after the server check; it is never cleared. (4) A snapshot with no annotation is treated as not live (owner choice), not rejected. (5) index.ts order: validate -> freshness -> stage-target grading, so a breach on a server-stale reading is worded as historical. (6) The evidence receipt and prompt are built from the checked packet, so the receipt now records server-derived labels.
+behavior_change: a browser that sends a manual snapshot plus hasFreshLiveSensorReadings=true (bridge health) used to clear missing-live; the server cannot verify bridge health, so missing-live is now forced true and the review must disclose that a fresh live snapshot is needed. More cautious output, not less.
+tried_and_rejected: rejecting packets with a snapshot but no annotation (owner chose not-live); re-deriving the source label (needs a server read of the stored reading; out of scope).
+remaining_limit: whether a "live" label is true at all is still client-asserted. Verifying it needs the edge to read the stored reading by id; candidate follow-up slice.
+commands: bunx vitest run src/test/ai-doctor-packet-server-freshness.test.ts src/test/ai-doctor-review-server-stage-grading.test.ts src/test/ai-doctor-live-review-static-safety.test.ts src/test/ai-doctor-review-grounding-edge-static.test.ts src/test/ai-doctor-packet-stage-targets.test.ts src/test/ai-doctor-review-request-packet-validation-rules.test.ts src/test/ai-doctor-review-request-packet.test.ts src/test/ai-doctor-review-grounding-rules.test.ts; node scripts/sync-edge-shared.mjs --check; node scripts/verify-edge-shared-in-sync.mjs; node scripts/check-no-src-lib-imports.mjs; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
+files_touched: src/lib/aiDoctorPacketServerFreshnessRules.ts (new); src/test/ai-doctor-packet-server-freshness.test.ts (new); supabase/functions/_shared/aiDoctorPacketServerFreshnessRules.ts (new shim); supabase/functions/_shared/lib/lib/aiDoctorPacketServerFreshnessRules.ts (generated); supabase/functions/_shared/lib/.sync-manifest.json (generated); supabase/functions/ai-doctor-review/index.ts; supabase/functions/ai-doctor-review/stageTargetGrading.test.ts; src/test/ai-doctor-review-server-stage-grading.test.ts; src/test/ai-doctor-live-review-static-safety.test.ts; docs/agents/handoffs/AI-DOCTOR-SERVER-FRESHNESS.md
+renegotiated_checks: ai-doctor-live-review-static-safety (pins the two-step order instead of the one-step line); ai-doctor-review-server-stage-grading (order now validate -> freshness -> grade, plus a commented-out freshness step must fail); stageTargetGrading.test.ts (three Deno cases added, none changed); .sync-manifest.json (generated). All declared with scripts/scorer-lock.mjs --unlock before commit.
+files_remaining: none for this slice
+blockers: none
+open_questions: none
+gotchas: Deno is not installed in the authoring container and a hook blocked downloading it, so the three new Deno cases are NOT_MEASURED locally; CI runs that file (ci.yml edge Deno step). A new mirrored module needs its shim to import ../../../src/lib/<file>.ts first; scripts/sync-edge-shared.mjs then rewrites it to ./lib/lib/<file>.ts.
+links: AI-DOCTOR-EDGE-AUDIT report (session chat, 2026-11-05)
+artifacts: none in the repository besides the tests
+reviewer_seat: not routed yet
+reviewer_sha: NOT_MEASURED
+session_state: no production access; no Supabase CLI, SQL, deploy or secret access used
+claimed_by: Claude session_017UoYKwpKSGr91xWT3yFtTS, 2026-11-05 18:20 UTC (assigned by Matthew)
+owner: Claude
+last_updated: 2026-11-05 12:20 CT, by Claude
+```

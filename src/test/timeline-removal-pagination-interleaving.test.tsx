@@ -32,7 +32,7 @@ const harness = vi.hoisted(() => ({
 }));
 
 interface QueryFilter {
-  op: "eq" | "is" | "not" | "gte" | "lte" | "lt" | "in";
+  op: "eq" | "is" | "not" | "gte" | "lte" | "lt" | "in" | "or";
   column: string;
   value: unknown;
 }
@@ -94,6 +94,11 @@ vi.mock("@/integrations/supabase/client", () => {
       },
       lt(column: string, value: unknown) {
         spec.filters.push({ op: "lt", column, value });
+        return query;
+      },
+      // Timeline's "Load older" keyset filter (#2890): one PostgREST or() on entry_at.
+      or(filter: string) {
+        spec.filters.push({ op: "or", column: "entry_at", value: filter });
         return query;
       },
       in(column: string, value: unknown[]) {
@@ -316,9 +321,10 @@ describe("Timeline removal and pagination completions compose in one batch", () 
       }
       if (spec.table === "diary_entries") {
         expect(growIdOf(spec)).toBe(GROW_A.id);
-        const cursor = spec.filters.find((filter) => filter.op === "lt");
+        const cursor = spec.filters.find((filter) => filter.op === "or");
         if (cursor) {
-          cursors.push(cursor.value);
+          // The keyset filter carries the cursor's entry_at as its first quoted value.
+          cursors.push(/^entry_at\.lt\."([^"]+)"/.exec(String(cursor.value))?.[1]);
           return olderPage.promise;
         }
         return { data: INITIAL_ROWS, error: null, count: 4 };

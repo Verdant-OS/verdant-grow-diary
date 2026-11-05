@@ -35,7 +35,7 @@ const harness = vi.hoisted(() => ({
 }));
 
 interface QueryFilter {
-  op: "eq" | "is" | "not" | "gte" | "lte" | "lt";
+  op: "eq" | "is" | "not" | "gte" | "lte" | "lt" | "or";
   column: string;
   value: unknown;
 }
@@ -84,6 +84,10 @@ vi.mock("@/integrations/supabase/client", () => {
       },
       lt(column: string, value: unknown) {
         spec.filters.push({ op: "lt", column, value });
+        return query;
+      },
+      or(filter: string) {
+        spec.filters.push({ op: "or", column: "or", value: filter });
         return query;
       },
       in() {
@@ -262,16 +266,18 @@ const PAGE_C: DiaryRow[] = [
 ];
 
 /**
- * Serves the newest page for the counted read and an older page per `lt`
- * cursor. Every cursor the Timeline sends is recorded.
+ * Serves the newest page for the counted read and an older page per keyset
+ * cursor (its `entry_at`). Every cursor the Timeline sends is recorded.
  */
 function serveDiaryPages(total: number, olderPages: Record<string, DiaryRow[]>): string[] {
   const cursors: string[] = [];
   harness.executeQuery.mockImplementation((spec: QuerySpec) => {
     if (spec.table !== "diary_entries") return { data: [], error: null };
-    const lt = spec.filters.find((filter) => filter.op === "lt" && filter.column === "entry_at");
-    if (!lt) return { data: PAGE_A, error: null, count: total };
-    const cursor = String(lt.value);
+    // Keyset page: `entry_at.lt."<cursor>",and(entry_at.eq."<cursor>",id.lt."<id>")`.
+    const keyset = spec.filters.find((filter) => filter.op === "or");
+    const match = keyset ? /^entry_at\.lt\."([^"]+)"/.exec(String(keyset.value)) : null;
+    if (!match) return { data: PAGE_A, error: null, count: total };
+    const cursor = match[1];
     cursors.push(cursor);
     return { data: olderPages[cursor] ?? [], error: null };
   });
@@ -301,6 +307,7 @@ describe("projectTimelineDiaryPage", () => {
       rows: [],
       hiddenCount: 0,
       oldestFetchedEntryAt: null,
+      oldestFetchedCursor: null,
     });
   });
 

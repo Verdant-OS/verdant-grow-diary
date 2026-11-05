@@ -21,7 +21,7 @@ import {
   buildCultivarDatabaseSeedPayload,
   cultivarSeedPayloadToSnapshot,
 } from "@/lib/cultivarDatabaseSeedPayloadRules";
-import { CultivarSlugRouteRules } from "@/lib/cultivarSlugRouteRules";
+import { CultivarSlugRouteService } from "@/lib/cultivarSlugRouteService";
 import { getRouter } from "@/router";
 import { Route as CultivarSlugRoute } from "@/routes/cultivars.$slug";
 import type { RootRouteContext } from "@/routes/__root";
@@ -88,7 +88,7 @@ describe("cultivar unknown-slug SSR follow-up", () => {
     flags.cultivarDatabaseReadsEnabled = false;
     db.tables = {};
     db.fail = false;
-    CultivarSlugRouteRules.resetRequestCache();
+    CultivarSlugRouteService.resetRequestCache();
   });
 
   it("server-rendered head for an unknown slug omits og:url and canonical", async () => {
@@ -122,10 +122,10 @@ describe("cultivar unknown-slug SSR follow-up", () => {
     seedDbOnly();
     flags.cultivarDatabaseReadsEnabled = true;
     db.fail = true;
-    const failed = await CultivarSlugRouteRules.decide("db-only-cut");
+    const failed = await CultivarSlugRouteService.decide("db-only-cut");
     expect(failed.status).toBe("unavailable");
     db.fail = false;
-    const retried = await CultivarSlugRouteRules.decide("db-only-cut");
+    const retried = await CultivarSlugRouteService.decide("db-only-cut");
     expect(retried).toMatchObject({ status: "found", slug: "db-only-cut" });
   });
 

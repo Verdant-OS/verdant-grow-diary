@@ -1,18 +1,17 @@
 /**
- * How `/cultivars/$slug` decides found, redirect, or not-found.
- * The route loader and the SSR head both call `decide` so they cannot disagree.
+ * How `/cultivars/$slug` decides found, redirect, not-found, or unavailable.
+ * Pure: no Supabase, no fetch, no clock. The catalog read and its per-request
+ * cache live in `cultivarSlugRouteService.ts`, which the route loader and the
+ * SSR head both call so they cannot disagree.
  */
 import { VERDANT_CULTIVAR_SLUGS, VERDANT_CULTIVARS } from "@/constants/strainReferenceLibrary";
 import type { VerdantCultivarProfile } from "@/constants/verdantCultivars";
 import { VERDANT_SITE_ORIGIN } from "@/constants/verdantSeoContent";
-import { supabase } from "@/integrations/supabase/client";
 import { cultivarDetailRobots } from "@/lib/cultivarDetailSeo";
-import { mapCultivarDatabaseSnapshot } from "@/lib/cultivarDatabaseReadModel";
 import {
-  fetchPublishedCultivarSnapshot,
-  type CultivarReferenceReadClient,
-} from "@/lib/cultivarReferenceService";
-import { featureFlags } from "@/lib/featureFlags";
+  mapCultivarDatabaseSnapshot,
+  type CultivarDatabaseSnapshot,
+} from "@/lib/cultivarDatabaseReadModel";
 import { staticRouteHead, type StaticRouteHead } from "@/lib/build/staticRouteHead";
 
 export type CultivarSlugDecision =
@@ -21,12 +20,10 @@ export type CultivarSlugDecision =
   | { status: "missing" }
   | { status: "unavailable"; slug: string };
 
-type KnownSlug = { slug: string; profile: VerdantCultivarProfile | null };
+export type CultivarKnownSlug = { slug: string; profile: VerdantCultivarProfile | null };
 
-type CatalogRead = { ok: boolean; known: readonly KnownSlug[] };
-
-/** One snapshot read shared by the loader and head for this turn. */
-let catalogPromise: Promise<CatalogRead> | null = null;
+/** `ok: false` means the database read failed and `known` holds only the static library. */
+export type CultivarCatalogRead = { ok: boolean; known: readonly CultivarKnownSlug[] };
 
 export class CultivarSlugRouteRules {
   /** Exact slug, else a case-insensitive redirect to the stored lowercase slug. */
@@ -42,13 +39,11 @@ export class CultivarSlugRouteRules {
     return { status: "missing" };
   }
 
-  /** Drop the shared snapshot so the next request reads again. */
-  static resetRequestCache(): void {
-    catalogPromise = null;
-  }
-
-  static async decide(slug: string | undefined): Promise<CultivarSlugDecision> {
-    const read = await CultivarSlugRouteRules.knownSlugs();
+  /** A slug missing only because the catalog read failed is unavailable (503), never a cacheable 404. */
+  static decideFromCatalog(
+    slug: string | undefined,
+    read: CultivarCatalogRead,
+  ): CultivarSlugDecision {
     const decision = CultivarSlugRouteRules.fromKnown(slug, read.known);
     if (!read.ok && decision.status === "missing") {
       return { status: "unavailable", slug: slug ?? "" };
@@ -56,47 +51,22 @@ export class CultivarSlugRouteRules {
     return decision;
   }
 
-  private static knownSlugs(): Promise<CatalogRead> {
-    if (catalogPromise) return catalogPromise;
-    let shared: Promise<CatalogRead>;
-    shared = CultivarSlugRouteRules.readKnownSlugs().then(
-      (read) => {
-        if (!read.ok) {
-          if (catalogPromise === shared) catalogPromise = null;
-          return read;
-        }
-        setTimeout(() => {
-          if (catalogPromise === shared) catalogPromise = null;
-        }, 0);
-        return read;
-      },
-      (error: unknown) => {
-        if (catalogPromise === shared) catalogPromise = null;
-        throw error;
-      },
-    );
-    catalogPromise = shared;
-    return shared;
+  /** The static library slugs, with no database profiles attached. */
+  static staticKnownSlugs(): CultivarKnownSlug[] {
+    return VERDANT_CULTIVARS.map((profile) => ({ slug: profile.slug, profile: null }));
   }
 
-  private static async readKnownSlugs(): Promise<CatalogRead> {
-    const known: KnownSlug[] = VERDANT_CULTIVARS.map((profile) => ({
-      slug: profile.slug,
-      profile: null,
-    }));
-    if (!featureFlags.cultivarDatabaseReadsEnabled) return { ok: true, known };
-    const snapshot = await fetchPublishedCultivarSnapshot(
-      supabase as unknown as CultivarReferenceReadClient,
-    );
-    if (!snapshot.ok) return { ok: false, known };
-    const mapped = mapCultivarDatabaseSnapshot(snapshot.snapshot);
+  /** Static slugs plus every published database profile; a database profile replaces its static slug's null. */
+  static knownFromSnapshot(snapshot: CultivarDatabaseSnapshot): CultivarKnownSlug[] {
+    const known = CultivarSlugRouteRules.staticKnownSlugs();
+    const mapped = mapCultivarDatabaseSnapshot(snapshot);
     for (const profile of mapped.catalog.profiles) {
       if (profile.publicationStatus !== "published") continue;
       const index = known.findIndex((entry) => entry.slug === profile.slug);
       if (index >= 0) known[index] = { slug: profile.slug, profile };
       else known.push({ slug: profile.slug, profile });
     }
-    return { ok: true, known };
+    return known;
   }
 
   static notFoundHead(): StaticRouteHead {

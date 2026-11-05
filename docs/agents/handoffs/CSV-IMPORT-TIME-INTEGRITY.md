@@ -1,17 +1,17 @@
 # CSV-IMPORT-TIME-INTEGRITY
 
 ```text
-TASK CSV-IMPORT-TIME-INTEGRITY  priority: P1  status: OPEN
+TASK CSV-IMPORT-TIME-INTEGRITY  priority: P1  status: CLOSED
 goal: Environment CSV import never saves a reading at a guessed time. Unzoned clock times need an explicit source time zone; DST folds/gaps are never guessed; soil-only and partly supported files say plainly what isn't imported.
 why: Matthew's brief "Priority: fix Spider Farmer CSV import integrity" (2026-11-05, baseline cd6f8fab13a950c73033b91cdb130a6ef9ee35c1). csvParser.parseFlexibleDate built Date.UTC from local-looking "YYYY-MM-DD HH:mm:ss" strings, so a Chicago export landed 5-6 hours early, and the Nov 1 01:00-01:55 fold was silently accepted. The modal also masked the parser's soil-only reason with generic "couldn't read" copy and never listed omitted soil columns.
 branch: claude/new-session-rd9w2e
 base: verdant-grow-diary @ cd6f8fab13a950c73033b91cdb130a6ef9ee35c1
 checkout: git fetch origin claude/new-session-rd9w2e verdant-grow-diary && git switch claude/new-session-rd9w2e
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2902 (draft)
-head_sha: see the branch tip; local commit only until push
-state: implementation and test renegotiation done; pushed as a draft PR awaiting CI and independent review.
-current_step: Matthew approved the scorer unlock in-session (2026-11-05). Five locked tests renegotiated; scorer-lock --report --base cd6f8fab: 5 changed, 0 still locked.
-next_action: watch required CI at the PR head; route an eligible independent reviewer (not this session) per OWNERSHIP.md §4.3.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2902 (merged through the merge queue)
+head_sha: 7ec28e9bad414eb2500094b83b12d42ba2252074 (final PR head)
+state: CLOSED. Merged as 1ba766fbb6fa864e93341c13937dc978649c1db6 (#2902) on 2026-11-05 ~23:34 UTC via the merge queue (enqueued by cheekhimself). Closed the same day by the authoring Claude session. Live behavior NOT_MEASURED until live /version.json reports 1ba766fb or later.
+current_step: merged. Required contexts at 7ec28e9b: 35/35 success (32 shards, Lint/typecheck/test/build, edge-mirror preflight, test:legal-seo). Codex code review found 3 issues at 1f9fbd8e, fixed in a33add34; Codex security review: no findings.
+next_action: none for this slice. Post-merge check below belongs to the owner once the merge SHA is live.
 post_merge_check: on https://verdantgrowdiary.com, once live /version.json reports the merge SHA: import a synthetic unzoned CSV into a verified disposable fixture tent, choose America/Chicago, confirm stored captured_at matches the preview's UTC instant. NOT_MEASURED until then.
 active_writer: Claude session_017UoYKypTBCTMSkumzPzSJa
 decisions:
@@ -27,15 +27,15 @@ tried_and_rejected: appending one fixed offset per file (wrong across DST); defa
 commands: bunx vitest run src/test/csv-import-source-time-zone.test.tsx --reporter=dot (also with TZ=America/Los_Angeles); the 34 CSV-related test files listed in this session; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
 files_touched: src/lib/csvTimestampRules.ts (new); src/lib/csvParser.ts; src/lib/environmentCsvImportViewModel.ts; src/lib/environmentCsvImportPersistence.ts; src/lib/environmentCsvPreviewCopyRules.ts; src/components/EnvironmentCsvImportModal.tsx; src/test/csv-import-source-time-zone.test.tsx (new); this file
 files_remaining: none for this slice. Renegotiated (owner-approved unlock): src/test/csv-parser.test.ts, src/test/environment-csv-import-ui.test.tsx, src/test/environment-csv-import-view-model.test.ts, src/test/import-grow-sensor-csv-parser-copy.test.ts, src/test/import-grow-sensor-csv-unit-copy.test.ts
-blockers: none in code. Independent review and required CI pending.
+blockers: none
 open_questions: (1) DONE in this PR; (2) require time_provenance at the write boundary for every row; (3) DONE in this PR (soil); (4) dedupe key has no device identity, so overlapping device/soil exports for one tent dedupe to the first imported value (Bravo values match; Alpha has small differences at 2 timestamps).
 gotchas: tsc needs NODE_OPTIONS=--max-old-space-size=8192. Do not whole-file prettier legacy files. Full-original replay: the 5 Bravo originals Matthew uploaded (SHA256 match brief) were replayed parse -> zone -> exclusion -> persistCsvEnvironmentRows with an in-memory fake client; all 5 import, originals byte-identical after. The 6 Alpha files were not supplied (BLOCKED). No real DB write.
 links: brief CLAUDE_SPIDER_FARMER_CSV_FIX_BRIEF.md (owner upload); #2808 soil guard preserved; #2895 untouched; #2796 recovery tracking
 artifacts: none in the repository besides the tests
 reviewer_seat: not yet routed (no PR)
-reviewer_sha: NOT_MEASURED
+reviewer_sha: NOT_MEASURED: no independent exact-head PASS was recorded on the PR before the merge; Codex automated review is informational, not acceptance.
 session_state: no production access; no writes outside this checkout
 claimed_by: Claude session_017UoYKypTBCTMSkumzPzSJa, 2026-11-05 18:00 UTC
 owner: Claude
-last_updated: 2026-11-05 12:40 CT, by Claude
+last_updated: 2026-11-05 17:40 CT, by Claude
 ```

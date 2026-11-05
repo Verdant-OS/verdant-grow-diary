@@ -14,7 +14,7 @@ current_step: review requested.
 next_action: Reviewer A (independent session, not session_017UoYKwwZkbqmWvtCRMw1DZ) reviews the exact head. The test file is scorer-locked, so merge also needs Matthew's own-words yes naming the SHA, plus 35/35.
 post_merge_check: none beyond CI; the change is a test case and handoff text.
 active_writer: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
-decisions: the 400 case is added inside the existing 25-iteration keep-alive loop, alternating with the 403, so both refusal branches run on the same reused socket. The target "http://[bad" fails URL parsing, which is the proxy's only 400 path. No existing assertion changed. RED: with only the 400 branch reverted to destroy-without-Connection:close, the test fails (1 failed, 2 passed); restored, 3/3 pass.
+decisions: the 400 case is added inside the existing 25-iteration keep-alive loop, alternating with the 403, so both refusal branches run through the same keep-alive agent (maxSockets 1). Each refusal sends Connection: close, so the agent opens a fresh socket for the next request; the test proves the client never reuses a socket the proxy is closing, not that one socket is reused (Codex P2 on #2877). The target "http://[bad" fails URL parsing, which is the proxy's only 400 path. No existing assertion changed. RED: with only the 400 branch reverted to destroy-without-Connection:close, the test fails (1 failed, 2 passed); restored, 3/3 pass.
 tried_and_rejected: setting aside the whole refusal fix for RED: it failed on the 403 assertion first, so it did not prove the new 400 line pins anything.
 commands: bunx vitest run src/test/google-analytics-collection-host-proxy.test.ts; node scripts/scorer-lock.mjs --report --base <merge-base>
 files_touched: src/test/google-analytics-collection-host-proxy.test.ts; docs/agents/handoffs/CI-FLAKE-GA-PROXY-REA-WAITFOR.md; docs/agents/handoffs/CI-LOCAL-SUPABASE-START-HARDENING.md; docs/agents/handoffs/REPORT-INGEST-ERROR-ANNOUNCEMENTS.md; docs/agents/handoffs/REVIEW-NOTE-FOLLOWUPS.md
@@ -29,5 +29,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
 owner: Claude
-last_updated: 2026-11-04 17:55 CT, by Claude
+last_updated: 2026-11-04 19:25 CT, by Claude
 ```

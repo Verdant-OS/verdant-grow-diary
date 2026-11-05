@@ -5,7 +5,8 @@ Seats and holders live only in `docs/agents/constitution/roster.md`. Bot descrip
 live in `docs/agents/grok-bots/`. The reproducible export is `grok-bot-fleet-manifest.json`.
 Decided by Matthew Cheek on 2026-11-05 (10:17–10:23 CT): the Ultra bots were deleted and
 rebuilt from scratch; the Ultra Relay seat exists; yeses are relayed to the PR as `[YES]`
-comments; every bot wakes on GitHub events, not chat pings.
+comments; every bot wakes on GitHub events, not chat pings, with one named exception: the Ultra
+Relay takes Matthew's yeses from its chat and posts them on the PR as `[YES]` (Matthew, 2026-11-05).
 
 Source for the vendor facts below: docs.x.ai Grok Bot overview, FAQ and teams pages, read
 2026-11-05. Facts marked `3rd-party` are reported, not confirmed by the vendor.
@@ -70,14 +71,16 @@ no verdict, no evidence lives there. Main seats are not members.
 
 ## Routines (event-triggered; one schedule; no polling)
 
+An **Ultra PR** is a pull request whose author is `verdant-ultra-bot`. R2, R3 and R5 use this definition.
+
 | #   | Seat            | Trigger (repo `Verdant-OS/verdant-grow-diary`)           | Filter                                                                                                                                                                                                                          | Action                                                                                                                                             |
 | --- | --------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | R1  | Merge Steward   | `issue_comment` created                                  | body contains `[PRECHECK] #` and `READY`, or `[YES] #` and `scope: "merge"` (quoted, the canonical Relay form)                                                                                                                  | Precondition re-read; `[MERGE] … QUEUED` or `BLOCKED`                                                                                              |
 | R2  | Ultra Fixer     | `check_suite` completed                                  | conclusion `failure`, PR author `verdant-ultra-bot`                                                                                                                                                                             | Triage; claim only if released/assigned; else `[CI] … FAIL`                                                                                        |
-| R3  | Ultra Fixer     | `pull_request_review` submitted; `issue_comment` created | `changes_requested` on an Ultra PR; or `[YES] #` naming an edit                                                                                                                                                                 | Repair per the Fixer seat file                                                                                                                     |
+| R3  | Ultra Fixer     | `pull_request_review` submitted; `issue_comment` created | `changes_requested` on an Ultra PR; or any `[YES] #` on an Ultra PR (the Fixer acts only when the quoted scope names a repair)                                                                                                  | Repair per the Fixer seat file                                                                                                                     |
 | R4  | Ultra Builder n | `issue_comment` created                                  | body contains `[SLICE] #` and `-> Ultra Builder n`; canonical dispatch is `[SLICE] #N @<40-hex> -> Ultra Builder n` (OWNERSHIP §4.2 parse rule)                                                                                 | Collision guard, claim, build                                                                                                                      |
 | R5  | Ultra Relay     | `issue_comment` created; `pull_request_review` submitted | comment author is not `verdant-ultra-bot`; body contains any of `[WITHDRAWN]`, `[FALLBACK`, `released_by:`, `claimed_by:`, `READY FOR REVIEW`, `BLOCKED` on an Ultra PR. `[HANDOFF]` is excluded: it is the Relay's own receipt | Reconcile that task's handoff file; post `[HANDOFF] … CURRENT/STALE` only when the state differs from the last `[HANDOFF]` on that PR (idempotent) |
-| R6  | Ultra Relay     | schedule, daily 06:00 America/Chicago                    | —                                                                                                                                                                                                                               | Reconciliation pass, summary, `WAITING ON MATTHEW:` line                                                                                           |
+| R6  | Ultra Relay     | schedule, daily 06:00 America/Chicago                    | —                                                                                                                                                                                                                               | Reconciliation pass, LAPSED check (claimed task, no GitHub activity for 24 h), summary, `WAITING ON MATTHEW:` line                                 |
 
 ## Auto Review rules (advisory on self-serve plans; the enforced fence is "no production credential on this computer")
 

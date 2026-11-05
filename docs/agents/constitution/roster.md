@@ -44,6 +44,8 @@ Ultra's open pull-request cap is 10.
 - Ultra's open pull-request cap is 10.
 - Reviewer C, Reviewer D, and QA are active.
 
+**Projects Manager has no Verdant delivery seat** (Matthew, 2026-11-05): it does not build, relay yeses, keep handoff files or route work; Ultra Relay (Roots) keeps handoff continuity.
+
 **Historical, no current seat:** Codex, Claude, Chemdawg/Grok 91, GDP. Their historical attribution, receipts, and contributor exclusions are kept word for word below. **Handoff guard:** any active assignment or hold owned by a historical agent stays in force until the Coordinator posts an explicit handoff to a seat (or Matthew releases it, as he released Codex's work on 2026-10-30), so no work is abandoned and no two writers collide.
 
 ## Historical

@@ -1,5 +1,5 @@
 {
-  "$comment": "Secret-free, reproducible description of the Ultra Grok Bot account. No tokens, no account ids. Seats and holders come from docs/agents/constitution/roster.md; descriptions from docs/agents/grok-bots/. Decided 2026-11-05 (Matthew Cheek). Rev 2026-11-05 r2: Codex P2 fixes (R1 quoted scope, R4 canonical tag, R5 self-exclusion + idempotency).",
+  "$comment": "Secret-free, reproducible description of the Ultra Grok Bot account. No tokens, no account ids. Seats and holders come from docs/agents/constitution/roster.md; descriptions from docs/agents/grok-bots/. Decided 2026-11-05 (Matthew Cheek). Rev 2026-11-05 r2: Codex P2 fixes (R1 quoted scope, R4 canonical tag, R5 self-exclusion + idempotency). Rev 2026-11-05 r3: R3 wakes on any [YES] and the Fixer reads the scope; R6 adds the LAPSED check (GROK-FLEET-WAKE-BASELINE).",
   "account": "Ultra",
   "githubIdentity": "verdant-ultra-bot",
   "plugins": ["github", "linear"],
@@ -63,7 +63,7 @@
       "id": "R3",
       "seat": "Ultra Fixer",
       "trigger": "github.pull_request_review.submitted | github.issue_comment.created",
-      "filter": "changes_requested on an Ultra PR, or '[YES] #' naming an edit",
+      "filter": "changes_requested on an Ultra PR, or any '[YES] #' on an Ultra PR (Fixer acts only when the quoted scope names a repair); Ultra PR = pr.author == verdant-ultra-bot",
       "action": "repair per seat file"
     },
     {
@@ -86,7 +86,7 @@
       "trigger": "schedule",
       "cron": "0 6 * * *",
       "timezone": "America/Chicago",
-      "action": "reconciliation pass; summary; WAITING ON MATTHEW line"
+      "action": "reconciliation pass; LAPSED check (claimed task, no GitHub activity for 24 h); summary; WAITING ON MATTHEW line"
     }
   ],
   "autoReview": {

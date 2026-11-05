@@ -1,6 +1,6 @@
 {
   "generator": "scripts/sync-edge-shared.mjs",
-  "sourceCount": 107,
+  "sourceCount": 108,
   "sourceHashes": {
     "src/constants/aiDoctorContextReadiness.ts": "387a0f98abfe7eeaeda0a24cc289b6491b5c017592989e095facf1efb2e671f2",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
@@ -17,6 +17,7 @@
     "src/lib/aiDoctorEnvironmentCheckRules.ts": "2a53ccec5b83ffa941d343cb83b63eff33baf9519acc92140e4251486b156b46",
     "src/lib/aiDoctorImportedHistoryPromptRules.ts": "700905b4624844c393eab1ede66b5385ed2836c3d70065ad0d011d6796c3ed51",
     "src/lib/aiDoctorManualTentSensorSnapshotAdapter.ts": "3ac30a0f787bbef12720a30d368371064fa92343ccb50c44748b914d61e51327",
+    "src/lib/aiDoctorPacketServerFreshnessRules.ts": "0b145616484c00675ae063ad961ba3de5744e141280c0882642705d7024e69fb",
     "src/lib/aiDoctorPacketStageTargetRules.ts": "1c82a913e556468446aa809a0e024096bbf998f09c22772a608c81d97118180b",
     "src/lib/aiDoctorPromptAssembly.ts": "d1c7a5a0472ad910a10a0a6438887ae1f6acaf929b231e1da591cbd1f6c1a37c",
     "src/lib/aiDoctorPromptVocabularyRules.ts": "8ae5730352434fed3caabfbfb938ef81e444654b37abe7a21ef93a11c2b60b07",

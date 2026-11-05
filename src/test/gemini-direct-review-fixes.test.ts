@@ -81,13 +81,16 @@ function createFakeClient(calls: RpcCall[], feature: string) {
 }
 
 function doctorPacket() {
+  // ai-doctor-review re-derives freshness from the server clock (#2899), so a
+  // manual reading must be inside its 24-hour window to count as current.
+  const capturedAt = new Date(Date.now() - 60_000).toISOString();
   return {
     schemaVersion: 1,
     plant: { strain: "Northern Lights", stage: "flower", medium: "coco", potSize: "11 L" },
     readiness: { state: "strong", evidence: ["sensor-snapshot"], missing: [] },
     recentEvents: [],
     recentSensorSnapshot: {
-      capturedAt: "2026-09-25T12:05:00.000Z",
+      capturedAt,
       severity: "ok",
       readings: [{ field: "humidity_pct", value: 50, unit: "%" }],
     },
@@ -174,7 +177,9 @@ describe("AI Doctor HMAC frame version", () => {
       likely_issue: "A possible stress pattern needs follow-up evidence.",
       confidence: "medium",
       evidence: ["Humidity is 50 percent in the current snapshot."],
-      missing_information: [],
+      // A manual reading is never live, so the server requires this disclosure
+      // (worded without "live", which the result contract bans).
+      missing_information: ["A fresh sensor snapshot is needed."],
       possible_causes: ["Normal variation remains possible."],
       immediate_action: "Observe the plant and add a follow-up note if its condition changes.",
       what_not_to_do: "Do not make abrupt equipment changes from this review.",

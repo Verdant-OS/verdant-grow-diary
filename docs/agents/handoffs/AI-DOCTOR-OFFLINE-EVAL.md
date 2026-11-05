@@ -7,10 +7,10 @@ why: The ADR (claude.ai Project doc claude/adr/ADR-DRAFT-ai-doctor-provider-path
 branch: claude/ai-doctor-offline-eval
 base: verdant-grow-diary
 checkout: git fetch origin claude/ai-doctor-offline-eval verdant-grow-diary && git switch claude/ai-doctor-offline-eval && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED (set after the draft PR opens)
-head_sha: NOT_MEASURED (set after the first push)
-state: local only
-current_step: first push and draft PR
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2903 (draft)
+head_sha: first push db08f60f75905d18a36f1aaee612710c5ede7209 (2026-11-05 ~19:10 UTC); this handoff update moves the head — read the PR for the current head
+state: pushed draft; CI pending
+current_step: draft PR open; waiting on CI and the eval key
 next_action: Matthew provides a dedicated Gemini API key for offline runs (not the production key); then run the live baseline command below and route the s2-review.md file to a fresh, non-contributing Grok session for the S2/S5 read-through.
 post_merge_check: NOT_APPLICABLE to production (tooling only, nothing ships to the app). Repository check: `bunx vitest run src/test/ai-doctor-eval-scoring.test.ts src/test/ai-doctor-eval-cases.test.ts` stays green on verdant-grow-diary after merge.
 active_writer: Claude (claude.ai orchestrator session, assigned by Matthew in chat 2026-11-05)

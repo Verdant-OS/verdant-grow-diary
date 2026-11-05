@@ -10,6 +10,10 @@
 // network beyond the std import, no secrets. Safe on every PR.
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { applyStageTargetSeverityToPacket } from "../_shared/aiDoctorPacketStageTargetRules.ts";
+import {
+  AI_DOCTOR_SERVER_STALE_SNAPSHOT_NOTE,
+  applyServerFreshnessToPacket,
+} from "../_shared/aiDoctorPacketServerFreshnessRules.ts";
 import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../_shared/aiDoctorReviewRequestPacketValidationRules.ts";
 
 function packet(rh: number, field = "humidity_pct", unit = "%") {
@@ -81,4 +85,51 @@ Deno.test("temperature_c 25 declared in °F is graded as -3.9 °C, as grounding 
     notes[0].startsWith("Current air temperature -3.9°C is below the flower target range "),
     true,
   );
+});
+
+// AI Doctor edge audit gap G1 (2026-11-05): the server re-derives freshness
+// from the capture time and its own clock before grading, in the same order
+// as ai-doctor-review/index.ts. An old reading sent as fresh live is marked
+// stale and not live, and a breach on it is worded as historical.
+const FRESHNESS_NOW = new Date("2026-09-25T18:05:00.000Z"); // 6 h after capture
+
+function liveForgedPacket(rh: number) {
+  const base = packet(rh);
+  return {
+    ...base,
+    recentSensorSnapshotAnnotation: {
+      ...base.recentSensorSnapshotAnnotation,
+      line: `LATEST_SENSOR_SNAPSHOT [source=live, stale=false, trust=high]: humidity=${rh}%`,
+      source: "live",
+      trust: "high",
+    },
+    missingLiveSensorReadings: false,
+  };
+}
+
+function serverCheck(raw: unknown, now: Date) {
+  const normalized = validateAndNormalizeAiDoctorReviewRequestPacket(raw);
+  if (!normalized) throw new Error("fixture packet failed server validation");
+  return applyStageTargetSeverityToPacket(applyServerFreshnessToPacket(normalized, now));
+}
+
+Deno.test("an old reading sent as fresh live is marked stale and not live", () => {
+  const checked = serverCheck(liveForgedPacket(50), FRESHNESS_NOW);
+  assertEquals(checked.recentSensorSnapshotAnnotation?.source, "live");
+  assertEquals(checked.recentSensorSnapshotAnnotation?.stale, true);
+  assertEquals(checked.recentSensorSnapshotAnnotation?.trust, "low");
+  assertEquals(checked.missingLiveSensorReadings, true);
+});
+
+Deno.test("a breach on a server-stale reading is worded as historical", () => {
+  const checked = serverCheck(liveForgedPacket(95), FRESHNESS_NOW);
+  const notes = checked.recentSensorSnapshotAnnotation?.safetyNotes ?? [];
+  assertEquals(notes[0], AI_DOCTOR_SERVER_STALE_SNAPSHOT_NOTE);
+  assertEquals(notes[1].startsWith("Stale reading captured 2026-09-25T12:05:00.000Z:"), true);
+});
+
+Deno.test("a fresh live reading keeps its labels and clears missing-live", () => {
+  const checked = serverCheck(liveForgedPacket(50), new Date("2026-09-25T12:10:00.000Z"));
+  assertEquals(checked.recentSensorSnapshotAnnotation?.stale, false);
+  assertEquals(checked.missingLiveSensorReadings, false);
 });

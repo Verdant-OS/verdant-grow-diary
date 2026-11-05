@@ -1,14 +1,14 @@
-TASK QUICKLOG-GROW-CONTEXT-ORDER priority: P1 status: OPEN
+TASK QUICKLOG-GROW-CONTEXT-ORDER priority: P1 status: CLOSED
 goal: Global Quick Log opened from a grow-scoped page (for example /timeline?growId=<grow>) lists that grow's tents and plants first under "In this grow", with the rest under "Other grows". It never pre-selects a target.
 why: Friction follow-up 2026-11-04, finding #1 (High), Quick Log half. From the Skunk Gas Run Timeline, global Quick Log opened with no target and every account tent/plant mixed together (QA, legacy and similarly named Flower/Flowering), a wrong-scope save risk. The Sensors half merged as cd6f8fab (#2895).
 branch: claude/new-session-1xvdwv (shared with the SENSORS-GROW-SCOPE-INTENT closing commit; this session may push only to this branch)
 base: verdant-grow-diary @ cd6f8fab13a950c73033b91cdb130a6ef9ee35c1
 checkout: git fetch origin claude/new-session-1xvdwv verdant-grow-diary && git switch claude/new-session-1xvdwv
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2896
-head_sha: see the PR
-state: pushed draft
-current_step: awaiting CI, an independent exact-head review, and Matthew's merge decision
-next_action: mark #2896 ready only on Matthew's say-so, then route an independent exact-head review
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2896 (merged)
+head_sha: 8ca3bfecebcc02257dc8ccb12a8877abe237fcf6 (reviewed head); merged to verdant-grow-diary as def965e1c055cb0932f1134e7b5a01824c154e93 on 2026-11-05 ~18:31 UTC
+state: merged; not live-verified
+current_step: closed. 35/35 required checks green at 8ca3bfe; must-be-green `Timeline local-day date filter (mocked)` was cancelled once by a 15-minute timeout (Chromium install took 14 min; tests 3/3 PASS), re-run once and passed. Codex code and security reviews clean at 8ca3bfe. The PR was enqueued at 18:25 UTC by the shared cheekhimself identity, not by this session; the queue produced a merge commit (parents cd6f8fab, 8ca3bfe) whose tree equals the reviewed head.
+next_action: none for this task. Run post_merge_check once Matthew publishes. Finding #2 (Dashboard Today's Grow Checks retry) is the next unclaimed slice.
 post_merge_check: after it is live, open the fixture grow's Timeline (URL carries growId), open global Quick Log: target field shows the placeholder (nothing selected) and the list shows "In this grow" with only that grow's targets first
 active_writer: Claude session_017UoYKwPKmXxd9hAw4QxsYU
 decisions:
@@ -31,9 +31,9 @@ decisions:
 - typecheck needs NODE_OPTIONS=--max-old-space-size=6144 in this container (pre-commit hook too).
   links: source report — Matthew's friction follow-up, 2026-11-04 (private; not committed)
   artifacts: rules test RED 5/5 failed then 5/5 pass; negative gate on sheet+AppShell: 2 failed / 23 passed, restored 25/25; all Quick Log + AppShell test files 447/447 (5561 tests)
-  reviewer_seat: not yet requested
-  reviewer_sha: none
+  reviewer_seat: Codex (chatgpt-codex-connector), not an author or repairer; [ROUTE] https://github.com/Verdant-OS/verdant-grow-diary/pull/2896#issuecomment-6664583495
+  reviewer_sha: 8ca3bfecebcc02257dc8ccb12a8877abe237fcf6 (code review no findings; security review no unresolved findings)
   session_state: Claude cloud session session_017UoYKwPKmXxd9hAw4QxsYU; subscribed to #2896
   claimed_by: Claude session_017UoYKwPKmXxd9hAw4QxsYU, 2026-11-05
   owner: Claude
-  last_updated: 2026-11-05, by Claude
+  last_updated: 2026-11-05 12:35 CT, by Claude (closed: merged as def965e1)

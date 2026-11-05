@@ -1,5 +1,5 @@
 {
-  "$comment": "Secret-free, reproducible description of the Ultra Grok Bot account. No tokens, no account ids. Seats and holders come from docs/agents/constitution/roster.md; descriptions from docs/agents/grok-bots/. Decided 2026-11-05 (Matthew Cheek).",
+  "$comment": "Secret-free, reproducible description of the Ultra Grok Bot account. No tokens, no account ids. Seats and holders come from docs/agents/constitution/roster.md; descriptions from docs/agents/grok-bots/. Decided 2026-11-05 (Matthew Cheek). Rev 2026-11-05 r2: Codex P2 fixes (R1 quoted scope, R4 canonical tag, R5 self-exclusion + idempotency).",
   "account": "Ultra",
   "githubIdentity": "verdant-ultra-bot",
   "plugins": ["github", "linear"],
@@ -10,7 +10,10 @@
     "scratch": "/workspace/verdant/handoffs/<TASK-ID>/"
   },
   "bots": [
-    { "seat": "Ultra Relay", "description": ["grok-bots/common.md", "grok-bots/ultra-relay.md"] },
+    {
+      "seat": "Ultra Relay",
+      "description": ["grok-bots/common.md", "grok-bots/ultra-relay.md"]
+    },
     {
       "seat": "Ultra Builder 1",
       "description": ["grok-bots/common.md", "grok-bots/ultra-builder.md"]
@@ -19,7 +22,10 @@
       "seat": "Ultra Builder 2",
       "description": ["grok-bots/common.md", "grok-bots/ultra-builder.md"]
     },
-    { "seat": "Ultra Fixer", "description": ["grok-bots/common.md", "grok-bots/ultra-fixer.md"] },
+    {
+      "seat": "Ultra Fixer",
+      "description": ["grok-bots/common.md", "grok-bots/ultra-fixer.md"]
+    },
     {
       "seat": "Merge Steward",
       "description": ["grok-bots/common.md", "grok-bots/merge-steward.md"]
@@ -43,7 +49,7 @@
       "id": "R1",
       "seat": "Merge Steward",
       "trigger": "github.issue_comment.created",
-      "filter": "body contains '[PRECHECK] #' and 'READY', or '[YES] #' and 'scope: merge'",
+      "filter": "body contains '[PRECHECK] #' and 'READY', or '[YES] #' and 'scope: \"merge\"' (quoted, the canonical Relay form)",
       "action": "precondition re-read; [MERGE] QUEUED or BLOCKED"
     },
     {
@@ -64,15 +70,15 @@
       "id": "R4",
       "seat": "Ultra Builder n",
       "trigger": "github.issue_comment.created",
-      "filter": "body contains '[SLICE] -> Ultra Builder n'",
+      "filter": "body contains '[SLICE] #' and '-> Ultra Builder n' (canonical form: [SLICE] #N @<40-hex> -> Ultra Builder n)",
       "action": "collision guard, claim, build"
     },
     {
       "id": "R5",
       "seat": "Ultra Relay",
       "trigger": "github.issue_comment.created | github.pull_request_review.submitted",
-      "filter": "any of [WITHDRAWN] [FALLBACK [HANDOFF] released_by: claimed_by: 'READY FOR REVIEW' BLOCKED on an Ultra PR",
-      "action": "reconcile handoff file; [HANDOFF] CURRENT|STALE"
+      "filter": "comment author is not verdant-ultra-bot, and body contains any of [WITHDRAWN] [FALLBACK released_by: claimed_by: 'READY FOR REVIEW' BLOCKED on an Ultra PR; [HANDOFF] is excluded (it is the Relay's own receipt)",
+      "action": "reconcile handoff file; post [HANDOFF] CURRENT|STALE only when the recorded state differs from the last [HANDOFF] on that PR (idempotent); never on an unchanged state"
     },
     {
       "id": "R6",

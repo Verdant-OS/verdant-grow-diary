@@ -21,6 +21,7 @@ import {
 import { mapCultivarDatabaseSnapshot } from "@/lib/cultivarDatabaseReadModel";
 import { cultivarVerificationIsSearchIndexable } from "@/lib/cultivarDetailSeo";
 import { CultivarSlugRouteRules } from "@/lib/cultivarSlugRouteRules";
+import { CultivarSlugRouteService } from "@/lib/cultivarSlugRouteService";
 import CultivarPage from "@/pages/CultivarPage";
 import { Route as CultivarSlugRoute } from "@/routes/cultivars.$slug";
 import type { RootRouteContext } from "@/routes/__root";
@@ -126,7 +127,7 @@ describe("cultivar slug route HTTP status", () => {
     db.tables = {};
     db.reads = 0;
     db.fail = false;
-    CultivarSlugRouteRules.resetRequestCache();
+    CultivarSlugRouteService.resetRequestCache();
   });
 
   it("returns 404 for an unknown slug and 200 for a known slug", async () => {
@@ -139,7 +140,7 @@ describe("cultivar slug route HTTP status", () => {
   });
 
   it("redirects a mixed-case slug with 308 and a Location header", async () => {
-    const decision = await CultivarSlugRouteRules.decide("Sour-Stomper");
+    const decision = await CultivarSlugRouteService.decide("Sour-Stomper");
     expect(decision).toEqual({ status: "redirect", slug: "sour-stomper" });
     const router = await loadRouter("/cultivars/Sour-Stomper");
     expect(router._serverResult?.type).toBe("redirect");
@@ -151,7 +152,7 @@ describe("cultivar slug route HTTP status", () => {
   it("keeps a published database-only cultivar found, sample, and noindex", async () => {
     seedDbOnlyVerified();
     flags.cultivarDatabaseReadsEnabled = true;
-    const decision = await CultivarSlugRouteRules.decide("db-only-cut");
+    const decision = await CultivarSlugRouteService.decide("db-only-cut");
     expect(decision.status).toBe("found");
     if (decision.status !== "found") throw new Error("expected found");
     expect(decision.profile?.verificationStatus).toBe("sample");
@@ -191,9 +192,9 @@ describe("cultivar slug route HTTP status", () => {
     ]);
     const once = db.reads;
     expect(once).toBeGreaterThan(0);
-    CultivarSlugRouteRules.resetRequestCache();
+    CultivarSlugRouteService.resetRequestCache();
     db.reads = 0;
-    await CultivarSlugRouteRules.decide("db-only-cut");
+    await CultivarSlugRouteService.decide("db-only-cut");
     expect(db.reads).toBe(once);
   });
 
@@ -206,7 +207,7 @@ describe("cultivar slug route HTTP status", () => {
     expect(router._serverResult.redirect.status).toBe(503);
     expect(router._serverResult.redirect.headers.get("cache-control")).toBe("no-store");
     expect(router._serverResult.redirect.status).not.toBe(404);
-    CultivarSlugRouteRules.resetRequestCache();
+    CultivarSlugRouteService.resetRequestCache();
     expect(await loadStatus("/cultivars/sour-stomper")).toBe(200);
   });
 

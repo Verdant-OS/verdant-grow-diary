@@ -1,11 +1,12 @@
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { CultivarSlugRouteRules } from "@/lib/cultivarSlugRouteRules";
+import { CultivarSlugRouteService } from "@/lib/cultivarSlugRouteService";
 import CultivarPage, { CultivarNotFound } from "@/pages/CultivarPage";
 
 export const Route = createFileRoute("/cultivars/$slug")({
   loader: async ({ params }) => {
-    const decision = await CultivarSlugRouteRules.decide(params.slug);
+    const decision = await CultivarSlugRouteService.decide(params.slug);
     if (decision.status === "redirect") {
       throw redirect({
         href: `/cultivars/${decision.slug}`,
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/cultivars/$slug")({
     return { slug: decision.slug, profile: decision.profile };
   },
   head: async ({ params }) => {
-    const decision = await CultivarSlugRouteRules.decide(params.slug);
+    const decision = await CultivarSlugRouteService.decide(params.slug);
     return CultivarSlugRouteRules.headFor(decision);
   },
   notFoundComponent: CultivarSlugNotFound,

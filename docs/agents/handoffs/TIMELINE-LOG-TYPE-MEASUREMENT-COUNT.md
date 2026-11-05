@@ -7,9 +7,9 @@ why: Blue Dream QA recheck on prod 72e17e5d1d18 (#2733 comment 6617485455): the 
 root_cause: the note's linked observation spine stamps details.event_type "observation" (diaryLinkedEventTypeRules.ts applyLinkedEventTypes). #2799 made the card (resolveEffectiveQuickLogCareType) and the chip (diaryEntryHasMeasurementEvidence) read the attached environment sibling, but the dropdown (timelineEvidenceFilterRules.ts rowEventType) still read only the stored token
 branch: claude/timeline-measurement-count-fix-ozil20
 base: verdant-grow-diary at 7d720e705c969321aa4411e35ca4bd52bfb622b7
-pr: see the draft PR for this branch
-head_sha: read the current head on GitHub
-state: implemented; draft PR; needs 35/35 and an independent exact-head PASS
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2881
+head_sha: 165f24fb2075b7a5a7a5f4509d07ebf1a5c24722 (implementation and test evidence). A later commit that only edits this handoff file keeps that code; the reviewer verifies with git diff 165f24fb2075b7a5a7a5f4509d07ebf1a5c24722 HEAD -- src
+state: marked ready by verdant-ultra-bot 2026-11-05 04:48 UTC; needs 35/35 and an independent exact-head PASS at the current head; Codex P2 (handoff pinning) fixed in the handoff-only follow-up commit
 next_action: independent exact-head review; then Matthew's per-item yes before any queue
 post_merge_check: once /version.json reports the merge SHA, a disposable-account whole-tent Quick Log note with temperature/humidity moves "Measurement (N)" in /timeline's log-type dropdown by +1 per save and after a hard reload; "Observation (N)" does not move; selecting Measurement lists the row
 active_writer: Claude session session_017UoYKvaD66HKYPL8bnvTH3

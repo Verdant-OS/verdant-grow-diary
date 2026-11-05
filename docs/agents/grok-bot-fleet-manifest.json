@@ -1,0 +1,119 @@
+{
+  "$comment": "Secret-free, reproducible description of the Ultra Grok Bot account. No tokens, no account ids. Seats and holders come from docs/agents/constitution/roster.md; descriptions from docs/agents/grok-bots/. Decided 2026-11-05 (Matthew Cheek). Rev 2026-11-05 r2: Codex P2 fixes (R1 quoted scope, R4 canonical tag, R5 self-exclusion + idempotency).",
+  "account": "Ultra",
+  "githubIdentity": "verdant-ultra-bot",
+  "plugins": ["github", "linear"],
+  "vault": [],
+  "workspace": {
+    "repo": "/workspace/verdant/repo",
+    "worktrees": "/workspace/verdant/wt/<TASK-ID>",
+    "scratch": "/workspace/verdant/handoffs/<TASK-ID>/"
+  },
+  "bots": [
+    {
+      "seat": "Ultra Relay",
+      "description": ["grok-bots/common.md", "grok-bots/ultra-relay.md"]
+    },
+    {
+      "seat": "Ultra Builder 1",
+      "description": ["grok-bots/common.md", "grok-bots/ultra-builder.md"]
+    },
+    {
+      "seat": "Ultra Builder 2",
+      "description": ["grok-bots/common.md", "grok-bots/ultra-builder.md"]
+    },
+    {
+      "seat": "Ultra Fixer",
+      "description": ["grok-bots/common.md", "grok-bots/ultra-fixer.md"]
+    },
+    {
+      "seat": "Merge Steward",
+      "description": ["grok-bots/common.md", "grok-bots/merge-steward.md"]
+    }
+  ],
+  "groupChats": [
+    {
+      "name": "Ultra Bench",
+      "seats": [
+        "Ultra Relay",
+        "Ultra Builder 1",
+        "Ultra Builder 2",
+        "Ultra Fixer",
+        "Merge Steward"
+      ],
+      "evidence": false
+    }
+  ],
+  "routines": [
+    {
+      "id": "R1",
+      "seat": "Merge Steward",
+      "trigger": "github.issue_comment.created",
+      "filter": "body contains '[PRECHECK] #' and 'READY', or '[YES] #' and 'scope: \"merge\"' (quoted, the canonical Relay form)",
+      "action": "precondition re-read; [MERGE] QUEUED or BLOCKED"
+    },
+    {
+      "id": "R2",
+      "seat": "Ultra Fixer",
+      "trigger": "github.check_suite.completed",
+      "filter": "conclusion == failure and pr.author == verdant-ultra-bot",
+      "action": "triage; claim only if released or assigned; else [CI] FAIL -> holder"
+    },
+    {
+      "id": "R3",
+      "seat": "Ultra Fixer",
+      "trigger": "github.pull_request_review.submitted | github.issue_comment.created",
+      "filter": "changes_requested on an Ultra PR, or '[YES] #' naming an edit",
+      "action": "repair per seat file"
+    },
+    {
+      "id": "R4",
+      "seat": "Ultra Builder n",
+      "trigger": "github.issue_comment.created",
+      "filter": "body contains '[SLICE] #' and '-> Ultra Builder n' (canonical form: [SLICE] #N @<40-hex> -> Ultra Builder n)",
+      "action": "collision guard, claim, build"
+    },
+    {
+      "id": "R5",
+      "seat": "Ultra Relay",
+      "trigger": "github.issue_comment.created | github.pull_request_review.submitted",
+      "filter": "comment author is not verdant-ultra-bot, and body contains any of [WITHDRAWN] [FALLBACK released_by: claimed_by: 'READY FOR REVIEW' BLOCKED on an Ultra PR; [HANDOFF] is excluded (it is the Relay's own receipt)",
+      "action": "reconcile handoff file; post [HANDOFF] CURRENT|STALE only when the recorded state differs from the last [HANDOFF] on that PR (idempotent); never on an unchanged state"
+    },
+    {
+      "id": "R6",
+      "seat": "Ultra Relay",
+      "trigger": "schedule",
+      "cron": "0 6 * * *",
+      "timezone": "America/Chicago",
+      "action": "reconciliation pass; summary; WAITING ON MATTHEW line"
+    }
+  ],
+  "autoReview": {
+    "enforced": "NOT_MEASURED (Enterprise-only; advisory on self-serve plans)",
+    "deny": [
+      "gh pr merge without --auto and --match-head-commit",
+      "gh pr merge --admin",
+      "gh pr review --approve",
+      "gh pr ready",
+      "git push --force*",
+      "git rebase of a pushed branch",
+      "branch delete",
+      "supabase db push",
+      "supabase functions deploy",
+      "supabase link",
+      "any request to *.supabase.co/rest/v1/rpc",
+      "Paddle, Stripe, Cloudflare dashboards",
+      "device bridge",
+      "writes under /workspace/verdant/repo"
+    ],
+    "requireApproval": [
+      "create or edit a routine or trigger",
+      "launch a cloud agent in a mode other than verdant-builder"
+    ]
+  },
+  "yesAuthorAllowlist": {
+    "logins": ["cheekhimself", "verdant-ultra-bot"],
+    "note": "Steward BLOCKs a [YES] from any other author. Full fix: an owner-only identity no bot holds (open decision)."
+  }
+}

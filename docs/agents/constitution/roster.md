@@ -11,6 +11,7 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 | Ultra Builder 1 | Ultra | Node                                     | `verdant-ultra-bot`     |
 | Ultra Builder 2 | Ultra | Wedding Cake                             | `verdant-ultra-bot`     |
 | Ultra Fixer     | Ultra | Brachs (Blueberry)                       | `verdant-ultra-bot`     |
+| Ultra Relay     | Ultra | Roots                                    | `verdant-ultra-bot`     |
 | Coordinator     | Main  | OG Kush                                  | `cheekhimself` (shared) |
 | Merge Steward   | Ultra | Granddaddy Purple                        | `verdant-ultra-bot`     |
 | Merge Readiness | Main  | Green Crack                              | `cheekhimself` (shared) |
@@ -37,6 +38,7 @@ Ultra's open pull-request cap is 10.
 - The Merge Steward has no authority over the #1971 hold, which stays with the Coordinator.
 - Steward Backup (Main) stands in when the Ultra Merge Steward is unavailable, under the same Steward rules, and still has no authority over the #1971 hold.
 - Main seats never write product code.
+- Ultra Relay never writes product code, reviews, approves, marks ready, queues, or merges. It relays Matthew's yeses verbatim to the PR as `[YES] #N @<sha> scope: "<his words>"` comments and keeps `docs/agents/handoffs/*.md` current. Matthew set that seat on 2026-11-05 at 10:21 AM CT.
 - Approvals come only from Matthew, in his own words.
 - OG Kush holds both Coordinator and Steward Backup. When it acts as Steward Backup, it cannot also be the reviewer of record for the same PR.
 - Ultra's open pull-request cap is 10.

@@ -74,7 +74,7 @@ describe("EnvironmentCsvImportModal UI", () => {
     );
     await uploadCsv(
       "deviceSerialnum,temperature(°C),humidity,vpd,temperature(°F),co2,Timestamp,ppfd\n" +
-        "80F1B2B452B8,25.7,52.4,1.57,78.3,775,2026-05-31 19:00:00,925\n",
+        "80F1B2B452B8,25.7,52.4,1.57,78.3,775,2026-05-31T19:00:00-05:00,925\n",
     );
     const preview = screen.getByTestId("csv-import-row-preview");
     expect(preview.textContent).toContain("25.7°C");

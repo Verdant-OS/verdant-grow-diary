@@ -64,7 +64,7 @@ describe("environmentCsvImportViewModel", () => {
     expect(cov.skippedRows).toBe(1);
     expect(cov.daysCovered).toBeGreaterThanOrEqual(2);
     expect(cov.partialSuccess).toBe(true);
-    expect(cov.partialMessage).toMatch(/Imported safely with 1 row skipped/);
+    expect(cov.partialMessage).toMatch(/Ready to import\. 1 row will be skipped/);
   });
 
   it("rowsToPersist returns valid rows only", () => {

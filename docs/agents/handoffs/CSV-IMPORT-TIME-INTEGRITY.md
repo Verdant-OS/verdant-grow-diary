@@ -7,11 +7,11 @@ why: Matthew's brief "Priority: fix Spider Farmer CSV import integrity" (2026-11
 branch: claude/new-session-rd9w2e
 base: verdant-grow-diary @ cd6f8fab13a950c73033b91cdb130a6ef9ee35c1
 checkout: git fetch origin claude/new-session-rd9w2e verdant-grow-diary && git switch claude/new-session-rd9w2e
-pr: none yet (draft to be opened after the scorer-lock decision below)
+pr: draft, see branch on GitHub
 head_sha: see the branch tip; local commit only until push
-state: implementation done locally; 5 existing scorer-locked tests still pin the old implicit-UTC behavior and are NOT edited (unlock not granted in-session).
-current_step: waiting on Matthew: authorize the scorer unlock for the 4 test files listed under blockers, or edit them himself.
-next_action: after the unlock, add { sourceTimeZone: "UTC" } (or a zone step in the UI test) to the 5 failing cases, change the Spider Farmer pin from 2026-05-31T19:00:00.000Z-by-default to an explicit-zone assertion, then push, open a draft PR and route independent review.
+state: implementation and test renegotiation done; pushed as a draft PR awaiting CI and independent review.
+current_step: Matthew approved the scorer unlock in-session (2026-11-05). Five locked tests renegotiated; scorer-lock --report --base cd6f8fab: 5 changed, 0 still locked.
+next_action: watch required CI at the PR head; route an eligible independent reviewer (not this session) per OWNERSHIP.md §4.3.
 post_merge_check: on https://verdantgrowdiary.com, once live /version.json reports the merge SHA: import a synthetic unzoned CSV into a verified disposable fixture tent, choose America/Chicago, confirm stored captured_at matches the preview's UTC instant. NOT_MEASURED until then.
 active_writer: Claude session_017UoYKypTBCTMSkumzPzSJa
 decisions:
@@ -20,12 +20,12 @@ decisions:
   - View model: new phase time_confirm before unit_confirm. rowsToPersist returns [] and canConfirmImport is false while any time is unresolved. Safe initial behavior per brief: a fold/gap blocks the WHOLE file (no "import the rest" workflow; that is an open product decision).
   - Modal: native <select> of Intl zones, device zone listed first and labeled but never preselected; preview shows source text, zone, offset and ISO UTC for first row, each offset change and last row; parse-generation guard drops stale parses after file replacement/reset; Confirm disabled and re-checked in the handler.
   - Persistence: persistCsvEnvironmentRows refuses the whole batch (client never called) if any row's captured_at is not canonical ISO UTC or its time_provenance does not re-derive exactly that instant. time_provenance is copied into raw_payload. Rows with NO provenance (hand-built, legacy) still pass the provenance step; requiring it would touch ~35 locked test fixtures — follow-up.
-  - Soil: modal shows CSV_SOIL_ONLY_MESSAGE instead of the generic no_sensor_data copy; preview lists unsupported (soil) columns. The "Imported safely with N skipped" preview copy is NOT changed yet: environment-csv-import-view-model.test.ts pins it (locked).
+  - Soil: modal shows CSV_SOIL_ONLY_MESSAGE instead of the generic no_sensor_data copy; preview lists unsupported (soil) columns. Preview partial copy is now preview-tense: "Ready to import. N rows will be skipped. Nothing is saved until you confirm." (pin renegotiated in environment-csv-import-view-model.test.ts).
 tried_and_rejected: appending one fixed offset per file (wrong across DST); defaulting to browser zone (the brief forbids an unconfirmed suggestion becoming fact).
 commands: bunx vitest run src/test/csv-import-source-time-zone.test.tsx --reporter=dot (also with TZ=America/Los_Angeles); the 34 CSV-related test files listed in this session; NODE_OPTIONS=--max-old-space-size=8192 bun run typecheck
 files_touched: src/lib/csvTimestampRules.ts (new); src/lib/csvParser.ts; src/lib/environmentCsvImportViewModel.ts; src/lib/environmentCsvImportPersistence.ts; src/lib/environmentCsvPreviewCopyRules.ts; src/components/EnvironmentCsvImportModal.tsx; src/test/csv-import-source-time-zone.test.tsx (new); this file
-files_remaining: src/test/csv-parser.test.ts; src/test/environment-csv-import-ui.test.tsx; src/test/import-grow-sensor-csv-parser-copy.test.ts; src/test/import-grow-sensor-csv-unit-copy.test.ts (all scorer-locked); optionally src/test/environment-csv-import-view-model.test.ts for the preview-tense copy
-blockers: scorer lock on the 4 files above. The in-session `node scripts/scorer-lock.mjs --unlock ...` call was declined by the permission classifier; only Matthew can clear it.
+files_remaining: none for this slice. Renegotiated (owner-approved unlock): src/test/csv-parser.test.ts, src/test/environment-csv-import-ui.test.tsx, src/test/environment-csv-import-view-model.test.ts, src/test/import-grow-sensor-csv-parser-copy.test.ts, src/test/import-grow-sensor-csv-unit-copy.test.ts
+blockers: none in code. Independent review and required CI pending.
 open_questions: (1) optional "exclude unresolved DST rows and import the rest" workflow; (2) require time_provenance at the write boundary for every row; (3) first-class soil import (separate reviewed slice).
 gotchas: tsc needs NODE_OPTIONS=--max-old-space-size=8192. Do not whole-file prettier legacy files. Full-original replay of the 11 private Alpha/Bravo files is BLOCKED: the files were not supplied to this session; only synthetic fixtures ran.
 links: brief CLAUDE_SPIDER_FARMER_CSV_FIX_BRIEF.md (owner upload); #2808 soil guard preserved; #2895 untouched; #2796 recovery tracking

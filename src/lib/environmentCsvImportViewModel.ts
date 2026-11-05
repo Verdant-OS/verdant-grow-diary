@@ -194,7 +194,7 @@ export function buildCoveragePreview(parsed: ParseEnvironmentCsvResult | null): 
     dateRange: parsed.dateRange,
     partialSuccess,
     partialMessage: partialSuccess
-      ? `Imported safely with ${skipped} row${skipped === 1 ? "" : "s"} skipped.`
+      ? `Ready to import. ${skipped} row${skipped === 1 ? "" : "s"} will be skipped. Nothing is saved until you confirm.`
       : null,
   };
 }

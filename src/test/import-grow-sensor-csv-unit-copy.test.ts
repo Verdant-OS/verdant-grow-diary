@@ -29,6 +29,7 @@ describe("import guide unit and blank-cell copy", () => {
       ["timestamp,Temperature,humidity", "2026-01-01 00:00:00,,55", "2026-01-01 00:05:00,,"].join(
         "\n",
       ),
+      { sourceTimeZone: "UTC" },
     );
     expect(blankTemp.validRows).toHaveLength(1);
     expect(blankTemp.validRows[0]?.temperature_c).toBeNull();
@@ -37,6 +38,7 @@ describe("import guide unit and blank-cell copy", () => {
 
     const ambiguous = parseEnvironmentCSVText(
       ["timestamp,Temperature,humidity", "2026-01-01 00:00:00,24,55"].join("\n"),
+      { sourceTimeZone: "UTC" },
     );
     const asFahrenheit = renormalizeWithUnit(ambiguous, "F");
     expect(asFahrenheit.validRows).toHaveLength(1);
@@ -47,6 +49,7 @@ describe("import guide unit and blank-cell copy", () => {
     const withFileVpd = renormalizeWithUnit(
       parseEnvironmentCSVText(
         ["timestamp,Temperature,humidity,vpd", "2026-01-01 00:00:00,24,55,1.1"].join("\n"),
+        { sourceTimeZone: "UTC" },
       ),
       "F",
     );

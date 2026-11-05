@@ -23,7 +23,7 @@ function makeFile(text: string, name = "export.csv", size?: number): File {
 describe("csvParser — dynamic header detection", () => {
   it("detects Date + Time columns and combines them (test 2)", () => {
     const csv = "Date,Time,Temp(°F),Humidity\n2026-06-01,10:00,77,55\n2026-06-01,11:00,78,54\n";
-    const r = parseEnvironmentCSVText(csv);
+    const r = parseEnvironmentCSVText(csv, { sourceTimeZone: "UTC" });
     expect(r.errors).toEqual([]);
     expect(r.detectedColumns.date).toBe("Date");
     expect(r.detectedColumns.time).toBe("Time");
@@ -56,7 +56,11 @@ describe("csvParser — dynamic header detection", () => {
     const csv =
       "\uFEFFdeviceSerialnum,temperature(°C),humidity,vpd,temperature(°F),co2,Timestamp,ppfd\n" +
       "80F1B2B452B8,25.7,52.4,1.57,78.3,775,2026-05-31 19:00:00,925\n";
-    const r = parseEnvironmentCSVText(csv);
+    // Unzoned clock time: never saved until a source zone is named.
+    const unzoned = parseEnvironmentCSVText(csv);
+    expect(unzoned.validRows).toEqual([]);
+    expect(unzoned.unresolvedTimeRows?.[0]?.reason).toBe("needs_source_time_zone");
+    const r = parseEnvironmentCSVText(csv, { sourceTimeZone: "America/Chicago" });
     expect(r.errors).toEqual([]);
     expect(r.detectedColumns.temperature).toBe("temperature(°C)");
     expect(r.detectedColumns.humidity).toBe("humidity");
@@ -75,7 +79,7 @@ describe("csvParser — dynamic header detection", () => {
       vpd_source: "csv",
       source_tag: "csv",
     });
-    expect(r.validRows[0].captured_at).toBe("2026-05-31T19:00:00.000Z");
+    expect(r.validRows[0].captured_at).toBe("2026-06-01T00:00:00.000Z");
     expect(r.validRows[0].raw_payload.deviceSerialnum).toBe("80F1B2B452B8");
   });
 });

@@ -17,7 +17,7 @@ import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface QueryFilter {
-  op: "eq" | "is" | "not" | "gte" | "lte" | "lt";
+  op: "eq" | "is" | "not" | "gte" | "lte" | "lt" | "or";
   column: string;
   value: unknown;
 }
@@ -96,6 +96,11 @@ vi.mock("@/integrations/supabase/client", () => {
       },
       lt(column: string, value: unknown) {
         spec.filters.push({ op: "lt", column, value });
+        return query;
+      },
+      // Keyset page filter: `entry_at.lt."<cursor>",and(entry_at.eq."<cursor>",id.lt."<id>")`.
+      or(filter: string) {
+        spec.filters.push({ op: "or", column: "entry_at", value: filter });
         return query;
       },
       in(column: string, value: unknown) {
@@ -347,7 +352,7 @@ describe("Timeline local-day query integration (America/Chicago)", () => {
   it("loadOlder() issues the identical local-day bounds as the initial page", async () => {
     harness.executeQuery.mockImplementation((spec) => {
       if (spec.table === "diary_entries") {
-        if (spec.filters.some((f) => f.op === "lt" && f.column === "entry_at")) {
+        if (spec.filters.some((f) => f.op === "or" && f.column === "entry_at")) {
           return { data: [], error: null };
         }
         return {
@@ -367,7 +372,7 @@ describe("Timeline local-day query integration (America/Chicago)", () => {
 
     await waitFor(() => {
       const pageSpec = harness.capturedQueries.find(
-        (q) => q.table === "diary_entries" && q.filters.some((f) => f.op === "lt"),
+        (q) => q.table === "diary_entries" && q.filters.some((f) => f.op === "or"),
       );
       expect(pageSpec).toBeDefined();
       expect(findFilter(pageSpec, "gte", "entry_at")).toBe(LOCAL_DAY_START_ISO);

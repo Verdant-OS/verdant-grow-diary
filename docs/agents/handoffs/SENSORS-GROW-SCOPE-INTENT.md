@@ -1,14 +1,14 @@
-TASK SENSORS-GROW-SCOPE-INTENT priority: P1 status: OPEN
+TASK SENSORS-GROW-SCOPE-INTENT priority: P1 status: CLOSED
 goal: /sensors honours the `growId` that Timeline's "Review sensor snapshot" already carries, so Sensors and its AI Doctor link stay in the grow the grower came from.
 why: Friction follow-up 2026-11-04, finding #1 (High). From the Skunk Gas Run Timeline, Sensors opened UX Audit Test Tent (another grow) and its next AI Doctor link targeted that test grow/tent — a wrong-scope risk for diary and AI context. Root cause (established fact): `readSensorsTentRouteIntent` read only `tentId`; with no tent in the URL the fallback picked the account's first tent, and the per-user page session kept a previous tent from any grow.
 branch: claude/new-session-1xvdwv
 base: verdant-grow-diary @ 343002a8500ad14a6acd1f88420d601894cc22b3
 checkout: git fetch origin claude/new-session-1xvdwv verdant-grow-diary && git switch claude/new-session-1xvdwv
-pr: read the draft PR URL for this branch from GitHub
-head_sha: see the PR (this file is written in the same commit as the fix)
-state: pushed draft
-current_step: awaiting CI and an independent exact-head review
-next_action: select an eligible non-contributing reviewer per OWNERSHIP.md §4.3 for the PR head
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2895 (merged)
+head_sha: 901293392d5ee60fdbc24ad3109d1b0fa28a5d8e (reviewed head); merged to verdant-grow-diary as cd6f8fab13a950c73033b91cdb130a6ef9ee35c1 on 2026-11-05 14:42 UTC
+state: merged; not live-verified
+current_step: closed. Merged through the merge queue after 35/35 required checks, clean Codex code and security reviews at the head, and Matthew's per-item yes at that head. The queue produced a merge commit (parents 343002a8, 90129339) rather than a squash; its tree equals the reviewed head.
+next_action: none for this task. Run post_merge_check once Matthew publishes. Remaining finding #1 work (global Quick Log scope from a grow-scoped Timeline) is a separate, unclaimed slice.
 post_merge_check: after it is live, from the fixture grow's Timeline press "Review sensor snapshot" and confirm Sensors highlights a tent in that grow and its AI Doctor link carries the same growId; a different grow reopens this task with the same owner
 active_writer: Claude session_017UoYKwPKmXxd9hAw4QxsYU
 decisions:
@@ -31,9 +31,9 @@ decisions:
 - node_modules was absent; `bun install --frozen-lockfile` succeeded here.
   links: source report — Matthew's friction follow-up, 2026-11-04 (uploaded to session, private screenshots not committed)
   artifacts: RED 7 failed / 1 passed before the fix; 8/8 after. Review-fix round: RED 2 failed / 8 passed, then 10/10; 31 Sensors test files 315/315
-  reviewer_seat: not yet requested
-  reviewer_sha: none
+  reviewer_seat: Codex (chatgpt-codex-connector), not an author or repairer; [ROUTE] https://github.com/Verdant-OS/verdant-grow-diary/pull/2895#issuecomment-6660343511
+  reviewer_sha: 901293392d5ee60fdbc24ad3109d1b0fa28a5d8e (code review "no major issues"; security review "no security issues")
   session_state: Claude cloud session session_017UoYKwPKmXxd9hAw4QxsYU; no routines; no paused workflows
   claimed_by: Claude session_017UoYKwPKmXxd9hAw4QxsYU, 2026-11-05
   owner: Claude
-  last_updated: 2026-11-05, by Claude
+  last_updated: 2026-11-05 08:45 CT, by Claude (closed: merged as cd6f8fab)

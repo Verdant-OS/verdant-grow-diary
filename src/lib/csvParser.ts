@@ -133,7 +133,8 @@ export interface ParseEnvironmentCsvResult {
   detectedColumns: DetectedColumns;
   /**
    * Header names this parser recognizes but does not import (today: soil
-   * columns other than soil temperature, soil moisture and soil EC), in file order. They are never mapped to an air metric. Always
+   * columns other than soil temperature, soil moisture and soil EC, and every
+   * target/setpoint/goal column), in file order. They are never mapped to an air metric. Always
    * set by the parser; absent only on results built elsewhere.
    */
   unsupportedColumns?: readonly string[];
@@ -248,9 +249,9 @@ export function parseEnvironmentCSVText(
     return withError(empty, "empty_file", "This CSV looks empty or damaged.");
   }
 
-  const { detected, unsupported, soil } = detectColumns(headers);
+  const { detected, unsupported, soilUnsupported, soil } = detectColumns(headers);
   empty.unsupportedColumns = unsupported;
-  const soilOnlyMessage = unsupported.length > 0 ? CSV_SOIL_ONLY_MESSAGE : null;
+  const soilOnlyMessage = soilUnsupported.length > 0 ? CSV_SOIL_ONLY_MESSAGE : null;
   const hasTimeCol =
     detected.timestamp !== null ||
     (detected.date !== null && detected.time !== null) ||
@@ -591,6 +592,15 @@ function isSoilHeader(normalized: string): boolean {
   return /soil/.test(normalized);
 }
 
+/**
+ * Target, setpoint and goal columns record what the grower wants, not what a
+ * sensor measured. They are set aside before any soil or air matching, so they
+ * can never be saved as a reading, whatever their position in the file.
+ */
+function isTargetHeader(normalized: string): boolean {
+  return /target|set.?point|goal|(^|[^a-z])sp([^a-z]|$)/.test(normalized);
+}
+
 interface SoilColumns {
   temperature: string | null;
   temperatureUnit: "C" | "F";
@@ -649,9 +659,11 @@ function fToCInRange(input: string | undefined): number | null {
 function detectColumns(headers: string[]): {
   detected: DetectedColumns;
   unsupported: string[];
+  soilUnsupported: string[];
   soil: SoilColumns;
 } {
   const soilHeaders: string[] = [];
+  const targets: string[] = [];
   const out: DetectedColumns = {
     timestamp: null,
     date: null,
@@ -667,6 +679,10 @@ function detectColumns(headers: string[]): {
 
   for (const h of headers) {
     const k = normalizeHeader(h);
+    if (isTargetHeader(k)) {
+      targets.push(h);
+      continue;
+    }
     if (isSoilHeader(k)) {
       soilHeaders.push(h);
       continue;
@@ -710,8 +726,10 @@ function detectColumns(headers: string[]): {
   }
 
   out.temperature = chooseTemperatureColumn(temperatureCandidates);
-  const { soil, unsupported } = classifySoilHeaders(soilHeaders);
-  return { detected: out, unsupported, soil };
+  const { soil, unsupported: soilUnsupported } = classifySoilHeaders(soilHeaders);
+  // File order, so the preview lists columns as the grower sees them.
+  const unsupported = headers.filter((h) => targets.includes(h) || soilUnsupported.includes(h));
+  return { detected: out, unsupported, soilUnsupported, soil };
 }
 
 function normalizeHeader(header: string): string {

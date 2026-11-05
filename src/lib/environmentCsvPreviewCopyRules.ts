@@ -101,3 +101,52 @@ function previewTemperature(row: ParsedEnvironmentRow): string {
   }
   return row.temperature_c != null ? `${row.temperature_c.toFixed(1)}°C` : "—";
 }
+
+// ---------- source time zone ----------
+
+export const CSV_TIME_ZONE_PROMPT = "Which time zone was this file recorded in?";
+export const CSV_TIME_ZONE_HELP =
+  "This file lists clock times without a time zone. Choose the zone the controller or its app was set to, so each reading lands at the moment it was taken. Verdant won’t guess.";
+export const CSV_TIME_ZONE_SELECT_LABEL = "Source time zone";
+export const CSV_TIME_ZONE_PLACEHOLDER = "Choose a time zone";
+export const CSV_TIME_ZONE_CONTINUE_LABEL = "Use this time zone";
+export const CSV_TIME_ZONE_CHANGE_LABEL = "Change time zone";
+export const CSV_TIME_FROM_FILE_NOTE = "Times use the UTC offsets written in the file.";
+
+export function csvTimeZoneNote(zone: string): string {
+  return `Clock times are read as ${zone}. Each reading below shows the file’s time, the offset used and the saved UTC instant.`;
+}
+
+/**
+ * Blocking copy for daylight-saving folds and gaps. These rows are never
+ * guessed, so the whole file stays unsaved until a later workflow handles them.
+ */
+export function buildCsvUnresolvedTimeMessage(
+  zone: string | null,
+  ambiguousCount: number,
+  nonexistentCount: number,
+): string {
+  const where = zone ? ` in ${zone}` : "";
+  const parts: string[] = [];
+  if (ambiguousCount > 0) {
+    parts.push(
+      `${ambiguousCount} row${ambiguousCount === 1 ? " has a time" : "s have times"} that happened twice${where} when clocks fell back`,
+    );
+  }
+  if (nonexistentCount > 0) {
+    parts.push(
+      `${nonexistentCount} row${nonexistentCount === 1 ? " has a time" : "s have times"} that never happened${where} when clocks sprang forward`,
+    );
+  }
+  return `Import is blocked. ${parts.join(", and ")}. The file doesn’t say which moment is meant, so Verdant won’t guess. Nothing has been saved.`;
+}
+
+/**
+ * Preview disclosure for recognized columns this importer does not read
+ * (today: soil). Shown before Confirm so a partly supported file never looks
+ * fully imported. Saved rows keep the original cells in their raw record.
+ */
+export function csvUnsupportedColumnsNote(columns: readonly string[]): string | null {
+  if (columns.length === 0) return null;
+  return `Not imported: ${columns.join(", ")}. This importer doesn’t read soil temperature, soil moisture or soil EC yet. Each saved reading keeps the file’s original row, including these cells, in its raw record.`;
+}

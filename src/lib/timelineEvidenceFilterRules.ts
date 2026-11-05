@@ -18,6 +18,7 @@ import { normalizePersistedGrowTentId } from "@/lib/growTentSelectionRules";
 import { normalizePersistedPlantId } from "@/lib/sensorRoutePlantIntentRules";
 import { buildTimelineLocalDateRangeBounds } from "@/lib/timelineDateRangeRules";
 import { DeletedPlantDisplayRules } from "@/lib/plantLifecycleWriteRules";
+import { resolveEffectiveQuickLogCareType } from "@/lib/environmentCheckTimelineViewModel";
 import {
   classifyTimelineSensorSource,
   type TimelineSensorSourceKind,
@@ -224,9 +225,24 @@ function safeRowText(
   return parts.join(" \u0001 ").toLowerCase();
 }
 
+/** Stored tokens the card can re-class from attached readings. */
+const RECLASSABLE_LOG_TYPES: ReadonlySet<string> = new Set(["observation", "note", "quick_log"]);
+
+/**
+ * Log-type token for the dropdown count and filter. A note or observation
+ * that the card badges Measurement (an attached environment reading, #2733)
+ * is a Measurement here too. Every other stored token is unchanged.
+ */
 function rowEventType(row: TimelineEvidenceRow): string | null {
   const v = (row.details ?? {})["event_type"];
-  return typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+  const stored = typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+  if (
+    (stored === null || RECLASSABLE_LOG_TYPES.has(stored.toLowerCase())) &&
+    resolveEffectiveQuickLogCareType({ details: row.details }) === "measurement"
+  ) {
+    return "measurement";
+  }
+  return stored;
 }
 
 /**

@@ -7,7 +7,7 @@ why: Matthew's brief "Priority: fix Spider Farmer CSV import integrity" (2026-11
 branch: claude/new-session-rd9w2e
 base: verdant-grow-diary @ cd6f8fab13a950c73033b91cdb130a6ef9ee35c1
 checkout: git fetch origin claude/new-session-rd9w2e verdant-grow-diary && git switch claude/new-session-rd9w2e
-pr: draft, see branch on GitHub
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2902 (draft)
 head_sha: see the branch tip; local commit only until push
 state: implementation and test renegotiation done; pushed as a draft PR awaiting CI and independent review.
 current_step: Matthew approved the scorer unlock in-session (2026-11-05). Five locked tests renegotiated; scorer-lock --report --base cd6f8fab: 5 changed, 0 still locked.
@@ -26,7 +26,7 @@ commands: bunx vitest run src/test/csv-import-source-time-zone.test.tsx --report
 files_touched: src/lib/csvTimestampRules.ts (new); src/lib/csvParser.ts; src/lib/environmentCsvImportViewModel.ts; src/lib/environmentCsvImportPersistence.ts; src/lib/environmentCsvPreviewCopyRules.ts; src/components/EnvironmentCsvImportModal.tsx; src/test/csv-import-source-time-zone.test.tsx (new); this file
 files_remaining: none for this slice. Renegotiated (owner-approved unlock): src/test/csv-parser.test.ts, src/test/environment-csv-import-ui.test.tsx, src/test/environment-csv-import-view-model.test.ts, src/test/import-grow-sensor-csv-parser-copy.test.ts, src/test/import-grow-sensor-csv-unit-copy.test.ts
 blockers: none in code. Independent review and required CI pending.
-open_questions: (1) optional "exclude unresolved DST rows and import the rest" workflow; (2) require time_provenance at the write boundary for every row; (3) first-class soil import (separate reviewed slice).
+open_questions: (1) DECIDED by Matthew 2026-11-05: next slice adds an explicit, opt-in "skip these N DST rows and import the rest" choice listing exact excluded rows (separate branch/PR, after #2902); (2) require time_provenance at the write boundary for every row; (3) first-class soil import (separate reviewed slice).
 gotchas: tsc needs NODE_OPTIONS=--max-old-space-size=8192. Do not whole-file prettier legacy files. Full-original replay of the 11 private Alpha/Bravo files is BLOCKED: the files were not supplied to this session; only synthetic fixtures ran.
 links: brief CLAUDE_SPIDER_FARMER_CSV_FIX_BRIEF.md (owner upload); #2808 soil guard preserved; #2895 untouched; #2796 recovery tracking
 artifacts: none in the repository besides the tests

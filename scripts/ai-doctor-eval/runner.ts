@@ -130,13 +130,20 @@ export async function runAiDoctorEval(opts: {
     const started = performance.now();
     try {
       const response = await opts.providerFetch(input, init);
+      // Read the whole body before stopping the clock: latency is time to the
+      // complete provider response, not to the headers (U5 gate).
+      const text = await response.text();
       latencyMs = Math.round(performance.now() - started);
       try {
-        usage = readUsage(await response.clone().json());
+        usage = readUsage(JSON.parse(text));
       } catch {
         usage = { prompt: null, completion: null };
       }
-      return response;
+      return new Response(text, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
     } catch (error) {
       latencyMs = Math.round(performance.now() - started);
       throw error;

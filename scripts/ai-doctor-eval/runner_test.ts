@@ -139,3 +139,42 @@ Deno.test("classifyRefundReason maps every handler refund reason", () => {
   assertEquals(classifyRefundReason("something_new").outcome, "unclassified");
   assertEquals(classifyRefundReason(null).outcome, "unclassified");
 });
+
+Deno.test("latency covers the full provider response body, not just headers", async () => {
+  const delayedBody = () => {
+    const payload = new TextEncoder().encode(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              tool_calls: [
+                {
+                  function: {
+                    name: "submit_ai_doctor_review",
+                    arguments: JSON.stringify(grounded),
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    const body = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        await new Promise((r) => setTimeout(r, 250));
+        controller.enqueue(payload);
+        controller.close();
+      },
+    });
+    return Promise.resolve(
+      new Response(body, { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+  };
+  const out = await runAiDoctorEval({ providerFetch: delayedBody, runs: 1, cases: strong01 });
+  assertEquals(out.records[0].outcome, "ok", JSON.stringify(out.records[0]));
+  assert(
+    (out.records[0].providerLatencyMs ?? 0) >= 200,
+    `latency ${out.records[0].providerLatencyMs}`,
+  );
+});

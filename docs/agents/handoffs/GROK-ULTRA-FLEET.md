@@ -7,10 +7,10 @@ why: On 2026-11-05 Matthew deleted every Ultra bot and started fresh. Grok Bot u
 branch: claude/grok-ultra-fleet-setup
 base: verdant-grow-diary
 checkout: git fetch origin claude/grok-ultra-fleet-setup verdant-grow-diary && git switch claude/grok-ultra-fleet-setup && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED until opened; see links
-head_sha: NOT_MEASURED until pushed (parent cd6f8fab13a950c73033b91cdb130a6ef9ee35c1, observed 2026-11-05 10:24 CT)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2897 (draft)
+head_sha: ea2448bae2b5a1defb6bce05a5dd03d48fc23023 is the validated docs commit (observed 2026-11-05 10:29 CT). The branch tip is this handoff stamp whose parent is that SHA; confirm with git rev-parse origin/claude/grok-ultra-fleet-setup
 state: pushed draft
-current_step: docs written; validation run; draft PR to open
+current_step: draft PR #2897 open at ea2448ba; validation PASS recorded in the PR body; awaiting [ROUTE]
 next_action: Coordinator routes an eligible Main reviewer with [ROUTE] #N @<head> (docs-only, non-gated except roster + OWNERSHIP which are governance text); reviewer posts a GitHub review at that commit
 post_merge_check: NOT_APPLICABLE (docs only); the fleet itself is NOT_MEASURED until T5a, T9-T12 in docs/agents/grok-bot-fleet.md have dated receipts
 active_writer: Claude session_017UoYKyV8KsaUHw4dJMbg16 on claude/grok-ultra-fleet-setup
@@ -29,5 +29,5 @@ reviewer_sha: NOT_MEASURED
 session_state: Claude Code remote session; no cloud agent; no routine; pending human decision: none for the docs
 claimed_by: Claude session_017UoYKyV8KsaUHw4dJMbg16, 2026-11-05 10:24 CT
 owner: Claude (this session); default inheritor OG Kush
-last_updated: 2026-11-05 10:27 CT, by Claude
+last_updated: 2026-11-05 10:30 CT, by Claude
 ```

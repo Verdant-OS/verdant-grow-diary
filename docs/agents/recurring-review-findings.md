@@ -97,6 +97,27 @@ Five PRs had the over-claim in the PR description or a doc changed in the PR, on
 - **Seen in:** #1774 (P1): the workflow's tool limits only constrain the agent's own tool calls. Tests, scripts or `package.json` entries it writes and then runs can still read the tokens from the environment or the git config.
 - **Before review:** if a job holds secrets, don't let it run code the job itself wrote. Split it into a no-secret build-and-test job and a separate publisher job.
 
+## Skills to run before asking for review
+
+These are the repository's own skills, listed in `.claude/skills/` and `.agents/skills/`.
+Run them in this order on the exact head you are about to hand over; each is read-only
+except where noted. A skill run is author preparation, not the independent review.
+
+1. **`verdant-collision-guard`** (`.claude/skills/verdant-collision-guard/`): the files the
+   head touches against every open and recently merged PR, and who owns that area.
+2. **`verdant-exact-sha-review`** (`.agents/skills/verdant-exact-sha-review/`): the
+   checklist above and the review axes, run against your own head before a reviewer does.
+3. **`verdant-doubt-check`** (`.claude/skills/verdant-doubt-check/`): required when the head
+   touches migrations, RLS, auth, billing or entitlements, the Action Queue, sensor
+   provenance, AI Doctor certainty or a governance file; optional otherwise.
+4. **`run-verdant-grow-diary`** (`.claude/skills/run-verdant-grow-diary/`): the validation
+   commands the PR body cites, run the way that skill documents them, with counts recorded
+   at the head SHA.
+
+Put the four results, or `SKIPPED` with the reason, in the PR body. Third-party skills are
+not on this list; what has been reviewed and decided about them is in
+`docs/agents/third-party-agent-skills.md`.
+
 ## Keeping this current
 
 When a verdict raises a pattern that isn't here, add it with the PR number. Recount only from packets you actually read, and update the sample note at the top.

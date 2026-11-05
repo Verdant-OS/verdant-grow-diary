@@ -82,10 +82,12 @@ vi.mock("@/components/QuickLogV2Sheet", () => ({
     defaultTargetKey,
     defaultAction,
     onOpenChange,
+    growContextId,
   }: {
     open: boolean;
     defaultTargetKey: string | null;
     defaultAction?: string;
+    growContextId?: string | null;
     onOpenChange: (open: boolean) => void;
   }) {
     const [draft, setDraft] = useState("");
@@ -98,6 +100,7 @@ vi.mock("@/components/QuickLogV2Sheet", () => ({
           data-open={String(open)}
           data-target-key={defaultTargetKey ?? ""}
           data-action={defaultAction ?? "note"}
+          data-grow-context={growContextId ?? ""}
         />
         {open ? (
           <div
@@ -199,6 +202,22 @@ function dispatchRuntimeEvent(event: Event) {
     window.dispatchEvent(event);
   });
 }
+
+describe("AppShell Quick Log grow context", () => {
+  const GROW = "6b95939b-08eb-41dd-b2c1-b124d899da49";
+
+  it("passes the route growId to the sheet as ordering context only", () => {
+    renderAt(`/timeline?growId=${GROW}`);
+    const state = screen.getByTestId("scoped-quick-log-state");
+    expect(state).toHaveAttribute("data-grow-context", GROW);
+    expect(state).toHaveAttribute("data-target-key", "");
+  });
+
+  it("passes no grow context for a route without a valid growId", () => {
+    renderAt("/timeline?growId=not-a-grow");
+    expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute("data-grow-context", "");
+  });
+});
 
 describe("AppShell mobile Quick Log routing", () => {
   beforeEach(() => {

@@ -304,6 +304,28 @@ export function partitionQuickLogV2TargetOptionsForTent(
   };
 }
 
+export interface GrowScopedQuickLogV2TargetPartitions {
+  /** The carried grow, or null when it is absent or owns no listed target. */
+  growId: string | null;
+  inGrow: QuickLogV2TargetOption[];
+  other: QuickLogV2TargetOption[];
+}
+
+/**
+ * Group the carried grow's targets first. Display order only: it never
+ * selects a target. A missing grow, or one with no listed targets, leaves
+ * the list ungrouped.
+ */
+export function partitionQuickLogV2TargetOptionsForGrow(
+  options: QuickLogV2TargetOption[],
+  growId: string | null | undefined,
+): GrowScopedQuickLogV2TargetPartitions {
+  const id = typeof growId === "string" ? growId.trim() : "";
+  const inGrow = id ? options.filter((option) => option.growId === id) : [];
+  if (inGrow.length === 0) return { growId: null, inGrow: [], other: options.slice() };
+  return { growId: id, inGrow, other: options.filter((option) => option.growId !== id) };
+}
+
 /** Case-insensitive type-to-filter against the visible Target label. */
 export function filterQuickLogV2TargetOptions(
   options: QuickLogV2TargetOption[],

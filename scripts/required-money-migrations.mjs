@@ -97,6 +97,11 @@ export const KNOWN_MONEY_MIGRATIONS = new Set([
   // Deliberately absent from REQUIRED_MONEY_MIGRATIONS: this PR does not
   // apply it, and the production probe must not demand it.
   "20261101180000_stripe_test_mode_subscription_sink.sql",
+  // Records the Stripe billing schema production already carries (applied
+  // outside the repo). Known, not required: every step is catalog-guarded,
+  // so production needs no apply, and the applied probe must not demand a
+  // schema_migrations row for it.
+  "20261104184500_record_live_stripe_billing_schema.sql",
   // billing / paddle foundation
   "20260620234500_add_paddle_event_processing.sql",
   "20260621003000_paddle_event_processing_operator_audit.sql",

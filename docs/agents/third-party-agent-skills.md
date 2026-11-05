@@ -103,6 +103,54 @@ references. Run it by hand in a read-only session against a closed historical di
 hooks and no credentials. Compare it with a baseline review on actionable findings, false
 positives and missed known issues. Stop there; any adoption is a separate small draft PR.
 
+### `pbakaus/impeccable` (reviewed 2026-11-04 UTC)
+
+**Verdict: adapt the `critique` review rubric as a manual procedure; do not install the
+package, and do not enable its binary, edit hook, telemetry or live mode.**
+
+- **Source:** `https://github.com/pbakaus/impeccable` at commit
+  `5af4319c4e7a7ee3e5e2b9fe899bcfb21c6190cb` (2026-11-04T15:09:55Z), Apache-2.0 (`LICENSE`
+  read from the clone). Pinned by a read-only shallow clone in the trial session. No text
+  was copied into this repository.
+- **What it is:** one skill with 24 commands routed through `skill/SKILL.src.md`, each
+  command a Markdown procedure under `skill/reference/`. Every command also runs
+  `scripts/impeccable`, a launcher that downloads a Rust engine binary into
+  `~/.impeccable/bin/` on first use. The package installs an edit hook that scans UI files
+  on every Edit or Write, fetches a remote catalog on new designs (telemetry, opt-out by
+  environment variable) and has a live mode that can launch the `codex` or `claude` CLI with
+  approvals and sandboxing disabled (`source claim`: the upstream `CLAUDE.md` and `README`;
+  the binary, hook and live mode were not run).
+- **Evidence gathered:** `skill/reference/critique.md` read in full and applied by hand to
+  `https://verdantgrowdiary.com/` and `/pricing` at live commit `57ed5a2904d5`, desktop only.
+  Report: `docs/audits/impeccable-critique-trial-2026-11-04.md`. The run is declared
+  degraded because its detector half was skipped under standing rule 2.
+- **Result:** two P1 findings a reviewer would act on (hero decision load; SEO copy placement)
+  from the design-review half alone. Nothing measured about the detector's accuracy.
+
+Decisions by component:
+
+- **`critique` and `audit` review rubrics** (heuristic table with mode-aware `n/a`, P0–P3
+  severity, persona pass): **adapted as a manual procedure.** Use the report above as the
+  shape; a reviewer runs it by hand with no scripts.
+- **`polish`, `bolder`, `distill` and the other steer/finish commands:** **reference only.**
+  They edit source and are not run against this repository.
+- **Engine binary and `impeccable detect`:** **deferred.** Would close with: one run against a
+  built `dist/` in an isolated fixture, no credentials, checksum of the downloaded binary
+  recorded against `skill/scripts/engine-checksums.txt`, findings compared with the manual
+  report. A separate authorized task.
+- **Edit hook (`hook`, `hook-before-edit`):** **rejected.** A per-edit scan that runs a
+  downloaded binary conflicts with the one-router-per-host rule and the no-untested-hooks
+  rule, and would fire on every agent edit in this repository.
+- **Live mode and `generate`:** **rejected.** Launching a coding CLI with approvals and
+  sandboxing disabled has no place in this repository's agent model.
+- **Telemetry / catalog fetch:** **rejected** for the same reason as the hook; it only
+  matters if the package is installed, which it is not.
+- **`npx impeccable install` and plugin-marketplace installs:** **not run.** They write
+  harness directories and hooks into the project.
+
+**Smallest next step, if wanted.** Decide the three founder questions at the end of the
+trial report, then open a UI slice for the P1 pair under normal review.
+
 ## Adding an entry
 
 Add a dated section under **Register** naming the source, the evidence actually gathered, and

@@ -123,7 +123,7 @@ export default function CultivarQaPanel({ cultivar }: Props) {
         </div>
       ) : null}
       {status === "error" ? (
-        <p data-testid="cultivar-qa-error" className="mt-4 text-sm text-destructive">
+        <p data-testid="cultivar-qa-error" role="alert" className="mt-4 text-sm text-destructive">
           {reasonCopy(reason)}
         </p>
       ) : null}

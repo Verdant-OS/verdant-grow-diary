@@ -1,17 +1,17 @@
 # AI-DOCTOR-SERVER-FRESHNESS
 
 ```text
-TASK AI-DOCTOR-SERVER-FRESHNESS  priority: P2  status: OPEN
+TASK AI-DOCTOR-SERVER-FRESHNESS  priority: P2  status: CLOSED
 goal: ai-doctor-review stops trusting the browser's sensor freshness labels. The server re-derives stale/trust/missing-live from the snapshot capture time and its own clock, downgrade-only, before any credit is spent.
 why: AI-DOCTOR-EDGE-AUDIT (read-only, 2026-11-05, HEAD cd6f8fab13a950c73033b91cdb130a6ef9ee35c1), gap G1. The edge validated recentSensorSnapshotAnnotation.stale/trust and missingLiveSensorReadings for type only. A direct caller could send an old reading labeled source=live, stale=false, trust=high with missingLiveSensorReadings=false; every server gate passed, the model could call the environment healthy, and the evidence receipt recorded the client's claim. Matthew approved the slice and named the Edge action in this session (2026-11-05): "Build it, draft PR"; a snapshot with no source label is treated as not live.
 branch: claude/new-session-6pvzau
 base: verdant-grow-diary
 checkout: git fetch origin claude/new-session-6pvzau verdant-grow-diary && git switch claude/new-session-6pvzau
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2899 (draft)
-head_sha: PR head is the newest commit on the branch (this handoff update). Last code commit 77c533d67971de634ee56e85a1affaa4aeb4e6c2; rule commit ef7b89d0ac06cc453562ce9edccb575f86202fc1; parent cd6f8fab13a950c73033b91cdb130a6ef9ee35c1
-state: OPEN. Readied by cheekhimself 2026-11-05 18:56 UTC. Not reviewed, not merged, not deployed.
-current_step: 35/35 required contexts SUCCESS at 77c533d6 (ci.yml run 42089648285, read 19:14 UTC). Shard 5/32 had failed at d34cc553 in gemini-direct-review-fixes (stale fixture), fixed in 77c533d6. Awaiting an independent exact-head review; CI re-runs at this handoff-only head.
-next_action: route an eligible independent reviewer (OWNERSHIP.md §4.3; this session authored the change and is excluded). Matthew's per-item yes is required before merge; Edge deploy is a separate founder decision.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2899 (merged through the merge queue, enqueued by cheekhimself 2026-11-05 22:00 UTC)
+head_sha: final PR head 086c9ffa46264c7b4ffd8998b7a07a6d2b2c8e50; merged as ad814e99dbfa60129ff9453c672148958873a994
+state: CLOSED. Merged as ad814e99dbfa60129ff9453c672148958873a994 (#2899) on 2026-11-05 at 35/35 required SUCCESS on the final head 086c9ffa. Merged is not deployed: the ai-doctor-review edge function change is not live until the founder deploys it. Closed 2026-11-05 by Claude session_017UoYKwpKSGr91xWT3yFtTS (the slice author).
+current_step: merged; edge deploy NOT_MEASURED (founder decision).
+next_action: none for this slice. Founder: deploy ai-doctor-review when ready; then run the post_merge_check. Candidate follow-up slice: server-side verification that a "live" label is true (read the stored reading).
 post_merge_check: after the edge function is deployed and live /version.json reports the merge SHA, run one AI Doctor review on the fixture grow whose newest live snapshot is older than 15 minutes, and confirm the result lists a fresh live snapshot under Missing information and does not call the environment stable or healthy. NOT_MEASURED until then.
 active_writer: Claude session_017UoYKwpKSGr91xWT3yFtTS
 decisions: (1) One pure rule src/lib/aiDoctorPacketServerFreshnessRules.ts, mirrored to supabase/functions/_shared, now injected. (2) Only live and manual annotations that claim stale=false are re-checked: the Sensor Truth Canon windows (live 15 min, manual 24 h, strict >), a capture time more than SENSOR_TRUTH_FUTURE_SKEW_MS (5 min) ahead of the server clock, or an unparseable time all become stale=true, trust=low, with the browser builder's stale line suffix and a safety note; the source label is never changed. (3) missingLiveSensorReadings is true unless a snapshot exists AND its annotation is fresh live after the server check; it is never cleared. (4) A snapshot with no annotation is treated as not live (owner choice), not rejected. (5) index.ts order: validate -> freshness -> stage-target grading, so a breach on a server-stale reading is worded as historical. (6) The evidence receipt and prompt are built from the checked packet, so the receipt now records server-derived labels.
@@ -27,10 +27,10 @@ open_questions: none
 gotchas: ci.yml required contexts skip draft PRs (ci.yml:106,726,824), so they ran only after the PR was readied. Deno is not installed in the authoring container and a hook blocked downloading it; the Deno cases ran in CI only. The AI Doctor result contract bans the word "live" in output, so a canned review discloses a missing live snapshot as "A fresh sensor snapshot is needed." A new mirrored module needs its shim to import ../../../src/lib/<file>.ts first; scripts/sync-edge-shared.mjs then rewrites it to ./lib/lib/<file>.ts.
 links: AI-DOCTOR-EDGE-AUDIT report (session chat, 2026-11-05)
 artifacts: none in the repository besides the tests
-reviewer_seat: not routed yet (GitHub comments need Matthew's approval). Automated Codex code and security reviews at d34cc553 reported no findings; they are not the independent review.
-reviewer_sha: NOT_MEASURED
+reviewer_seat: none routed. No independent exact-head review was recorded on the PR before cheekhimself enqueued it; automated Codex code and security reviews at d34cc553 reported no findings and are not the independent review.
+reviewer_sha: NOT_MEASURED (no independent review)
 session_state: no production access; no Supabase CLI, SQL, deploy or secret access used
 claimed_by: Claude session_017UoYKwpKSGr91xWT3yFtTS, 2026-11-05 18:20 UTC (assigned by Matthew)
 owner: Claude
-last_updated: 2026-11-05 13:15 CT, by Claude
+last_updated: 2026-11-05 16:10 CT, by Claude
 ```

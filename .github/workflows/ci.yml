@@ -812,7 +812,12 @@ jobs:
           for i in 1 2 3 4 5 6 7 8; do
             n=$(( base + i ))
             echo "Running sub-shard ${n}/256 for gate shard ${{ matrix.shard }}/32"
-            bunx vitest run --shard=${n}/256 --pool=forks --maxWorkers=1 --isolate --passWithNoTests
+            # --passWithNoTests exits 0 on empty discovery; the JSON report keeps
+            # the resolved counters, and the assert fails the step when a
+            # sub-shard ran zero test files or zero tests (audit 2026-11-05 F-04).
+            report="${RUNNER_TEMP}/vitest-shard-${n}.json"
+            bunx vitest run --shard=${n}/256 --pool=forks --maxWorkers=1 --isolate --passWithNoTests --reporter=default --reporter=json --outputFile="${report}"
+            node scripts/assert-vitest-shard-ran-tests.mjs "${report}"
           done
 
   quicklog-correction-measured-values:

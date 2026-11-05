@@ -1,3 +1,5 @@
+import type { TimelineKeysetCursor } from "@/lib/timelineQueryOrderRules";
+
 /** Placeholder note the manual Quick Log RPC writes when the grower note is empty. */
 export const QUICK_LOG_PLACEHOLDER_NOTE = "(quick log)";
 
@@ -130,6 +132,8 @@ export type TimelineDiaryPageProjection<T> = {
   hiddenCount: number;
   /** `entry_at` of the oldest fetched row, hidden or not; the next keyset cursor. */
   oldestFetchedEntryAt: string | null;
+  /** `(entry_at, id)` of that same row, so tied timestamps page without gaps. */
+  oldestFetchedCursor: TimelineKeysetCursor | null;
 };
 
 /**
@@ -142,9 +146,11 @@ export function projectTimelineDiaryPage<T extends TimelineQuickLogPlaceholderRo
   fetched: readonly T[],
 ): TimelineDiaryPageProjection<T> {
   const rows = dropBlankQuickLogPlaceholderRows(fetched);
+  const oldest = fetched.length > 0 ? fetched[fetched.length - 1] : null;
   return {
     rows,
     hiddenCount: fetched.length - rows.length,
-    oldestFetchedEntryAt: fetched.length > 0 ? fetched[fetched.length - 1].entry_at : null,
+    oldestFetchedEntryAt: oldest ? oldest.entry_at : null,
+    oldestFetchedCursor: oldest ? { entryAt: oldest.entry_at, id: oldest.id } : null,
   };
 }

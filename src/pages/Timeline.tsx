@@ -2,7 +2,11 @@ import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
 import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
 import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
-import { orderNewestFirstStable } from "@/lib/timelineQueryOrderRules";
+import {
+  filterOlderThanCursor,
+  orderNewestFirstStable,
+  type TimelineKeysetCursor,
+} from "@/lib/timelineQueryOrderRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { CriticalReadDeadlineError, withCriticalReadDeadline } from "@/lib/boundedReadRules";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -636,7 +640,8 @@ export default function Timeline() {
   // so `entriesTotal > entries.length` means unfetched rows remain (#2094).
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
   // Keyset cursor: the oldest fetched diary row, even when it is a hidden mirror.
-  const [oldestFetchedEntryAt, setOldestFetchedEntryAt] = useState<string | null>(null);
+  // Carries (entry_at, id) so rows tied on entry_at at the page edge still load.
+  const [oldestFetchedCursor, setOldestFetchedCursor] = useState<TimelineKeysetCursor | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [growEvents, setGrowEvents] = useState<GrowEventRowForRecent[]>([]);
   const [timelineSensorEvents, setTimelineSensorEvents] = useState<GrowEventRowForRecent[]>([]);
@@ -841,7 +846,7 @@ export default function Timeline() {
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
-      setOldestFetchedEntryAt(null);
+      setOldestFetchedCursor(null);
       setGrowEvents([]);
       setTimelineSensorEvents([]);
       setTimelineLinkedRoots([]);
@@ -866,7 +871,7 @@ export default function Timeline() {
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(null);
-      setOldestFetchedEntryAt(null);
+      setOldestFetchedCursor(null);
       setGrowEvents([]);
       setTimelineSensorEvents([]);
       setTimelineLinkedRoots([]);
@@ -995,7 +1000,7 @@ export default function Timeline() {
           ? entriesResult.count - entriesPage.hiddenCount
           : null,
       );
-      setOldestFetchedEntryAt(entriesPage.oldestFetchedEntryAt);
+      setOldestFetchedCursor(entriesPage.oldestFetchedCursor);
       setGrowEvents(nextGrowEvents);
       setTimelineSensorEvents(nextSensorEvents);
       setTimelineLinkedRoots([]);
@@ -1301,7 +1306,7 @@ export default function Timeline() {
       entries.length === 0
     )
       return;
-    const cursor = oldestFetchedEntryAt;
+    const cursor = oldestFetchedCursor;
     if (!cursor) return;
     const requestedGrowId = activeGrowId;
     const requestedReadKey = activeReadKey;
@@ -1315,11 +1320,14 @@ export default function Timeline() {
       // never walks out of the filtered range.
       const olderResult = await selectWithRetractionCompat((withRetractionFilter) => {
         let olderQuery = orderNewestFirstStable(
-          supabase
-            .from("diary_entries")
-            .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
-            .eq("grow_id", requestedGrowId)
-            .lt("entry_at", cursor),
+          filterOlderThanCursor(
+            supabase
+              .from("diary_entries")
+              .select("id,note,photo_url,stage,details,entry_at,plant_id,tent_id")
+              .eq("grow_id", requestedGrowId),
+            "entry_at",
+            cursor,
+          ),
           "entry_at",
         ).limit(100);
         if (withRetractionFilter) olderQuery = olderQuery.is("retracted_at", null);
@@ -1369,7 +1377,7 @@ export default function Timeline() {
         }
       }
       if (isCurrentPage() && older.length) {
-        setOldestFetchedEntryAt(olderPage.oldestFetchedEntryAt);
+        setOldestFetchedCursor(olderPage.oldestFetchedCursor);
         if (olderPage.hiddenCount > 0) {
           setEntriesTotal((total) => (total === null ? null : total - olderPage.hiddenCount));
         }

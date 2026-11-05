@@ -30,7 +30,7 @@ decisions:
 - `bun run typecheck` OOMs at the default Node heap in this container; set NODE_OPTIONS=--max-old-space-size=6144.
 - node_modules was absent; `bun install --frozen-lockfile` succeeded here.
   links: source report — Matthew's friction follow-up, 2026-11-04 (uploaded to session, private screenshots not committed)
-  artifacts: RED 7 failed / 1 passed before the fix; 8/8 after; 142/142 across 9 neighbouring Sensors/CTA test files
+  artifacts: RED 7 failed / 1 passed before the fix; 8/8 after. Review-fix round: RED 2 failed / 8 passed, then 10/10; 31 Sensors test files 315/315
   reviewer_seat: not yet requested
   reviewer_sha: none
   session_state: Claude cloud session session_017UoYKwPKmXxd9hAw4QxsYU; no routines; no paused workflows

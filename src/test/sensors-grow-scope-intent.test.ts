@@ -116,4 +116,38 @@ describe("Sensors keeps the carried grow scope", () => {
     });
     expect(second.selection.tentId).toBe(FLOWER);
   });
+  it("keeps the grow scope on repeated reconciliations (empty grow stays empty)", () => {
+    const input = {
+      intent: read(sensorsPath(GROW_EMPTY)),
+      intentKey: "visit-1",
+      tents: TENTS,
+      tentsLoaded: true,
+    };
+    const first = reconcileSensorsSelection(createSensorsPageSession(1), input);
+    expect(first.selection.tentId).toBeNull();
+    const second = reconcileSensorsSelection(first, input);
+    expect(second.selection.tentId).toBeNull();
+    // A tent-list refresh under the same intent still stays in the grow.
+    const third = reconcileSensorsSelection(second, { ...input, tents: [...TENTS] });
+    expect(third.selection.tentId).toBeNull();
+  });
+
+  it("an explicit click on the URL's own tent clears a required gate whose grow conflicts", () => {
+    const intent = read(withGrowId(`/sensors?tentId=${QA_TENT}&tentIntent=required`, GROW_SKUNK));
+    expect(
+      buildSensorsRequiredTentGate({
+        intent,
+        intentKey: "k",
+        appliedIntentKey: "k",
+        currentTentId: QA_TENT,
+        explicitTentId: QA_TENT,
+        tents: TENTS,
+        tentsLoaded: true,
+      }),
+    ).toEqual({
+      requiredSelectionId: QA_TENT,
+      reselectionRequired: false,
+      resolutionPending: false,
+    });
+  });
 });

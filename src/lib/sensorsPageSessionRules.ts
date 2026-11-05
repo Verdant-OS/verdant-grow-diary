@@ -231,7 +231,11 @@ export function reconcileSensorsSelection(
         }
       : intentChanged
         ? input.intent
-        : null;
+        : // Keep the carried grow scope on later passes (tent-list refreshes)
+          // until the grower explicitly picks a tent.
+          !explicitId && input.intent?.growId
+          ? { tentId: null, growId: input.intent.growId }
+          : null;
   const tentId = resolveSensorsTentRouteSelection({
     intent,
     currentTentId: previous.tentId,

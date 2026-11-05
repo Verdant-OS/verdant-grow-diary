@@ -212,7 +212,9 @@ export default function Sensors() {
               }
             : intentChanged
               ? sensorsTentRouteIntent
-              : null,
+              : !explicitTentId && sensorsTentRouteIntent.growId
+                ? { tentId: null, growId: sensorsTentRouteIntent.growId }
+                : null,
         currentTentId,
         tents,
       }),

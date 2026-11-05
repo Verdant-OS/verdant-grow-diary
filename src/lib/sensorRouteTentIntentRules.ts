@@ -167,7 +167,7 @@ export function buildSensorsRequiredTentGate(
       : input.explicitTentId;
   // A grower's explicit pick may leave the carried grow; only the route's own
   // target is held to it.
-  const explicitPick = desiredTentId !== input.intent.tentId;
+  const explicitPick = input.explicitTentId !== null && input.explicitTentId !== undefined;
   const requiredSelectionId = resolveSensorsTentRouteSelection({
     intent: {
       tentId: normalizePersistedGrowTentId(desiredTentId),

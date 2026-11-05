@@ -89,6 +89,25 @@ no verdict, no evidence lives there. Main seats are not members.
 - Require approval: creating or editing any routine or trigger; launching a cloud agent in
   any mode other than `verdant-builder`.
 
+## Who may post a `[YES]` (merge-approval authorship)
+
+A `[YES]` is a per-item approval, so its author matters as much as its text. The Steward's
+re-read checks the comment author against this allowlist before anything else:
+
+| Login               | Why it is on the list                                     | Weakness                                                   |
+| ------------------- | --------------------------------------------------------- | ---------------------------------------------------------- |
+| `cheekhimself`      | Matthew's own login; he may type a yes on the PR directly | Shared with every Main seat (OWNERSHIP, roster)            |
+| `verdant-ultra-bot` | The Ultra Relay posts relayed yeses as this login         | Shared with every Ultra seat, including the Steward itself |
+
+Any other author → `[MERGE] #N @sha BLOCKED ([YES] author not allowlisted)`, reported in Ultra
+Bench, never acted on. This closes the "anyone who can comment" hole but not the shared-login
+one: a prompt-injected Main or Ultra bot could still post a well-formed `[YES]`. The full fix is
+an **owner-only GitHub identity that no bot holds**, used only for yeses, with this allowlist
+reduced to it. That is an account decision for Matthew and is recorded as `NOT_MEASURED` /
+open until he makes it. Until then the compensating controls are the ones already in the gate:
+exact-SHA match, 35/35 required checks, a non-author Main APPROVE at that SHA, no holds, and
+the Steward's refusal to merge anything it wrote, fixed or base-merged.
+
 ## Receipts before the fleet counts as live
 
 | #   | Test                                                             | PASS                                                                                                                         |

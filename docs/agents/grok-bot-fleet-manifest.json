@@ -111,5 +111,9 @@
       "create or edit a routine or trigger",
       "launch a cloud agent in a mode other than verdant-builder"
     ]
+  },
+  "yesAuthorAllowlist": {
+    "logins": ["cheekhimself", "verdant-ultra-bot"],
+    "note": "Steward BLOCKs a [YES] from any other author. Full fix: an owner-only identity no bot holds (open decision)."
   }
 }

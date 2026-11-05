@@ -20,7 +20,7 @@ commands: node scripts/assert-docs-safety.mjs; npx prettier --check docs/agents/
 files_touched: docs/agents/constitution/roster.md docs/agents/OWNERSHIP.md docs/agents/grok-bot-fleet.md docs/agents/grok-bot-fleet-manifest.json docs/agents/grok-bots/common.md docs/agents/grok-bots/ultra-builder.md docs/agents/grok-bots/ultra-fixer.md docs/agents/grok-bots/merge-steward.md docs/agents/grok-bots/ultra-relay.md docs/agents/grok-bots/ultra-verifier.md docs/agents/handoffs/GROK-ULTRA-FLEET.md
 files_remaining: docs/agents/CURRENT_STATE.md receipt rows for T5a (gh auth status) and the fleet bootstrap, written by the Relay seat after the account is rebuilt; not this PR
 blockers: none for the docs. Merge needs an independent Main reviewer verdict at the exact head and Matthew's per-item yes.
-open_questions: Q3 plan tier (X Subscription shared pool vs separate Bot pool) decides whether cloud agents save usage; Q2 whether the 4.1 CI webhook routine is live and which bot owns it. Neither gates this PR.
+open_questions: Q7 (Codex security P2): create an owner-only GitHub identity for [YES] comments that no bot holds, and shrink the yes-author allowlist to it? Matthew's decision. Q3 plan tier (X Subscription shared pool vs separate Bot pool) decides whether cloud agents save usage; Q2 whether the 4.1 CI webhook routine is live and which bot owns it. Neither gates this PR.
 gotchas: Live Ultra routines R1, R4, R5 were saved from the pre-fix text and must be re-saved by their bots to match this revision (R1 quoted scope, R4 canonical [SLICE] #N @sha form, R5 author exclusion + idempotency); that needs Matthew's yes to each bot. OWNERSHIP 4.2's heading still names GDP/Chemdawg (retired); left as is to keep this PR narrow. Roots and Moonbow appeared in receipts before this seat existed; Moonbow still has no seat.
 links: docs/agents/grok-bot-fleet.md; claude.ai project doc claude/specs/grok-ultra-fleet-setup-2026-11-05.md
 artifacts: validation output recorded in the PR body
@@ -29,5 +29,5 @@ reviewer_sha: cfe22b276b81ab63460691c387a4de0247e20f36 (Codex 4xP2, superseded)
 session_state: Claude Code remote session; no cloud agent; no routine; pending human decision: none for the docs
 claimed_by: Claude session_017UoYKyV8KsaUHw4dJMbg16, 2026-11-05 10:24 CT
 owner: Claude (this session); default inheritor OG Kush
-last_updated: 2026-11-05 11:40 CT, by Claude
+last_updated: 2026-11-05 11:44 CT, by Claude
 ```

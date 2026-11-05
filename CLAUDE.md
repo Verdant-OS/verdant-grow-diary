@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-11-04.3**
+**Sentinel-Version: 2026-11-05.1**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
@@ -46,12 +46,12 @@ suggestions.
 **`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file tool
 before you acknowledge.** Also read `docs/agents/HANDOFF_LOG.md` before acknowledging;
 these are the two required files beyond the imported constitution and role. Nothing about
-their authority has changed. Measured 2026-08-21 at 153,142 bytes / ~27,400 tokens, CURRENT_STATE.md was
-68.9% of the whole memory chain and 19.1% of every context window, re-sent on every turn
-of every session whether or not that session touched operating state. It is also the
-changing shift report, revised several times a day, so most of what it costs on any given
-turn is history that has already been superseded. Loading it on demand costs the same
-tokens once, in the sessions that actually need it, instead of in all of them.
+their authority has changed. Imported, CURRENT_STATE.md would be the largest file in the
+memory chain, re-sent on every turn of every session whether or not that session touched
+operating state. It is also the changing shift report, revised several times a day, so most
+of what it costs on any given turn is history that has already been superseded. Loading it
+on demand costs the same tokens once, in the sessions that actually need it, instead of in
+all of them.
 
 CURRENT_STATE.md carries production, applied-migration and approved-scope evidence;
 HANDOFF_LOG.md records current task claims, branches, checkpoints and blockers. Confirm
@@ -145,14 +145,15 @@ Verified 2026-08-19 on the deploy branch. Re-verify before citing on another bra
 
 # Codebase orientation
 
-Everything below is `established fact`, measured at `f25f9ed` (#1020) on 2026-08-21;
-current deploy tip is `28c01a01` (#1078). Counts were not re-taken at the later tip. It
-describes **structure, tooling, and conventions** only.
+Everything below is `established fact`, re-checked at `7d720e70` (#2876) on 2026-11-05. It
+describes **structure, tooling, and conventions** only, and deliberately carries no file
+counts: counts drifted by a third between 2026-08-21 and 2026-11-05 without anyone noticing.
+When a number matters, measure the tree.
 It makes no claim about production, GA4/GSC, or which migrations are applied — those axes
 belong to `docs/agents/CURRENT_STATE.md` and keep their `BLOCKED` / `NOT_MEASURED` labels
 there.
 
-Exhaustive inventories (full route table, all 34 edge functions, all 86 workflows, the
+Exhaustive inventories (full route table, every edge function, every workflow, the
 One-Tent Loop module index, the entitlements API surface) live in
 [`docs/codebase-map.md`](docs/codebase-map.md) so they do not load into every session.
 
@@ -191,43 +192,42 @@ deployment, does not mean the apex serves it.
 
 ## Repository map
 
-| Path                                                       | Size           | Contents                                                                          |
-| ---------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------- |
-| `src/`                                                     | 4,921 ts/tsx   | The application (see below)                                                       |
-| `supabase/migrations/`                                     | 272 `.sql`     | Append-only migration history — **immutable once merged**                         |
-| `supabase/functions/`                                      | 34 + `_shared` | Deno edge functions                                                               |
-| `scripts/`                                                 | 236 entries    | Gates, harnesses, probes, release tooling (`.mjs` and `.ts`)                      |
-| `.github/workflows/`                                       | 86             | CI; `ci.yml` supplies every ruleset-required check                                |
-| `e2e/`                                                     | 59 specs       | Playwright                                                                        |
-| `docs/`                                                    | 397 files      | Governance, specs, runbooks, knowledge library, SEO                               |
-| `config/`                                                  | 10             | Pinned JSON contracts (required checks, replay compat, allowlists)                |
-| `fixtures/`, `spikes/`, `plugins/`, `tools/`, `templates/` | —              | Sample payloads, sandboxed spikes, the Grow OS agent plugin, hardware testbenches |
+| Path                                                       | Contents                                                                          |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `src/`                                                     | The application (see below)                                                       |
+| `supabase/migrations/`                                     | Append-only migration history — **immutable once merged**                         |
+| `supabase/functions/`                                      | Deno edge functions, plus the `_shared` mirror                                    |
+| `scripts/`                                                 | Gates, harnesses, probes, release tooling (`.mjs` and `.ts`)                      |
+| `.github/workflows/`                                       | CI; `ci.yml` supplies every ruleset-required check                                |
+| `e2e/`                                                     | Playwright specs                                                                  |
+| `docs/`                                                    | Governance, specs, runbooks, knowledge library, SEO                               |
+| `config/`                                                  | Pinned JSON contracts (required checks, replay compat, allowlists)                |
+| `fixtures/`, `spikes/`, `plugins/`, `tools/`, `templates/` | Sample payloads, sandboxed spikes, the Grow OS agent plugin, hardware testbenches |
 
 ## `src/` layout
 
-| Directory                    | Files | Role                                                                                                                                       |
-| ---------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/lib/`                   | 1,111 | Business logic. 1,002 flat at root + 17 domain subdirs (`ai/`, `genetics/`, `mcp/`, `cost/`, `entitlements/`, `quick-log/`, `sensors/`, …) |
-| `src/test/`                  | 2,849 | **Nearly all tests live here**, not beside their source                                                                                    |
-| `src/components/`            |   492 | Feature components, flat PascalCase; `ui/` holds 49 shadcn primitives                                                                      |
-| `src/routes/`                |   147 | TanStack file-route tree                                                                                                                   |
-| `src/pages/`                 |   139 | Page components that route files render                                                                                                    |
-| `src/hooks/`                 |   126 | React Query + Supabase access hooks                                                                                                        |
-| `src/constants/`             |    50 | Frozen domain tables **and pinned user-facing copy**                                                                                       |
-| `src/integrations/`          |     8 | Supabase browser/server clients, auth middleware, generated `types.ts`                                                                     |
-| `src/store/`, `src/context/` |     4 | React context providers: `auth`, `grows`, pheno sampling, and `TentQuickLogTargetContext` (Tent → AppShell Quick Log target wiring)        |
+| Directory                    | Role                                                                                                                                         |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/`                   | Business logic. Mostly flat at root, plus domain subdirs (`ai/`, `genetics/`, `mcp/`, `cost/`, `entitlements/`, `quick-log/`, `sensors/`, …) |
+| `src/test/`                  | **Nearly all tests live here**, not beside their source                                                                                      |
+| `src/components/`            | Feature components, flat PascalCase; `ui/` holds the shadcn primitives                                                                       |
+| `src/routes/`                | TanStack file-route tree                                                                                                                     |
+| `src/pages/`                 | Page components that route files render                                                                                                      |
+| `src/hooks/`                 | React Query + Supabase access hooks                                                                                                          |
+| `src/constants/`             | Frozen domain tables **and pinned user-facing copy**                                                                                         |
+| `src/integrations/`          | Supabase browser/server clients, auth middleware, generated `types.ts`                                                                       |
+| `src/store/`, `src/context/` | React context providers: `auth`, `grows`, pheno sampling, and `TentQuickLogTargetContext` (Tent → AppShell Quick Log target wiring)          |
 
 ## Layering, as actually practised
 
-`AGENTS.md` states the intended layering. What the tree contains, measured at `src/lib/`
-root:
+`AGENTS.md` states the intended layering. What the tree contains at `src/lib/` root:
 
-| Suffix          | Count | Contract                                                                                                                                              |
-| --------------- | ----: | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `*Rules.ts`     |   474 | _Intended:_ pure — no React, no Supabase, no fetch, no clock; `now: Date` injected                                                                    |
-| `*ViewModel.ts` |   167 | Pure presentation shaping. Zero import React; zero import Supabase                                                                                    |
-| `*Service.ts`   |    26 | The I/O layer — 25 of 26 import the Supabase client                                                                                                   |
-| `*Advisor.ts`   |     0 | Named in the constitution's table; none at the `src/lib/*Advisor.ts` glob (a nested `genetics/breedingActionAdvisor.ts` exists and is not this layer) |
+| Suffix          | Contract                                                                                                                                              |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `*Rules.ts`     | _Intended:_ pure — no React, no Supabase, no fetch, no clock; `now: Date` injected                                                                    |
+| `*ViewModel.ts` | Pure presentation shaping. Zero import React; zero import Supabase                                                                                    |
+| `*Service.ts`   | The I/O layer — nearly all import the Supabase client                                                                                                 |
+| `*Advisor.ts`   | Named in the constitution's table; none at the `src/lib/*Advisor.ts` glob (a nested `genetics/breedingActionAdvisor.ts` exists and is not this layer) |
 
 Put new business logic in a `*Rules.ts`, new presentation shaping in a `*ViewModel.ts`, new
 I/O in a `*Service.ts` or a hook. Components and pages stay presenters.
@@ -235,20 +235,19 @@ I/O in a `*Service.ts` or a hook. Components and pages stay presenters.
 The `*Rules.ts` row is the **intended** contract, not a measured property — measured drift,
 so you recognise it rather than copy it:
 
-- **55 of 474 `*Rules.ts` call `Date.now()` directly** and **7 call `Math.random()`**
+- **Dozens of `*Rules.ts` call `Date.now()` directly** and **seven call `Math.random()`**
   (`ecowittCanaryAuditRules.ts`, `plantProfilePhotoStorageRules.ts`, `leadSavedViewsRules.ts`,
   `aiDoctorSessionsSavedViewsRules.ts`, `environmentSummaryExportAuditRules.ts`,
   `publicQuickLogStarterRules.ts`, `sensorDiagnosticsExportRules.ts`). Those modules are not
   deterministic and not time-injectable. Inject the clock and seed in new code; do not cite
   these as precedent.
-- No root-level `*Rules.ts` imports the Supabase client. Two (`sensorIngestNormalizationRules.ts`,
-  `sensorWebhookIngestRules.ts`) import the generated `TablesInsert` type only — a type import,
-  not I/O (re-verified at `2f67a545`, 2026-09-25; contract AC-3.2).
-- 38 of 492 components and 33 of 139 pages import `@/integrations/supabase/client` directly
-  instead of going through a hook. (A plain path grep returns 39 and 34; the two extra hits are
-  `vi.mock("@/integrations/supabase/client")` in `src/components/QuickLog.test.tsx` and
-  `src/pages/support/__tests__/support-forms.test.tsx`, which are mocks, not production
-  imports. Count import statements, not path references.)
+- One root-level `*Rules.ts` imports the Supabase client: `cultivarSlugRouteRules.ts`, since
+  #2777 (2026-11-03). It is I/O, not a pure rule; do not copy it. Two others
+  (`sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`) import the generated
+  `TablesInsert` type only — a type import, not I/O (contract AC-3.2).
+- Some components and pages import `@/integrations/supabase/client` directly instead of going
+  through a hook. When counting them, count import statements, not path references:
+  `vi.mock("@/integrations/supabase/client")` lines in co-located tests are mocks.
 
 Do not extend any of these patterns.
 
@@ -281,11 +280,8 @@ User-facing copy is **data**, not JSX: it is pinned in `src/constants/*Copy.ts` 
 `src/lib/react-router-compat.tsx` re-implements the react-router-dom v6 API (`useNavigate`,
 `useLocation`, `useParams`, `Link`, `Outlet`, `Navigate`) on top of TanStack Router.
 
-**666 files import from it. Zero files under `src/components/` or `src/pages/` import
-`@tanstack/react-router` directly.** Both figures are import statements, not path matches: 682
-files mention the shim path, but 16 of those are comments, regex assertions, `vi.mock(...)`
-references, or the shim's own test helper. The zero holds by either measure — `@tanstack/react-router`
-does not appear in `src/components/` or `src/pages/` at all.
+**Most component and page code imports from it. No file under `src/components/` or
+`src/pages/` mentions `@tanstack/react-router` at all** (re-checked 2026-11-05).
 
 Vitest aliases the shim to a real MemoryRouter
 (`src/test/helpers/reactRouterCompat.vitest.tsx`) so component tests get working navigation.
@@ -296,8 +292,8 @@ component is the most common way to produce code that looks correct and fails in
 ## Daily commands
 
 Bun is canonical (`bun.lock`, `bunfig.toml`); `bun.lock` is the only lockfile and
-`package-lock.json` is forbidden since `#1873`. `package.json` carries **320** scripts — these are the ones you
-actually run:
+`package-lock.json` is forbidden since `#1873`. `package.json` carries hundreds of scripts — these are the ones
+you actually run:
 
 ```bash
 bun run dev -- --host 127.0.0.1 --port 8080   # IPv4 and 8080 explicitly; see traps below
@@ -320,10 +316,10 @@ Environment and install gotchas are owned by
 
 ## Testing conventions
 
-- Tests are **centralised**: 2,802 of 2,828 `src/**/*.{test,spec}.{ts,tsx}` files sit in
-  `src/test/`, named kebab-case by feature (`action-detail-linked-alert.test.tsx`). Only 26
-  are co-located. Follow the centralised pattern unless the file you are editing already
-  has a neighbour test.
+- Tests are **centralised**: nearly all `src/**/*.{test,spec}.{ts,tsx}` files sit in
+  `src/test/`, named kebab-case by feature (`action-detail-linked-alert.test.tsx`); only a
+  few dozen are co-located. Follow the centralised pattern unless the file you are editing
+  already has a neighbour test.
 - Runner: Vitest, jsdom, globals on, single setup file `src/test/setup.ts`. Sharding is a
   CLI concern, not config.
 - Playwright projects: `setup`, `chromium-authed` (seeded session), `chromium-mocked` and

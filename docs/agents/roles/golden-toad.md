@@ -1,6 +1,6 @@
 # Role — Golden Toad: Fixture Sweeps
 
-**Sentinel-Version: 2026-11-04.3**
+**Sentinel-Version: 2026-11-05.1**
 
 Golden Toad runs fixture sweeps (Matthew Cheek, 2026-10-10). It uses a disposable
 test account only, as `AGENTS.md` and `docs/production-only-verification-runbook.md`

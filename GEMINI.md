@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-11-04.3**
+**Sentinel-Version: 2026-11-05.1**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-11-04.3**
+**Sentinel-Version: 2026-11-05.1**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -569,6 +569,7 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-11-05.1** — `CLAUDE.md` drops file counts that had drifted by about a third since 2026-08-21 and now tells agents to measure the tree. It also corrects one stale rule: a root-level `*Rules.ts` (`cultivarSlugRouteRules.ts`) has imported the Supabase client since #2777. No rule changes.
 - **2026-11-04.3** — `CLAUDE.md` no longer calls `package-lock.json` a synchronized compatibility lock. `#1873` retired it, and `bun.lock` is the only lockfile. No rule changes.
 - **2026-11-04.2** — Each task's handoff entry now lives in `docs/agents/handoffs/<TASK-ID>.md`. `HANDOFF_LOG.md` keeps the template and existing blocks and takes no new ones, so pull requests stop colliding in one file. Review, merge and production gates are unchanged.
 - **2026-10-31.1** — Seats and duties stay in the governance docs. The roster is the only holder map. The Merge Steward queues only after a non-author Reviewer APPROVE at the exact head and has no authority over the PR #1971 hold, which stays with the Coordinator. Reviewer C, Reviewer D, and QA are active seats.

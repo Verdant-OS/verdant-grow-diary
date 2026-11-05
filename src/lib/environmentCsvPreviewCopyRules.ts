@@ -88,6 +88,11 @@ export function formatCsvPreviewRow(row: ParsedEnvironmentRow): string {
   if (row.vpd_kpa != null) parts.push(`${row.vpd_kpa.toFixed(2)} kPa VPD`);
   if (row.co2_ppm != null) parts.push(`${row.co2_ppm.toFixed(0)} ppm CO₂`);
   if (row.ppfd != null) parts.push(`${row.ppfd.toFixed(0)} PPFD`);
+  if (row.soil_temp_c != null) parts.push(`soil ${row.soil_temp_c.toFixed(1)}°C`);
+  if (row.soil_moisture_pct != null) {
+    parts.push(`soil moisture ${row.soil_moisture_pct.toFixed(1)}% (uncalibrated)`);
+  }
+  if (row.soil_ec != null) parts.push(`soil EC ${row.soil_ec.toFixed(2)} (mS/cm assumed)`);
   return parts.join(" · ");
 }
 
@@ -148,5 +153,32 @@ export function buildCsvUnresolvedTimeMessage(
  */
 export function csvUnsupportedColumnsNote(columns: readonly string[]): string | null {
   if (columns.length === 0) return null;
-  return `Not imported: ${columns.join(", ")}. This importer doesn’t read soil temperature, soil moisture or soil EC yet. Each saved reading keeps the file’s original row, including these cells, in its raw record.`;
+  return `Not imported: ${columns.join(", ")}. Verdant doesn’t recognize these columns yet. Each saved reading keeps the file’s original row, including these cells, in its raw record.`;
+}
+
+/**
+ * Preview disclosure for soil values whose meaning the export does not state.
+ * Shown whenever a file carries soil moisture or soil EC.
+ */
+export function csvSoilMeaningNote(hasMoisture: boolean, hasEc: boolean): string | null {
+  const parts: string[] = [];
+  if (hasMoisture) {
+    parts.push(
+      "Soil moisture is the controller’s own reading, not a calibrated water-content value",
+    );
+  }
+  if (hasEc) parts.push("soil EC is saved as mS/cm, which the file doesn’t state");
+  if (parts.length === 0) return null;
+  const text = parts.join("; ");
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`;
+}
+
+/** Explicit opt-in to leave out DST fold/gap rows. Nothing is guessed. */
+export function buildCsvExcludeUnresolvedLabel(excluded: number, kept: number): string {
+  return `Leave out these ${excluded} row${excluded === 1 ? "" : "s"} and import the other ${kept}`;
+}
+
+export function buildCsvExcludedRowsNote(rowNumbers: readonly number[], kept: number): string {
+  const n = rowNumbers.length;
+  return `${n} row${n === 1 ? "" : "s"} will be left out and not saved (row${n === 1 ? "" : "s"} ${rowNumbers.join(", ")}). The other ${kept} will be imported when you confirm. Your file isn’t changed.`;
 }

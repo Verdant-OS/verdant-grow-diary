@@ -145,7 +145,8 @@ describe("csvParser — source time zone", () => {
       { rowNumber: 2, sourceText: "2026-11-01 01:30:00", reason: "needs_source_time_zone" },
       { rowNumber: 3, sourceText: "2026-11-04 19:55:00", reason: "needs_source_time_zone" },
     ]);
-    expect(r.unsupportedColumns).toContain("humidity_soil");
+    // Recognized soil columns now import as soil metrics (founder decision 2026-11-05).
+    expect(r.unsupportedColumns).toEqual([]);
   });
 
   it("with America/Chicago: exact instants, provenance kept, the fold stays unresolved", () => {
@@ -387,11 +388,12 @@ describe("EnvironmentCsvImportModal — source time zone step", () => {
 });
 
 describe("EnvironmentCsvImportModal — soil disclosure", () => {
+  // Only soil columns Verdant does not recognize (here: ph_soil) are still unsupported.
   const SOIL_ONLY =
-    "deviceSerialnum,roomId,sensorId,temperature(°C),humidity,vpd,temperature(°F),co2,Timestamp,temperature_soil_f(°F),temperature_soil(°C),humidity_soil,ec_soil\n" +
-    "SYNTHETIC-BRAVO,10000,SYNTHETIC-SOIL,,,,,,2026-11-05T11:00:00-06:00,71.6,22.0,45,0.50\n";
+    "deviceSerialnum,roomId,sensorId,temperature(°C),humidity,vpd,co2,Timestamp,ph_soil\n" +
+    "SYNTHETIC-BRAVO,10000,SYNTHETIC-SOIL,,,,,2026-11-05T11:00:00-06:00,6.2\n";
 
-  it("shows the soil-only reason, not the generic unreadable-file copy", async () => {
+  it("shows the soil-only reason for unrecognized soil columns, not the generic copy", async () => {
     const onConfirm = vi.fn(async () => ({ insertedCount: 0, error: null }));
     render(<EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />);
     await upload(SOIL_ONLY);
@@ -410,11 +412,10 @@ describe("EnvironmentCsvImportModal — soil disclosure", () => {
       />,
     );
     await upload(
-      `${HEADER}\nSYNTHETIC-ALPHA,25.0,60,1.27,77.0,420,2026-11-05T11:00:00-06:00,71.6,22.0,45,0.50,0\n`,
+      `${HEADER},ph_soil\nSYNTHETIC-ALPHA,25.0,60,1.27,77.0,420,2026-11-05T11:00:00-06:00,71.6,22.0,45,0.50,0,6.2\n`,
     );
     const note = await screen.findByTestId("csv-import-unsupported-columns");
-    expect(note.textContent).toContain(
-      "Not imported: temperature_soil_f(°F), temperature_soil(°C), humidity_soil, ec_soil.",
-    );
+    expect(note.textContent).toContain("Not imported: ph_soil.");
+    expect(note.textContent).not.toContain("humidity_soil");
   });
 });

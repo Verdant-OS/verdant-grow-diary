@@ -31,7 +31,19 @@ import {
 
 export const CSV_SENSOR_SOURCE = "csv" as const;
 
-type CsvSensorMetric = "temperature_c" | "humidity_pct" | "vpd_kpa" | "co2_ppm" | "ppfd";
+type CsvSensorMetric =
+  | "temperature_c"
+  | "humidity_pct"
+  | "vpd_kpa"
+  | "co2_ppm"
+  | "ppfd"
+  | "soil_temp_c"
+  | "soil_moisture_pct"
+  | "ec";
+
+/** Provenance for soil values whose meaning the CSV does not state. */
+export const CSV_SOIL_MOISTURE_BASIS = "vendor_reading_uncalibrated" as const;
+export const CSV_SOIL_EC_UNIT_ASSUMED = "mS/cm" as const;
 
 export interface CsvInsertScope {
   user_id: string;
@@ -59,6 +71,8 @@ export interface SensorReadingInsert {
     source_app?: "ac_infinity" | "spider_farmer" | "vivosun" | null;
     import_file_name?: string | null;
     time_provenance?: ParsedEnvironmentRow["time_provenance"];
+    soil_moisture_basis?: typeof CSV_SOIL_MOISTURE_BASIS;
+    ec_unit_assumed?: typeof CSV_SOIL_EC_UNIT_ASSUMED;
   };
 }
 
@@ -148,6 +162,11 @@ export function buildSensorReadingInserts(
     pushMetric("vpd_kpa", r.vpd_kpa, r.vpd_source ? { vpd_source: r.vpd_source } : {});
     pushMetric("co2_ppm", r.co2_ppm);
     pushMetric("ppfd", r.ppfd);
+    pushMetric("soil_temp_c", r.soil_temp_c ?? null);
+    pushMetric("soil_moisture_pct", r.soil_moisture_pct ?? null, {
+      soil_moisture_basis: CSV_SOIL_MOISTURE_BASIS,
+    });
+    pushMetric("ec", r.soil_ec ?? null, { ec_unit_assumed: CSV_SOIL_EC_UNIT_ASSUMED });
   });
   return out;
 }

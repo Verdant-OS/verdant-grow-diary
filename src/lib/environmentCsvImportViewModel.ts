@@ -33,6 +33,17 @@ export interface ImportState {
   partialWrite: boolean;
   errorCode: string | null;
   errorMessage: string | null;
+  /**
+   * The grower's explicit choice to leave out rows whose time could not be
+   * established (DST fold/gap) for this exact parse. Null = not chosen.
+   * Any new parse (file or zone change) or reset clears it.
+   */
+  timeExclusion: TimeExclusion | null;
+}
+
+export interface TimeExclusion {
+  sourceTimeZone: string | null;
+  rowNumbers: readonly number[];
 }
 
 export const INITIAL_IMPORT_STATE: ImportState = {
@@ -44,6 +55,7 @@ export const INITIAL_IMPORT_STATE: ImportState = {
   partialWrite: false,
   errorCode: null,
   errorMessage: null,
+  timeExclusion: null,
 };
 
 export function startParsingState(): ImportState {
@@ -85,6 +97,49 @@ export function hasUnresolvedTime(parsed: ParseEnvironmentCsvResult | null): boo
   return (parsed?.unresolvedTimeRows ?? []).length > 0;
 }
 
+/** Row numbers that a grower may opt to leave out: folds and gaps only. */
+function excludableRowNumbers(parsed: ParseEnvironmentCsvResult | null): number[] | null {
+  const unresolved = parsed?.unresolvedTimeRows ?? [];
+  if (unresolved.length === 0) return null;
+  if (unresolved.some((r) => r.reason === "needs_source_time_zone")) return null;
+  return unresolved.map((r) => r.rowNumber);
+}
+
+/** True only when the exclusion names exactly this parse's unresolved rows and zone. */
+export function exclusionCoversUnresolved(
+  parsed: ParseEnvironmentCsvResult | null,
+  exclusion: TimeExclusion | null | undefined,
+): boolean {
+  const rows = excludableRowNumbers(parsed);
+  if (!rows || !exclusion) return false;
+  if (exclusion.sourceTimeZone !== (parsed?.sourceTimeZone ?? null)) return false;
+  if (exclusion.rowNumbers.length !== rows.length) return false;
+  return rows.every((n, i) => exclusion.rowNumbers[i] === n);
+}
+
+/** Whether unresolved times still stop the write. */
+export function timeBlocksWrite(
+  parsed: ParseEnvironmentCsvResult | null,
+  exclusion: TimeExclusion | null | undefined,
+): boolean {
+  return hasUnresolvedTime(parsed) && !exclusionCoversUnresolved(parsed, exclusion);
+}
+
+/** Explicit opt-in: leave out the DST fold/gap rows and import the rest. */
+export function excludeUnresolvedTimeRows(state: ImportState): ImportState {
+  if (state.phase !== "preview") return state;
+  const rows = excludableRowNumbers(state.parsed);
+  if (!rows || (state.parsed?.validRows.length ?? 0) === 0) return state;
+  return {
+    ...state,
+    timeExclusion: { sourceTimeZone: state.parsed?.sourceTimeZone ?? null, rowNumbers: rows },
+  };
+}
+
+export function undoTimeExclusion(state: ImportState): ImportState {
+  return state.timeExclusion ? { ...state, timeExclusion: null } : state;
+}
+
 /** Return to the zone question for the same file (e.g. "Change time zone"). */
 export function reopenTimeZoneChoice(state: ImportState): ImportState {
   if (state.phase !== "preview" && state.phase !== "unit_confirm") return state;
@@ -94,14 +149,14 @@ export function reopenTimeZoneChoice(state: ImportState): ImportState {
   ) {
     return state;
   }
-  return { ...state, phase: "time_confirm" };
+  return { ...state, phase: "time_confirm", timeExclusion: null };
 }
 
 /** The Confirm gate. The persistence adapter re-checks independently. */
 export function canConfirmImport(state: ImportState): boolean {
   return (
     (state.phase === "preview" || state.phase === "error") &&
-    !hasUnresolvedTime(state.parsed) &&
+    !timeBlocksWrite(state.parsed, state.timeExclusion) &&
     (state.parsed?.validRows.length ?? 0) > 0
   );
 }
@@ -125,18 +180,23 @@ export function buildCsvImportDoneMessage(
   insertedCount: number,
   duplicateCount: number,
   sensorRowCount?: number,
+  timeExcludedCount = 0,
 ): string {
+  const excludedNote =
+    timeExcludedCount > 0
+      ? ` Left out ${timeExcludedCount} row${timeExcludedCount === 1 ? "" : "s"} whose time was unclear around a clock change, as you chose.`
+      : "";
   if (insertedCount === 0 && duplicateCount > 0) {
-    return "No new readings imported. These readings already exist in Verdant.";
+    return `No new readings imported. These readings already exist in Verdant.${excludedNote}`;
   }
   const stored =
     sensorRowCount != null && sensorRowCount > 0 && sensorRowCount !== insertedCount
       ? `Imported ${insertedCount} CSV reading(s). From ${sensorRowCount} sensor row(s).`
       : `Imported ${insertedCount} CSV reading(s).`;
   if (duplicateCount > 0) {
-    return `${stored} Skipped ${duplicateCount} duplicate reading(s) already in Verdant.`;
+    return `${stored} Skipped ${duplicateCount} duplicate reading(s) already in Verdant.${excludedNote}`;
   }
-  return stored;
+  return `${stored}${excludedNote}`;
 }
 
 /** Convenience wrapper that calls the parser and reduces the result. */
@@ -199,11 +259,16 @@ export function buildCoveragePreview(parsed: ParseEnvironmentCsvResult | null): 
   };
 }
 
-/** Rows ready for the confirm-only persistence step. Empty while any time is unresolved. */
+/**
+ * Rows ready for the confirm-only persistence step. Empty while any time is
+ * unresolved, unless the grower explicitly excluded exactly those rows.
+ * Excluded rows are never in validRows, so they can never be written.
+ */
 export function rowsToPersist(
   parsed: ParseEnvironmentCsvResult | null,
+  exclusion: TimeExclusion | null = null,
 ): readonly ParsedEnvironmentRow[] {
-  if (hasUnresolvedTime(parsed)) return [];
+  if (timeBlocksWrite(parsed, exclusion)) return [];
   return parsed?.validRows ?? [];
 }
 

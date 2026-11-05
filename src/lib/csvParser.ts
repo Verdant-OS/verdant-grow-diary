@@ -101,6 +101,16 @@ export interface ParsedEnvironmentRow {
   vpd_kpa: number | null;
   co2_ppm: number | null;
   ppfd: number | null;
+  /**
+   * Root-zone readings. Optional only for rows built elsewhere; the parser
+   * always sets them (null when the file has no such column or the cell is
+   * blank or out of range). Never derived from or mixed with air metrics.
+   */
+  soil_temp_c?: number | null;
+  /** The controller's own moisture %, not calibrated water content. */
+  soil_moisture_pct?: number | null;
+  /** Soil EC as written in the file. Unit is not stated by the export. */
+  soil_ec?: number | null;
   // raw preserved
   raw_temperature: number | null;
   raw_temp_unit: RawTempUnit;
@@ -123,7 +133,7 @@ export interface ParseEnvironmentCsvResult {
   detectedColumns: DetectedColumns;
   /**
    * Header names this parser recognizes but does not import (today: soil
-   * columns), in file order. They are never mapped to an air metric. Always
+   * columns other than soil temperature, soil moisture and soil EC), in file order. They are never mapped to an air metric. Always
    * set by the parser; absent only on results built elsewhere.
    */
   unsupportedColumns?: readonly string[];
@@ -238,7 +248,7 @@ export function parseEnvironmentCSVText(
     return withError(empty, "empty_file", "This CSV looks empty or damaged.");
   }
 
-  const { detected, unsupported } = detectColumns(headers);
+  const { detected, unsupported, soil } = detectColumns(headers);
   empty.unsupportedColumns = unsupported;
   const soilOnlyMessage = unsupported.length > 0 ? CSV_SOIL_ONLY_MESSAGE : null;
   const hasTimeCol =
@@ -250,7 +260,10 @@ export function parseEnvironmentCSVText(
     detected.humidity !== null ||
     detected.vpd !== null ||
     detected.co2 !== null ||
-    detected.ppfd !== null;
+    detected.ppfd !== null ||
+    soil.temperature !== null ||
+    soil.moisture !== null ||
+    soil.ec !== null;
   if (!hasTimeCol || !hasMetricCol) {
     return withError(
       empty,
@@ -344,9 +357,26 @@ export function parseEnvironmentCSVText(
           ? computeVpdKpa(tempC, rh)
           : null;
     const co2Ppm = detected.co2 ? parseMetric(rec[detected.co2], 0, 10_000) : null;
+    // Soil bounds: soil_temp_c matches the DB trigger (-20..80 °C).
+    const soilTempC = soil.temperature
+      ? soil.temperatureUnit === "F"
+        ? fToCInRange(rec[soil.temperature])
+        : parseMetric(rec[soil.temperature], -20, 80)
+      : null;
+    const soilMoisture = soil.moisture ? parseMetric(rec[soil.moisture], 0, 100) : null;
+    const soilEc = soil.ec ? parseMetric(rec[soil.ec], 0, 20) : null;
     const ppfd = detected.ppfd ? parseMetric(rec[detected.ppfd], 0, 2_500) : null;
 
-    if (tempC == null && rh == null && vpd == null && co2Ppm == null && ppfd == null) {
+    if (
+      tempC == null &&
+      rh == null &&
+      vpd == null &&
+      co2Ppm == null &&
+      ppfd == null &&
+      soilTempC == null &&
+      soilMoisture == null &&
+      soilEc == null
+    ) {
       skipped.push({ rowNumber, reason: "no_metrics" });
       return;
     }
@@ -380,6 +410,9 @@ export function parseEnvironmentCSVText(
       vpd_kpa: vpd,
       co2_ppm: co2Ppm,
       ppfd,
+      soil_temp_c: soilTempC,
+      soil_moisture_pct: soilMoisture,
+      soil_ec: soilEc,
       raw_temperature: rawTemp,
       raw_temp_unit: tempHeader ? inferredUnit : "unknown",
       raw_payload: rec,
@@ -558,11 +591,59 @@ function isSoilHeader(normalized: string): boolean {
   return /soil/.test(normalized);
 }
 
+interface SoilColumns {
+  temperature: string | null;
+  temperatureUnit: "C" | "F";
+  moisture: string | null;
+  ec: string | null;
+}
+
+/**
+ * Soil headers are matched only against soil metrics, never air ones. A °C
+ * soil temperature column wins over a °F duplicate; the duplicate is still a
+ * recognized column, not an unsupported one.
+ */
+function classifySoilHeaders(soilHeaders: readonly string[]): {
+  soil: SoilColumns;
+  unsupported: string[];
+} {
+  const soil: SoilColumns = { temperature: null, temperatureUnit: "C", moisture: null, ec: null };
+  let tempC: string | null = null;
+  let tempF: string | null = null;
+  const unsupported: string[] = [];
+  for (const h of soilHeaders) {
+    const k = normalizeHeader(h);
+    if (/temp/.test(k)) {
+      const isF = /°f|\(f\)|_f\b|fahrenheit/.test(k);
+      if (isF && tempF == null) tempF = h;
+      else if (!isF && tempC == null) tempC = h;
+      else unsupported.push(h);
+    } else if (soil.moisture == null && /humidity|moisture|vwc|water/.test(k)) {
+      soil.moisture = h;
+    } else if (soil.ec == null && /(^|[^a-z])ec([^a-z]|$)|conductiv/.test(k)) {
+      soil.ec = h;
+    } else {
+      unsupported.push(h);
+    }
+  }
+  soil.temperature = tempC ?? tempF;
+  soil.temperatureUnit = tempC ? "C" : "F";
+  return { soil, unsupported };
+}
+
+function fToCInRange(input: string | undefined): number | null {
+  const f = parseNumber(input ?? "");
+  if (f == null) return null;
+  const c = Math.round(((f - 32) * 5 * 10) / 9) / 10;
+  return c >= -20 && c <= 80 ? c : null;
+}
+
 function detectColumns(headers: string[]): {
   detected: DetectedColumns;
   unsupported: string[];
+  soil: SoilColumns;
 } {
-  const unsupported: string[] = [];
+  const soilHeaders: string[] = [];
   const out: DetectedColumns = {
     timestamp: null,
     date: null,
@@ -579,7 +660,7 @@ function detectColumns(headers: string[]): {
   for (const h of headers) {
     const k = normalizeHeader(h);
     if (isSoilHeader(k)) {
-      unsupported.push(h);
+      soilHeaders.push(h);
       continue;
     }
     if (
@@ -621,7 +702,8 @@ function detectColumns(headers: string[]): {
   }
 
   out.temperature = chooseTemperatureColumn(temperatureCandidates);
-  return { detected: out, unsupported };
+  const { soil, unsupported } = classifySoilHeaders(soilHeaders);
+  return { detected: out, unsupported, soil };
 }
 
 function normalizeHeader(header: string): string {

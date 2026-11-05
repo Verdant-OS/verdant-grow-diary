@@ -29,7 +29,10 @@ import {
   buildTimePreview,
   canConfirmImport,
   cancelImport,
+  excludeUnresolvedTimeRows,
   hasUnresolvedTime,
+  timeBlocksWrite,
+  undoTimeExclusion,
   reduceParseResult,
   reopenTimeZoneChoice,
   rowsToPersist,
@@ -62,8 +65,11 @@ import {
   CSV_TIME_ZONE_PROMPT,
   CSV_TIME_ZONE_SELECT_LABEL,
   buildCsvImportFailureMessage,
+  buildCsvExcludeUnresolvedLabel,
+  buildCsvExcludedRowsNote,
   buildCsvUnresolvedTimeMessage,
   csvTimeZoneNote,
+  csvSoilMeaningNote,
   csvUnsupportedColumnsNote,
   mergeCsvImportFailureReceipts,
   type CsvImportFailureReceipt,
@@ -205,7 +211,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
   const handleConfirm = useCallback(async () => {
     if (inFlightRef.current) return;
     if (!canConfirmImport(state)) return;
-    const rows = rowsToPersist(state.parsed);
+    const rows = rowsToPersist(state.parsed, state.timeExclusion);
     if (rows.length === 0) return;
     inFlightRef.current = true;
     setState((prev) => ({ ...prev, phase: "inserting" }));
@@ -254,8 +260,15 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
 
   const coverage = buildCoveragePreview(state.parsed);
   const timePreview = buildTimePreview(state.parsed);
-  const timeBlocked = hasUnresolvedTime(state.parsed);
+  const timeUnresolved = hasUnresolvedTime(state.parsed);
+  const timeBlocked = timeBlocksWrite(state.parsed, state.timeExclusion);
+  const canOfferExclusion = timeBlocked && (state.parsed?.validRows.length ?? 0) > 0;
   const unsupportedNote = csvUnsupportedColumnsNote(state.parsed?.unsupportedColumns ?? []);
+  const parsedRows = state.parsed?.validRows ?? [];
+  const soilNote = csvSoilMeaningNote(
+    parsedRows.some((r) => r.soil_moisture_pct != null),
+    parsedRows.some((r) => r.soil_ec != null),
+  );
   const windowPreview = buildCsvHistoryWindowPreview(
     state.parsed?.validRows ?? [],
     historyWindow,
@@ -414,6 +427,11 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
                 {coverage.partialMessage}
               </div>
             ) : null}
+            {soilNote ? (
+              <p data-testid="csv-import-soil-meaning" className="text-xs" role="note">
+                {soilNote}
+              </p>
+            ) : null}
             {unsupportedNote ? (
               <p data-testid="csv-import-unsupported-columns" className="text-xs" role="note">
                 {unsupportedNote}
@@ -473,6 +491,43 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
                     </li>
                   ) : null}
                 </ul>
+                {canOfferExclusion ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setState((prev) => excludeUnresolvedTimeRows(prev))}
+                    data-testid="csv-import-time-exclude"
+                  >
+                    {buildCsvExcludeUnresolvedLabel(
+                      timePreview.unresolvedCount,
+                      state.parsed?.validRows.length ?? 0,
+                    )}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            {timeUnresolved && !timeBlocked && state.timeExclusion ? (
+              <div
+                role="status"
+                data-testid="csv-import-time-excluded"
+                className="space-y-1 rounded-md border px-3 py-2 text-xs"
+              >
+                <p>
+                  {buildCsvExcludedRowsNote(
+                    state.timeExclusion.rowNumbers,
+                    state.parsed?.validRows.length ?? 0,
+                  )}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setState((prev) => undoTimeExclusion(prev))}
+                  data-testid="csv-import-time-exclude-undo"
+                >
+                  Undo
+                </Button>
               </div>
             ) : null}
             <ul
@@ -511,6 +566,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
                 state.insertedCount,
                 state.duplicateCount,
                 state.contributedSensorRowCount ?? undefined,
+                state.timeExclusion?.rowNumbers.length ?? 0,
               )}
             </p>
             <p className="text-xs text-muted-foreground" data-testid="csv-import-historical-note">

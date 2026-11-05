@@ -142,8 +142,6 @@ const DEVICE_TABLE: Table = {
   ],
 };
 
-const SOIL_COLUMNS = ["temperature_soil_f(°F)", "temperature_soil(°C)", "humidity_soil", "ec_soil"];
-
 function toCsv(t: Table): string {
   return [t.header, ...t.rows].map((r) => r.join(",")).join("\n") + "\n";
 }
@@ -179,22 +177,41 @@ function meaning(r: ParseEnvironmentCsvResult) {
       vpd_kpa: v.vpd_kpa,
       co2_ppm: v.co2_ppm,
       ppfd: v.ppfd,
+      soil_temp_c: v.soil_temp_c,
+      soil_moisture_pct: v.soil_moisture_pct,
+      soil_ec: v.soil_ec,
     })),
   };
 }
 
 describe("csvParser — soil columns never become air metrics (F2)", () => {
-  it("rejects the soil-only export in its original column order with a soil-specific reason", () => {
+  // Founder decision 2026-11-05: Spider Farmer soil columns import as soil
+  // metrics (soil_temp_c, soil_moisture_pct, ec). They still never become air.
+  it("imports the soil-only export as soil metrics only, in its original column order", () => {
     const r = parseEnvironmentCSVText(toCsv(SOIL_TABLE));
-    expect(r.validRows).toEqual([]);
-    expect(r.errors).toEqual([{ code: "no_sensor_data", message: CSV_SOIL_ONLY_MESSAGE }]);
-    expect([...(r.unsupportedColumns ?? [])].sort()).toEqual([...SOIL_COLUMNS].sort());
+    expect(r.errors).toEqual([]);
+    expect(r.unsupportedColumns).toEqual([]);
+    expect(r.validRows.map((v) => [v.soil_temp_c, v.soil_moisture_pct, v.soil_ec])).toEqual([
+      [25.9, 79.6, 1.13],
+      [25.8, 79.5, 1.13],
+      [25.6, 79.4, 1.11],
+      [25.5, 79.3, 1.12],
+    ]);
+    for (const v of r.validRows) {
+      expect(v).toMatchObject({
+        temperature_c: null,
+        humidity_pct: null,
+        vpd_kpa: null,
+        co2_ppm: null,
+      });
+    }
+    expect(CSV_SOIL_ONLY_MESSAGE).toContain("soil");
   });
 
   it("gives the same result when soil Celsius is moved to the first column", () => {
     const original = parseEnvironmentCSVText(toCsv(SOIL_TABLE));
     const moved = parseEnvironmentCSVText(toCsv(moveToFront(SOIL_TABLE, "temperature_soil(°C)")));
-    expect(moved.validRows).toEqual([]);
+    expect(moved.validRows.every((v) => v.temperature_c === null)).toBe(true);
     expect(meaning(moved)).toEqual(meaning(original));
   });
 
@@ -204,10 +221,13 @@ describe("csvParser — soil columns never become air metrics (F2)", () => {
       "2026-11-03T10:20:00-06:00,25.9\n" +
       "2026-11-03T10:25:00-06:00,25.8\n";
     const r = parseEnvironmentCSVText(csv);
-    expect(r.validRows).toEqual([]);
     expect(r.detectedColumns.temperature).toBeNull();
-    expect(r.errors).toEqual([{ code: "no_sensor_data", message: CSV_SOIL_ONLY_MESSAGE }]);
-    expect(r.unsupportedColumns).toEqual(["temperature_soil(°C)"]);
+    expect(r.errors).toEqual([]);
+    expect(r.unsupportedColumns).toEqual([]);
+    expect(r.validRows.map((v) => [v.temperature_c, v.soil_temp_c])).toEqual([
+      [null, 25.9],
+      [null, 25.8],
+    ]);
   });
 
   it("is order-independent across every rotation and the reverse of the soil schema", () => {
@@ -222,7 +242,7 @@ describe("csvParser — soil columns never become air metrics (F2)", () => {
 });
 
 describe("csvParser — device export keeps air metrics regardless of order (F2)", () => {
-  it("maps air temperature, RH, VPD, CO₂ and PPFD and lists soil columns as not imported", () => {
+  it("maps air temperature, RH, VPD, CO₂ and PPFD, and soil to soil metrics only", () => {
     const r = parseEnvironmentCSVText(toCsv(DEVICE_TABLE));
     expect(r.errors).toEqual([]);
     expect(r.detectedColumns.temperature).toBe("temperature(°C)");
@@ -235,7 +255,9 @@ describe("csvParser — device export keeps air metrics regardless of order (F2)
       co2_ppm: 587,
       ppfd: 973,
     });
-    expect([...(r.unsupportedColumns ?? [])].sort()).toEqual([...SOIL_COLUMNS].sort());
+    expect(r.unsupportedColumns).toEqual([]);
+    expect(r.validRows[0].soil_temp_c).not.toBeNull();
+    expect(r.validRows[0].humidity_pct).not.toBe(r.validRows[0].soil_moisture_pct);
   });
 
   it("produces identical air readings for every rotation and the reverse of the device schema", () => {

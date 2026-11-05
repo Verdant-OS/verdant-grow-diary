@@ -1,8 +1,12 @@
 -- Read-only privilege contract for public.stripe_payment_receipts
 -- (migration 20261104233500_stripe_payment_receipts_billing_privileges.sql).
+--
+-- THIS IS AN OPERATOR VERIFICATION QUERY, NOT A CI SUITE. Nothing in CI runs
+-- it; it lives outside supabase/tests/ so the test-execution manifest does not
+-- count it as a pgTAP lane. Run it after the founder applies the migration.
 -- Writes nothing: every check is a catalog read inside a transaction that
 -- rolls back. Fails with an ASSERT message naming the first broken rule.
--- Run: psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/stripe_payment_receipts_privileges.sql
+-- Run: psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/sql/verify-stripe-payment-receipts-privileges.sql
 
 \set ON_ERROR_STOP on
 BEGIN;

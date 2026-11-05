@@ -2,7 +2,7 @@
  * 20261104233500 removes client privileges on public.stripe_payment_receipts:
  * PUBLIC and anon get nothing, authenticated keeps SELECT for the owner-read
  * policy, service_role keeps all. The runtime contract is
- * supabase/tests/stripe_payment_receipts_privileges.sql (catalog asserts).
+ * scripts/sql/verify-stripe-payment-receipts-privileges.sql (catalog asserts).
  *
  * @source-scan-justified: privileges are a fact about the SQL statements in
  * the migration; there is no resolved value to import, and vitest has no

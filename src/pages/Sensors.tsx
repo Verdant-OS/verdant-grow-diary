@@ -208,6 +208,7 @@ export default function Sensors() {
             ? {
                 tentId: explicitTentId ?? sensorsTentRouteIntent.tentId,
                 requireExactMatch: true,
+                growId: explicitTentId ? null : sensorsTentRouteIntent.growId,
               }
             : intentChanged
               ? sensorsTentRouteIntent

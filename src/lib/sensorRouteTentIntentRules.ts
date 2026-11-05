@@ -18,6 +18,8 @@ import {
 
 export const SENSORS_TENT_INTENT_QUERY_PARAM = "tentId";
 export const SENSORS_TENT_INTENT_MODE_QUERY_PARAM = "tentIntent";
+/** Same key `withGrowId` writes, so grow-scoped CTAs need no second shape. */
+export const SENSORS_GROW_INTENT_QUERY_PARAM = "growId";
 export const SENSORS_TENT_INTENT_MODE_REQUIRED = "required";
 export const SENSORS_TENT_ROUTE = "/sensors";
 
@@ -31,6 +33,16 @@ export interface SensorsTentRouteIntent {
   tentId: string | null;
   /** Fail closed instead of selecting another tent when this target is unavailable. */
   requireExactMatch?: boolean;
+  /**
+   * Grow carried from the page the grower came from. When present, only tents
+   * in this grow can be chosen by the route; a grow with no tents selects none.
+   */
+  growId?: string | null;
+}
+
+/** A tent row as the Sensors page loads it; `growId` scopes route selection. */
+export interface SensorsTentCandidate extends GrowTentSelectionCandidate {
+  growId?: unknown;
 }
 
 export interface BuildSensorsTentRouteOptions {
@@ -43,7 +55,7 @@ export interface ResolveSensorsTentRouteSelectionInput {
   /** Current local selection, usually a grower chip click. */
   currentTentId?: unknown;
   /** Authenticated tent rows loaded by the existing read path. */
-  tents?: readonly (GrowTentSelectionCandidate | null | undefined)[] | null;
+  tents?: readonly (SensorsTentCandidate | null | undefined)[] | null;
 }
 
 export interface SensorsRequiredTentGateInput extends ResolveSensorsTentRouteSelectionInput {
@@ -65,7 +77,7 @@ export function buildSensorsTentRouteIntentKey(
 ): string {
   const semanticIntentKey = `${intent?.tentId ?? ""}\n${
     intent?.requireExactMatch === true ? "required" : "fallback"
-  }`;
+  }${intent?.growId ? `\n${intent.growId}` : ""}`;
   return navigationKey ? `${navigationKey}\n${semanticIntentKey}` : semanticIntentKey;
 }
 
@@ -73,10 +85,13 @@ export function buildSensorsTentRouteIntentKey(
 export function readSensorsTentRouteIntent(
   search: SensorsTentIntentSearch | null | undefined,
 ): SensorsTentRouteIntent {
+  // Grow ids are persisted UUIDs too; the same normalizer fails closed.
+  const growId = normalizePersistedGrowTentId(search?.get(SENSORS_GROW_INTENT_QUERY_PARAM));
   return {
     tentId: normalizePersistedGrowTentId(search?.get(SENSORS_TENT_INTENT_QUERY_PARAM)),
     requireExactMatch:
       search?.get(SENSORS_TENT_INTENT_MODE_QUERY_PARAM) === SENSORS_TENT_INTENT_MODE_REQUIRED,
+    ...(growId ? { growId } : {}),
   };
 }
 
@@ -109,7 +124,10 @@ export function buildSensorsTentRouteHref(
 export function resolveSensorsTentRouteSelection(
   input: ResolveSensorsTentRouteSelectionInput,
 ): string | null {
-  const tents = input.tents ?? [];
+  const scopedGrowId = normalizePersistedGrowTentId(input.intent?.growId);
+  const tents = (input.tents ?? []).filter(
+    (tent) => scopedGrowId === null || normalizePersistedGrowTentId(tent?.growId) === scopedGrowId,
+  );
   const requestedTentId = normalizePersistedGrowTentId(input.intent?.tentId);
   const requestedTentIsAvailable =
     requestedTentId !== null &&
@@ -147,8 +165,15 @@ export function buildSensorsRequiredTentGate(
     input.explicitTentId === null || input.explicitTentId === undefined
       ? input.intent.tentId
       : input.explicitTentId;
+  // A grower's explicit pick may leave the carried grow; only the route's own
+  // target is held to it.
+  const explicitPick = desiredTentId !== input.intent.tentId;
   const requiredSelectionId = resolveSensorsTentRouteSelection({
-    intent: { tentId: normalizePersistedGrowTentId(desiredTentId), requireExactMatch: true },
+    intent: {
+      tentId: normalizePersistedGrowTentId(desiredTentId),
+      requireExactMatch: true,
+      growId: explicitPick ? null : input.intent.growId,
+    },
     currentTentId: null,
     tents: input.tents,
   });

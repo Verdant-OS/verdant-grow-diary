@@ -224,7 +224,11 @@ export function reconcileSensorsSelection(
     explicitSelection?.intentKey === input.intentKey ? explicitSelection.tentId : null;
   const intent =
     input.intent?.requireExactMatch === true
-      ? { tentId: explicitId ?? input.intent.tentId, requireExactMatch: true }
+      ? {
+          tentId: explicitId ?? input.intent.tentId,
+          requireExactMatch: true,
+          growId: explicitId ? null : input.intent.growId,
+        }
       : intentChanged
         ? input.intent
         : null;

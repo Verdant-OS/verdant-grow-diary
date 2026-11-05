@@ -1,7 +1,7 @@
 # GROK-ULTRA-FLEET
 
 ```text
-TASK GROK-ULTRA-FLEET  priority: other  status: OPEN
+TASK GROK-ULTRA-FLEET  priority: other  status: CLOSED
 goal: Record the rebuilt Ultra Grok Bot fleet in the repo: the Ultra Relay seat (Roots) in the roster, one description file per Ultra seat, a secret-free fleet doc and manifest, and the [YES] / [HANDOFF] tags in OWNERSHIP 4.2, so any cold agent can rebuild the account and resume a dark bot's work from GitHub alone.
 why: On 2026-11-05 Matthew deleted every Ultra bot and started fresh. Grok Bot usage is exhausted per account, and bot memory is per bot, so continuity must live in the repo, not in a bot. Matthew's decisions (10:17-10:23 CT): Roots holds Ultra Relay; Roots posts his yeses on PRs verbatim; bots wake only on repository triggers.
 branch: claude/grok-ultra-fleet-setup
@@ -9,9 +9,9 @@ base: verdant-grow-diary
 checkout: git fetch origin claude/grok-ultra-fleet-setup verdant-grow-diary && git switch claude/grok-ultra-fleet-setup && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2897 (draft)
 head_sha: ea2448bae2b5a1defb6bce05a5dd03d48fc23023 is the validated docs commit (observed 2026-11-05 10:29 CT). The branch tip is this handoff stamp whose parent is that SHA; confirm with git rev-parse origin/claude/grok-ultra-fleet-setup
-state: review (ready for review since 2026-11-05 11:34 CT by cheekhimself)
-current_step: Codex code review at cfe22b27 posted 4 P2 (R5 self-trigger loop, Fixer push-before-handoff order, R4 filter vs 4.2 tag format, R1 unquoted scope). All four fixed in the next commit; head moves, so the prior [YES] and any verdict at cfe22b27 are historical. Required CI re-runs at the new head.
-next_action: Coordinator routes an eligible Main reviewer with [ROUTE] #N @<head> (docs-only, non-gated except roster + OWNERSHIP which are governance text); reviewer posts a GitHub review at that commit
+state: merged. PR #2897 merged 2026-11-05 18:35:21Z as merge commit 66134ba4ac5aed841ef882e1537a5a315e809a01 (parents def965e1c055cb0932f1134e7b5a01824c154e93 and the PR head 3df14bc310f9f6316e1b48080f2c3e1c4ca6cd97; a merge, not a squash, per git cat-file), merged_by cheekhimself
+current_step: CLOSED. Last open step: queued 12:27 CT and merged 12:35 CT by cheekhimself with 35/35 required checks green at 3df14bc3 and Matthew's [YES] on the PR, but with no APPROVE review at that head and no [ROUTE]/[PRECHECK]/[MERGE] receipts; whether the actor was Matthew or a Main seat is NOT_MEASURED. Recorded, not hidden.
+next_action: none; closed. Follow-ups live in their own tasks: roster change for OG Kush's retirement (Roots takes Coordinator; Steward Backup holder is Matthew's open decision), Q7 owner-only [YES] login, T5a and T9-T12 fleet receipts.
 post_merge_check: NOT_APPLICABLE (docs only); the fleet itself is NOT_MEASURED until T5a, T9-T12 in docs/agents/grok-bot-fleet.md have dated receipts
 active_writer: Claude session_017UoYKyV8KsaUHw4dJMbg16 on claude/grok-ultra-fleet-setup
 decisions: Five Ultra bots, not more (usage pool is per account; extra bots add parallelism, not resilience). Handoff packet is the existing per-task file with head_sha, next_action, commands, session_state mandatory at every stop point. One scheduled routine on the account; all others GitHub-event triggered. Verifier seat is phase 2 and has no holder. The eighteen sentinel-versioned files are untouched, so no version bump.
@@ -29,5 +29,5 @@ reviewer_sha: cfe22b276b81ab63460691c387a4de0247e20f36 (Codex 4xP2, superseded)
 session_state: Claude Code remote session; no cloud agent; no routine; pending human decision: none for the docs
 claimed_by: Claude session_017UoYKyV8KsaUHw4dJMbg16, 2026-11-05 10:24 CT
 owner: Claude (this session); default inheritor OG Kush
-last_updated: 2026-11-05 11:44 CT, by Claude
+last_updated: 2026-11-05 12:59 CT, by Claude
 ```

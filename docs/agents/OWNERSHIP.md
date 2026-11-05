@@ -272,6 +272,8 @@ current actor, reviewer, repair-only role and hold are the named assignment abov
   [SPEC]     OWNERSHIP.md updated @sha — <what changed>, next: <owner + action>
   [READY]    Connector <name> live — next: <owner + action>
   [HOLD]     #N
+  [YES]      #N @sha scope: "<Matthew's words, verbatim>" — relayed by <Ultra Relay holder> from Matthew Cheek, <YYYY-MM-DD HH:MM CT>   (Ultra Relay; the only form in which a chat yes counts)
+  [HANDOFF]  #N @sha CURRENT | STALE (<fields>) | LAPSED -> Coordinator   (Ultra Relay; handoff-file state)
   [ESCALATE] <one line>   (only the four items in section 1)
   ```
 - **Rules.**
@@ -279,6 +281,7 @@ current actor, reviewer, repair-only role and hold are the named assignment abov
   - Reply only when it adds something.
   - A new head supersedes its review request/claim and invalidates the old verdict; it does not release the implementation writer's claim.
   - No secrets or production data in the channel.
+  - Parse rule (2026-11-05): the first token is the tag, the second `#N`, the third `@<40-hex>`; a line that fails this is prose and triggers nothing; a tag on a PR whose head no longer equals `@sha` is history, never an instruction. A `[YES]` binds to one item at one head; a new head needs a new `[YES]`.
 - **Digest.** GDP posts an end-of-day digest. Only `[ESCALATE]` lines notify Matthew right away.
 
 ### 4.3 Available reviewer routing and request ledger (Codex)

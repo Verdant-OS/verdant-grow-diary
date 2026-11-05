@@ -18,18 +18,15 @@
 import type { AiDoctorReportInput } from "./aiDoctorReportRules";
 import { redactReportLine, buildPerMetricStatusTable } from "./aiDoctorReportRules";
 import { assertExportHeadersSafe, assertExportSafe } from "./exportRedactionRules";
+import { escapeCsvCell } from "./csvCellEscapeRules";
 
 export type CsvCell = string | number | null | undefined;
 
-/** Escape a single CSV cell — handles commas, quotes, newlines, CR. */
+/** Escape a single CSV cell — redacts, neutralises formula triggers, quotes commas/quotes/newlines. */
 export function csvEscape(value: CsvCell): string {
   if (value == null) return "";
-  const s = typeof value === "string" ? value : String(value);
-  const redacted = redactReportLine(s);
-  if (/[",\r\n]/.test(redacted)) {
-    return `"${redacted.replace(/"/g, '""')}"`;
-  }
-  return redacted;
+  if (typeof value === "number") return escapeCsvCell(value);
+  return escapeCsvCell(redactReportLine(String(value)));
 }
 
 export const AI_DOCTOR_EVIDENCE_CSV_COLUMNS: readonly string[] = [

@@ -11,9 +11,9 @@ pr: see the draft PR linked from this branch
 head_sha: see the branch tip / PR head; verify before resuming
 state: pushed draft; independent exact-head review requested
 current_step: draft PR open; required CI and independent review pending
-next_action: an eligible independent reviewer (not session_017UoYKvcBMuMR8Aor8Egv, the author; not session_017UoYKwtXgN34MaeSUiEsYz or session_017UoYKypTBCTMSkumzPzSJa) reviews the exact PR head per OWNERSHIP.md §4.3
+next_action: an eligible independent reviewer (not session_017UoYKvfBUjcuMR8Aor8Egv, the author; not session_017UoYKwtXgN34MaeSUiEsYz or session_017UoYKypTBCTMSkumzPzSJa) reviews the exact PR head per OWNERSHIP.md §4.3
 post_merge_check: once live /version.json reports the merge SHA, import a synthetic CSV with humidity_high_limit before humidity into a verified disposable fixture tent on https://verdantgrowdiary.com; confirm the stored humidity is the observation and the preview lists the limit as not imported. NOT_MEASURED until then.
-active_writer: Claude session_017UoYKvcBMuMR8Aor8Egv
+active_writer: Claude session_017UoYKvfBUjcuMR8Aor8Egv
 decisions:
   - One added pattern in isTargetHeader (src/lib/csvParser.ts): /limit|alarm|alert|threshold|trigger/ as a substring. It reuses #2908's set-aside path, so these columns land in unsupportedColumns in file order and the existing "Not imported" note names them. No copy change.
   - min/max/avg are NOT excluded (acceptance 3). No evidence or decision to treat them as configuration. Note: with humidity_max placed before humidity, first-match still saves the max; that ordering behavior is unchanged and out of scope.
@@ -25,12 +25,12 @@ files_touched: src/lib/csvParser.ts; src/test/csv-parser-limit-threshold-exclusi
 files_remaining: none
 blockers: none in code
 open_questions: (0) Already-saved rows: limit values imported before this lands stay stored as readings; finding them needs a production read (NOT_MEASURED, not attempted). (1) First-match ordering for aggregate columns (max before the plain reading) is unchanged; needs Matthew's decision if it should change.
-gotchas: tsc needs NODE_OPTIONS=--max-old-space-size=8192. node_modules installed with bun install --frozen-lockfile (succeeded; no lockfile change).
+gotchas: commit 321cf1ad carries a mistyped Claude-Session trailer (session_017UoYKvcBMuMR8Aor8Egv); the author session is session_017UoYKvfBUjcuMR8Aor8Egv. tsc needs NODE_OPTIONS=--max-old-space-size=8192. node_modules installed with bun install --frozen-lockfile (succeeded; no lockfile change).
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2908 (merged as 01f30d11; target/setpoint exclusion); docs/agents/handoffs/CSV-TARGET-SETPOINT-EXCLUSION.md
-reviewer_seat: requested (see the PR's [ROUTE] comment)
+reviewer_seat: fresh Claude review session session_017UoYKxXatS9j3bPvWqjDH4 (created by the author with spec and diff only); state requested
 reviewer_sha: none yet
 session_state: no production access used. Check-in trig_01Ai7H8CduzUBJJf566fXZEC fired and is done.
-claimed_by: Claude session_017UoYKvcBMuMR8Aor8Egv, 2026-11-06 02:20 UTC
+claimed_by: Claude session_017UoYKvfBUjcuMR8Aor8Egv, 2026-11-06 02:20 UTC
 owner: Claude
 last_updated: 2026-11-06 02:35 UTC, by Claude
 ```

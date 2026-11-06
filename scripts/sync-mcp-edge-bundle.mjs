@@ -85,7 +85,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   if (!["--check", "--write"].includes(mode) || process.argv.length > 3)
     throw new Error("Usage: node scripts/sync-mcp-edge-bundle.mjs [--check|--write]");
   const existing = (await readFile(output, "utf8")).replace(/\r\n/g, "\n");
-  if (!existing.startsWith(banner))
+  if (!existing.startsWith(banner) && !existing.startsWith(legacyBanner))
     throw new Error("Refusing to overwrite an unrecognized MCP bundle.");
   const code = await generateMcpEdgeBundle();
   if (mode === "--write" && existing !== code) await writeFile(output, code, "utf8");

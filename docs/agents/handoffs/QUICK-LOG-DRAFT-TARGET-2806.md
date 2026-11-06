@@ -7,8 +7,8 @@ why: Issue #2806. One sessionStorage slot held every target. Opening Quick Log w
 branch: cursor/quick-log-draft-target-d610
 base: verdant-grow-diary
 checkout: git fetch origin cursor/quick-log-draft-target-d610 verdant-grow-diary && git switch cursor/quick-log-draft-target-d610
-pr: created with this push; read the PR URL from the branch
-head_sha: 138e21e43c28311de0886cf933f6642a4a3318d0 is the fix. Review the branch tip of origin/cursor/quick-log-draft-target-d610 (this handoff stamp is the child of that fix). Confirm with git rev-parse.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2918 draft
+head_sha: 3724148f8d52ba79ef2e47cd0ec08de241d672a8 is the tip that opened the draft PR. The fix is 138e21e43c28311de0886cf933f6642a4a3318d0. A later handoff stamp moves the tip; confirm with git rev-parse origin/cursor/quick-log-draft-target-d610.
 state: implemented, draft PR
 current_step: per-target session slots, exact-match restore, leave warning, regression tests
 next_action: independent exact-head review after required CI is green at the pushed SHA. Do not merge. No production write.

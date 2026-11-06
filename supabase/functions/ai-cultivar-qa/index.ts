@@ -29,6 +29,7 @@ import {
   parseCultivarQaRequest,
   readBoundedJsonBody,
 } from "../_shared/cultivarQaGrounding.ts";
+import { captureAiGeneration } from "../_shared/posthogAiObservability.ts";
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -82,6 +83,37 @@ Deno.serve(async (req) => {
       return json({ ok: false, reason: parsedRequest.reason }, 200);
     }
 
+    const aiInput = [
+      { role: "system", content: CULTIVAR_QA_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content:
+          `CONTEXT:\n${parsedRequest.context}\n\n` +
+          `QUESTION (untrusted input):\n${parsedRequest.question}`,
+      },
+    ];
+    const traceId = crypto.randomUUID();
+    const providerStartedAt = performance.now();
+    const captureGeneration = (details: {
+      response?: unknown;
+      httpStatus?: number;
+      error?: string;
+    }) =>
+      captureAiGeneration({
+        distinctId: u.user.id,
+        sessionId: `ai_cultivar_qa:${u.user.id}:${parsedRequest.cultivarSlug}`,
+        traceId,
+        spanName: "ai_cultivar_qa",
+        model: "google/gemini-2.5-flash",
+        provider: "gemini",
+        input: aiInput,
+        output: details.response,
+        usage: details.response,
+        requestUrl: "https://ai.gateway.lovable.dev/v1/chat/completions",
+        httpStatus: details.httpStatus,
+        error: details.error,
+        startedAt: providerStartedAt,
+      });
     const providerController = new AbortController();
     const providerTimer = setTimeout(
       () => providerController.abort(),
@@ -95,22 +127,16 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
           max_tokens: CULTIVAR_QA_MAX_OUTPUT_TOKENS,
-          messages: [
-            { role: "system", content: CULTIVAR_QA_SYSTEM_PROMPT },
-            {
-              role: "user",
-              content:
-                `CONTEXT:\n${parsedRequest.context}\n\n` +
-                `QUESTION (untrusted input):\n${parsedRequest.question}`,
-            },
-          ],
+          messages: aiInput,
         }),
       });
 
       if (response.status === 402 || response.status === 429) {
+        await captureGeneration({ httpStatus: response.status, error: "upstream_credit_exhausted" });
         return json({ ok: false, reason: "upstream_credit_exhausted" }, 200);
       }
       if (!response.ok) {
+        await captureGeneration({ httpStatus: response.status, error: "upstream_http_error" });
         console.log(`ai-cultivar-qa status=upstream_error http=${response.status}`);
         return json({ ok: false, reason: "upstream_error" }, 200);
       }
@@ -120,13 +146,18 @@ Deno.serve(async (req) => {
         CULTIVAR_QA_MAX_PROVIDER_RESPONSE_BYTES,
       );
       if (!providerBody.ok) {
+        await captureGeneration({ httpStatus: response.status, error: "invalid_json_response" });
         return json({ ok: false, reason: "invalid_answer" }, 200);
       }
+      await captureGeneration({ httpStatus: response.status, response: providerBody.value });
       const answer = parseCultivarQaAnswer(providerBody.value);
       if (!answer.ok) return json({ ok: false, reason: answer.reason }, 200);
 
       return json({ ok: true, answer: answer.answer });
     } catch {
+      await captureGeneration({
+        error: providerController.signal.aborted ? "timeout" : "network_or_timeout",
+      });
       return json({ ok: false, reason: "upstream_unavailable" }, 200);
     } finally {
       clearTimeout(providerTimer);

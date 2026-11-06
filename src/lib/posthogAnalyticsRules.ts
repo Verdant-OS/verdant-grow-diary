@@ -31,7 +31,13 @@ export type PostHogStartup =
   | { enabled: true; key: string; apiHost: string };
 
 export type PostHogProductEvent = {
-  name: "user_signed_up" | "grow_created" | "plant_created" | "log_created" | "sensor_csv_imported";
+  name:
+    | "user_signed_up"
+    | "grow_created"
+    | "tent_created"
+    | "plant_created"
+    | "log_created"
+    | "sensor_csv_imported";
   properties: Record<string, string | number>;
 };
 
@@ -135,6 +141,8 @@ export function mapFunnelEventToPostHog(
       return [{ name: "user_signed_up", properties: {} }];
     case "grow_created":
       return [{ name: "grow_created", properties: {} }];
+    case "tent_created":
+      return [{ name: "tent_created", properties: {} }];
     case "plant_created":
       return [{ name: "plant_created", properties: {} }];
     case "quick_log_saved":
@@ -201,6 +209,7 @@ const PRODUCT_PROPERTY_KEYS: Record<string, readonly string[]> = {
   $web_vitals: ["$pathname", "$current_url", ...WEB_VITALS_VALUE_KEYS],
   user_signed_up: [],
   grow_created: [],
+  tent_created: [],
   plant_created: [],
   log_created: ["source"],
   sensor_csv_imported: ["row_count"],
@@ -244,6 +253,11 @@ export function buildPostHogInitOptions(apiHost: string): Partial<PostHogConfig>
     opt_out_persistence_by_default: true,
     disable_surveys: true,
     enable_recording_console_log: false,
+    logs: {
+      captureConsoleLogs: false,
+      serviceName: "verdant-grow-diary-web",
+      environment: "production",
+    },
     capture_performance: { web_vitals: true, web_vitals_attribution: false, network_timing: false },
     persistence: "localStorage+cookie",
     property_denylist: ["email", "$email", "name", "note", "notes", "diary"],

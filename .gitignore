@@ -91,3 +91,4 @@ rea-out/
 *.apk
 *.apks
 *.xapk
+.env

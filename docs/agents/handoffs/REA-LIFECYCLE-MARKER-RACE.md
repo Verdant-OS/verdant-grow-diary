@@ -1,7 +1,8 @@
 # REA-LIFECYCLE-MARKER-RACE
 
 ```text
-TASK REA-LIFECYCLE-MARKER-RACE  priority: other  status: OPEN
+TASK REA-LIFECYCLE-MARKER-RACE  priority: other  status: CLOSED
+closed: merged. #2837 merged into verdant-grow-diary on 2026-11-04 as 1c5fa6cc6c3247c0c45c3845f2abacef425bed7d (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Remove the read race in scripts/rea/tests/lifecycle.test.mjs that intermittently fails the required "Lint, typecheck, test, build" check.
 why: The test waited only for the marker file to exist, then read once; the fixture (fixtures/stubborn-child.mjs) rewrites it every 10 ms with writeFileSync, which truncates first, so a read could see ''. Failed required CI on #2818 (job 126276128198). Reproduced locally 1/60.
 branch: claude/rea-lifecycle-marker-race
@@ -29,5 +30,5 @@ reviewer_sha: 851fbd1c3fb46b6d4297f6ed4cf37c844bdfc124 (superseded by the docs-o
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03 CT
 owner: Claude
-last_updated: 2026-11-03 22:50 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-03 22:50 CT, by Claude)
 ```

@@ -1,7 +1,8 @@
 # CLOSE-STALE-GROK-HANDOFF-BLOCKS
 
 ```text
-TASK CLOSE-STALE-GROK-HANDOFF-BLOCKS  priority: other  status: OPEN
+TASK CLOSE-STALE-GROK-HANDOFF-BLOCKS  priority: other  status: CLOSED
+closed: merged. #2862 merged into verdant-grow-diary on 2026-11-04 as afc04fa36f3eca4afd550b0a8a60e2ed9df1063b (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: close twelve Grok-owned handoff tasks whose PRs already merged or closed, so no agent reads their OPEN blocks in HANDOFF_LOG.md as live claims
 why: Matthew, 2026-11-04 ~06:40 UTC, in Claude session_017UoYKv4arxJYBMGNNh1bvN: "take over all of Grok's work and close it out"; Grok is no longer active. Every Grok PR is merged or closed, except #2751 and #2752, which Claude session_017UoYKvcvohNxhmW342Lieo holds
 branch: claude/close-stale-grok-handoff-blocks
@@ -29,5 +30,5 @@ reviewer_sha: f1d97858214e8e3325892fc5f37983d7e9fb74cd (PASS; superseded by this
 session_state: Claude session_017UoYKv4arxJYBMGNNh1bvN; no paused workflows
 claimed_by: Claude session_017UoYKv4arxJYBMGNNh1bvN, 2026-11-04
 owner: Claude session_017UoYKv4arxJYBMGNNh1bvN
-last_updated: 2026-11-04, by Claude session_017UoYKv4arxJYBMGNNh1bvN
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04, by Claude session_017UoYKv4arxJYBMGNNh1bvN)
 ```

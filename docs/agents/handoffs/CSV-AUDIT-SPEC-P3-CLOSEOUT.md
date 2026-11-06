@@ -1,7 +1,8 @@
 # CSV-AUDIT-SPEC-P3-CLOSEOUT
 
 ```text
-TASK CSV-AUDIT-SPEC-P3-CLOSEOUT  priority: other  status: OPEN
+TASK CSV-AUDIT-SPEC-P3-CLOSEOUT  priority: other  status: CLOSED
+closed: merged. #2913 merged into verdant-grow-diary on 2026-11-06 as d7f8ba85735dafaa2be550772a422777f66dcf2d (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Close the CSV-TARGET-ROWS-AUDIT-SPEC handoff after #2912 merged, and fix the two non-blocking P3s from review 5796150535 (handoff pin wording; a count-only per-pattern query so the shared receipt never needs header text).
 why: Matthew, 2026-11-06, assigned this docs-only slice. AGENTS.md §12 requires a merged task's file to be CLOSED the same day with reason and final SHA. P3-2 matters to growers' privacy: the receipt asked for per-pattern counts that only header text (restricted to the console) could give.
 branch: claude/csv-audit-spec-p3-closeout
@@ -34,5 +35,5 @@ reviewer_sha: none yet
 session_state: no production access used. Synthetic PGlite only. No live /version.json read this session.
 claimed_by: Claude session_017UoYKwTGex9Q7PDBtbQr4L, 2026-11-06 06:15 UTC
 owner: Claude
-last_updated: 2026-11-06 06:15 UTC, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-06 06:15 UTC, by Claude)
 ```

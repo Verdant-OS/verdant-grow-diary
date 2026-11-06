@@ -1,7 +1,8 @@
 # AI-DOCTOR-OFFLINE-EVAL
 
 ```text
-TASK AI-DOCTOR-OFFLINE-EVAL  priority: other  status: OPEN
+TASK AI-DOCTOR-OFFLINE-EVAL  priority: other  status: CLOSED
+closed: merged. #2903 merged into verdant-grow-diary on 2026-11-05 as 1b52bc42f32baaead5a0030d781dd80805928cc3 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: An offline eval harness and 40 synthetic cases that measure the current AI Doctor route (Gemini, gemini-3-flash-preview, standard tier) against the pass thresholds Matthew approved on 2026-11-05, so the provider decision in the AI Doctor provider-path ADR (Option C, "eval first") rests on data.
 why: The ADR (claude.ai Project doc claude/adr/ADR-DRAFT-ai-doctor-provider-path-2026-10-07.md, independently reviewed PASS 2026-11-05) defers the provider decision until an eval exists. No per-run quality, latency or cost baseline exists today; the edge function does not persist provider usage.
 branch: claude/ai-doctor-offline-eval
@@ -41,5 +42,5 @@ links: claude.ai Project docs claude/adr/ADR-DRAFT-ai-doctor-provider-path-2026-
 reviewer: NOT_ASSIGNED — needs an eligible independent reviewer under OWNERSHIP.md §4.3 (not this session)
 reviewed_sha: none
 session_state: no routines armed; no paused workflows; pending human decisions: eval key (Matthew); reviewer routing
-last_updated: 2026-11-05
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-05)
 ```

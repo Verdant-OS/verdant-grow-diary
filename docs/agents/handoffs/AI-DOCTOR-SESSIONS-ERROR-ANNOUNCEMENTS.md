@@ -1,7 +1,8 @@
 # AI-DOCTOR-SESSIONS-ERROR-ANNOUNCEMENTS
 
 ```text
-TASK AI-DOCTOR-SESSIONS-ERROR-ANNOUNCEMENTS  priority: other  status: OPEN
+TASK AI-DOCTOR-SESSIONS-ERROR-ANNOUNCEMENTS  priority: other  status: CLOSED
+closed: merged. #2855 merged into verdant-grow-diary on 2026-11-04 as 8ac41be75922e2e894eed551361a9d03ec34ad87 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Error messages on the AI Doctor sessions pages announce themselves to screen readers: the detail page copy-review and copy-link failures, and the index page saved-view save and import errors.
 why: Grower UX audit 2026-11-03 finding 12 (screen reader), fourth batch after #2845, #2850 and #2852. On the detail page the copy buttons carry a fixed aria-label and no live region, so "Copy failed" was never heard; the saved-view errors had no role.
 branch: claude/error-announcements-ai-doctor
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
 owner: Claude
-last_updated: 2026-11-03 22:35 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-03 22:35 CT, by Claude)
 ```

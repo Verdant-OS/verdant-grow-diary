@@ -1,7 +1,8 @@
 # CSV-LIMIT-HANDOFF-CLOSEOUT
 
 ```text
-TASK CSV-LIMIT-HANDOFF-CLOSEOUT  priority: other  status: OPEN
+TASK CSV-LIMIT-HANDOFF-CLOSEOUT  priority: other  status: CLOSED
+closed: merged. #2914 merged into verdant-grow-diary on 2026-11-06 as 805c3cd8e33ec6dcbb9137019e25442842e94b99 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Close docs/agents/handoffs/CSV-LIMIT-THRESHOLD-EXCLUSION.md now that #2911 merged, so a cold agent does not treat merged work as in flight.
 why: Matthew, 2026-11-06, chose "Close both via draft PR" after an audit found both CSV handoffs still OPEN after merge. AGENTS.md §12: a merged task's file is CLOSED the same day with reason and final SHA. The #2912 half is already done by draft #2913 (session_017UoYKwTGex9Q7PDBtbQr4L), so this slice covers only #2911.
 branch: claude/practical-johnson-6funir
@@ -31,5 +32,5 @@ reviewer_sha: none yet
 session_state: no production access used. PR activity subscription on #2914 held by session_017UoYKyU27JPpmSh3Cbj7EK.
 claimed_by: Claude session_017UoYKyU27JPpmSh3Cbj7EK, 2026-11-06
 owner: Claude
-last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK)
 ```

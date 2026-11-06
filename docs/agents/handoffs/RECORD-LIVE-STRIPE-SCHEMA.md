@@ -1,7 +1,8 @@
 # RECORD-LIVE-STRIPE-SCHEMA
 
 ```text
-TASK RECORD-LIVE-STRIPE-SCHEMA  priority: P2  status: OPEN
+TASK RECORD-LIVE-STRIPE-SCHEMA  priority: P2  status: CLOSED
+closed: merged. #2873 merged into verdant-grow-diary on 2026-11-04 as 7e4d79dfaf3f2a9e322d4b3dcf646e6839ea4f39 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: add one catalog-guarded migration that records the Stripe billing schema production already carries, so a database built from this repository matches production; it must change nothing when run against production.
 why: production knkwiiywfkbqznbxwqfh has subscriptions.billing_provider, stripe_subscription_id, stripe_customer_id, nullable paddle ids, subscriptions_provider_check (billing_provider), subscriptions_provider_identity_check, subscriptions_stripe_upsert_key, the partial unique index subscriptions_stripe_identity, the ai_credit_grants stripe_credit_pack source and anchor rules, table stripe_payment_receipts with RLS and policy stripe_receipts_owner_read, and function stripe_record_credit_payment. No migration on verdant-grow-diary or on lovable-sync-1793724974 defines any of them. Matthew chose "keep frozen and port" for that branch and then "record it" for this drift, 2026-11-04 12:34 and 12:37 CT. This slice is step one of the port, the schema record. Code port is a later slice.
 branch: claude/record-live-stripe-schema
@@ -29,5 +30,5 @@ reviewer_sha: f51d08551c522031f39e5aedb8043b00880f880d (Reviewer D, REQUEST_CHAN
 session_state: Claude session_017UoYKvX8JN1gmRFpibsDqQ holds the branch; no paused workflows; pending human decisions listed under blockers and open_questions
 claimed_by: Claude session_017UoYKvX8JN1gmRFpibsDqQ, 2026-11-04 18:55 UTC
 owner: Claude session_017UoYKvX8JN1gmRFpibsDqQ
-last_updated: 2026-11-04 23:05 UTC, by Claude session_017UoYKvX8JN1gmRFpibsDqQ (repair for review 5777101717)
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04 23:05 UTC, by Claude session_017UoYKvX8JN1gmRFpibsDqQ (repair for review 5777101717))
 ```

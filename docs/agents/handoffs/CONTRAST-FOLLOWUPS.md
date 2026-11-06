@@ -1,7 +1,8 @@
 # CONTRAST-FOLLOWUPS
 
 ```text
-TASK CONTRAST-FOLLOWUPS  priority: other  status: OPEN
+TASK CONTRAST-FOLLOWUPS  priority: other  status: CLOSED
+closed: merged. #2874 merged into verdant-grow-diary on 2026-11-04 as 57ed5a2904d5d47c49958d839db1c5c1d8b9260b (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Close the post-merge P3 review findings on #2840 (muted opacity floor) and #2827 (contrast token spec).
 why: Both PRs merged on 2026-11-04 with P3s from Reviewers A and B. Two of them were real. First, the #2840 guard still skipped PlantManualSensorFreshnessCard.tsx through a PENDING entry, so that file was unchecked. Second, the #2827 spec's white-on-red ratios used pure white instead of the 98% token, and it described a bg-destructive mapping that #2839 did not ship.
 branch: claude/contrast-followups
@@ -37,5 +38,5 @@ reviewer_sha: none yet
 session_state: none
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04 20:15 UTC
 owner: Claude session_017UoYKwwZkbqmWvtCRMw1DZ
-last_updated: 2026-11-04 14:15 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04 14:15 CT, by Claude)
 ```

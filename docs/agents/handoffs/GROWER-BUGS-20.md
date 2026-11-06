@@ -1,7 +1,8 @@
 # GROWER-BUGS-20
 
 ```text
-TASK GROWER-BUGS-20  priority: P1  status: OPEN
+TASK GROWER-BUGS-20  priority: P1  status: CLOSED
+closed: merged. #2857 merged into verdant-grow-diary on 2026-11-04 as 7042edefdc9d84fe37cd0a873d5ca8ba03871fe5 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: grower bug brief 2026-11-03 item 20 - test/QA tents and grows live in a real account; stop test tooling from writing to real accounts; list, do not delete
 why: e2e/lib/productionQuickLogFixtureRules.ts pinned the production Quick Log write smoke to cheekhimself@gmail.com (#2478, 2026-10-24), contradicting docs/production-only-verification-runbook.md:8 (#1971, 2026-10-27: disposable test account only, never the owner's accounts). The four named tents are created by no repo spec or script (hand-driven QA/audit sessions)
 branch: claude/grower-bugs-20 (founder-named, 2026-11-04)
@@ -27,5 +28,5 @@ reviewer_sha: none yet
 session_state: Claude session also watches PRs #2820, #2828, #2842, #2844, #2846, #2851
 claimed_by: Claude, 2026-11-04 04:30 UTC
 owner: Claude
-last_updated: 2026-11-04 19:40 UTC, by Claude session_017UoYKyhNGum4qmfYdoNRLr
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04 19:40 UTC, by Claude session_017UoYKyhNGum4qmfYdoNRLr)
 ```

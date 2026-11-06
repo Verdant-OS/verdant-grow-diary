@@ -11,9 +11,7 @@ const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8
 };
 
 type ViteConfigExport =
-  | UserConfig
-  | Promise<UserConfig>
-  | ((env: ConfigEnv) => UserConfig | Promise<UserConfig>);
+  UserConfig | Promise<UserConfig> | ((env: ConfigEnv) => UserConfig | Promise<UserConfig>);
 
 function flattenPlugins(plugins: unknown): Array<{ name?: string }> {
   if (!Array.isArray(plugins)) return [];
@@ -47,7 +45,9 @@ describe("Lovable MCP codegen host safety", () => {
     const mod = await import("../../vite.config");
     const exported = mod.default as ViteConfigExport;
     const env: ConfigEnv = { command: "serve", mode: "development", isSsrBuild: false };
-    const resolved = await Promise.resolve(typeof exported === "function" ? exported(env) : exported);
+    const resolved = await Promise.resolve(
+      typeof exported === "function" ? exported(env) : exported,
+    );
     const pluginNames = flattenPlugins(resolved.plugins).map((plugin) => plugin.name ?? "");
 
     expect(pluginNames.some((name) => /mcp/i.test(name))).toBe(false);

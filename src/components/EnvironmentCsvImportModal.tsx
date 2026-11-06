@@ -95,6 +95,7 @@ export interface EnvironmentCsvImportModalProps {
     failureReason?: CsvImportFailureReason;
     error: string | null;
   }>;
+  onUndoImport?: () => Promise<{ error: string | null }>;
   /**
    * Optional post-import handoff destination supplied by the launcher
    * from its own trusted context (assigned plant, else selected tent).
@@ -144,6 +145,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
     open,
     onOpenChange,
     onConfirm,
+    onUndoImport,
     viewHistoryHref = null,
     addCurrentReadingHref = null,
     historyWindow = UNKNOWN_CSV_HISTORY_WINDOW,
@@ -159,6 +161,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
   // Bumped on every new parse, file choice and reset; a stale parse never lands.
   const parseGenRef = useRef(0);
   const [zoneChoice, setZoneChoice] = useState("");
+  const [undoing, setUndoing] = useState(false);
   const zoneSelectId = useId();
   const { deviceZone, zones } = useMemo(listTimeZones, []);
 
@@ -256,6 +259,27 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
       inFlightRef.current = false;
     }
   }, [state, onConfirm]);
+
+  const handleUndo = useCallback(async () => {
+    if (!onUndoImport || undoing) return;
+    setUndoing(true);
+    try {
+      const result = await onUndoImport();
+      if (result.error) {
+        setState((prev) => ({
+          ...prev,
+          phase: "error",
+          errorCode: "insert_failed",
+          errorMessage: result.error,
+          partialWrite: false,
+        }));
+        return;
+      }
+      handleClose();
+    } finally {
+      setUndoing(false);
+    }
+  }, [handleClose, onUndoImport, undoing]);
 
   const coverage = buildCoveragePreview(state.parsed);
   const timePreview = buildTimePreview(state.parsed);
@@ -572,6 +596,16 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
               {CSV_IMPORT_HISTORICAL_CONTEXT_NOTE}
             </p>
             <DialogFooter>
+              {state.insertedCount > 0 && onUndoImport ? (
+                <Button
+                  variant="outline"
+                  onClick={handleUndo}
+                  disabled={undoing}
+                  data-testid="csv-import-undo-batch"
+                >
+                  {undoing ? "Undoing…" : "Undo this import"}
+                </Button>
+              ) : null}
               {addCurrentReadingHref && inRouter ? (
                 <Button asChild data-testid="csv-import-add-current-reading">
                   <Link to={addCurrentReadingHref} onClick={handleClose}>

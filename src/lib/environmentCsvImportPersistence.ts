@@ -50,6 +50,8 @@ export interface CsvInsertScope {
   grow_id: string;
   tent_id: string;
   plant_id?: string | null;
+  /** Stable import-run id for surgical rollback of one confirmed batch. */
+  import_batch_id?: string;
 }
 
 export interface SensorReadingInsert {
@@ -60,6 +62,8 @@ export interface SensorReadingInsert {
   value: number;
   captured_at: string;
   raw_payload: {
+    csv_import: true;
+    import_batch_id: string;
     source_tag: typeof CSV_SOURCE_TAG;
     grow_id: string;
     tent_id: string;
@@ -75,6 +79,8 @@ export interface SensorReadingInsert {
     ec_unit_assumed?: typeof CSV_SOIL_EC_UNIT_ASSUMED;
   };
 }
+
+export const UNSPECIFIED_CSV_IMPORT_BATCH_ID = "batch-unspecified" as const;
 
 /** Grower copy when the write boundary refuses rows with unsettled times. */
 export const CSV_TIME_UNRESOLVED_COPY =
@@ -125,8 +131,12 @@ export function buildSensorReadingInserts(
   scope: CsvInsertScope,
 ): SensorReadingInsert[] {
   const out: SensorReadingInsert[] = [];
+  const importBatchId =
+    (scope.import_batch_id ?? "").trim() || UNSPECIFIED_CSV_IMPORT_BATCH_ID;
   rows.forEach((r, sourceRow) => {
     const basePayload = {
+      csv_import: true as const,
+      import_batch_id: importBatchId,
       source_tag: CSV_SOURCE_TAG,
       grow_id: scope.grow_id,
       tent_id: scope.tent_id,

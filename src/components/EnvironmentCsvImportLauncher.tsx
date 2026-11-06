@@ -59,6 +59,21 @@ export interface EnvironmentCsvImportLauncherProps {
 
 const DEFAULT_LABEL = "Import historical data";
 
+function buildImportBatchId(): string {
+  const g = globalThis as { crypto?: { randomUUID?: () => string } };
+  if (typeof g.crypto?.randomUUID === "function") {
+    return g.crypto.randomUUID();
+  }
+  return `batch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+type RpcClient = {
+  rpc: (
+    fn: string,
+    args?: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message?: string | null } | null }>;
+};
+
 function makeInsertClient(
   canContinue: () => boolean,
   rows: readonly ParsedEnvironmentRow[],
@@ -164,7 +179,13 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
     if (!user?.id || !growId || !tentId) return;
     generation.current += 1;
     setImportSession({
-      scope: { user_id: user.id, grow_id: growId, tent_id: tentId, plant_id: plantId },
+      scope: {
+        user_id: user.id,
+        grow_id: growId,
+        tent_id: tentId,
+        plant_id: plantId,
+        import_batch_id: buildImportBatchId(),
+      },
       generation: generation.current,
     });
     unconfirmedWrite.current = false;
@@ -244,6 +265,35 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
     [importSession, qc],
   );
 
+  const handleUndoImport = useCallback(async () => {
+    if (!importSession) return { error: "Import session unavailable." };
+    const importBatchId = (importSession.scope.import_batch_id ?? "").trim();
+    if (!importBatchId) return { error: "Import batch unavailable." };
+    const rpc = supabase as unknown as RpcClient;
+    const { data, error } = await rpc.rpc("undo_csv_sensor_import_batch", {
+      p_tent_id: importSession.scope.tent_id,
+      p_import_batch_id: importBatchId,
+    });
+    const ok =
+      !!data && typeof data === "object" && "ok" in data
+        ? (data as { ok?: boolean }).ok === true
+        : false;
+    if (error || !ok) {
+      return { error: "Could not undo this CSV import batch. Try again." };
+    }
+    qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
+    qc.invalidateQueries({ queryKey: ["sensor_readings"] });
+    qc.invalidateQueries({ queryKey: ["csv-timeline-context"] });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("verdant:csv-imported"));
+    }
+    toast({
+      title: "CSV import undone",
+      description: "Removed the imported CSV readings from this batch.",
+    });
+    return { error: null };
+  }, [importSession, qc]);
+
   if (!ready && !(open && ownsImport)) {
     return (
       <div
@@ -272,6 +322,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
           open={open && ownsImport}
           onOpenChange={handleOpenChange}
           onConfirm={handleConfirm}
+          onUndoImport={handleUndoImport}
           viewHistoryHref={viewHistoryHref}
           addCurrentReadingHref={addCurrentReadingHref}
           historyWindow={historyAccess.window}
@@ -308,6 +359,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         open={open && ownsImport}
         onOpenChange={handleOpenChange}
         onConfirm={handleConfirm}
+        onUndoImport={handleUndoImport}
         viewHistoryHref={viewHistoryHref}
         addCurrentReadingHref={addCurrentReadingHref}
         historyWindow={historyAccess.window}

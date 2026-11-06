@@ -12,11 +12,16 @@ import {
 } from "@/lib/quickLogDuplicateSubmitGuard";
 import {
   isQuickLogObservationDraftEmpty,
+  normalizeQuickLogObservationDraftTarget,
   parseQuickLogObservationDraft,
   QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
+  QUICK_LOG_OBSERVATION_DRAFT_LEAVE_WARNING,
   quickLogObservationDraftRestoredCopy,
+  quickLogObservationDraftStorageId,
+  quickLogObservationDraftTargetMove,
   QUICK_LOG_OBSERVATION_SAVE_ERROR,
   restorableQuickLogObservationDraft,
+  shouldWarnBeforeLeavingQuickLogObservation,
 } from "@/lib/quickLogObservationDraftRules";
 import {
   clearBrowserSessionFormDraft,
@@ -767,6 +772,12 @@ function QuickLogV2SheetForOwner({
   // form; it must skip that one run or it rewrites (then clears) a draft that
   // belongs to another target.
   const observationDraftResetPendingRef = useRef(false);
+  // The plant or tent whose slot the open form is writing. A target change
+  // files the current words back into this slot before loading the next one.
+  const observationDraftScopeRef = useRef<string | null>(null);
+  // The target picker changed slots. The chip-line effect must not copy the
+  // previous target's note onto the draft just loaded for the new one.
+  const observationDraftSlotSwitchRef = useRef(false);
   // An open re-baselines the response target. "armed" in the open's own commit
   // (the form is still the previous open's), "ready" in the next, which holds
   // the reset form; retarget checks wait until then.
@@ -1332,16 +1343,39 @@ function QuickLogV2SheetForOwner({
     if (open) {
       setRestoredMediaPending(false);
       setVisitMode("fast_check");
-      const storedDraft = observationDraftSuppressedRef.current
+      const openTarget = normalizeQuickLogObservationDraftTarget(defaultTargetKey);
+      observationDraftScopeRef.current = openTarget;
+      let restorable = observationDraftSuppressedRef.current
         ? null
-        : readBrowserSessionFormDraft(
-            user?.id ?? "",
+        : restorableQuickLogObservationDraft(
+            readBrowserSessionFormDraft(
+              user?.id ?? "",
+              quickLogObservationDraftStorageId(openTarget),
+              parseQuickLogObservationDraft,
+            ),
+            openTarget,
+          );
+      // An older single-slot draft is adopted only when it names this target,
+      // then removed so it cannot reappear on a different plant or tent.
+      if (!restorable && user?.id && !observationDraftSuppressedRef.current) {
+        const legacy = restorableQuickLogObservationDraft(
+          readBrowserSessionFormDraft(
+            user.id,
             QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
             parseQuickLogObservationDraft,
+          ),
+          openTarget,
+        );
+        if (legacy) {
+          writeBrowserSessionFormDraft(
+            user.id,
+            quickLogObservationDraftStorageId(openTarget),
+            legacy,
           );
-      // A draft returns for its own target, or as text only when the sheet has
-      // none; never into another plant's target.
-      const restorable = restorableQuickLogObservationDraft(storedDraft, defaultTargetKey);
+          clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+          restorable = legacy;
+        }
+      }
       const restoredDraft = restorable ? restorable.form : null;
       setObservationDraftRestored(
         restorable ? quickLogObservationDraftRestoredCopy(restorable) : null,
@@ -1425,6 +1459,100 @@ function QuickLogV2SheetForOwner({
   }, [open, defaultTargetKey, defaultAction, user?.id]);
 
   useEffect(() => {
+    if (!user?.id || !open || postSave) return;
+    if (observationDraftResetPendingRef.current || observationDraftSuppressedRef.current) return;
+    if (
+      recoveryStorageFence ||
+      wateringRetrySubmissionRef.current ||
+      manualRetrySubmissionRef.current ||
+      feedingRetrySubmissionRef.current ||
+      (saveInFlightRef.current && submissionLockedRef.current)
+    ) {
+      return;
+    }
+    const fromTarget = observationDraftScopeRef.current;
+    const toTarget = normalizeQuickLogObservationDraftTarget(form.selectedKey);
+    if (fromTarget === toTarget) return;
+
+    const draftForm = form.action === "feed" ? { ...form, note: feedingForm.note } : form;
+    const fromEmpty = isQuickLogObservationDraftEmpty(draftForm, structuredInput);
+    const destination = restorableQuickLogObservationDraft(
+      readBrowserSessionFormDraft(
+        user.id,
+        quickLogObservationDraftStorageId(toTarget),
+        parseQuickLogObservationDraft,
+      ),
+      toTarget,
+    );
+    const payloadFor = (target: string | null) => ({
+      form: { ...draftForm, selectedKey: target },
+      saveFailed: observationUnconfirmedRef.current,
+      idempotencyKey: observationUnconfirmedRef.current ? saveIdempotencyKeyRef.current : null,
+      tempEntryUnit: manualTempEntryUnitRef.current,
+      chipStatus: chipAuthoredStatusRef.current,
+      structured: structuredInput,
+      soilTempEntryUnit: soilTempEntryUnitRef.current,
+    });
+    if (
+      quickLogObservationDraftTargetMove({
+        fromTarget,
+        toTarget,
+        fromEmpty,
+        toEmpty: destination === null,
+      }) === "move-onto-target"
+    ) {
+      writeBrowserSessionFormDraft(
+        user.id,
+        quickLogObservationDraftStorageId(toTarget),
+        payloadFor(toTarget),
+      );
+      clearBrowserSessionFormDraft(user.id, quickLogObservationDraftStorageId(null));
+      observationDraftScopeRef.current = toTarget;
+      observationDraftOwnedRef.current = true;
+      return;
+    }
+
+    if (!fromEmpty) {
+      writeBrowserSessionFormDraft(
+        user.id,
+        quickLogObservationDraftStorageId(fromTarget),
+        payloadFor(fromTarget),
+      );
+    }
+    observationDraftScopeRef.current = toTarget;
+    observationDraftResetPendingRef.current = true;
+    observationDraftSlotSwitchRef.current = true;
+    observationDraftOwnedRef.current = Boolean(destination);
+    observationUnconfirmedRef.current = Boolean(destination?.saveFailed);
+    manualTempEntryUnitRef.current = destination?.tempEntryUnit ?? null;
+    chipAuthoredStatusRef.current = destination?.chipStatus ?? null;
+    soilTempEntryUnitRef.current = destination?.soilTempEntryUnit ?? null;
+    const restoredDraft = destination?.form ?? null;
+    setObservationDraftRestored(
+      destination ? quickLogObservationDraftRestoredCopy(destination) : null,
+    );
+    setForm({
+      ...(restoredDraft ?? EMPTY_QUICKLOG_V2_FORM),
+      selectedKey: toTarget,
+      action: restoredDraft?.action ?? form.action,
+    });
+    setFeedingForm(
+      restoredDraft?.action === "feed"
+        ? { ...EMPTY_QUICKLOG_FEEDING_FORM, note: restoredDraft.note }
+        : EMPTY_QUICKLOG_FEEDING_FORM,
+    );
+    setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
+    setStructuredInput(destination?.structured ?? EMPTY_STRUCTURED_READING_INPUT);
+    setLocalError(destination?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null);
+    setNoteFirstSaveFailedMessage(
+      destination?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null,
+    );
+    if (destination?.saveFailed && destination.idempotencyKey && !saveInFlightRef.current) {
+      saveIdempotencyKeyRef.current = destination.idempotencyKey;
+    }
+  }, [user?.id, open, form, feedingForm.note, postSave, structuredInput, recoveryStorageFence]);
+
+  useEffect(() => {
     if (!user?.id) return;
     if (observationDraftResetPendingRef.current) {
       observationDraftResetPendingRef.current = false;
@@ -1440,16 +1568,17 @@ function QuickLogV2SheetForOwner({
       return;
     }
     if (!open || postSave) return;
+    const scope = observationDraftScopeRef.current;
     if (isQuickLogObservationDraftEmpty(draftForm, structuredInput)) {
       if (observationDraftOwnedRef.current) {
-        clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+        clearOwnedObservationDraft();
         observationDraftOwnedRef.current = false;
       }
       return;
     }
     observationDraftOwnedRef.current = true;
-    writeBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID, {
-      form: draftForm,
+    writeBrowserSessionFormDraft(user.id, quickLogObservationDraftStorageId(scope), {
+      form: { ...draftForm, selectedKey: scope },
       saveFailed: observationUnconfirmedRef.current,
       idempotencyKey: observationUnconfirmedRef.current ? saveIdempotencyKeyRef.current : null,
       tempEntryUnit: manualTempEntryUnitRef.current,
@@ -1460,6 +1589,26 @@ function QuickLogV2SheetForOwner({
     // localError is a trigger, not an input: when only the error flips, this
     // re-persists the ref-held saveFailed flag even though the form is unchanged.
   }, [user?.id, open, form, feedingForm.note, postSave, localError, structuredInput]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!unsavedObservationNeedsLeaveWarning()) return;
+      event.preventDefault();
+      event.returnValue = QUICK_LOG_OBSERVATION_DRAFT_LEAVE_WARNING;
+    };
+    const onPopState = () => {
+      if (!unsavedObservationNeedsLeaveWarning()) return;
+      if (window.confirm(QUICK_LOG_OBSERVATION_DRAFT_LEAVE_WARNING)) return;
+      window.history.pushState(window.history.state, "", window.location.href);
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [open, form, feedingForm.note, structuredInput, postSave]);
 
   // Tent-scoped pick: recent plant in the tent, else the sole plant, else the
   // selected tent. Only when selectedKey is still empty — never rewrite an
@@ -1604,6 +1753,11 @@ function QuickLogV2SheetForOwner({
   const responseTargetPlantIdRef = useRef(responseTargetPlantId);
   useEffect(() => {
     if (submissionLockedRef.current || responseBaselineResetRef.current) return;
+    if (observationDraftSlotSwitchRef.current) {
+      observationDraftSlotSwitchRef.current = false;
+      responseTargetPlantIdRef.current = responseTargetPlantId;
+      return;
+    }
     const previousPlantId = responseTargetPlantIdRef.current;
     responseTargetPlantIdRef.current = responseTargetPlantId;
     // Fire when the plant the marker DESCRIBES changes — to a different plant,
@@ -2328,8 +2482,8 @@ function QuickLogV2SheetForOwner({
       // may still be another plant's unsaved note; only clear one this sheet owns.
       if (observationDraftOwnedRef.current) {
         observationDraftSuppressedRef.current = true;
-        if (user?.id) {
-          clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+        if (user?.id && observationDraftOwnedRef.current) {
+          clearOwnedObservationDraft();
         }
       }
       const savedPlantId = resolved.plantId ?? null;
@@ -3038,7 +3192,7 @@ function QuickLogV2SheetForOwner({
       manualRetrySubmissionRef.current = null;
     }
     if (user?.id && observationDraftOwnedRef.current) {
-      clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+      clearOwnedObservationDraft();
     }
     const successMessage =
       submissionAction === "water"
@@ -3339,7 +3493,7 @@ function QuickLogV2SheetForOwner({
     if (observationDraftOwnedRef.current) {
       observationDraftSuppressedRef.current = true;
       if (user?.id) {
-        clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+        clearOwnedObservationDraft();
       }
     }
     keepSubmissionLockedRef.current = false;
@@ -3349,6 +3503,26 @@ function QuickLogV2SheetForOwner({
     onOpenChange(false);
     const { navigation } = mismatchedReceipt;
     navigateToTimeline(navigation.href, navigation.hash, navigation.path);
+  }
+
+  function clearOwnedObservationDraft() {
+    if (!user?.id) return;
+    const scope = observationDraftScopeRef.current;
+    clearBrowserSessionFormDraft(user.id, quickLogObservationDraftStorageId(scope));
+    const legacy = readBrowserSessionFormDraft(
+      user.id,
+      QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
+      parseQuickLogObservationDraft,
+    );
+    if (legacy && normalizeQuickLogObservationDraftTarget(legacy.form.selectedKey) === scope) {
+      clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
+    }
+  }
+
+  function unsavedObservationNeedsLeaveWarning() {
+    if (!open || postSave || observationDraftSuppressedRef.current) return false;
+    const draftForm = form.action === "feed" ? { ...form, note: feedingForm.note } : form;
+    return shouldWarnBeforeLeavingQuickLogObservation(draftForm, structuredInput);
   }
 
   /**
@@ -3376,6 +3550,10 @@ function QuickLogV2SheetForOwner({
       if (blocked) {
         toast.message(QUICK_LOG_CLOSE_BLOCKED_HINT);
         return;
+      }
+      if (unsavedObservationNeedsLeaveWarning()) {
+        const leave = window.confirm(QUICK_LOG_OBSERVATION_DRAFT_LEAVE_WARNING);
+        if (!leave) return;
       }
       resetVideoSelection();
     }

@@ -8,13 +8,27 @@ import {
   type StructuredReadingTextInput,
 } from "@/lib/quickLogStructuredReadingRules";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
-import {
-  RESPONSE_CHECK_STATUSES,
-  removeChipAuthoredResponseLine,
-  type ResponseCheckStatus,
-} from "@/lib/tenSecondQuickCheckRules";
+import { RESPONSE_CHECK_STATUSES, type ResponseCheckStatus } from "@/lib/tenSecondQuickCheckRules";
 
 export const QUICK_LOG_OBSERVATION_DRAFT_FORM_ID = "quick-log-v2-observation";
+
+/** Session-storage id for one plant, one tent, or an entry that has no target yet. */
+export function quickLogObservationDraftStorageId(targetKey: string | null | undefined): string {
+  const target = normalizeQuickLogObservationDraftTarget(targetKey);
+  return target
+    ? `${QUICK_LOG_OBSERVATION_DRAFT_FORM_ID}.target.${target}`
+    : `${QUICK_LOG_OBSERVATION_DRAFT_FORM_ID}.target.none`;
+}
+
+/** A plant or tent key. Anything else is "no target". */
+export function normalizeQuickLogObservationDraftTarget(
+  targetKey: string | null | undefined,
+): string | null {
+  if (typeof targetKey !== "string") return null;
+  const trimmed = targetKey.trim();
+  if (!/^(plant|tent):[^\s]+$/.test(trimmed) || trimmed.length > 200) return null;
+  return trimmed;
+}
 
 const ACTIONS: readonly QuickLogV2Action[] = ["water", "feed", "note"];
 
@@ -81,29 +95,53 @@ export const QUICK_LOG_OBSERVATION_DRAFT_RESTORED_COPY =
 export const QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY =
   "Restored your unsaved entry. Choose a plant or tent before you save.";
 
+/** Cancel, Back, and refresh ask this while the open entry is not empty. */
+export const QUICK_LOG_OBSERVATION_DRAFT_LEAVE_WARNING =
+  "This Quick Log note is not saved yet. It stays with this plant or tent if you leave, and it is not written to the timeline.";
+
 /**
- * A stored draft is restored into the target it was typed for. When the sheet
- * opens with no target, the words come back but the target does not: target
- * selection stays explicit or route-derived, so a draft never picks one. The
- * failed flag and its key belonged to the old target's save and stay behind;
- * only definitive rejections are stored, so nothing committed under that key.
+ * Which stored draft the sheet may show. Only an exact target match restores.
+ * A draft written for one plant or tent stays there when the sheet opens for
+ * another, or with no target at all. An entry that has no target yet restores
+ * only when the sheet also has none. An empty draft restores nothing.
  */
 export function restorableQuickLogObservationDraft(
   stored: QuickLogObservationDraft | null,
   defaultTargetKey: string | null | undefined,
 ): QuickLogObservationDraft | null {
   if (!stored || isQuickLogObservationDraftEmpty(stored.form, stored.structured)) return null;
-  const target = defaultTargetKey || null;
-  if (stored.form.selectedKey === target) return stored;
-  if (target !== null) return null;
-  // The chip's response line belonged to the old plant; it does not follow the
-  // words into a target the grower has not picked yet.
-  const note = stored.chipStatus
-    ? removeChipAuthoredResponseLine(stored.form.note, stored.chipStatus)
-    : stored.form.note;
-  const form = { ...stored.form, selectedKey: null, note };
-  if (isQuickLogObservationDraftEmpty(form, stored.structured)) return null;
-  return { ...stored, form, saveFailed: false, idempotencyKey: null, chipStatus: null };
+  const openTarget = normalizeQuickLogObservationDraftTarget(defaultTargetKey);
+  const storedTarget = normalizeQuickLogObservationDraftTarget(stored.form.selectedKey);
+  if (storedTarget !== openTarget) return null;
+  return stored;
+}
+
+/**
+ * Leaving or cancelling an open Quick Log asks first when the entry still has
+ * something to keep. An empty form does not ask.
+ */
+export function shouldWarnBeforeLeavingQuickLogObservation(
+  form: QuickLogV2FormState,
+  structured: StructuredReadingTextInput | null | undefined,
+): boolean {
+  return !isQuickLogObservationDraftEmpty(form, structured);
+}
+
+/**
+ * A note typed before any plant or tent was chosen may move onto the first
+ * target the grower picks, when that target has no draft of its own. A note
+ * that already belongs to a target never moves onto a different one.
+ */
+export function quickLogObservationDraftTargetMove(input: {
+  fromTarget: string | null;
+  toTarget: string | null;
+  fromEmpty: boolean;
+  toEmpty: boolean;
+}): "move-onto-target" | "stay" {
+  const from = normalizeQuickLogObservationDraftTarget(input.fromTarget);
+  const to = normalizeQuickLogObservationDraftTarget(input.toTarget);
+  if (from === null && to !== null && !input.fromEmpty && input.toEmpty) return "move-onto-target";
+  return "stay";
 }
 
 export function quickLogObservationDraftRestoredCopy(restored: QuickLogObservationDraft): string {

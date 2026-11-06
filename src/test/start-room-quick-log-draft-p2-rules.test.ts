@@ -3,7 +3,10 @@ import {
   parseQuickLogObservationDraft,
   QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY,
   quickLogObservationDraftRestoredCopy,
+  quickLogObservationDraftStorageId,
+  quickLogObservationDraftTargetMove,
   restorableQuickLogObservationDraft,
+  shouldWarnBeforeLeavingQuickLogObservation,
 } from "@/lib/quickLogObservationDraftRules";
 import {
   adoptablePendingGrowId,
@@ -21,19 +24,16 @@ describe("restorableQuickLogObservationDraft", () => {
     expect(restorableQuickLogObservationDraft(draft("plant:a"), "plant:a")).not.toBeNull();
     expect(restorableQuickLogObservationDraft(draft("plant:a"), "plant:b")).toBeNull();
   });
-  it("never lets a draft pick a target when the sheet has none", () => {
+  it("does not restore a targeted draft when the sheet opens with none", () => {
     for (const none of [null, undefined, ""]) {
-      const restored = restorableQuickLogObservationDraft(draft("plant:a"), none);
-      expect(restored?.form.note).toBe("pale leaves");
-      expect(restored?.form.selectedKey).toBeNull();
-      // The old target's failed save and key stay behind.
-      expect(restored?.saveFailed).toBe(false);
-      expect(restored?.idempotencyKey).toBeNull();
-      expect(quickLogObservationDraftRestoredCopy(restored!)).toBe(
-        QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY,
-      );
+      expect(restorableQuickLogObservationDraft(draft("plant:a"), none)).toBeNull();
     }
-    expect(restorableQuickLogObservationDraft(draft(null), null)).not.toBeNull();
+    const untargeted = restorableQuickLogObservationDraft(draft(null), null);
+    expect(untargeted?.form.note).toBe("pale leaves");
+    expect(untargeted?.form.selectedKey).toBeNull();
+    expect(quickLogObservationDraftRestoredCopy(untargeted!)).toBe(
+      QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY,
+    );
   });
   it("reads the entry unit and chip status, and older drafts without them", () => {
     const stored = parseQuickLogObservationDraft({
@@ -57,6 +57,64 @@ describe("restorableQuickLogObservationDraft", () => {
   it("ignores empty or missing drafts", () => {
     expect(restorableQuickLogObservationDraft(draft("plant:a", "  "), "plant:a")).toBeNull();
     expect(restorableQuickLogObservationDraft(null, "plant:a")).toBeNull();
+  });
+});
+
+describe("quick log observation draft slots (#2806)", () => {
+  it("keeps one storage id per plant or tent, and a separate id when there is no target", () => {
+    expect(quickLogObservationDraftStorageId("plant:a")).toBe(
+      "quick-log-v2-observation.target.plant:a",
+    );
+    expect(quickLogObservationDraftStorageId(" tent:tent-1 ")).toBe(
+      "quick-log-v2-observation.target.tent:tent-1",
+    );
+    expect(quickLogObservationDraftStorageId(null)).toBe("quick-log-v2-observation.target.none");
+    expect(quickLogObservationDraftStorageId("grow:1")).toBe(
+      "quick-log-v2-observation.target.none",
+    );
+  });
+
+  it("moves an untargeted note onto the first empty target and never from one target onto another", () => {
+    expect(
+      quickLogObservationDraftTargetMove({
+        fromTarget: null,
+        toTarget: "plant:a",
+        fromEmpty: false,
+        toEmpty: true,
+      }),
+    ).toBe("move-onto-target");
+    expect(
+      quickLogObservationDraftTargetMove({
+        fromTarget: "plant:a",
+        toTarget: "tent:b",
+        fromEmpty: false,
+        toEmpty: true,
+      }),
+    ).toBe("stay");
+    expect(
+      quickLogObservationDraftTargetMove({
+        fromTarget: null,
+        toTarget: "plant:a",
+        fromEmpty: false,
+        toEmpty: false,
+      }),
+    ).toBe("stay");
+    expect(
+      quickLogObservationDraftTargetMove({
+        fromTarget: null,
+        toTarget: "plant:a",
+        fromEmpty: true,
+        toEmpty: true,
+      }),
+    ).toBe("stay");
+  });
+
+  it("warns only when the observation is not empty", () => {
+    const empty = draft("plant:a", "  ").form;
+    expect(shouldWarnBeforeLeavingQuickLogObservation(empty, null)).toBe(false);
+    expect(shouldWarnBeforeLeavingQuickLogObservation({ ...empty, note: "half typed" }, null)).toBe(
+      true,
+    );
   });
 });
 

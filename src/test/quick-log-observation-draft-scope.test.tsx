@@ -172,19 +172,19 @@ describe("Quick Log observation draft scope and ambiguous outcomes (#2541 P2s)",
     );
   });
 
-  it("restores the words but not the target when the sheet opens with none", async () => {
+  it("does not restore plant A's draft when the sheet opens with no target (#2806)", async () => {
     await failNoteOn("plant:plant-1", "invalid_details");
     renderSheet(null);
-    expect(await screen.findByTestId("qlv2-note")).toHaveValue("First leaves look pale");
-    expect(screen.getByTestId("qlv2-draft-restored")).toHaveTextContent(
-      QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY,
-    );
-    // The grower picks the target; the draft never does.
+    expect(await screen.findByTestId("qlv2-note")).toHaveValue("");
+    expect(screen.queryByTestId("qlv2-draft-restored")).toBeNull();
+    expect(screen.queryByText(QUICK_LOG_OBSERVATION_DRAFT_RESTORED_NO_TARGET_COPY)).toBeNull();
     expect(screen.getByLabelText("Choose plant or tent for this Quick Log")).toHaveTextContent(
       "Choose a tent or plant",
     );
-    // The old target's failed save does not follow the words.
     expect(screen.queryByText(QUICK_LOG_OBSERVATION_SAVE_ERROR)).toBeNull();
+    cleanup();
+    renderSheet("plant:plant-1");
+    expect(await screen.findByTestId("qlv2-note")).toHaveValue("First leaves look pale");
   });
 
   it("forgets a draft the grower deleted back to empty (review 5677784998)", async () => {
@@ -309,19 +309,22 @@ describe("Quick Log observation draft scope and ambiguous outcomes (#2541 P2s)",
     );
   });
 
-  it("drops a chip's response line when the draft returns with no target", async () => {
+  it("keeps a chip response on its plant when Quick Log opens with no target (#2806)", async () => {
     renderSheet("plant:plant-1");
     fireEvent.click(await screen.findByTestId("qlv2-response-chip-better"));
     const typed = await screen.findByTestId("qlv2-note");
     fireEvent.change(typed, { target: { value: `${noteValue(typed)}\nLeaves look pale` } });
-    await waitFor(() => expect(window.sessionStorage.length).toBeGreaterThan(0));
+    await waitFor(() => expect(storedDraftText()).toContain("Leaves look pale"));
     cleanup();
     renderSheet(null);
+    expect(screen.queryByTestId("qlv2-draft-restored")).toBeNull();
+    expect(screen.queryByDisplayValue(/Leaves look pale/)).toBeNull();
+    expect(screen.queryByDisplayValue(/Response check:/)).toBeNull();
+    cleanup();
+    renderSheet("plant:plant-1");
     const note = await screen.findByTestId("qlv2-note");
-    // Positive control: the draft did come back, just without the chip's line.
-    expect(screen.getByTestId("qlv2-draft-restored")).toBeInTheDocument();
     expect(noteValue(note)).toContain("Leaves look pale");
-    expect(noteValue(note)).not.toContain("Response check:");
+    expect(noteValue(note)).toContain("Response check:");
   });
 
   it("keeps plant A's failed draft when the same mounted sheet reopens for plant B", async () => {

@@ -382,6 +382,7 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
     const original = await saveWaterWithLostReply();
     expect(committed.size).toBe(1);
 
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(view.onOpenChange).toHaveBeenCalledWith(false);
     view.rerenderOpen(false);

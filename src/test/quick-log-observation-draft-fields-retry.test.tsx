@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SESSION_FORM_DRAFT_VERSION } from "@/lib/sessionFormDraftRules";
 import { writeBrowserSessionFormDraft } from "@/lib/sessionFormDraftStore";
 import {
-  QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
   QUICK_LOG_OBSERVATION_SAVE_ERROR,
+  quickLogObservationDraftStorageId,
 } from "@/lib/quickLogObservationDraftRules";
 
 const STORED_SAVE_KEY = "quicklog-v2-same-observation-save";
@@ -64,7 +64,7 @@ vi.mock("sonner", () => ({
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 
 function draftKey(userId: string) {
-  return `verdant.session-form.${SESSION_FORM_DRAFT_VERSION}.${userId}.${QUICK_LOG_OBSERVATION_DRAFT_FORM_ID}`;
+  return `verdant.session-form.${SESSION_FORM_DRAFT_VERSION}.${userId}.${quickLogObservationDraftStorageId("plant:plant-1")}`;
 }
 
 function renderSheet() {
@@ -169,7 +169,7 @@ describe("Quick Log observation draft keeps every field", () => {
   });
 
   it("restores a stored failed observation for the same user and retries its save key", async () => {
-    writeBrowserSessionFormDraft("user-1", QUICK_LOG_OBSERVATION_DRAFT_FORM_ID, {
+    writeBrowserSessionFormDraft("user-1", quickLogObservationDraftStorageId("plant:plant-1"), {
       form: {
         selectedKey: "plant:plant-1",
         action: "note",

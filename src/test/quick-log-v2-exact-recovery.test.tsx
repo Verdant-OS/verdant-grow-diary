@@ -308,6 +308,7 @@ describe("ASTRA-001 exact Note recovery", () => {
     expect(screen.getByLabelText("Note (optional)")).toBeEnabled();
     expect(screen.getByLabelText("Choose plant or tent for this Quick Log")).toBeEnabled();
     expect(screen.queryByTestId("qlv2-exact-retry-lock")).not.toBeInTheDocument();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(view.onOpenChange).toHaveBeenCalledWith(false);
   });

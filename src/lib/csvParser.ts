@@ -598,7 +598,12 @@ function isSoilHeader(normalized: string): boolean {
  * can never be saved as a reading, whatever their position in the file.
  */
 function isTargetHeader(normalized: string): boolean {
-  return /target|set.?point|goal|(^|[^a-z])sp([^a-z]|$)/.test(normalized);
+  // Standalone "sp"/"set" also match before a digit ("SP1"): ambiguous, so the
+  // column is set aside (listed as not imported) rather than risk a setpoint.
+  return (
+    /target|goal|desired|ideal|set[\s_.-]?p(oin)?t/.test(normalized) ||
+    /(^|[^a-z])(tgt|sp|s\.p\.?|set|setting)([^a-z]|$)/.test(normalized)
+  );
 }
 
 interface SoilColumns {

@@ -1,7 +1,8 @@
 # CONTRAST-TOKENS-SPEC
 
 ```text
-TASK CONTRAST-TOKENS-SPEC  priority: other  status: OPEN
+TASK CONTRAST-TOKENS-SPEC  priority: other  status: CLOSED
+closed: merged. #2827 merged into verdant-grow-diary on 2026-11-04 as d5abcb0ab8df9a1a62977d512aa8e132ecf645a4 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Measure Verdant's text contrast from the theme tokens and decide how to fix the failures.
 why: Live audit 2026-11-03 finding 12 flagged muted text on dark green as a contrast risk without measuring it. Measured from src/styles.css at c03f64a: base muted text passes AA (5.5-7.1:1); the dark-theme --destructive fails as text (3.47-4.30:1) and as a white-label button fill (4.40:1); muted text at /70 or below fails (2.1-4.0:1), including the stale and missing labels in PlantManualSensorFreshnessCard.
 branch: claude/contrast-measurements-spec
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-03 18:45 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-03 18:45 CT, by Claude)
 ```

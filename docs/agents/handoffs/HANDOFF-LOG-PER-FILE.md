@@ -1,7 +1,8 @@
 # HANDOFF-LOG-PER-FILE
 
 ```text
-TASK HANDOFF-LOG-PER-FILE  priority: other  status: OPEN
+TASK HANDOFF-LOG-PER-FILE  priority: other  status: CLOSED
+closed: merged. #2860 merged into verdant-grow-diary on 2026-11-04 as cae980f53c938c45dc260f9ced13fb38e5b3e242 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Stop pull requests colliding in docs/agents/HANDOFF_LOG.md by giving each task its own handoff file.
 why: 28 of 34 open PRs edited the log on 2026-11-04. #2836, #2830, #2839 and #2824 were all removed from the merge queue at 06:01 UTC for conflicts in that file alone. In a sample of 60 PRs updated since 2026-11-01, the queue recorded 13 merge_conflict removals against 29 merges.
 branch: claude/handoff-log-per-file
@@ -29,5 +30,5 @@ reviewer_sha: none yet
 session_state: Matthew asked for this in Claude session ce09a2e9-9fcc-42f2-9613-36ffc1d80911 on 2026-11-04.
 claimed_by: Claude session ce09a2e9-9fcc-42f2-9613-36ffc1d80911, 2026-11-04 00:30 CT
 owner: Claude session ce09a2e9-9fcc-42f2-9613-36ffc1d80911
-last_updated: 2026-11-04 00:30 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04 00:30 CT, by Claude)
 ```

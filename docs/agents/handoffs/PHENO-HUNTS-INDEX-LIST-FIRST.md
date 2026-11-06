@@ -1,7 +1,8 @@
 # PHENO-HUNTS-INDEX-LIST-FIRST
 
 ```text
-TASK PHENO-HUNTS-INDEX-LIST-FIRST  priority: other  status: OPEN
+TASK PHENO-HUNTS-INDEX-LIST-FIRST  priority: other  status: CLOSED
+closed: merged. #2836 merged into verdant-grow-diary on 2026-11-04 as c4551b46636da131288eda63515039f430fddd01 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Show the Pheno Hunts list before the keeper stability roll-up.
 why: Live audit 2026-11-03 finding 10 (last sentence): Pheno Hunts opened with keeper summaries from audit/demo records before the active hunt list. Source: PhenoHuntsIndex rendered PhenoStabilityDashboard above the list. The roll-up reads every keeper the grower owns (RLS-scoped), so filtering would hide real records; the fix is order only.
 branch: claude/pheno-hunts-index-order
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
 owner: Claude
-last_updated: 2026-11-03 18:15 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-03 18:15 CT, by Claude)
 ```

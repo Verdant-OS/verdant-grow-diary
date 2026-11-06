@@ -1,7 +1,8 @@
 # STRUCTURED-READINGS-REVIEW-FIXES
 
 ```text
-TASK STRUCTURED-READINGS-REVIEW-FIXES  priority: P2  status: OPEN
+TASK STRUCTURED-READINGS-REVIEW-FIXES  priority: P2  status: CLOSED
+closed: merged. #2863 merged into verdant-grow-diary on 2026-11-04 as fb3ea19f678d3869f51f124859e4ed0b5361eb39 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Ship the #2820 grower-bug slices together with the two review fixes (pin the soil-temperature entry unit once typing starts; keep structured readings and the soil unit in Note drafts). This PR replaces #2820.
 why: The independent review failed #2820 at 1c0f0ecb with two P2s (soil temperature reinterpreted on unit change; structured readings dropped from Note drafts). A push to #2820's branch was refused, so Matthew chose on 2026-11-04 to land the work as this PR and close #2820.
 branch: claude/structured-readings-review-fixes
@@ -29,5 +30,5 @@ reviewer_sha: none at the new head (the advisory findings at f5399254 were relay
 session_state: no production access; merge seat held by this session
 claimed_by: Claude session_017UoYKyNbAomBtM3Ja7L89e, 2026-11-04 (reassigned by Matthew; prior holder session_017UoYKyhNGum4qmfYdoNRLr released)
 owner: Claude
-last_updated: 2026-11-04 17:30 UTC, by Claude session_017UoYKyNbAomBtM3Ja7L89e
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04 17:30 UTC, by Claude session_017UoYKyNbAomBtM3Ja7L89e)
 ```

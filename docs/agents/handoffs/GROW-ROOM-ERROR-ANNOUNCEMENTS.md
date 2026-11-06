@@ -1,7 +1,8 @@
 # GROW-ROOM-ERROR-ANNOUNCEMENTS
 
 ```text
-TASK GROW-ROOM-ERROR-ANNOUNCEMENTS  priority: other  status: OPEN
+TASK GROW-ROOM-ERROR-ANNOUNCEMENTS  priority: other  status: CLOSED
+closed: merged. #2852 merged into verdant-grow-diary on 2026-11-04 as 8005737d8800b2de496aee8c56f58aae5b0a09ec (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Error messages on the grow-room and report surfaces (soil moisture calibration, dryback and watering history strips, tent irrigation history, Plant Merge, diary-range and environment report date ranges) announce themselves to screen readers.
 why: Grower UX audit 2026-11-03 finding 12 (screen reader), third batch after Verdant-OS/verdant-grow-diary#2845 (entry forms) and #2850 (spine pages): 8 error elements here had no role or aria-live.
 branch: claude/error-announcements-batch3
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
 owner: Claude
-last_updated: 2026-11-03 22:20 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-03 22:20 CT, by Claude)
 ```

@@ -134,7 +134,7 @@ export interface ParseEnvironmentCsvResult {
   /**
    * Header names this parser recognizes but does not import (today: soil
    * columns other than soil temperature, soil moisture and soil EC, and every
-   * target/setpoint/goal column), in file order. They are never mapped to an air metric. Always
+   * target/setpoint/goal or limit/alarm/threshold column), in file order. They are never mapped to an air metric. Always
    * set by the parser; absent only on results built elsewhere.
    */
   unsupportedColumns?: readonly string[];
@@ -593,15 +593,18 @@ function isSoilHeader(normalized: string): boolean {
 }
 
 /**
- * Target, setpoint and goal columns record what the grower wants, not what a
- * sensor measured. They are set aside before any soil or air matching, so they
- * can never be saved as a reading, whatever their position in the file.
+ * Target, setpoint and goal columns record what the grower wants, and limit,
+ * alarm, alert, threshold and trigger columns record a configured boundary;
+ * neither is what a sensor measured. They are set aside before any soil or air
+ * matching, so they can never be saved as a reading, whatever their position
+ * in the file. Aggregates (min, max, avg) may be real readings and still import.
  */
 function isTargetHeader(normalized: string): boolean {
   // Standalone "sp"/"set" also match before a digit ("SP1"): ambiguous, so the
   // column is set aside (listed as not imported) rather than risk a setpoint.
   return (
     /target|goal|desired|ideal|set[\s_.-]?p(oin)?t/.test(normalized) ||
+    /limit|alarm|alert|threshold|trigger/.test(normalized) ||
     /(^|[^a-z])(tgt|sp|s\.p\.?|set|setting)([^a-z]|$)/.test(normalized)
   );
 }

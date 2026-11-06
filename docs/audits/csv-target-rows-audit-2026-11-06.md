@@ -1,6 +1,6 @@
 # Read-only audit: CSV readings that may be saved target/setpoint values
 
-**Status:** spec only, 2026-11-06. Nothing in this document has been run. No result exists yet.
+**Status:** spec only, 2026-11-06 (round 2). Never run on production. No result exists yet.
 **Author:** Claude (CSV-TARGET-SETPOINT-EXCLUSION workstream; fix #2908, merged as
 `01f30d11ad3337c3788e18fc46aae33a871e7677`).
 **Runs:** only by a seat authorized for production reads, under
@@ -48,13 +48,35 @@ Keep this in step with `isTargetHeader` at the head that is live when the audit 
 (limit/alarm/threshold exclusion, another session) edits `csvParser.ts`; limit, alarm and threshold
 columns stay out of scope here.
 
-## Query (read-only)
+## Queries (read-only)
+
+**How to run.** Run each query **on its own** and record **each** result set, including an empty
+one. Several SQL tools return only the last statement of a multi-statement script, so never paste
+these as one script. Use a read-only session where the client allows it (in `psql`:
+`BEGIN TRANSACTION READ ONLY;`, then each query, then `ROLLBACK;`). Every query is a plain `SELECT`.
+
+**Query 0: denominator and visibility.** It always returns one row.
 
 ```sql
-BEGIN TRANSACTION READ ONLY;
+SELECT current_user AS run_as,
+       (SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user) AS bypasses_rls,
+       count(*) AS csv_rows,
+       count(*) FILTER (WHERE jsonb_typeof(raw_payload -> 'raw_row') = 'object'
+                          AND raw_payload -> 'raw_row' <> '{}'::jsonb) AS csv_rows_with_raw_row
+FROM public.sensor_readings
+WHERE source = 'csv';
+```
 
+`sensor_readings` has row-level security (`20260516204601_…sql:155`). A role without
+`bypasses_rls = true` sees only its own rows, or none, and every query below then returns empty. A
+table owner without `rolbypassrls` also reads as `false` here. That is a safe false negative: the
+result becomes `NOT_MEASURED`, never `PASS`.
+
+**Query 1: candidate readings, by metric and kind.** It returns one row per (metric, kind) present.
+
+```sql
 WITH csv_rows AS (
-  SELECT id, user_id, tent_id, metric, value, captured_at, created_at, raw_payload
+  SELECT id, user_id, tent_id, metric, value, created_at, raw_payload
   FROM public.sensor_readings
   WHERE source = 'csv'
     -- filter here, before jsonb_each_text, which errors on a non-object
@@ -62,7 +84,8 @@ WITH csv_rows AS (
 ),
 target_cells AS (
   SELECT r.id, r.user_id, r.tent_id, r.metric, r.value, r.created_at,
-         kv.key AS target_header, kv.value AS target_cell
+         r.raw_payload ->> 'vpd_source' AS vpd_source,
+         lower(kv.key) AS h, kv.value AS target_cell
   FROM csv_rows r
   CROSS JOIN LATERAL jsonb_each_text(r.raw_payload -> 'raw_row') AS kv
   WHERE lower(kv.key) ~ '(target|goal|desired|ideal|set[[:space:]_.-]?p(oin)?t)'
@@ -70,86 +93,159 @@ target_cells AS (
 ),
 classified AS (
   SELECT t.*,
-         -- Nested CASE, not AND: PostgreSQL does not promise left-to-right AND evaluation,
+         -- Header heuristic: does this target header belong to the reading's own metric?
+         -- Derived VPD (vpd_source = 'derived') was computed from the row's temperature and
+         -- humidity (csvParser.ts computeVpdKpa), so a temperature or humidity target counts for it.
+         CASE t.metric
+           WHEN 'temperature_c'     THEN t.h ~ 'temp' AND t.h !~ 'soil'
+           WHEN 'humidity_pct'      THEN t.h ~ '(hum|rh)'
+           WHEN 'vpd_kpa'           THEN t.h ~ 'vpd'
+                                      OR (t.vpd_source = 'derived'
+                                          AND ((t.h ~ 'temp' AND t.h !~ 'soil') OR t.h ~ '(hum|rh)'))
+           WHEN 'co2_ppm'           THEN t.h ~ 'co2'
+           WHEN 'ppfd'              THEN t.h ~ '(ppfd|par|light)'
+           WHEN 'soil_temp_c'       THEN t.h ~ 'soil' AND t.h ~ 'temp'
+           WHEN 'soil_moisture_pct' THEN t.h ~ '(moist|vwc)'
+           WHEN 'ec'                THEN t.h ~ '(^|[^a-z])ec([^a-z]|$)|conduct'
+           ELSE false
+         END AS same_metric,
+         -- Nested CASE, not AND: PostgreSQL does not promise AND evaluation order,
          -- so a non-numeric cell could otherwise reach the ::numeric cast and abort the audit.
          CASE
            WHEN t.target_cell ~ '^[[:space:]]*-?[0-9]+(\.[0-9]+)?[[:space:]]*$' THEN
-             CASE WHEN abs(t.value - trim(t.target_cell)::numeric) <= 0.05
-                  THEN 'value_equals_target_cell'   -- likely saved the target
-                  ELSE 'target_column_present'      -- file had a target column; value differs
-             END
-           ELSE 'target_column_present'
-         END AS match_kind
+             abs(t.value - trim(t.target_cell)::numeric) <= 0.05
+           ELSE false
+         END AS value_equals_cell
   FROM target_cells t
+),
+per_reading AS (
+  -- One verdict per reading, so buckets never double-count a reading.
+  SELECT id, user_id, tent_id, metric, created_at,
+         CASE
+           WHEN bool_or(same_metric AND value_equals_cell) THEN 'likely_saved_target'
+           WHEN bool_or(same_metric)                       THEN 'same_metric_target_present'
+           ELSE 'other_metric_target_only'
+         END AS kind
+  FROM classified
+  GROUP BY id, user_id, tent_id, metric, created_at
 )
--- 1) Headline counts (no personal data)
-SELECT metric, match_kind,
-       count(DISTINCT id)       AS readings,
+SELECT metric, kind,
+       count(*)                 AS readings,
        count(DISTINCT tent_id)  AS tents,
        count(DISTINCT user_id)  AS growers,
        min(created_at)          AS first_saved,
        max(created_at)          AS last_saved
-FROM classified
-GROUP BY metric, match_kind
-ORDER BY metric, match_kind;
+FROM per_reading
+GROUP BY metric, kind
+ORDER BY metric, kind;
+```
 
--- 2) Rows with no usable raw_row (cannot be classified): report as UNKNOWN, never clean
-SELECT metric, count(*) AS readings_without_raw_row
+Each reading lands in exactly one `kind`, so `readings` can be summed.
+
+**Query 2: readings that cannot be classified.** Report them as UNKNOWN, never clean.
+
+```sql
+SELECT metric, count(*) AS readings_without_usable_raw_row
 FROM public.sensor_readings
 WHERE source = 'csv'
-  AND (raw_payload IS NULL OR jsonb_typeof(raw_payload -> 'raw_row') IS DISTINCT FROM 'object')
-GROUP BY metric;
+  AND (raw_payload IS NULL
+       OR jsonb_typeof(raw_payload -> 'raw_row') IS DISTINCT FROM 'object'
+       OR raw_payload -> 'raw_row' = '{}'::jsonb)
+GROUP BY metric
+ORDER BY metric;
+```
 
--- 3) Which header spellings occurred (header names only, no values or ids).
--- Self-contained: a CTE lives for one statement only, so the filter is repeated here.
+**Query 3: which header spellings occurred.** Header names only, with no values or ids.
+
+```sql
 SELECT kv.key AS target_header, count(DISTINCT r.id) AS readings
 FROM (
   SELECT id, raw_payload FROM public.sensor_readings
   WHERE source = 'csv' AND jsonb_typeof(raw_payload -> 'raw_row') = 'object'
 ) r
 CROSS JOIN LATERAL jsonb_each_text(r.raw_payload -> 'raw_row') AS kv
-WHERE (lower(kv.key) ~ '(target|goal|desired|ideal|set[[:space:]_.-]?p(oin)?t)'
-    OR lower(kv.key) ~ '(^|[^a-z])(tgt|sp|s\.p\.?|set|setting)([^a-z]|$)')
+WHERE lower(kv.key) ~ '(target|goal|desired|ideal|set[[:space:]_.-]?p(oin)?t)'
+     OR lower(kv.key) ~ '(^|[^a-z])(tgt|sp|s\.p\.?|set|setting)([^a-z]|$)'
 GROUP BY kv.key
-ORDER BY readings DESC
+ORDER BY readings DESC, kv.key
 LIMIT 50;
-
-ROLLBACK;
 ```
 
 ## Known limits
 
-- **One row per (reading, target header) pair.** A file with `humidity_target` puts that column in
-  the `raw_row` of its temperature, CO₂ and soil readings too. Those unrelated readings show as
-  `target_column_present`. Read query 1 together with query 3: a metric is at real risk only when a
-  target header for that metric appears.
+- **Same-metric matching is a header heuristic.** A file with `humidity_target` puts that column in
+  the `raw_row` of its temperature, CO₂ and soil readings too. Those readings land in
+  `other_metric_target_only`. The `same_metric` mapping in query 1 is keyword-based. A header it
+  doesn't recognize falls to `other_metric_target_only`, which is still a review state, never clean.
+  Read query 1 with query 3.
+- **Derived VPD.** When a file had no VPD column, VPD was computed from the row's imported
+  temperature and humidity. Before #2908, a humidity target could feed that calculation. Those
+  `vpd_kpa` readings (`raw_payload.vpd_source = 'derived'`) count as same-metric whenever a
+  temperature or humidity target header is present. Their value is a calculation, so it rarely
+  equals a target cell, and they usually appear as `same_metric_target_present`.
 - **°F targets:** an air-temperature setpoint in °F that was converted and saved shows as
-  `target_column_present`, not `value_equals_target_cell`, because the saved value is °C. Review those
+  `same_metric_target_present`, not `likely_saved_target`, because the saved value is °C. Review those
   by metric and header, not by value match.
 - **Equal by coincidence:** a real reading can equal the target cell (the grower hit the target).
-  `value_equals_target_cell` means _likely_, not proven. Proof needs the file's column order, which
+  `likely_saved_target` means _likely_, not proven. Proof needs the file's column order, which
   `raw_row` does not keep.
-- **SQL run on synthetic rows only, never on production.** On 2026-11-06 all three queries ran
-  in an in-process Postgres (PGlite 0.5.15) against nine labeled synthetic rows: target equal to value,
-  target different, non-numeric target cell, `raw_payload` NULL, `raw_row` a string, no `raw_row`, a
-  clean CSV row, a `manual` row and a BOM-prefixed `SP1` header. Each landed in the expected bucket.
-  The header regex matched `isTargetHeader` on 24/24 headers. The draft this replaces aborted on the
-  string `raw_row` (`cannot call jsonb_each_text on a non-object`). This proves the SQL text, not
-  production behavior; a production run is still `NOT_MEASURED`.
+- **SQL run on synthetic rows only, never on production.** See "Validation" below.
 - **Timing:** run after #2908 is live (live `/version.json` reports `01f30d11` or a descendant), so
-  no new affected rows land mid-audit. Record that SHA in the receipt.
+  no new affected rows land mid-audit. Record that SHA in the receipt. `practical observation`,
+  2026-11-06: live `/version.json` reported `01f30d11ad3337c3788e18fc46aae33a871e7677`, from a
+  read-only fetch; re-check it at run time.
 
 ## Receipt to record (the person who runs it)
 
-- Who ran it, seat, time (UTC), production project, live `/version.json` SHA.
-- Output of queries 1–3 as shown. **No** user ids, tent ids, row ids or raw values in any shared
-  channel.
-- Status: `PASS` only if query 1 returns zero rows **and** query 2 returns zero rows. Otherwise
-  `FAIL` (affected rows may exist) or `NOT_MEASURED` (could not run).
+- Who ran it, seat, time (UTC), production project, live `/version.json` SHA, and query 0's
+  `run_as` and `bypasses_rls`.
+- Every result set from queries 0–3, each recorded separately. Write "0 rows" for an empty one.
+  **No** user ids, tent ids, row ids or raw values in any shared channel.
+- Status (AGENTS.md §15), decided in this order:
+  1. `NOT_MEASURED`: any query missing, errored or not recorded separately, or
+     `bypasses_rls` is not `true`.
+  2. `NO_DATA`: query 0 `csv_rows` = 0. There is nothing to classify. This is not a pass.
+  3. `FAIL`: query 1 has any `likely_saved_target` row. A defect is likely present; size the
+     correction from it.
+  4. `NEEDS_REVIEW` (unresolved, never a pass): query 1 has only `same_metric_target_present` or
+     `other_metric_target_only` rows, or query 2 has any row.
+  5. `PASS`: only when query 0 `csv_rows` > 0 and `bypasses_rls` = `true`, and queries 1 and 2
+     each returned an actual empty result set.
+
+## Validation (synthetic rows only)
+
+`practical observation`, 2026-11-06. This proves the SQL text, not production behavior. No real
+database was contacted.
+
+- **Engine:** in-process Postgres (PGlite 0.5.15) in a scratch directory outside the repo. The
+  table is a minimal `public.sensor_readings (id, user_id, tent_id, metric, value numeric,
+captured_at, created_at, source, raw_payload jsonb)`.
+- **13 synthetic rows, each labeled:**
+  - soil temp saved 30 with `soil_temp_target_c=30`: `likely_saved_target`
+  - soil temp saved 20 from the same file: `same_metric_target_present`
+  - humidity 50 with `humidity_target=60`, plus a non-numeric `Hum SetPt` cell in the same file: no
+    abort, `same_metric_target_present`
+  - derived VPD with `humidity_target`: `same_metric_target_present`
+  - CO₂ with only `humidity_target`: `other_metric_target_only`
+  - one reading with two target headers: counted once
+  - `raw_payload` NULL, `raw_row` a string, `raw_row` `{}`, no `raw_row`: all in query 2
+  - a clean CSV row and a `manual` row with a target header: excluded
+  - a BOM-prefixed `SP1` header: matched (`other_metric_target_only`; `SP1` names no metric)
+- **Gates:**
+  - the results matched expectations
+  - under an RLS-filtered non-owner role, query 0 reads `bypasses_rls = false` and `csv_rows = 0`,
+    and queries 1–3 return 0 rows, so the receipt rule gives `NOT_MEASURED`
+  - a `DELETE` inside `BEGIN TRANSACTION READ ONLY` was refused
+  - the header regex matched `isTargetHeader` on 24/24 headers
+- **Defects fixed relative to the earlier drafts:**
+  - an abort on a non-object `raw_row`
+  - an AND-ordered numeric cast
+  - a CTE referenced from a second statement
+  - a PASS rule that read an empty or RLS-hidden result as clean (independent review P2-1)
 
 ## Not authorized by this spec
 
 Any UPDATE/DELETE; corrections through `manual_sensor_correction_operations`, the CSV batch undo
 proposed in #2909, or otherwise; grower notifications; exports; or AI Doctor/alert re-runs. If rows
 are found, the next step is a separate correction proposal (append-only, owner-approved), sized from
-query 1 and query 3.
+queries 1 and 3.

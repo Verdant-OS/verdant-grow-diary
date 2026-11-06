@@ -1,6 +1,7 @@
 # Read-only audit: CSV readings that may be saved target/setpoint values
 
-**Status:** spec only, 2026-11-06 (round 3). Never run on production. No result exists yet.
+**Status:** spec only, 2026-11-06. Merged in #2912 as `ac97a03c404ca39fcd198ebd40efe43cb81e5ca9`;
+query 4 added after merge (review 5796150535, P3-2). Never run on production. No result exists yet.
 **Author:** Claude (CSV-TARGET-SETPOINT-EXCLUSION workstream). Fixes covered: #2908 (targets and
 setpoints, merged as `01f30d11ad3337c3788e18fc46aae33a871e7677`) and #2911 (limits, alarms and
 thresholds, merged as `cc8da1790d35ea0c41a788ce0593d8e4c3c9b9ac`).
@@ -66,7 +67,7 @@ receipt for such a run must say which head the matcher equals.
 one. Several SQL tools return only the last statement of a multi-statement script, so never paste
 these as one script. Use one read-only snapshot where the client allows it (in `psql`:
 `BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;`, then each query, then `ROLLBACK;`),
-so all four queries see the same rows. Every query is a plain `SELECT`.
+so all five queries see the same rows. Every query is a plain `SELECT`.
 
 **Query 0: denominator and visibility.** It always returns one row.
 
@@ -174,7 +175,8 @@ ORDER BY metric;
 
 **Query 3: which header spellings occurred.** Header names only, with no values or ids. Headers
 are grower-written text and may hold a name or markup, so **query 3's output stays in the
-restricted console**. The shared receipt gives only its row count and per-pattern counts.
+restricted console**. The shared receipt gives only its row count. Per-pattern counts come from
+query 4, which returns no header text.
 
 ```sql
 SELECT kv.key AS target_header, count(DISTINCT r.id) AS readings
@@ -190,6 +192,37 @@ GROUP BY kv.key
 ORDER BY readings DESC, kv.key
 LIMIT 50;
 ```
+
+**Query 4: per-pattern counts, safe to share.** Counts only, with no header text, values or ids.
+Each matched header spelling gets exactly one pattern: the first alternative it matches, in the
+order target/setpoint, then limit/alarm, then standalone. The three patterns are the same
+alternatives as queries 1 and 3. It returns one row per pattern present.
+
+```sql
+SELECT CASE
+         WHEN lower(kv.key) ~ '(target|goal|desired|ideal|set[[:space:]_.-]?p(oin)?t)'
+           THEN '1_target_setpoint'
+         WHEN lower(kv.key) ~ '(limit|alarm|alert|threshold|trigger)'
+           THEN '2_limit_alarm'
+         ELSE '3_standalone'
+       END AS pattern,
+       count(DISTINCT kv.key) AS header_spellings,
+       count(DISTINCT r.id)   AS readings
+FROM (
+  SELECT id, raw_payload FROM public.sensor_readings
+  WHERE source = 'csv' AND jsonb_typeof(raw_payload -> 'raw_row') = 'object'
+) r
+CROSS JOIN LATERAL jsonb_each_text(r.raw_payload -> 'raw_row') AS kv
+WHERE lower(kv.key) ~ '(target|goal|desired|ideal|set[[:space:]_.-]?p(oin)?t)'
+     OR lower(kv.key) ~ '(limit|alarm|alert|threshold|trigger)'
+     OR lower(kv.key) ~ '(^|[^a-z])(tgt|sp|s\.p\.?|set|setting)([^a-z]|$)'
+GROUP BY 1
+ORDER BY 1;
+```
+
+`header_spellings` can be summed: when query 3 returned fewer than 50 rows, the sum equals query 3's
+row count. `readings` cannot be summed, because one reading whose file has headers of two patterns
+counts once in each.
 
 ## Known limits
 
@@ -221,9 +254,9 @@ LIMIT 50;
 
 - Who ran it, seat, time (UTC), production project ref, live `/version.json` SHA, and query 0's
   `run_as` and `bypasses_rls`.
-- Results of queries 0–2, each recorded separately ("0 rows" for an empty one). For query 3, give
-  only its row count and per-pattern counts (target/setpoint, limit/alarm, standalone), never the
-  header text (see query 3). **No** user ids, tent ids, row ids, header text or raw values in any
+- Results of queries 0–2 and 4, each recorded separately ("0 rows" for an empty one). For query 3,
+  give only its row count, never the header text (see query 3). Per-pattern counts
+  (target/setpoint, limit/alarm, standalone) are query 4's result, copied as returned. **No** user ids, tent ids, row ids, header text or raw values in any
   shared channel.
 - Status (AGENTS.md §15). Apply the first rule that holds:
   1. `NOT_MEASURED` when any of these is true:
@@ -231,6 +264,8 @@ LIMIT 50;
      - `bypasses_rls` is not `true`
      - the production project ref or live SHA is not recorded and verified
      - the reconciliation fails: `csv_rows − csv_rows_with_raw_row` must equal the query 2 total
+     - query 3 returned fewer than 50 rows and the sum of query 4's `header_spellings` differs
+       from query 3's row count
   2. `NO_DATA`: query 0 `csv_rows` = 0. There is nothing to classify. This is not a pass.
   3. `FAIL (likely)`: query 1 has any `likely_saved_target` row, meaning a value equal to a
      target cell on a same-metric header. That is strong evidence, not proof (see "Equal by
@@ -278,6 +313,14 @@ captured_at, created_at, source, raw_payload jsonb)`.
   - the header test matched `isTargetHeader` at `cc8da179` on 36/36 headers. The function was
     loaded from that commit's source, and the headers included limit/alarm/alert/threshold/trigger
     spellings and look-alikes (`Sunset`, `Offset`, `Speed`, `Spectrum`, `Tgt2`, `Limiter`)
+- **Query 4 (closeout, after merge), same engine, 22 synthetic rows:** the 19 above plus three
+  labeled rows for first-match order: `co2_target_alarm` (target and alarm) lands in
+  `1_target_setpoint`; `Alarm SP` (alarm and standalone `sp`) lands in `2_limit_alarm`; `set` alone
+  lands in `3_standalone`. Result: `1_target_setpoint` 10 spellings / 12 readings, `2_limit_alarm`
+  2 / 2, `3_standalone` 2 / 2. The sum of `header_spellings` (14) equals query 3's row count (14),
+  and query 4's `WHERE` clause is text-identical to query 3's. Under the RLS-filtered non-owner role,
+  query 4 returns 0 rows with `bypasses_rls = false`. Queries 0–3 were re-run unchanged: the 19
+  original rows kept their classifications.
 - **Defects fixed relative to the earlier drafts:**
   - an abort on a non-object `raw_row`
   - an AND-ordered numeric cast

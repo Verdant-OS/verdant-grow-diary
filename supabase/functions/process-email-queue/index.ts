@@ -1,5 +1,12 @@
 import { sendLovableEmail } from "npm:@lovable.dev/email-js";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+
+type EmailQueueMessage = {
+  msg_id: number;
+  message: Record<string, unknown>;
+  read_ct?: number;
+  enqueued_at?: string;
+};
 
 const MAX_RETRIES = 5;
 const DEFAULT_BATCH_SIZE = 10;

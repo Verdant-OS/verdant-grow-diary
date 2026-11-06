@@ -1,7 +1,8 @@
 # SENSORS-PAGE-SECTIONS-SPEC
 
 ```text
-TASK SENSORS-PAGE-SECTIONS-SPEC  priority: other  status: OPEN
+TASK SENSORS-PAGE-SECTIONS-SPEC  priority: other  status: CLOSED
+closed: merged. #2833 merged into verdant-grow-diary on 2026-11-04 as df8de1800b3a736fbceb7e4b4e577f60aa41ec90 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Spec splitting Sensors into Daily readings, History & import, and Connect & diagnostics, with founder decisions D1-D3.
 why: Live audit 2026-11-03 finding 7. Source-traced: SensorsTestbenchPanel (testbench, bridge tokens, command examples) renders for any grower whose server live-sensor gate is open, on the same scroll as daily readings; operator diagnostics are already role-gated.
 branch: claude/sensors-page-sections-spec
@@ -29,5 +30,5 @@ reviewer_sha: see PR
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
 owner: Claude
-last_updated: 2026-11-03 22:55 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-03 22:55 CT, by Claude)
 ```

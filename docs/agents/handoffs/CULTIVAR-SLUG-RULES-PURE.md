@@ -1,7 +1,8 @@
 # CULTIVAR-SLUG-RULES-PURE
 
 ```text
-TASK CULTIVAR-SLUG-RULES-PURE  priority: other  status: OPEN
+TASK CULTIVAR-SLUG-RULES-PURE  priority: other  status: CLOSED
+closed: merged. #2883 merged into verdant-grow-diary on 2026-11-05 as e4c2fc02dda02d28bab3529f62ba311df6570a57 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Move the Supabase I/O out of src/lib/cultivarSlugRouteRules.ts into src/lib/cultivarSlugRouteService.ts so the rules file is pure (AGENTS.md §5), with /cultivars/$slug behavior unchanged, including the catalog 503 from #2777.
 why: cultivarSlugRouteRules.ts was the only root-level *Rules.ts importing @/integrations/supabase/client (added by #2758, changed by #2777). Recorded as drift at af6a416d in docs/architecture-contract.md and as an open follow-up in docs/agents/handoffs/ARCH-CONTRACT-RESTAMP-AF6A416D.md and docs/audits/architecture-contract-collision-audit-2026-11-04.md.
 branch: claude/blissful-pasteur-3rt3xi
@@ -29,5 +30,5 @@ reviewer_sha: none yet
 session_state: no routines, no paused workflows; merge and ready-for-review are not authorized by this task
 claimed_by: Claude session session_017UoYKw3nGZoQ8yQWt5kYNR, 2026-11-05 00:12 CT
 owner: Claude (this session)
-last_updated: 2026-11-05 00:29 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-05 00:29 CT, by Claude)
 ```

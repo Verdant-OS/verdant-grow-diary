@@ -1,7 +1,8 @@
 # CREATE-TENT-PLANT-FIELD-LABELS
 
 ```text
-TASK CREATE-TENT-PLANT-FIELD-LABELS  priority: other  status: OPEN
+TASK CREATE-TENT-PLANT-FIELD-LABELS  priority: other  status: CLOSED
+closed: merged. #2824 merged into verdant-grow-diary on 2026-11-04 as 10b4257bf21c2173bda374ba3d306fd5bd6fe422 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Tie every field label in the Create Tent and Create Plant forms to its control so assistive tech announces it.
 why: Live audit 2026-11-03 finding 12 follow-up. New Grow's unlabelled fields are fixed in #2823; the same pattern remained in Create Tent (Size, Brand, Stage) and Create Plant (Stage, Type, Tent, Strain, Health, Started at).
 branch: claude/create-tent-plant-field-labels
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-03
 owner: Claude
-last_updated: 2026-11-03 17:08 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-03 17:08 CT, by Claude)
 ```

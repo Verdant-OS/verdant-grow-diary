@@ -1,7 +1,8 @@
 # GROWER-BUGS-10
 
 ```text
-TASK GROWER-BUGS-10  priority: P1  status: OPEN
+TASK GROWER-BUGS-10  priority: P1  status: CLOSED
+closed: merged. #2844 merged into verdant-grow-diary on 2026-11-04 as e818fc27f865f0843e38ea6bdd4e09f918ec29da (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: grower bug brief 2026-11-03 item 10 / issue #2785 - plant, tent and timeline tabs crash or hang; per-plant Timeline worst
 why: measured in mocked Chromium at verdant-grow-diary 773635e: 100 Timeline entries with 12 MP photos took the renderer to ~1,509 MB after scrolling (no photos ~419 MB, 800x600 photos ~646 MB); JS heap ~56-75 MB in all runs; zero REST calls after settle (no refetch loop). Cause: every entry photo renders the original camera file
 branch: claude/grower-bugs-10 (founder-named, 2026-11-04)
@@ -27,5 +28,5 @@ reviewer_sha: f4ecf5bc (Reviewer A FAIL, P2 handoff; Reviewer B PASS); new head 
 session_state: Claude session also watches PRs #2820, #2828, #2842
 claimed_by: Claude, 2026-11-04 02:45 UTC
 owner: Claude
-last_updated: 2026-11-04 18:25 UTC, by Claude session_017UoYKyhNGum4qmfYdoNRLr
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04 18:25 UTC, by Claude session_017UoYKyhNGum4qmfYdoNRLr)
 ```

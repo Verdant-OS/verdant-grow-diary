@@ -1,7 +1,8 @@
 # TOUCH-TARGET-MINIMUM
 
 ```text
-TASK TOUCH-TARGET-MINIMUM  priority: other  status: OPEN
+TASK TOUCH-TARGET-MINIMUM  priority: other  status: CLOSED
+closed: merged. #2841 merged into verdant-grow-diary on 2026-11-04 as a7652479f7959b52de3bb9474a6ae748245eba8a (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Every icon-only button is at least 24x24 CSS px (WCAG 2.2 AA 2.5.8), with a guard.
 why: Audit 2026-11-03 finding 12 listed touch targets as unmeasured; docs/specs/contrast-tokens.md section 7 left it for its own pass. A syntax-tree scan found six icon-only buttons at 12-20px, including the shared InfoPopover trigger that documents itself as built for gloved hands.
 branch: claude/touch-target-audit
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
 owner: Claude
-last_updated: 2026-11-03 21:05 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-03 21:05 CT, by Claude)
 ```

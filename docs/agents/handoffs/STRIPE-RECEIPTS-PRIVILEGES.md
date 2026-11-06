@@ -1,7 +1,8 @@
 # STRIPE-RECEIPTS-PRIVILEGES
 
 ```text
-TASK STRIPE-RECEIPTS-PRIVILEGES  priority: P2  status: OPEN
+TASK STRIPE-RECEIPTS-PRIVILEGES  priority: P2  status: CLOSED
+closed: merged. #2876 merged into verdant-grow-diary on 2026-11-05 as 7d720e705c969321aa4411e35ca4bd52bfb622b7 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: remove client privileges on public.stripe_payment_receipts. PUBLIC and anon get none, authenticated keeps SELECT (owner-read policy stripe_receipts_owner_read), service_role keeps all.
 why: #2873 (merged 2026-11-04 23:29:59 UTC as 7e4d79df) recorded the table as production carries it. Production shows anon and authenticated with all table privileges (source claim: #2873's catalog read, ~18:40 UTC), including TRUNCATE, which RLS does not cover. Reviewer D raised it as P3-2 on #2873. Owner decision, Matthew, 2026-11-04, own words in session_017UoYKyYn6zdpJ8hDJwznA7: "yes, tighten it, as its own small PR after #2873 lands. Leaving TRUNCATE open on a money table helps no one, and any Stripe code ported later should never depend on client writes to it."
 branch: claude/gracious-meitner-m22v39
@@ -28,5 +29,5 @@ reviewer_sha: none yet
 session_state: no paused workflows; pending human decisions listed under blockers
 claimed_by: Claude session_017UoYKyYn6zdpJ8hDJwznA7, 2026-11-04 23:45 UTC
 owner: Claude session_017UoYKyYn6zdpJ8hDJwznA7
-last_updated: 2026-11-05 01:30 UTC, by Claude session_017UoYKyYn6zdpJ8hDJwznA7 (moved the verification query out of supabase/tests after the test-execution manifest failed shard 1)
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-05 01:30 UTC, by Claude session_017UoYKyYn6zdpJ8hDJwznA7 (moved the verification query out of supabase/tests after the test-execution manifest failed shard 1))
 ```

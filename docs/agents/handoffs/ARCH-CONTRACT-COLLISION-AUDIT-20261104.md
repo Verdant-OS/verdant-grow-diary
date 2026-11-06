@@ -1,7 +1,8 @@
 # ARCH-CONTRACT-COLLISION-AUDIT-20261104
 
 ```text
-TASK ARCH-CONTRACT-COLLISION-AUDIT-20261104  priority: other  status: OPEN
+TASK ARCH-CONTRACT-COLLISION-AUDIT-20261104  priority: other  status: CLOSED
+closed: merged. #2871 merged into verdant-grow-diary on 2026-11-04 as 098190d1b6e9ad73ebf870f785c56066aef052f6 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Record the 2026-11-04 collision audit for the architecture-contract and release-topology assignment at deploy tip 790559c5c45af9f4056f9fb89f09756cdcf20373: both deliverables exist (#2864 merged as the tip; #2858 open), no cited file changed since the af6a416d stamp, and the stack conclusions hold at the tip except the two known assignment-text errors. Docs only; no competing contract or spec.
 why: Matthew's standing architecture/specification assignment asks for a contract and a topology spec after a collision audit. The audit found both already delivered and maintained, so the deliverable is a dated receipt plus a routed next action, the same shape the founder chose on 2026-10-28 (#2572) and 2026-10-29 (#2622).
 branch: claude/ai-adoption-token-doctor-2vdycu
@@ -29,5 +30,5 @@ reviewer_sha: 24c0673d219504073129f3b39cf2b7d944044404 (PASS, P3 only, review 57
 session_state: Claude cloud session_017UoYKusgHQUETXKtkGNWZi holds the branch and is subscribed to the PR; no scheduled tasks, no paused workflows; pending human decision: whether to merge a receipt or only read it
 claimed_by: Claude session_017UoYKusgHQUETXKtkGNWZi, 2026-11-04 18:20 UTC
 owner: Claude session_017UoYKusgHQUETXKtkGNWZi
-last_updated: 2026-11-04 19:45 UTC, by Claude session_017UoYKusgHQUETXKtkGNWZi
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04 19:45 UTC, by Claude session_017UoYKusgHQUETXKtkGNWZi)
 ```

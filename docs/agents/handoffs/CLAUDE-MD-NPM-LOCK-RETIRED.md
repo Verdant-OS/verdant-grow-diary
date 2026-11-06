@@ -1,7 +1,8 @@
 # CLAUDE-MD-NPM-LOCK-RETIRED
 
 ```text
-TASK CLAUDE-MD-NPM-LOCK-RETIRED  priority: other  status: OPEN
+TASK CLAUDE-MD-NPM-LOCK-RETIRED  priority: other  status: CLOSED
+closed: merged. #2853 merged into verdant-grow-diary on 2026-11-04 as d31d0433603cf4ced18eb6e5e22b013d6ae360c1 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Stop CLAUDE.md from calling package-lock.json a "synchronized compatibility lock". #1873 retired it; bun.lock is the only lockfile and package-lock.json is forbidden.
 why: The architecture contract audit of 2026-11-04 (deploy tip e3ecc2b2214314526c9149000ac5932351fd82cd) found the stale wording in CLAUDE.md "Repository operating facts" and "Daily commands". Every Claude session loads CLAUDE.md, so the stale wording teaches a retired setup. Matthew asked for this slice.
 branch: claude/claude-md-npm-lock-retired
@@ -29,5 +30,5 @@ reviewer_sha: 8914868cb66cf1c05dec7e83327ae43afc131229 (superseded; needs re-rev
 session_state: PR activity subscription and a safety-net check-in in the author session; no paused workflows; pending human decision: Matthew's merge yes at the new head
 claimed_by: Claude session_017UoYKywiErQ3bEQMo9dYGe, 2026-11-03 22:15 CT
 owner: Claude session_017UoYKywiErQ3bEQMo9dYGe
-last_updated: 2026-11-04 09:30 UTC, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04 09:30 UTC, by Claude)
 ```

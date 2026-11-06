@@ -1,7 +1,8 @@
 # GROWER-BUGS-11
 
 ```text
-TASK GROWER-BUGS-11  priority: P1  status: OPEN
+TASK GROWER-BUGS-11  priority: P1  status: CLOSED
+closed: merged. #2851 merged into verdant-grow-diary on 2026-11-04 as 379e9311dae05e6da27385de9ef41c9cafec1745 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: grower bug brief 2026-11-03 item 11 - after sign-in /onboarding flashes a blank body before the dashboard; first load sometimes fails with ERR_CONNECTION_CLOSED
 why: measured in mocked Chromium: a grower with grows goes /auth -> /onboarding ("Loading your grows...") -> `/`, and `/` showed ~1 s of blank page before the dashboard. Cause: RootEntry kept its own `hydrated` useState(false)+useEffect, so every client-side mount for a signed-in grower first rendered and lazy-loaded the public Landing behind an invisible Suspense loader, then swapped to AppShell
 branch: claude/grower-bugs-11 (founder-named, 2026-11-04)
@@ -27,5 +28,5 @@ reviewer_sha: none yet
 session_state: Claude session also watches PRs #2820, #2828, #2842, #2844, #2846
 claimed_by: Claude, 2026-11-04 04:20 UTC
 owner: Claude
-last_updated: 2026-11-04 19:00 UTC, by Claude session_017UoYKyhNGum4qmfYdoNRLr (restored as its own file after a base merge dropped the HANDOFF_LOG block)
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04 19:00 UTC, by Claude session_017UoYKyhNGum4qmfYdoNRLr (restored as its own file after a base merge dropped the HANDOFF_LOG block))
 ```

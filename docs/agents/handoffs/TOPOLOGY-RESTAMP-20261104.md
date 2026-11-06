@@ -1,7 +1,8 @@
 # TOPOLOGY-RESTAMP-20261104
 
 ```text
-TASK TOPOLOGY-RESTAMP-20261104  priority: other  status: OPEN
+TASK TOPOLOGY-RESTAMP-20261104  priority: other  status: CLOSED
+closed: merged. #2858 merged into verdant-grow-diary on 2026-11-04 as f386c7695266c1e6338a551164da52475138bc0f (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: slice C of the architecture work. Re-verify docs/specs/release-topology-specification.md at deploy tip 776ff8d62d87309c08b1ac9e261c108cb99e679a (#2828) without duplicating the merged contract (#2622).
 why: Matthew chose slice C on 2026-11-04 after Grok ran out of tokens. The three PRs it waited on had resolved: #2539 merged, #2609 and #2589 closed unmerged.
 branch: claude/blissful-pasteur-ntlsw7
@@ -29,5 +30,5 @@ reviewer_sha: none at the current head (latest stale: b15751e618e92ce698528ee500
 session_state: Claude cloud session 017UoYKwUSLxBTGDKmDQqxii; subscribed to PR #2858; no production access; no scheduled check-ins
 claimed_by: Claude session_017UoYKwUSLxBTGDKmDQqxii, 2026-11-04 05:35 UTC
 owner: Claude
-last_updated: 2026-11-04 19:55 UTC, by Claude session_017UoYKwUSLxBTGDKmDQqxii (moved to per-file entry; review P2/P3 fixes)
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04 19:55 UTC, by Claude session_017UoYKwUSLxBTGDKmDQqxii (moved to per-file entry; review P2/P3 fixes))
 ```

@@ -1,7 +1,8 @@
 # ECOWITT-CUSTOM-UPLOAD-INGEST-PATH
 
 ```text
-TASK ECOWITT-CUSTOM-UPLOAD-INGEST-PATH  priority: other  status: OPEN
+TASK ECOWITT-CUSTOM-UPLOAD-INGEST-PATH  priority: other  status: CLOSED
+closed: merged. #2849 merged into verdant-grow-diary on 2026-11-04 as 52676d16bb59677e9aed8391b73e5fc8f91cf3b9 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: The EcoWitt custom-upload station card shows only rows the custom-upload planner wrote. Each planned row carries raw_payload.ingest_path = "ecowitt_custom_upload" and raw_payload.claim_id.
 why: P3-1 from the exact-head reviews of #2732 at 191af23c75310e239318b996276365c7df9c346e (Seat D fix request, Seat C note). With an active claim, live rows from the older passkey bridge (supabase/functions/ecowitt-ingest) on the same tent rendered under the custom-upload card. Genuinely live, but the card misstated which pathway produced them.
 branch: claude/relaxed-fermat-aladcl
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access; no Publish, APPLY, device or Action Queue operation
 claimed_by: Claude session_017UoYKxbtbUu2bCt65XUPv7, 2026-11-04
 owner: Claude
-last_updated: 2026-11-04 12:35 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-04 12:35 CT, by Claude)
 ```

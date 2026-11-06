@@ -1,7 +1,8 @@
 # ERROR-ANNOUNCEMENTS
 
 ```text
-TASK ERROR-ANNOUNCEMENTS  priority: other  status: OPEN
+TASK ERROR-ANNOUNCEMENTS  priority: other  status: CLOSED
+closed: merged. #2845 (branch claude/error-announcements) merged into verdant-grow-diary on 2026-11-04 as 68871377bd1969b71d8894d4fe1b9bf2197f9503 (final SHA; GitHub API, read 2026-11-06). Related later batches with their own entries: #2852 (8005737d8800b2de496aee8c56f58aae5b0a09ec, GROW-ROOM-ERROR-ANNOUNCEMENTS), #2855 (8ac41be75922e2e894eed551361a9d03ec34ad87, AI-DOCTOR-SESSIONS-ERROR-ANNOUNCEMENTS), #2856 (f95bfeb84e3854f4877601350d40435fb9d197da). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Every error element in the One-Tent Loop entry forms (Quick Log, Create Tent, Create Plant, Grows, the Sensors manual reading card) announces itself to screen readers, and the field errors are tied to their inputs.
 why: Grower UX audit 2026-11-03 finding 12 (screen reader): four error messages had no role="alert"/status or aria-live, so a screen-reader user never heard that a value or a load was refused.
 branch: claude/error-announcements
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
 owner: Claude
-last_updated: 2026-11-03 21:45 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-03 21:45 CT, by Claude)
 ```

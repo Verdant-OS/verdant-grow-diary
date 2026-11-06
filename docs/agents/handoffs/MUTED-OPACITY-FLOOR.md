@@ -1,7 +1,8 @@
 # MUTED-OPACITY-FLOOR
 
 ```text
-TASK MUTED-OPACITY-FLOOR  priority: other  status: OPEN
+TASK MUTED-OPACITY-FLOOR  priority: other  status: CLOSED
+closed: merged. #2840 merged into verdant-grow-diary on 2026-11-04 as f071075d10d1036253879d91d3ccadd0a044cb78 (final SHA; GitHub API, read 2026-11-06). Closed in bulk by Claude session_017UoYKyU27JPpmSh3Cbj7EK on 2026-11-06 at Matthew's request (source claim: his answer in that session). This close does not resolve the post_merge_check, open_questions or blockers below; they are carried forward in docs/agents/handoffs/CLAUDE-HANDOFF-BULK-CLOSE-20261106.md.
 goal: Implement contrast decision D2 (a): no meaningful muted text at /70 or fainter; only aria-hidden decoration may go fainter; a guard keeps it that way.
 why: Audit 2026-11-03 finding 12; docs/specs/contrast-tokens.md (#2827) measured muted text at /70 and below at 2.1-4.0:1 (fails AA). Matthew chose D2 (a) on 2026-11-04.
 branch: claude/muted-opacity-floor
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access
 claimed_by: Claude session_017UoYKwwZkbqmWvtCRMw1DZ, 2026-11-04
 owner: Claude
-last_updated: 2026-11-03 19:20 CT, by Claude
+last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (bulk close; previous 2026-11-03 19:20 CT, by Claude)
 ```

@@ -1,5 +1,12 @@
 import type { RefreshReflection } from "@/lib/fieldNotebookOutcomeRules";
 
+function countShowsEntry(cache: unknown, id: string): boolean {
+  if (Array.isArray(cache)) return cache.length > 0 && containsId(cache, id);
+  if (!cache || typeof cache !== "object" || !("count" in cache)) return false;
+  const count = (cache as { count: unknown }).count;
+  return typeof count === "number" && Number.isFinite(count) && count > 0 && containsId(cache, id);
+}
+
 function containsId(value: unknown, id: string): boolean {
   if (value === id) return true;
   if (Array.isArray(value)) return value.some((item) => containsId(item, id));
@@ -15,9 +22,7 @@ export function reflectionFromEvidence(input: {
   growEventId: string;
 }): RefreshReflection {
   const timelineHit = input.timelineCaches.some((cache) => containsId(cache, input.growEventId));
-  const counted = input.timelineCaches.some(
-    (cache) => Array.isArray(cache) && cache.length > 0 && containsId(cache, input.growEventId),
-  );
+  const counted = input.timelineCaches.some((cache) => countShowsEntry(cache, input.growEventId));
   const newest = input.recentItems?.[0];
   return {
     timelineHasEntry: timelineHit,

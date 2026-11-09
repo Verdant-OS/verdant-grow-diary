@@ -1,20 +1,59 @@
 import { emptyDraft, type NotebookDraft } from "@/lib/fieldNotebookOutcomeRules";
 
-/** In-memory only. A reload still drops drafts (#2806). */
-const drafts = new Map<string, NotebookDraft>();
+/**
+ * In-memory only, one map per signed-in account. A reload still drops drafts
+ * (#2806). The active owner changes only through the auth identity fence.
+ */
+const stores = new Map<string, Map<string, NotebookDraft>>();
+let activeOwnerId: string | null = null;
 
-export function readNotebookDraft(tentId: string): NotebookDraft {
-  return drafts.get(tentId) ?? emptyDraft(tentId);
+function ownerKey(userId: string | null): string {
+  return userId ?? "";
 }
 
-export function writeNotebookDraft(draft: NotebookDraft): void {
-  drafts.set(draft.tentId, draft);
+function storeFor(userId: string | null): Map<string, NotebookDraft> {
+  const key = ownerKey(userId);
+  let store = stores.get(key);
+  if (!store) {
+    store = new Map();
+    stores.set(key, store);
+  }
+  return store;
+}
+
+export function notebookSessionOwner(): string | null {
+  return activeOwnerId;
+}
+
+/** Drop the previous account's drafts, then publish the next owner. */
+export function adoptNotebookSessionOwner(userId: string | null): void {
+  if (userId === activeOwnerId) return;
+  stores.delete(ownerKey(activeOwnerId));
+  activeOwnerId = userId;
+  storeFor(userId);
+}
+
+export function readNotebookDraft(tentId: string): NotebookDraft {
+  return storeFor(activeOwnerId).get(tentId) ?? emptyDraft(tentId);
+}
+
+/**
+ * Writes land only for the owner captured when the attempt started.
+ * A late write from the previous account is dropped.
+ */
+export function writeNotebookDraft(
+  draft: NotebookDraft,
+  asOwner: string | null = activeOwnerId,
+): boolean {
+  if (asOwner !== activeOwnerId) return false;
+  storeFor(activeOwnerId).set(draft.tentId, draft);
+  return true;
 }
 
 export function notebookDrafts(): NotebookDraft[] {
-  return [...drafts.values()];
+  return [...storeFor(activeOwnerId).values()];
 }
 
 export function clearNotebookSession(): void {
-  drafts.clear();
+  stores.delete(ownerKey(activeOwnerId));
 }

@@ -216,9 +216,63 @@ export function backToNote(draft: NotebookDraft): NotebookDraft {
   return { ...draft, phase: "uncertain", writeBlocked: true };
 }
 
-/** J1 acknowledgement is the only path that clears the draft. */
+/**
+ * J1 clears the confirmed attempt. Text typed after that attempt was submitted
+ * stays in the editor.
+ */
 export function acknowledgeFound(draft: NotebookDraft): NotebookDraft {
-  return emptyDraft(draft.tentId);
+  const cleared = emptyDraft(draft.tentId);
+  const submitted = draft.attempt?.note;
+  if (submitted != null && draft.note !== submitted) {
+    return { ...cleared, note: draft.note };
+  }
+  return cleared;
+}
+
+/** Apply a Timeline check without replacing text typed while the read was in flight. */
+export function draftAfterTimelineCheck(
+  started: NotebookDraft,
+  liveNote: string,
+  reconciled: ReconcileResult,
+): NotebookDraft {
+  const note = liveNote;
+  const verified =
+    reconciled.status === "found" &&
+    started.attempt &&
+    reconciled.entry.note === started.attempt.note &&
+    reconciled.entry.tentId === started.tentId
+      ? reconciled.entry
+      : null;
+  if (verified) {
+    return {
+      ...started,
+      note,
+      phase: "check_found",
+      verifiedEntry: verified,
+      serverOccurredAt: verified.occurredAt,
+      knownEventId: verified.growEventId,
+      writeBlocked: true,
+      recoverySurface: "timeline",
+    };
+  }
+  if (reconciled.status === "none") {
+    return {
+      ...started,
+      note,
+      phase: "check_none",
+      verifiedEntry: null,
+      writeBlocked: true,
+      recoverySurface: "timeline",
+    };
+  }
+  return {
+    ...started,
+    note,
+    phase: "uncertain",
+    verifiedEntry: null,
+    writeBlocked: true,
+    recoverySurface: "grow",
+  };
 }
 
 export function mayRetry(draft: NotebookDraft): boolean {

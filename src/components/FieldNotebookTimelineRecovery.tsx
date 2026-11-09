@@ -1,6 +1,12 @@
 import { useState } from "react";
+import NotebookRouteLink from "@/components/NotebookRouteLink";
 import { acknowledgeFound, backToNote, type NotebookDraft } from "@/lib/fieldNotebookOutcomeRules";
-import { notebookDrafts, writeNotebookDraft } from "@/lib/fieldNotebookSession";
+import {
+  notebookDrafts,
+  notebookSessionOwner,
+  readNotebookDraft,
+  writeNotebookDraft,
+} from "@/lib/fieldNotebookSession";
 import { formatFoundTitle, formatServerClockLabel } from "@/lib/fieldNotebookViewModel";
 
 /** Recovery for attempts that navigated here. State stays in memory for this session. */
@@ -36,8 +42,8 @@ export default function FieldNotebookTimelineRecovery() {
                   type="button"
                   className="mt-2 min-h-11 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
                   onClick={() => {
-                    const cleared = acknowledgeFound(draft);
-                    writeNotebookDraft(cleared);
+                    const cleared = acknowledgeFound(readNotebookDraft(draft.tentId));
+                    writeNotebookDraft(cleared, notebookSessionOwner());
                     setDrafts((current) => current.filter((item) => item.tentId !== draft.tentId));
                   }}
                 >
@@ -61,9 +67,12 @@ export default function FieldNotebookTimelineRecovery() {
                 </button>
               </>
             )}
-            <a href="/" className="mt-2 inline-flex min-h-11 items-center text-sm underline">
+            <NotebookRouteLink
+              to="/"
+              className="mt-2 inline-flex min-h-11 items-center text-sm underline"
+            >
               Back to the grow
-            </a>
+            </NotebookRouteLink>
           </div>
         );
       })}

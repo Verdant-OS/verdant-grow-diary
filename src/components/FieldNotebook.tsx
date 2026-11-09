@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import NotebookRouteLink from "@/components/NotebookRouteLink";
 import {
   acknowledgeFound,
   applyTransport,
   backToNote,
+  draftAfterTimelineCheck,
   maySubmit,
   reconcileAttempt,
   type FieldNotebookAttempt,
@@ -13,6 +15,7 @@ import {
 } from "@/lib/fieldNotebookOutcomeRules";
 import {
   clearNotebookSession,
+  notebookSessionOwner,
   readNotebookDraft,
   writeNotebookDraft,
 } from "@/lib/fieldNotebookSession";
@@ -107,8 +110,8 @@ export default function FieldNotebook({
 
   if (!selected || !draft) return null;
 
-  function put(next: NotebookDraft) {
-    writeNotebookDraft(next);
+  function put(next: NotebookDraft, asOwner: string | null = notebookSessionOwner()) {
+    writeNotebookDraft(next, asOwner);
     setDrafts((prev) => ({ ...prev, [next.tentId]: next }));
   }
 
@@ -117,6 +120,7 @@ export default function FieldNotebook({
     if (kind === "save" && !maySubmit(live)) return;
     if (kind === "retry" && live.phase !== "clear_failure") return;
     const attempt = beginAttempt(live, selected.name, kind === "retry");
+    const ownerAtSubmit = notebookSessionOwner();
     const frozen: NotebookDraft = {
       ...live,
       phase: "saving",
@@ -140,7 +144,7 @@ export default function FieldNotebook({
         if (!current || current.attempt?.attemptId !== attempt.attemptId) return prev;
         if (current.note !== attempt.note || current.phase !== "saving") return prev;
         const next = applyTransport(current, response.transport, response.reflection);
-        writeNotebookDraft(next);
+        writeNotebookDraft(next, ownerAtSubmit);
         return { ...prev, [selected.id]: next };
       });
     } catch {
@@ -154,54 +158,32 @@ export default function FieldNotebook({
           return prev;
         }
         const next = applyTransport(current, { kind: "dispatched_no_receipt" }, NONE);
-        writeNotebookDraft(next);
+        writeNotebookDraft(next, ownerAtSubmit);
         return { ...prev, [selected.id]: next };
       });
     }
   }
 
   async function checkTimeline() {
-    const live = drafts[selected.id] ?? readNotebookDraft(selected.id);
-    const receipt = await onFindEntry(selected.id, live.knownEventId);
+    const tentId = selected.id;
+    const started = drafts[tentId] ?? readNotebookDraft(tentId);
+    const ownerAtCheck = notebookSessionOwner();
+    const receipt = await onFindEntry(tentId, started.knownEventId);
     const availability = Array.isArray(receipt) ? "authoritative" : "unavailable";
     const reconciled = reconcileAttempt(
-      live.knownEventId,
+      started.knownEventId,
       Array.isArray(receipt) ? receipt : [],
       availability,
     );
-    const verified =
-      reconciled.status === "found" &&
-      live.attempt &&
-      reconciled.entry.note === live.attempt.note &&
-      reconciled.entry.tentId === live.tentId
-        ? reconciled.entry
-        : null;
-    const next: NotebookDraft = verified
-      ? {
-          ...live,
-          phase: "check_found",
-          verifiedEntry: verified,
-          serverOccurredAt: verified.occurredAt,
-          knownEventId: verified.growEventId,
-          writeBlocked: true,
-          recoverySurface: "timeline",
-        }
-      : reconciled.status === "none"
-        ? {
-            ...live,
-            phase: "check_none",
-            verifiedEntry: null,
-            writeBlocked: true,
-            recoverySurface: "timeline",
-          }
-        : {
-            ...live,
-            phase: "uncertain",
-            verifiedEntry: null,
-            writeBlocked: true,
-            recoverySurface: "grow",
-          };
-    put(next);
+    setDrafts((prev) => {
+      const live = prev[tentId] ?? started;
+      if (started.attempt && live.attempt?.attemptId !== started.attempt.attemptId) {
+        return prev;
+      }
+      const next = draftAfterTimelineCheck(started, live.note, reconciled);
+      writeNotebookDraft(next, ownerAtCheck);
+      return { ...prev, [tentId]: next };
+    });
   }
 
   const slots = readingsByTent[selected.id] ?? [];
@@ -344,12 +326,12 @@ export default function FieldNotebook({
         ) : null}
         <div className="flex flex-col gap-2">
           {draft.phase === "saved" ? (
-            <a
-              href="/timeline"
+            <NotebookRouteLink
+              to="/timeline"
               className="inline-flex min-h-11 items-center text-sm font-medium underline"
             >
               View in Timeline
-            </a>
+            </NotebookRouteLink>
           ) : null}
           {view.showCheckTimeline ? (
             <button
@@ -363,12 +345,12 @@ export default function FieldNotebook({
             </button>
           ) : null}
           {view.showCheckTimeline ? (
-            <a
-              href="/timeline"
+            <NotebookRouteLink
+              to="/timeline"
               className="inline-flex min-h-11 items-center text-sm font-medium underline"
             >
               Open Timeline
-            </a>
+            </NotebookRouteLink>
           ) : null}
           {draft.phase === "check_found" || draft.phase === "check_none" ? (
             <button

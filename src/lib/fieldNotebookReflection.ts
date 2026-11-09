@@ -22,6 +22,19 @@ export function reflectionFromEvidence(input: {
   return {
     timelineHasEntry: timelineHit,
     countIncludesEntry: counted,
-    lastActivityIncludesEntry: newest?.id === input.growEventId,
+    lastActivityIncludesEntry: sameRecentActivityId(newest?.id, input.growEventId),
   };
+}
+
+/** Recent Activity prefixes grow-event ids. A diary row with the same uuid is not a match. */
+export function sameRecentActivityId(
+  recentId: string | null | undefined,
+  growEventId: string,
+): boolean {
+  if (!recentId || !growEventId) return false;
+  if (recentId === growEventId) return true;
+  const prefix = "grow-event-";
+  if (recentId.startsWith(prefix) && recentId.slice(prefix.length) === growEventId) return true;
+  if (growEventId.startsWith(prefix) && growEventId.slice(prefix.length) === recentId) return true;
+  return false;
 }

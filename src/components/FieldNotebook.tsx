@@ -17,7 +17,6 @@ import {
   type SaveTransport,
 } from "@/lib/fieldNotebookOutcomeRules";
 import {
-  clearNotebookSession,
   notebookSessionOwner,
   readNotebookDraft,
   subscribeNotebookSession,
@@ -97,10 +96,6 @@ export default function FieldNotebook({
 }) {
   const [selectedId, setSelectedId] = useState(tents[0]?.id ?? "");
   const [drafts, setDrafts] = useState<Record<string, NotebookDraft>>(() => {
-    if (import.meta.env.MODE === "test") {
-      const saveInFlight = tents.some((tent) => readNotebookDraft(tent.id).phase === "saving");
-      if (!saveInFlight) clearNotebookSession();
-    }
     const initial: Record<string, NotebookDraft> = {};
     for (const tent of tents) initial[tent.id] = readNotebookDraft(tent.id);
     return initial;
@@ -144,7 +139,11 @@ export default function FieldNotebook({
         : live;
     if (kind === "save" && !maySubmit(ready)) return;
     if (kind === "retry" && live.phase !== "clear_failure") return;
-    const attempt = beginAttempt(ready, selected.name, kind === "retry");
+    const attempt = beginAttempt(
+      ready,
+      selected.name,
+      kind === "retry" || (ready.phase === "uncertain" && ready.attempt != null),
+    );
     const ownerAtSubmit = notebookSessionOwner();
     const tentId = selected.id;
     const frozen: NotebookDraft = {
@@ -399,7 +398,11 @@ export default function FieldNotebook({
               disabled={
                 draft.phase === "saving" ||
                 (draft.phase === "editing" && !maySubmit(draft)) ||
-                (draft.phase === "saved" ? false : view.primaryDisabled)
+                (draft.phase === "uncertain" && !draft.writeBlocked
+                  ? false
+                  : draft.phase === "saved"
+                    ? false
+                    : view.primaryDisabled)
               }
               onClick={() => {
                 if (draft.phase === "saved" && !noteChanged) {

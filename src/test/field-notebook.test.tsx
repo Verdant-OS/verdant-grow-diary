@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import FieldNotebook, { type FieldNotebookSaveResponse } from "@/components/FieldNotebook";
 import type { FieldNotebookServerEntry } from "@/lib/fieldNotebookOutcomeRules";
+import { clearNotebookSession } from "@/lib/fieldNotebookSession";
 import type { ReadingSlot } from "@/lib/fieldNotebookViewModel";
 
 const tents = [
@@ -55,6 +56,10 @@ const reflected: FieldNotebookSaveResponse = {
 };
 
 describe("FieldNotebook", () => {
+  beforeEach(() => {
+    clearNotebookSession();
+  });
+
   it("names the save button with the selected tent and shows source only for present readings", () => {
     render(
       <FieldNotebook
@@ -139,11 +144,9 @@ describe("FieldNotebook", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
     fireEvent.click(await screen.findByRole("button", { name: "Check Timeline" }));
-    expect(await screen.findByText("No matching entry found")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check Timeline" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Back to note" }));
     expect(screen.getByPlaceholderText("Add what you observed.")).toHaveValue("maybe saved");
-    expect(screen.getByRole("button", { name: "Save to Flower Tent 2" })).toBeDisabled();
     expect(onSave).toHaveBeenCalledTimes(1);
   });
 

@@ -237,6 +237,21 @@ export function draftAfterTimelineCheck(
   reconciled: ReconcileResult,
 ): NotebookDraft {
   const note = liveNote;
+  // No event id means Timeline cannot identify a row. Keep Check Timeline
+  // and the note. Save may send the same attempt again. Retry stays for a
+  // confirmed failure only, so an uncertain write is not sent twice.
+  if (!started.knownEventId && reconciled.status !== "found") {
+    return {
+      ...started,
+      note,
+      phase: "uncertain",
+      verifiedEntry: null,
+      knownEventId: null,
+      serverOccurredAt: null,
+      writeBlocked: false,
+      recoverySurface: "grow",
+    };
+  }
   const verified =
     reconciled.status === "found" &&
     started.attempt &&
@@ -296,6 +311,7 @@ export function notesMatchCanonical(
 
 export function maySubmit(draft: NotebookDraft): boolean {
   if (draft.writeBlocked) return false;
+  if (draft.phase === "uncertain") return canonicalNotebookNote(draft.note).length > 0;
   if (draft.phase === "saved") {
     return (
       draft.completedNote !== null &&

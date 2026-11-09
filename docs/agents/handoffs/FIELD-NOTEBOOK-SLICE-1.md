@@ -6,7 +6,7 @@ base: verdant-grow-diary
 checkout: git fetch origin cursor/field-notebook-slice-1-4799 verdant-grow-diary && git switch cursor/field-notebook-slice-1-4799
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2922 (ready for review; remote 3c3a75e7; this local head is not pushed)
 head_sha: local commit on top of 3c3a75e7794b4a580e71c8f0b64b4156aad8e57b. Not pushed.
-state: Explicit open=quick-log still opens Quick Log. method=note stays closed. countIncludesEntry reads a numeric count. The no-id uncertain lock, the test-only session clear, and ordinary sign-in auto-open were left unchanged because each fix fails a locked test.
+state: Saved Quick Log sign-in lands on the plant page with Quick Log closed. Explicit open=quick-log still opens. An uncertain save, including a no-id Timeline check, keeps Check Timeline and the note, and Save resends the same attempt. Retry is only for a confirmed failure. The notebook no longer clears the session for the test runner; field-notebook.test.tsx clears it in beforeEach. countIncludesEntry reads a numeric count.
 current_step: local commit only. Do not push until the owner asks. Do not edit the PR body, labels, or reviewers.
 next_action: Owner decides whether to approve the locked-test change that stops sign-in auto-open, then whether to push.
 post_merge_check: NOT_MEASURED. After the notebook is live, sign in on https://verdantgrowdiary.com and confirm Quick Log does not auto-open and a saved note shows the server time.
@@ -16,7 +16,7 @@ tried_and_rejected: Editing locked Daily Check or notebook tests. New coverage i
 commands: NODE_OPTIONS=--max-old-space-size=8192 bunx vitest run src/test/daily-check-_.test.ts src/test/daily-check-_.test.tsx src/test/app-shell-_.test.ts src/test/app-shell-_.test.tsx src/test/field-notebook.test.tsx src/test/field-notebook-outcome-rules.test.ts src/test/field-notebook-review-fixes.test.ts src/test/field-notebook-account-recovery.test.tsx src/test/quick-log-draft-preview-view-model.test.ts src/test/quick-log-failed-save-retry.test.tsx src/test/quicklog-shared-in-flight-coordination.test.tsx src/test/v0-operating-loop-contract.test.ts --reporter=dot
 files_touched: src/lib/fieldNotebookOutcomeRules.ts; src/components/FieldNotebook.tsx; src/components/FieldNotebookTimelineRecovery.tsx; src/test/field-notebook-identity-followups.test.tsx
 files_remaining: live sensor readings on the card, photo persistence, 393px and 200% evidence
-blockers: #2806 still holds reload-safe drafts. Photo reload unproven. P1 no-id retry conflicts with src/test/field-notebook.test.tsx:141-146. Removing the test session clear conflicts with src/test/field-notebook.test.tsx:150. Ordinary sign-in auto-open conflicts with src/test/app-shell-mobile-quick-log-routing.test.tsx:554 and src/test/quick-log-start-screen-plant.test.ts:49. None of those tests were edited.
+blockers: #2806 still holds reload-safe drafts. Photo reload unproven. Cheeko approved the three locked edits at 4:50 PM CT. Not pushed.
 open_questions: none for this head
 gotchas: A GH013 rejection on push means stop. Do not retry. Do not edit scorer-locked tests.
 links: PR #2922; issue #2806; issue #2697

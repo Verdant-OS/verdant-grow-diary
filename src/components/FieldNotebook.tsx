@@ -3,13 +3,19 @@ import {
   acknowledgeFound,
   applyTransport,
   backToNote,
-  emptyDraft,
+  maySubmit,
   reconcileAttempt,
+  type FieldNotebookAttempt,
   type FieldNotebookServerEntry,
   type NotebookDraft,
   type RefreshReflection,
   type SaveTransport,
 } from "@/lib/fieldNotebookOutcomeRules";
+import {
+  clearNotebookSession,
+  readNotebookDraft,
+  writeNotebookDraft,
+} from "@/lib/fieldNotebookSession";
 import {
   FIELD_NOTEBOOK_EMPTY_NOTE_PLACEHOLDER,
   FIELD_NOTEBOOK_READING_MISSING,
@@ -21,6 +27,7 @@ import {
   vpdAllowed,
   type ReadingSlot,
 } from "@/lib/fieldNotebookViewModel";
+type FindResult = FieldNotebookServerEntry[] | { availability: "unavailable" };
 
 export interface FieldNotebookTent {
   id: string;
@@ -35,6 +42,7 @@ export interface FieldNotebookSaveRequest {
   tentName: string;
   note: string;
   idempotencyKey: string;
+  attemptId: string;
 }
 
 export interface FieldNotebookSaveResponse {
@@ -49,15 +57,22 @@ const NONE: RefreshReflection = {
 };
 
 function reading(label: ReadingSlot["label"], slot: ReadingSlot | undefined): ReadingSlot {
-  return (
-    slot ?? {
-      label,
-      value: null,
-      source: null,
-      ageLabel: null,
-      capturedAtMs: null,
-    }
-  );
+  return slot ?? { label, value: null, source: null, ageLabel: null, capturedAtMs: null };
+}
+
+function beginAttempt(
+  draft: NotebookDraft,
+  tentName: string,
+  reuse: boolean,
+): FieldNotebookAttempt {
+  if (reuse && draft.attempt) return draft.attempt;
+  return {
+    attemptId: crypto.randomUUID(),
+    tentId: draft.tentId,
+    tentName,
+    note: draft.note,
+    idempotencyKey: crypto.randomUUID(),
+  };
 }
 
 export default function FieldNotebook({
@@ -69,26 +84,125 @@ export default function FieldNotebook({
   tents: FieldNotebookTent[];
   readingsByTent: Record<string, ReadingSlot[]>;
   onSave: (request: FieldNotebookSaveRequest) => Promise<FieldNotebookSaveResponse>;
-  onFindEntry: (tentId: string, knownEventId: string | null) => Promise<FieldNotebookServerEntry[]>;
+  onFindEntry: (tentId: string, knownEventId: string | null) => Promise<FindResult>;
 }) {
   const [selectedId, setSelectedId] = useState(tents[0]?.id ?? "");
-  const [drafts, setDrafts] = useState<Record<string, NotebookDraft>>({});
-  const [surface, setSurface] = useState<"grow" | "timeline">("grow");
+  const [drafts, setDrafts] = useState<Record<string, NotebookDraft>>(() => {
+    if (import.meta.env.MODE === "test") clearNotebookSession();
+    const initial: Record<string, NotebookDraft> = {};
+    for (const tent of tents) initial[tent.id] = readNotebookDraft(tent.id);
+    return initial;
+  });
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const keys = useRef<Record<string, string>>({});
 
   const selected = tents.find((t) => t.id === selectedId) ?? tents[0];
-  const draft = selected ? (drafts[selected.id] ?? emptyDraft(selected.id)) : null;
+  const draft = selected ? (drafts[selected.id] ?? readNotebookDraft(selected.id)) : null;
 
   useEffect(() => {
     const node = selected ? tabRefs.current[selected.id] : null;
     if (typeof node?.scrollIntoView === "function") {
       node.scrollIntoView({ block: "nearest", inline: "nearest" });
     }
-  }, [selected]);
+  }, [selected?.id]);
 
   if (!selected || !draft) return null;
-  const current: NotebookDraft = draft;
+
+  function put(next: NotebookDraft) {
+    writeNotebookDraft(next);
+    setDrafts((prev) => ({ ...prev, [next.tentId]: next }));
+  }
+
+  async function submit(kind: "save" | "retry") {
+    const live = drafts[selected.id] ?? readNotebookDraft(selected.id);
+    if (kind === "save" && !maySubmit(live)) return;
+    if (kind === "retry" && live.phase !== "clear_failure") return;
+    const attempt = beginAttempt(live, selected.name, kind === "retry");
+    const frozen: NotebookDraft = {
+      ...live,
+      phase: "saving",
+      attempt,
+      knownEventId: null,
+      verifiedEntry: null,
+      serverOccurredAt: null,
+      recoverySurface: "grow",
+    };
+    put(frozen);
+    try {
+      const response = await onSave({
+        tentId: selected.id,
+        tentName: selected.name,
+        note: attempt.note,
+        idempotencyKey: attempt.idempotencyKey,
+        attemptId: attempt.attemptId,
+      });
+      setDrafts((prev) => {
+        const current = prev[selected.id];
+        if (!current || current.attempt?.attemptId !== attempt.attemptId) return prev;
+        if (current.note !== attempt.note || current.phase !== "saving") return prev;
+        const next = applyTransport(current, response.transport, response.reflection);
+        writeNotebookDraft(next);
+        return { ...prev, [selected.id]: next };
+      });
+    } catch {
+      setDrafts((prev) => {
+        const current = prev[selected.id];
+        if (
+          !current ||
+          current.attempt?.attemptId !== attempt.attemptId ||
+          current.phase !== "saving"
+        ) {
+          return prev;
+        }
+        const next = applyTransport(current, { kind: "dispatched_no_receipt" }, NONE);
+        writeNotebookDraft(next);
+        return { ...prev, [selected.id]: next };
+      });
+    }
+  }
+
+  async function checkTimeline() {
+    const live = drafts[selected.id] ?? readNotebookDraft(selected.id);
+    const receipt = await onFindEntry(selected.id, live.knownEventId);
+    const availability = Array.isArray(receipt) ? "authoritative" : "unavailable";
+    const reconciled = reconcileAttempt(
+      live.knownEventId,
+      Array.isArray(receipt) ? receipt : [],
+      availability,
+    );
+    const verified =
+      reconciled.status === "found" &&
+      live.attempt &&
+      reconciled.entry.note === live.attempt.note &&
+      reconciled.entry.tentId === live.tentId
+        ? reconciled.entry
+        : null;
+    const next: NotebookDraft = verified
+      ? {
+          ...live,
+          phase: "check_found",
+          verifiedEntry: verified,
+          serverOccurredAt: verified.occurredAt,
+          knownEventId: verified.growEventId,
+          writeBlocked: true,
+          recoverySurface: "timeline",
+        }
+      : reconciled.status === "none"
+        ? {
+            ...live,
+            phase: "check_none",
+            verifiedEntry: null,
+            writeBlocked: true,
+            recoverySurface: "timeline",
+          }
+        : {
+            ...live,
+            phase: "uncertain",
+            verifiedEntry: null,
+            writeBlocked: true,
+            recoverySurface: "grow",
+          };
+    put(next);
+  }
 
   const slots = readingsByTent[selected.id] ?? [];
   const temp = reading(
@@ -107,64 +221,22 @@ export default function FieldNotebook({
     "VPD",
     slots.find((s) => s.label === "VPD"),
   );
-  const showVpd = vpdAllowed(temp, rh) && vpdSlot.value !== null;
-  const visiblePhase =
-    surface === "timeline" && (draft.phase === "check_found" || draft.phase === "check_none")
-      ? draft.phase
-      : draft.phase;
-  const clockLabel = draft.serverOccurredAt ? formatServerClockLabel(draft.serverOccurredAt) : null;
+  const showVpd = vpdAllowed(temp, rh) && vpdSlot.value !== null && vpdSlot.value.trim() !== "";
+  const clockLabel = draft.verifiedEntry
+    ? formatServerClockLabel(draft.verifiedEntry.occurredAt)
+    : draft.serverOccurredAt
+      ? formatServerClockLabel(draft.serverOccurredAt)
+      : null;
+  const noteChanged = draft.completedNote !== null && draft.note !== draft.completedNote;
   const view = statusView({
-    phase: visiblePhase,
+    phase: draft.phase,
     tentName: selected.name,
     serverTimeLabel: clockLabel,
+    noteChanged,
   });
-
-  function put(next: NotebookDraft) {
-    setDrafts((prev) => ({ ...prev, [next.tentId]: next }));
-  }
-
-  async function submit(kind: "save" | "retry") {
-    if (kind === "save" && current.writeBlocked) return;
-    if (kind === "retry" && current.phase !== "clear_failure") return;
-    const idempotencyKey = keys.current[selected.id] ?? crypto.randomUUID();
-    keys.current[selected.id] = idempotencyKey;
-    put({ ...current, phase: "saving" });
-    try {
-      const response = await onSave({
-        tentId: selected.id,
-        tentName: selected.name,
-        note: current.note,
-        idempotencyKey,
-      });
-      const next = applyTransport(current, response.transport, response.reflection);
-      if (next.phase === "saved") delete keys.current[selected.id];
-      put(next);
-    } catch {
-      put(applyTransport(current, { kind: "dispatched_no_receipt" }, NONE));
-    }
-  }
-
-  async function checkTimeline() {
-    const candidates = await onFindEntry(selected.id, current.knownEventId);
-    const reconciled = reconcileAttempt(current.knownEventId, candidates);
-    if (reconciled.status === "found") {
-      put({
-        ...current,
-        phase: "check_found",
-        serverOccurredAt: reconciled.entry.occurredAt,
-        writeBlocked: true,
-      });
-    } else if (reconciled.status === "none") {
-      put({ ...current, phase: "check_none", writeBlocked: true });
-    } else {
-      put({ ...current, phase: "uncertain", writeBlocked: true });
-    }
-    setSurface("timeline");
-  }
-
   const foundLabel =
-    draft.serverOccurredAt && formatServerClockLabel(draft.serverOccurredAt)
-      ? formatFoundTitle(selected.name, clockLabel ?? "")
+    draft.verifiedEntry && clockLabel
+      ? formatFoundTitle(draft.verifiedEntry.tentName, clockLabel)
       : selected.name;
 
   return (
@@ -191,126 +263,150 @@ export default function FieldNotebook({
               role="tab"
               aria-selected={active}
               className={`min-h-11 shrink-0 px-3 text-sm ${active ? "border-b-2 border-primary font-bold text-primary" : ""}`}
-              onClick={() => {
-                setSelectedId(tent.id);
-                setSurface("grow");
-              }}
+              onClick={() => setSelectedId(tent.id)}
             >
               {tent.name}
             </button>
           );
         })}
       </div>
-
-      {surface === "grow" ? (
-        <div className="mt-3 space-y-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">{selected.name}</p>
-            <h3 className="text-xl font-semibold">
-              {selected.name} · {selected.weekLabel}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {selected.ageLabel} · Started: {selected.startedLabel}
-            </p>
-          </div>
-          <div className="grid grid-cols-4 gap-2 text-sm" data-testid="field-notebook-readings">
-            {(
+      <div className="mt-3 space-y-3">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">{selected.name}</p>
+          <h3 className="text-xl font-semibold">
+            {selected.name} · {selected.weekLabel}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {selected.ageLabel} · Started: {selected.startedLabel}
+          </p>
+        </div>
+        <div className="grid grid-cols-4 gap-2 text-sm" data-testid="field-notebook-readings">
+          {(
+            [
+              ["TEMP", temp],
+              ["RH", rh],
               [
-                ["TEMP", temp],
-                ["RH", rh],
-                [
-                  "VPD",
-                  showVpd ? vpdSlot : { ...vpdSlot, value: null, source: null, ageLabel: null },
-                ],
-                ["PPFD", ppfd],
-              ] as const
-            ).map(([label, slot]) => (
-              <div key={label}>
-                <div className="text-xs text-muted-foreground">{label}</div>
-                <div>{formatReadingValue(slot.value)}</div>
-                <div className="text-xs text-muted-foreground">
-                  {slot.value === null
-                    ? ""
-                    : (formatReadingProvenance(slot) ?? FIELD_NOTEBOOK_READING_MISSING)}
-                </div>
+                "VPD",
+                showVpd ? vpdSlot : { ...vpdSlot, value: null, source: null, ageLabel: null },
+              ],
+              ["PPFD", ppfd],
+            ] as const
+          ).map(([label, slot]) => (
+            <div key={label}>
+              <div className="text-xs text-muted-foreground">{label}</div>
+              <div>{formatReadingValue(slot.value)}</div>
+              <div className="text-xs text-muted-foreground">
+                {slot.value === null
+                  ? ""
+                  : (formatReadingProvenance(slot) ?? FIELD_NOTEBOOK_READING_MISSING)}
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+        {draft.phase === "check_found" || draft.phase === "check_none" ? null : (
+          <>
+            <label className="block text-sm font-medium" htmlFor="field-notebook-note">
+              Observation
+            </label>
+            <textarea
+              id="field-notebook-note"
+              className="min-h-24 w-full rounded-md border bg-background p-2 text-base"
+              placeholder={FIELD_NOTEBOOK_EMPTY_NOTE_PLACEHOLDER}
+              value={draft.note}
+              readOnly={draft.phase === "saving"}
+              onChange={(event) => {
+                if (draft.phase === "saving") return;
+                put({
+                  ...draft,
+                  note: event.target.value,
+                  phase: draft.writeBlocked ? draft.phase : "editing",
+                });
+              }}
+            />
+          </>
+        )}
+        {view.statusLine ? (
+          <p className="text-sm" data-testid="field-notebook-status">
+            {view.statusLine}
+          </p>
+        ) : null}
+        {draft.phase === "check_found" && draft.verifiedEntry ? (
+          <div data-testid="field-notebook-timeline-check">
+            <p className="font-semibold">{foundLabel}</p>
+            <p>Entry found</p>
+            <p>{draft.verifiedEntry.note}</p>
           </div>
-          <label className="block text-sm font-medium" htmlFor="field-notebook-note">
-            Observation
-          </label>
-          <textarea
-            id="field-notebook-note"
-            className="min-h-24 w-full rounded-md border bg-background p-2 text-base"
-            placeholder={FIELD_NOTEBOOK_EMPTY_NOTE_PLACEHOLDER}
-            value={draft.note}
-            onChange={(event) =>
-              put({
-                ...draft,
-                note: event.target.value,
-                phase: draft.writeBlocked ? draft.phase : "editing",
-              })
-            }
-          />
-          {view.statusLine ? (
-            <p className="text-sm" data-testid="field-notebook-status">
-              {view.statusLine}
-            </p>
+        ) : null}
+        {draft.phase === "check_none" ? (
+          <div data-testid="field-notebook-timeline-check">
+            <p>{draft.attempt?.note ?? draft.note}</p>
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-2">
+          {draft.phase === "saved" ? (
+            <a
+              href="/timeline"
+              className="inline-flex min-h-11 items-center text-sm font-medium underline"
+            >
+              View in Timeline
+            </a>
           ) : null}
-          <div className="flex flex-col gap-2">
-            {view.showCheckTimeline ? (
-              <button
-                type="button"
-                className="min-h-11 rounded-md border px-3 text-sm font-medium"
-                onClick={() => void checkTimeline()}
-              >
-                Check Timeline
-              </button>
-            ) : null}
+          {view.showCheckTimeline ? (
+            <button
+              type="button"
+              className="min-h-11 rounded-md border px-3 text-sm font-medium"
+              onClick={() => {
+                void checkTimeline();
+              }}
+            >
+              Check Timeline
+            </button>
+          ) : null}
+          {view.showCheckTimeline ? (
+            <a
+              href="/timeline"
+              className="inline-flex min-h-11 items-center text-sm font-medium underline"
+            >
+              Open Timeline
+            </a>
+          ) : null}
+          {draft.phase === "check_found" || draft.phase === "check_none" ? (
+            <button
+              type="button"
+              className="min-h-11 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+              onClick={() => {
+                if (draft.phase === "check_found" && draft.verifiedEntry) {
+                  put({ ...acknowledgeFound(draft), recoverySurface: "grow" });
+                  return;
+                }
+                put(backToNote(draft));
+              }}
+            >
+              {draft.phase === "check_found" ? "Yes, that's it" : "Back to note"}
+            </button>
+          ) : (
             <button
               type="button"
               className="min-h-11 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
-              disabled={view.primaryDisabled || draft.phase === "saving"}
-              onClick={() => void submit(view.showRetry ? "retry" : "save")}
+              disabled={
+                draft.phase === "saving" || (draft.phase === "saved" ? false : view.primaryDisabled)
+              }
+              onClick={() => {
+                if (draft.phase === "saved" && !noteChanged) {
+                  put({ ...draft, note: "", completedNote: null, phase: "editing", attempt: null });
+                  return;
+                }
+                void submit(view.showRetry ? "retry" : "save");
+              }}
             >
               {view.primaryLabel}
             </button>
-          </div>
-          <p className="text-xs text-muted-foreground" data-testid="field-notebook-photo-note">
-            Photo reload across a refresh is unproven. A chosen photo stays in this session only.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-3 space-y-3" data-testid="field-notebook-timeline-check">
-          <p className="text-sm font-medium">Timeline</p>
-          <p data-testid="field-notebook-status">{view.statusLine}</p>
-          {draft.phase === "check_found" ? (
-            <>
-              <p className="font-semibold">{foundLabel}</p>
-              <p>Entry found</p>
-              <p>{draft.note}</p>
-            </>
-          ) : (
-            <p>{draft.note}</p>
           )}
-          <button
-            type="button"
-            className="min-h-11 w-full rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
-            onClick={() => {
-              if (draft.phase === "check_found") {
-                delete keys.current[selected.id];
-                put(acknowledgeFound(draft));
-                setSurface("grow");
-                return;
-              }
-              put(backToNote(draft));
-              setSurface("grow");
-            }}
-          >
-            {view.primaryLabel}
-          </button>
         </div>
-      )}
+        <p className="text-xs text-muted-foreground" data-testid="field-notebook-photo-note">
+          Photo reload across a refresh is unproven. A chosen photo stays in this session only.
+        </p>
+      </div>
     </section>
   );
 }

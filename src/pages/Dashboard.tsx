@@ -21,7 +21,7 @@ import { Link } from "@/lib/react-router-compat";
 import { AlertTriangle, Box, Sprout, Sparkles, ArrowRight } from "lucide-react";
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
-import FieldNotebookMount from "@/components/FieldNotebookMount";
+import { FieldNotebookScope } from "@/components/FieldNotebookMount";
 import KpiCard from "@/components/KpiCard";
 import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
@@ -254,7 +254,7 @@ export default function Dashboard() {
   // minute so an open tab cannot keep a fresh label past the stale boundary.
   const nowTick = useNowTick();
   // AI Insights: no real-data hook yet — render an honest empty state below.
-  const { recent, pending } = useDashboardScopedData(scopedGrowId ?? null);
+  const { recent, pending, reload } = useDashboardScopedData(scopedGrowId ?? null);
   // Multi-tent selector for the Latest Environment card. Defaults to "all"
   // (matches prior behavior); when a specific tent is chosen the snapshot
   // hook only queries that tent so the displayed reading matches context.
@@ -612,7 +612,14 @@ export default function Dashboard() {
           backHref={backHref}
         />
       )}
-      <FieldNotebookMount tents={tents.map((tent) => ({ id: tent.id, name: tent.name }))} />
+      <FieldNotebookScope
+        growsLoading={growsLoading}
+        growId={scopedGrowId ?? activeGrowId ?? null}
+        tents={tents
+          .filter((tent) => tent.growId === (scopedGrowId ?? activeGrowId))
+          .map((tent) => ({ id: tent.id, name: tent.name }))}
+        reloadRecent={scopedGrowId ? reload : undefined}
+      />
       <TonightTentHomeCard
         selection={homeSelection}
         metrics={homeMetrics}

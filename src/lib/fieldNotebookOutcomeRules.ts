@@ -36,6 +36,7 @@ export type SaveTransport =
   | { kind: "timeout_after_dispatch" }
   | { kind: "connection_lost_after_dispatch" }
   | { kind: "http_error_after_dispatch"; status: number }
+  | { kind: "not_dispatched"; reason: string }
   | { kind: "acknowledged"; entry: FieldNotebookServerEntry };
 
 export interface RefreshReflection {
@@ -67,6 +68,7 @@ export function isUncertain(transport: SaveTransport): boolean {
       return true;
     case "offline_before_dispatch":
     case "definitive_rejection":
+    case "not_dispatched":
     case "acknowledged":
       return false;
     default: {
@@ -110,7 +112,9 @@ export type ReconcileResult =
 export function reconcileAttempt(
   knownEventId: string | null,
   candidates: FieldNotebookServerEntry[],
+  availability: "authoritative" | "unavailable" = "authoritative",
 ): ReconcileResult {
+  if (availability === "unavailable") return { status: "unresolved" };
   if (!knownEventId) {
     return candidates.length === 0 ? { status: "none" } : { status: "unresolved" };
   }
@@ -128,8 +132,13 @@ export interface NotebookDraft {
   attempt: FieldNotebookAttempt | null;
   knownEventId: string | null;
   serverOccurredAt: string | null;
+  /** Verified row for this attempt. Never the live textarea. */
+  verifiedEntry: FieldNotebookServerEntry | null;
+  /** Note text that already completed. A second save requires an edit. */
+  completedNote: string | null;
   /** True after an uncertain outcome until the grower confirms J1. Blocks a new write. */
   writeBlocked: boolean;
+  recoverySurface: "grow" | "timeline";
 }
 
 export function emptyDraft(tentId: string): NotebookDraft {
@@ -140,7 +149,10 @@ export function emptyDraft(tentId: string): NotebookDraft {
     attempt: null,
     knownEventId: null,
     serverOccurredAt: null,
+    verifiedEntry: null,
+    completedNote: null,
     writeBlocked: false,
+    recoverySurface: "grow",
   };
 }
 
@@ -149,22 +161,54 @@ export function applyTransport(
   transport: SaveTransport,
   reflection: RefreshReflection,
 ): NotebookDraft {
+  if (transport.kind === "not_dispatched") {
+    return {
+      ...draft,
+      phase: draft.phase === "saving" ? "editing" : draft.phase,
+      writeBlocked: false,
+    };
+  }
   if (transport.kind === "acknowledged") {
+    const sameTent = transport.entry.tentId === draft.tentId;
+    const sameNote = !draft.attempt || transport.entry.note === draft.attempt.note;
+    if (!sameTent || !sameNote) {
+      return {
+        ...draft,
+        phase: "uncertain",
+        writeBlocked: true,
+        knownEventId: null,
+        verifiedEntry: null,
+      };
+    }
     const next: NotebookDraft = {
       ...draft,
       knownEventId: transport.entry.growEventId,
       serverOccurredAt: transport.entry.occurredAt,
+      verifiedEntry: transport.entry,
       note: draft.note,
     };
     if (canPresentSaved(transport, reflection)) {
-      return { ...next, phase: "saved", writeBlocked: false };
+      return {
+        ...next,
+        phase: "saved",
+        writeBlocked: false,
+        completedNote: transport.entry.note,
+        recoverySurface: "grow",
+      };
     }
     return { ...next, phase: "uncertain", writeBlocked: true };
   }
   if (isClearFailure(transport)) {
-    return { ...draft, phase: "clear_failure", writeBlocked: false };
+    return { ...draft, phase: "clear_failure", writeBlocked: false, recoverySurface: "grow" };
   }
-  return { ...draft, phase: "uncertain", writeBlocked: true, knownEventId: draft.knownEventId };
+  return {
+    ...draft,
+    phase: "uncertain",
+    writeBlocked: true,
+    knownEventId: null,
+    verifiedEntry: null,
+    serverOccurredAt: null,
+  };
 }
 
 /** J2 "Back to note" keeps the uncertain attempt. It does not open a new save. */
@@ -182,5 +226,7 @@ export function mayRetry(draft: NotebookDraft): boolean {
 }
 
 export function maySubmit(draft: NotebookDraft): boolean {
-  return draft.phase === "editing" && !draft.writeBlocked;
+  if (draft.phase !== "editing" || draft.writeBlocked) return false;
+  if (draft.completedNote !== null && draft.note === draft.completedNote) return false;
+  return true;
 }

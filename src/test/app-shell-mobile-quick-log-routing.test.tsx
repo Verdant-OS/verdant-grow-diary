@@ -543,36 +543,30 @@ describe("AppShell mobile Quick Log routing", () => {
     expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
-  it("honors and consumes the saved Quick Log start-screen intent", async () => {
+  it("consumes the saved Quick Log start-screen intent without opening Quick Log", async () => {
     renderAt("/dashboard?open=quick-log");
 
-    await waitFor(() => expect(screen.getByTestId("legacy-quick-log")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByTestId("current-search").textContent).toBe(""));
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
   });
 
-  it("binds a consumed Plant Detail Quick Log intent to the plant in the route", async () => {
+  it("consumes a Plant Detail Quick Log intent without opening Quick Log", async () => {
     renderAt(`/plants/${PLANT_ID}?open=quick-log`);
 
-    const dialog = await screen.findByTestId("legacy-quick-log");
-    expect(dialog).toHaveAttribute("data-plant-id", PLANT_ID);
     await waitFor(() => expect(screen.getByTestId("current-search").textContent).toBe(""));
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
   });
 
-  it("opens and consumes the comparison-guide phenotype prompt without selecting a plant", async () => {
+  it("consumes the comparison-guide phenotype prompt without opening Quick Log", async () => {
     renderAt("/dashboard?open=quick-log&type=observation&prompt=oreoz-vs-gelonade&utm=guide");
 
-    const dialog = await screen.findByTestId("legacy-quick-log");
-    expect(dialog).toHaveAttribute("data-event-type", "observation");
-    expect(dialog).toHaveAttribute("data-source", "oreoz-vs-gelonade-guide");
-    expect(dialog).toHaveAttribute("data-suppress-plant-default", "true");
-    expect(screen.getByTestId("legacy-quick-log-note")).toHaveTextContent(
-      /phenotypic observation/i,
-    );
     await waitFor(() =>
       expect(screen.getByTestId("current-search")).toHaveTextContent("?utm=guide"),
     );
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
   });
 
   it("does not open Quick Log for an unrecognized query value", () => {

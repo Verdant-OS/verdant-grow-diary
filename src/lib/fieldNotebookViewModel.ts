@@ -37,6 +37,7 @@ export function formatReadingProvenance(slot: ReadingSlot): string | null {
 export function vpdAllowed(temp: ReadingSlot, rh: ReadingSlot): boolean {
   if (temp.capturedAtMs === null || rh.capturedAtMs === null) return false;
   if (temp.value === null || rh.value === null) return false;
+  if (temp.value.trim() === "" || rh.value.trim() === "") return false;
   return temp.capturedAtMs === rh.capturedAtMs;
 }
 
@@ -44,11 +45,12 @@ export function vpdAllowed(temp: ReadingSlot, rh: ReadingSlot): boolean {
 export function formatServerClockLabel(iso: string): string | null {
   const ms = Date.parse(iso);
   if (Number.isNaN(ms)) return null;
-  return new Intl.DateTimeFormat("en-US", {
+  const clock = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
     timeZone: "UTC",
   }).format(ms);
+  return `${clock} UTC`;
 }
 
 export function formatSavedLine(tentName: string, serverTimeLabel: string): string {
@@ -84,6 +86,7 @@ export function statusView(input: {
   phase: FieldNotebookPhase;
   tentName: string;
   serverTimeLabel: string | null;
+  noteChanged?: boolean;
 }): StatusView {
   const save = formatSaveButton(input.tentName);
   switch (input.phase) {
@@ -112,7 +115,7 @@ export function statusView(input: {
           input.serverTimeLabel !== null
             ? formatSavedLine(input.tentName, input.serverTimeLabel)
             : null,
-        primaryLabel: save,
+        primaryLabel: input.noteChanged ? save : "New note",
         primaryDisabled: false,
         showRetry: false,
         showCheckTimeline: false,

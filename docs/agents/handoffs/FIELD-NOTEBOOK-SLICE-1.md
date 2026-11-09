@@ -6,9 +6,9 @@ base: verdant-grow-diary
 checkout: git fetch origin cursor/field-notebook-slice-1-4799 verdant-grow-diary && git switch cursor/field-notebook-slice-1-4799
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2922 (draft, gated)
 head_sha: read the current head on GitHub after the ordinary push
-state: notebook card mounted on Dashboard; save uses verifyPersistedNote so occurred_at is read; DailyCheck and AppShell no longer open Quick Log from a deep link
-current_step: focused tests, typecheck, and eslint on touched files passed locally before the push. Keep the PR draft.
-next_action: Independent exact-head review. Do not mark ready, merge, or enable auto-merge.
+state: local review fixes on top of 6de5b837. Not pushed. Attempt identity, reflection evidence, current-grow scope, and no auto-open.
+current_step: local commit only. Do not push until the owner asks. Keep #2922 draft.
+next_action: Owner decides whether to push. Six unapproved DailyCheck pins still expect Quick Log to auto-open.
 post_merge_check: NOT_MEASURED. After the notebook is live, sign in on https://verdantgrowdiary.com and confirm Quick Log does not auto-open and a saved note shows the server time.
 active_writer: Cursor cloud agent (this slice)
 decisions: In-memory per-tent drafts only. No sessionStorage (#2806). Clear failure is definitive rejection or offline-before-dispatch only. Note readback select now includes occurred_at. Reflection flags are set after refetchQueries resolves; cache contents are not inspected. J1/J2 is an in-card surface, not the MobileNav Timeline tab. Photo reload is unproven.

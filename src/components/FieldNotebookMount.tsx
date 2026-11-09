@@ -175,6 +175,7 @@ export default function FieldNotebookMount({
     <FieldNotebook
       tents={notebookTents}
       readingsByTent={readingsByTent}
+      growId={growId}
       onSave={onSave}
       onFindEntry={async (tentId, knownEventId) => {
         const tent = tents.find((item) => item.id === tentId);

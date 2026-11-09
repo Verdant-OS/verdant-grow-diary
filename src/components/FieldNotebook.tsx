@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import NotebookRouteLink from "@/components/NotebookRouteLink";
+import { timelinePath } from "@/lib/routes";
 import {
   acknowledgeFound,
   applyTransport,
@@ -86,11 +87,13 @@ export default function FieldNotebook({
   readingsByTent,
   onSave,
   onFindEntry,
+  growId = null,
 }: {
   tents: FieldNotebookTent[];
   readingsByTent: Record<string, ReadingSlot[]>;
   onSave: (request: FieldNotebookSaveRequest) => Promise<FieldNotebookSaveResponse>;
   onFindEntry: (tentId: string, knownEventId: string | null) => Promise<FindResult>;
+  growId?: string | null;
 }) {
   const [selectedId, setSelectedId] = useState(tents[0]?.id ?? "");
   const [drafts, setDrafts] = useState<Record<string, NotebookDraft>>(() => {
@@ -350,7 +353,7 @@ export default function FieldNotebook({
         <div className="flex flex-col gap-2">
           {draft.phase === "saved" ? (
             <NotebookRouteLink
-              to="/timeline"
+              to={timelinePath(growId)}
               className="inline-flex min-h-11 items-center text-sm font-medium underline"
             >
               View in Timeline
@@ -369,7 +372,7 @@ export default function FieldNotebook({
           ) : null}
           {view.showCheckTimeline ? (
             <NotebookRouteLink
-              to="/timeline"
+              to={timelinePath(growId)}
               className="inline-flex min-h-11 items-center text-sm font-medium underline"
             >
               Open Timeline

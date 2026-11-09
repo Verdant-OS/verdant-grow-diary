@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import NotebookRouteLink from "@/components/NotebookRouteLink";
+import NotebookRouteLink, { navigateNotebookHref } from "@/components/NotebookRouteLink";
+import { withGrowId } from "@/lib/routes";
 import { acknowledgeFound, backToNote, type NotebookDraft } from "@/lib/fieldNotebookOutcomeRules";
 import {
   notebookDrafts,
@@ -12,7 +13,11 @@ import {
 import { formatFoundTitle, formatServerClockLabel } from "@/lib/fieldNotebookViewModel";
 
 /** Recovery for attempts that navigated here. State stays in memory for this session. */
-export default function FieldNotebookTimelineRecovery() {
+export default function FieldNotebookTimelineRecovery({
+  growId = null,
+}: {
+  growId?: string | null;
+}) {
   const router = useRouter({ warn: false });
   const [drafts, setDrafts] = useState<NotebookDraft[]>(() =>
     notebookDrafts().filter((draft) => draft.recoverySurface === "timeline"),
@@ -75,7 +80,7 @@ export default function FieldNotebookTimelineRecovery() {
                     };
                     writeNotebookDraft(back, notebookSessionOwner());
                     setDrafts((current) => current.filter((item) => item.tentId !== draft.tentId));
-                    if (router) void router.navigate({ to: "/" });
+                    if (router) navigateNotebookHref(router, withGrowId("/", growId));
                   }}
                 >
                   Back to note
@@ -83,7 +88,7 @@ export default function FieldNotebookTimelineRecovery() {
               </>
             )}
             <NotebookRouteLink
-              to="/"
+              to={withGrowId("/", growId)}
               className="mt-2 inline-flex min-h-11 items-center text-sm underline"
             >
               Back to the grow

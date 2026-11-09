@@ -40,6 +40,17 @@ export function vpdAllowed(temp: ReadingSlot, rh: ReadingSlot): boolean {
   return temp.capturedAtMs === rh.capturedAtMs;
 }
 
+/** Format an authoritative ISO timestamp. Uses UTC so the label is the server clock, not the device. */
+export function formatServerClockLabel(iso: string): string | null {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return null;
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(ms);
+}
+
 export function formatSavedLine(tentName: string, serverTimeLabel: string): string {
   return `Saved to ${tentName} · ${serverTimeLabel} · View in Timeline`;
 }

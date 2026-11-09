@@ -39,6 +39,8 @@ export interface QuickLogV2SaveResult {
   waterContextChanged?: boolean;
   /** Exact Watering was saved previously, then retracted; it is not an active save. */
   savedThenRetracted?: boolean;
+  /** Server grow_events.occurred_at from the note readback. Never a client clock. */
+  serverOccurredAt?: string | null;
 }
 
 interface RpcResponse {
@@ -86,9 +88,7 @@ export function useQuickLogV2Save() {
   const [error, setError] = useState<string | null>(null);
   const guardRef = useRef<QuickLogSubmitGuardController<QuickLogV2SaveResult> | null>(null);
   if (guardRef.current === null) {
-    guardRef.current = createQuickLogSubmitGuard(
-      () => ({ ok: false, reason: "save_in_flight" }),
-    );
+    guardRef.current = createQuickLogSubmitGuard(() => ({ ok: false, reason: "save_in_flight" }));
   }
 
   const saveRequest = useCallback(
@@ -197,6 +197,7 @@ export function useQuickLogV2Save() {
             waterContextChanged = resolved.contextChanged;
           }
         }
+        let serverOccurredAt: string | null | undefined;
         let persistedNote: string | null | undefined;
         let persistedGrowId: string | null | undefined;
         let persistedTentId: string | null | undefined;
@@ -218,7 +219,7 @@ export function useQuickLogV2Save() {
             }
             const { data: event, error: readError } = await supabase
               .from("grow_events")
-              .select("id,note,grow_id,plant_id,tent_id,event_type,source,is_deleted")
+              .select("id,note,grow_id,plant_id,tent_id,event_type,source,is_deleted,occurred_at")
               .eq("id", r.grow_event_id)
               .maybeSingle();
             if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
@@ -256,6 +257,10 @@ export function useQuickLogV2Save() {
               };
             }
             persistedNote = event.note;
+            serverOccurredAt =
+              typeof event.occurred_at === "string" && event.occurred_at.length > 0
+                ? event.occurred_at
+                : null;
           }
         }
         if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
@@ -272,6 +277,7 @@ export function useQuickLogV2Save() {
           ...(persistedTentId !== undefined ? { persistedTentId } : {}),
           ...(persistedPlantId !== undefined ? { persistedPlantId } : {}),
           ...(persistedNote !== undefined ? { persistedNote } : {}),
+          ...(serverOccurredAt !== undefined ? { serverOccurredAt } : {}),
         };
       } catch (thrown) {
         if (!canContinue()) return { ok: false, reason: "receipt_unverified" };

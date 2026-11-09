@@ -21,6 +21,7 @@ import { Link } from "@/lib/react-router-compat";
 import { AlertTriangle, Box, Sprout, Sparkles, ArrowRight } from "lucide-react";
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
+import FieldNotebookMount from "@/components/FieldNotebookMount";
 import KpiCard from "@/components/KpiCard";
 import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
@@ -611,6 +612,7 @@ export default function Dashboard() {
           backHref={backHref}
         />
       )}
+      <FieldNotebookMount tents={tents.map((tent) => ({ id: tent.id, name: tent.name }))} />
       <TonightTentHomeCard
         selection={homeSelection}
         metrics={homeMetrics}

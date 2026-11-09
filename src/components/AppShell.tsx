@@ -256,8 +256,12 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     setOpenScopedLog(false);
     setMobileLaunchTargetKey(null);
     setStructuredOpenIntent(null);
-    setPrefill(guidePrefill ?? startPrefill);
-    setOpenLog(true);
+    // AC1: consume the one-shot marker so it cannot reopen later, and leave
+    // Quick Log closed. Sign-in and the saved start preference stay on this page.
+    setPrefill(null);
+    setOpenLog(false);
+    void guidePrefill;
+    void startPrefill;
     nav(
       {
         pathname: location.pathname,

@@ -7,6 +7,7 @@ import {
   canonicalNotebookNote,
   draftAfterTimelineCheck,
   maySubmit,
+  notesMatchCanonical,
   reconcileAttempt,
   type FieldNotebookAttempt,
   type FieldNotebookServerEntry,
@@ -132,13 +133,19 @@ export default function FieldNotebook({
 
   async function submit(kind: "save" | "retry") {
     const live = drafts[selected.id] ?? readNotebookDraft(selected.id);
-    if (kind === "save" && !maySubmit(live)) return;
+    const ready =
+      kind === "save" &&
+      live.phase === "saved" &&
+      !notesMatchCanonical(live.note, live.completedNote)
+        ? { ...live, phase: "editing" as const }
+        : live;
+    if (kind === "save" && !maySubmit(ready)) return;
     if (kind === "retry" && live.phase !== "clear_failure") return;
-    const attempt = beginAttempt(live, selected.name, kind === "retry");
+    const attempt = beginAttempt(ready, selected.name, kind === "retry");
     const ownerAtSubmit = notebookSessionOwner();
     const tentId = selected.id;
     const frozen: NotebookDraft = {
-      ...live,
+      ...ready,
       phase: "saving",
       attempt,
       knownEventId: null,
@@ -221,7 +228,8 @@ export default function FieldNotebook({
     : draft.serverOccurredAt
       ? formatServerClockLabel(draft.serverOccurredAt)
       : null;
-  const noteChanged = draft.completedNote !== null && draft.note !== draft.completedNote;
+  const noteChanged =
+    draft.completedNote !== null && !notesMatchCanonical(draft.note, draft.completedNote);
   const view = statusView({
     phase: draft.phase,
     tentName: selected.name,
@@ -310,10 +318,13 @@ export default function FieldNotebook({
               readOnly={draft.phase === "saving"}
               onChange={(event) => {
                 if (draft.phase === "saving") return;
+                const note = event.target.value;
+                const sameCompleted =
+                  draft.completedNote !== null && notesMatchCanonical(note, draft.completedNote);
                 put({
                   ...draft,
-                  note: event.target.value,
-                  phase: draft.writeBlocked ? draft.phase : "editing",
+                  note,
+                  phase: draft.writeBlocked ? draft.phase : sameCompleted ? "saved" : "editing",
                 });
               }}
             />
@@ -383,7 +394,9 @@ export default function FieldNotebook({
               type="button"
               className="min-h-11 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
               disabled={
-                draft.phase === "saving" || (draft.phase === "saved" ? false : view.primaryDisabled)
+                draft.phase === "saving" ||
+                (draft.phase === "editing" && !maySubmit(draft)) ||
+                (draft.phase === "saved" ? false : view.primaryDisabled)
               }
               onClick={() => {
                 if (draft.phase === "saved" && !noteChanged) {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import NotebookRouteLink from "@/components/NotebookRouteLink";
 import { acknowledgeFound, backToNote, type NotebookDraft } from "@/lib/fieldNotebookOutcomeRules";
@@ -6,6 +6,7 @@ import {
   notebookDrafts,
   notebookSessionOwner,
   readNotebookDraft,
+  subscribeNotebookSession,
   writeNotebookDraft,
 } from "@/lib/fieldNotebookSession";
 import { formatFoundTitle, formatServerClockLabel } from "@/lib/fieldNotebookViewModel";
@@ -15,6 +16,14 @@ export default function FieldNotebookTimelineRecovery() {
   const router = useRouter({ warn: false });
   const [drafts, setDrafts] = useState<NotebookDraft[]>(() =>
     notebookDrafts().filter((draft) => draft.recoverySurface === "timeline"),
+  );
+
+  useEffect(
+    () =>
+      subscribeNotebookSession(() => {
+        setDrafts(notebookDrafts().filter((draft) => draft.recoverySurface === "timeline"));
+      }),
+    [],
   );
 
   if (drafts.length === 0) return null;

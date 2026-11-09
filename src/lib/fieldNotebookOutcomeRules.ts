@@ -171,7 +171,7 @@ export function applyTransport(
   if (transport.kind === "acknowledged") {
     const sameTent = transport.entry.tentId === draft.tentId;
     const sameNote =
-      !draft.attempt || transport.entry.note === canonicalNotebookNote(draft.attempt.note);
+      !draft.attempt || notesMatchCanonical(transport.entry.note, draft.attempt.note);
     if (!sameTent || !sameNote) {
       return {
         ...draft,
@@ -193,7 +193,7 @@ export function applyTransport(
         ...next,
         phase: "saved",
         writeBlocked: false,
-        completedNote: transport.entry.note,
+        completedNote: canonicalNotebookNote(transport.entry.note),
         recoverySurface: "grow",
       };
     }
@@ -224,7 +224,7 @@ export function backToNote(draft: NotebookDraft): NotebookDraft {
 export function acknowledgeFound(draft: NotebookDraft): NotebookDraft {
   const cleared = emptyDraft(draft.tentId);
   const submitted = draft.attempt?.note;
-  if (submitted != null && draft.note !== submitted) {
+  if (submitted != null && !notesMatchCanonical(draft.note, submitted)) {
     return { ...cleared, note: draft.note };
   }
   return cleared;
@@ -240,7 +240,7 @@ export function draftAfterTimelineCheck(
   const verified =
     reconciled.status === "found" &&
     started.attempt &&
-    reconciled.entry.note === started.attempt.note &&
+    notesMatchCanonical(reconciled.entry.note, started.attempt.note) &&
     reconciled.entry.tentId === started.tentId
       ? reconciled.entry
       : null;
@@ -285,9 +285,26 @@ export function canonicalNotebookNote(note: string): string {
   return note.trim();
 }
 
+/** Receipt and duplicate identity. Padding does not make a second note. */
+export function notesMatchCanonical(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  if (left == null || right == null) return false;
+  return canonicalNotebookNote(left) === canonicalNotebookNote(right);
+}
+
 export function maySubmit(draft: NotebookDraft): boolean {
-  if (draft.phase !== "editing" || draft.writeBlocked) return false;
-  if (draft.completedNote !== null && canonicalNotebookNote(draft.note) === draft.completedNote) {
+  if (draft.writeBlocked) return false;
+  if (draft.phase === "saved") {
+    return (
+      draft.completedNote !== null &&
+      !notesMatchCanonical(draft.note, draft.completedNote) &&
+      canonicalNotebookNote(draft.note).length > 0
+    );
+  }
+  if (draft.phase !== "editing") return false;
+  if (draft.completedNote !== null && notesMatchCanonical(draft.note, draft.completedNote)) {
     return false;
   }
   return true;

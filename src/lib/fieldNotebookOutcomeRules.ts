@@ -170,7 +170,8 @@ export function applyTransport(
   }
   if (transport.kind === "acknowledged") {
     const sameTent = transport.entry.tentId === draft.tentId;
-    const sameNote = !draft.attempt || transport.entry.note === draft.attempt.note;
+    const sameNote =
+      !draft.attempt || transport.entry.note === canonicalNotebookNote(draft.attempt.note);
     if (!sameTent || !sameNote) {
       return {
         ...draft,
@@ -279,8 +280,15 @@ export function mayRetry(draft: NotebookDraft): boolean {
   return draft.phase === "clear_failure" && !draft.writeBlocked;
 }
 
+/** Text the save payload actually writes. The editor snapshot stays untrimmed. */
+export function canonicalNotebookNote(note: string): string {
+  return note.trim();
+}
+
 export function maySubmit(draft: NotebookDraft): boolean {
   if (draft.phase !== "editing" || draft.writeBlocked) return false;
-  if (draft.completedNote !== null && draft.note === draft.completedNote) return false;
+  if (draft.completedNote !== null && canonicalNotebookNote(draft.note) === draft.completedNote) {
+    return false;
+  }
   return true;
 }

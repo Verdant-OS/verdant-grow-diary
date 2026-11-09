@@ -4,6 +4,7 @@ import {
   acknowledgeFound,
   applyTransport,
   backToNote,
+  canonicalNotebookNote,
   draftAfterTimelineCheck,
   maySubmit,
   reconcileAttempt,
@@ -17,6 +18,7 @@ import {
   clearNotebookSession,
   notebookSessionOwner,
   readNotebookDraft,
+  subscribeNotebookSession,
   writeNotebookDraft,
 } from "@/lib/fieldNotebookSession";
 import {
@@ -73,7 +75,7 @@ function beginAttempt(
     attemptId: crypto.randomUUID(),
     tentId: draft.tentId,
     tentName,
-    note: draft.note,
+    note: canonicalNotebookNote(draft.note),
     idempotencyKey: crypto.randomUUID(),
   };
 }
@@ -91,7 +93,10 @@ export default function FieldNotebook({
 }) {
   const [selectedId, setSelectedId] = useState(tents[0]?.id ?? "");
   const [drafts, setDrafts] = useState<Record<string, NotebookDraft>>(() => {
-    if (import.meta.env.MODE === "test") clearNotebookSession();
+    if (import.meta.env.MODE === "test") {
+      const saveInFlight = tents.some((tent) => readNotebookDraft(tent.id).phase === "saving");
+      if (!saveInFlight) clearNotebookSession();
+    }
     const initial: Record<string, NotebookDraft> = {};
     for (const tent of tents) initial[tent.id] = readNotebookDraft(tent.id);
     return initial;
@@ -100,6 +105,16 @@ export default function FieldNotebook({
 
   const selected = tents.find((t) => t.id === selectedId) ?? tents[0];
   const draft = selected ? (drafts[selected.id] ?? readNotebookDraft(selected.id)) : null;
+
+  useEffect(() => {
+    return subscribeNotebookSession(() => {
+      setDrafts((prev) => {
+        const next = { ...prev };
+        for (const tent of tents) next[tent.id] = readNotebookDraft(tent.id);
+        return next;
+      });
+    });
+  }, [tents]);
 
   useEffect(() => {
     const node = selected ? tabRefs.current[selected.id] : null;
@@ -121,6 +136,7 @@ export default function FieldNotebook({
     if (kind === "retry" && live.phase !== "clear_failure") return;
     const attempt = beginAttempt(live, selected.name, kind === "retry");
     const ownerAtSubmit = notebookSessionOwner();
+    const tentId = selected.id;
     const frozen: NotebookDraft = {
       ...live,
       phase: "saving",
@@ -133,35 +149,31 @@ export default function FieldNotebook({
     put(frozen);
     try {
       const response = await onSave({
-        tentId: selected.id,
+        tentId,
         tentName: selected.name,
         note: attempt.note,
         idempotencyKey: attempt.idempotencyKey,
         attemptId: attempt.attemptId,
       });
-      setDrafts((prev) => {
-        const current = prev[selected.id];
-        if (!current || current.attempt?.attemptId !== attempt.attemptId) return prev;
-        if (current.note !== attempt.note || current.phase !== "saving") return prev;
-        const next = applyTransport(current, response.transport, response.reflection);
-        writeNotebookDraft(next, ownerAtSubmit);
-        return { ...prev, [selected.id]: next };
-      });
+      settleSave(tentId, attempt, ownerAtSubmit, response.transport, response.reflection);
     } catch {
-      setDrafts((prev) => {
-        const current = prev[selected.id];
-        if (
-          !current ||
-          current.attempt?.attemptId !== attempt.attemptId ||
-          current.phase !== "saving"
-        ) {
-          return prev;
-        }
-        const next = applyTransport(current, { kind: "dispatched_no_receipt" }, NONE);
-        writeNotebookDraft(next, ownerAtSubmit);
-        return { ...prev, [selected.id]: next };
-      });
+      settleSave(tentId, attempt, ownerAtSubmit, { kind: "dispatched_no_receipt" }, NONE);
     }
+  }
+
+  function settleSave(
+    tentId: string,
+    attempt: FieldNotebookAttempt,
+    ownerAtSubmit: string | null,
+    transport: SaveTransport,
+    reflection: RefreshReflection,
+  ) {
+    const current = readNotebookDraft(tentId);
+    if (current.attempt?.attemptId !== attempt.attemptId || current.phase !== "saving") return;
+    if (canonicalNotebookNote(current.note) !== attempt.note) return;
+    const next = applyTransport(current, transport, reflection);
+    writeNotebookDraft(next, ownerAtSubmit);
+    setDrafts((prev) => ({ ...prev, [tentId]: next }));
   }
 
   async function checkTimeline() {

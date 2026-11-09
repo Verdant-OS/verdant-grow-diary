@@ -10,6 +10,7 @@ import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEven
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { findNotebookEntry } from "@/lib/fieldNotebookFindService";
+import { buildQuickLogGroupedTimelineQueryOptions } from "@/hooks/useQuickLogGroupedTimeline";
 import { reflectionFromEvidence } from "@/lib/fieldNotebookReflection";
 import type { FieldNotebookServerEntry, RefreshReflection } from "@/lib/fieldNotebookOutcomeRules";
 import type { ReadingSlot } from "@/lib/fieldNotebookViewModel";
@@ -64,7 +65,7 @@ export default function FieldNotebookMount({
     startedLabel: "—",
   }));
 
-  async function reflect(growEventId: string): Promise<RefreshReflection> {
+  async function reflect(growEventId: string, tentId: string): Promise<RefreshReflection> {
     dispatchQuickLogV2EntryCreated({
       createdAt: new Date().toISOString(),
       growEventId,
@@ -73,17 +74,26 @@ export default function FieldNotebookMount({
     });
     applyQuickLogV2Refresh(queryClient, {
       targetType: "tent",
-      targetId: tents[0]?.id ?? growId,
-      tentId: tents[0]?.id ?? null,
+      targetId: tentId,
+      tentId,
     });
+    let fetchedTimeline: unknown = null;
+    try {
+      fetchedTimeline = await queryClient.fetchQuery(
+        buildQuickLogGroupedTimelineQueryOptions({ kind: "tent", tentId }),
+      );
+    } catch {
+      fetchedTimeline = null;
+    }
     await queryClient.refetchQueries({ queryKey: ["quick_log_grouped_timeline"] });
     await queryClient.refetchQueries({ queryKey: ["timeline_memory"] });
     if (reloadRecent) await reloadRecent();
     const recent = await readDashboardRecent(growId);
-    const timelineCaches = [
+    const cached = [
       ...queryClient.getQueriesData({ queryKey: ["quick_log_grouped_timeline"] }),
       ...queryClient.getQueriesData({ queryKey: ["timeline_memory"] }),
     ].map(([, data]) => data);
+    const timelineCaches = [fetchedTimeline, ...cached];
     return reflectionFromEvidence({
       timelineCaches,
       recentItems: recent.status === "ok" ? recent.items : null,
@@ -153,7 +163,7 @@ export default function FieldNotebookMount({
       return { transport: { kind: "acknowledged", entry }, reflection: EMPTY_REFLECTION };
     }
     try {
-      const reflection = await reflect(result.growEventId);
+      const reflection = await reflect(result.growEventId, request.tentId);
       return { transport: { kind: "acknowledged", entry }, reflection };
     } catch {
       return { transport: { kind: "acknowledged", entry }, reflection: EMPTY_REFLECTION };

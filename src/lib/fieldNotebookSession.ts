@@ -5,7 +5,17 @@ import { emptyDraft, type NotebookDraft } from "@/lib/fieldNotebookOutcomeRules"
  * (#2806). The active owner changes only through the auth identity fence.
  */
 const stores = new Map<string, Map<string, NotebookDraft>>();
+const listeners = new Set<() => void>();
 let activeOwnerId: string | null = null;
+
+function notifyNotebookSession(): void {
+  for (const listener of listeners) listener();
+}
+
+export function subscribeNotebookSession(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
 
 function ownerKey(userId: string | null): string {
   return userId ?? "";
@@ -31,6 +41,7 @@ export function adoptNotebookSessionOwner(userId: string | null): void {
   stores.delete(ownerKey(activeOwnerId));
   activeOwnerId = userId;
   storeFor(userId);
+  notifyNotebookSession();
 }
 
 export function readNotebookDraft(tentId: string): NotebookDraft {
@@ -47,6 +58,7 @@ export function writeNotebookDraft(
 ): boolean {
   if (asOwner !== activeOwnerId) return false;
   storeFor(activeOwnerId).set(draft.tentId, draft);
+  notifyNotebookSession();
   return true;
 }
 
@@ -56,4 +68,5 @@ export function notebookDrafts(): NotebookDraft[] {
 
 export function clearNotebookSession(): void {
   stores.delete(ownerKey(activeOwnerId));
+  notifyNotebookSession();
 }

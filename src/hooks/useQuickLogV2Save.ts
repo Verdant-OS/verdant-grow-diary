@@ -223,7 +223,15 @@ export function useQuickLogV2Save() {
               .eq("id", r.grow_event_id)
               .maybeSingle();
             if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
-            if (readError || !event || event.id !== r.grow_event_id) {
+            if (readError || !event) {
+              setError("receipt_unverified");
+              return {
+                ok: false,
+                reason: "receipt_unverified",
+                growEventId: r.grow_event_id,
+              };
+            }
+            if (event.id !== r.grow_event_id) {
               setError("receipt_unverified");
               return { ok: false, reason: "receipt_unverified" };
             }

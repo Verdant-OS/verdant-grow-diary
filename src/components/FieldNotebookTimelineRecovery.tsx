@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useRouter } from "@tanstack/react-router";
 import NotebookRouteLink from "@/components/NotebookRouteLink";
 import { acknowledgeFound, backToNote, type NotebookDraft } from "@/lib/fieldNotebookOutcomeRules";
 import {
@@ -11,6 +12,7 @@ import { formatFoundTitle, formatServerClockLabel } from "@/lib/fieldNotebookVie
 
 /** Recovery for attempts that navigated here. State stays in memory for this session. */
 export default function FieldNotebookTimelineRecovery() {
+  const router = useRouter({ warn: false });
   const [drafts, setDrafts] = useState<NotebookDraft[]>(() =>
     notebookDrafts().filter((draft) => draft.recoverySurface === "timeline"),
   );
@@ -58,9 +60,13 @@ export default function FieldNotebookTimelineRecovery() {
                   type="button"
                   className="mt-2 min-h-11 rounded-md border px-3 text-sm font-medium"
                   onClick={() => {
-                    const back = backToNote(draft);
-                    writeNotebookDraft(back);
+                    const back = {
+                      ...backToNote(readNotebookDraft(draft.tentId)),
+                      recoverySurface: "grow" as const,
+                    };
+                    writeNotebookDraft(back, notebookSessionOwner());
                     setDrafts((current) => current.filter((item) => item.tentId !== draft.tentId));
+                    if (router) void router.navigate({ to: "/" });
                   }}
                 >
                   Back to note

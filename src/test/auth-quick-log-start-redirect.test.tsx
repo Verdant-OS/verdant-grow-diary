@@ -176,8 +176,9 @@ describe("Auth start-screen routing", () => {
     renderAuth("/auth");
     fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
     await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent("/plants/plant-a?open=quick-log"),
+      expect(screen.getByTestId("location")).toHaveTextContent("/plants/plant-a"),
     );
+    expect(screen.getByTestId("location").textContent).not.toContain("open=quick-log");
   });
 
   it("sends a first-time user with no saved start screen to onboarding", async () => {
@@ -208,8 +209,9 @@ describe("Auth start-screen routing", () => {
     h.user = { id: "user-1" };
     renderAuth("/auth", true);
     await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent("/plants/plant-a?open=quick-log"),
+      expect(screen.getByTestId("location")).toHaveTextContent("/plants/plant-a"),
     );
+    expect(screen.getByTestId("location").textContent).not.toContain("open=quick-log");
     fireEvent.click(screen.getByRole("button", { name: /switch user/i }));
     fireEvent.click(screen.getByRole("button", { name: /return to auth/i }));
     await act(async () => {

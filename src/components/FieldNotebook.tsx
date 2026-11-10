@@ -362,9 +362,19 @@ export default function FieldNotebook({
               className="min-h-24 w-full rounded-md border bg-background p-2 text-base"
               placeholder={FIELD_NOTEBOOK_EMPTY_NOTE_PLACEHOLDER}
               value={draft.note}
-              readOnly={draft.phase === "saving" || draft.idempotencyRetracted === true}
+              readOnly={
+                draft.phase === "saving" ||
+                draft.idempotencyRetracted === true ||
+                (draft.phase === "uncertain" && draft.attempt != null)
+              }
               onChange={(event) => {
-                if (draft.phase === "saving" || draft.idempotencyRetracted === true) return;
+                if (
+                  draft.phase === "saving" ||
+                  draft.idempotencyRetracted === true ||
+                  (draft.phase === "uncertain" && draft.attempt != null)
+                ) {
+                  return;
+                }
                 const note = event.target.value;
                 if (draft.writeBlocked) {
                   put({ ...draft, note });

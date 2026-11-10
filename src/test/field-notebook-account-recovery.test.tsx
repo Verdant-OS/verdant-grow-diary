@@ -113,15 +113,16 @@ describe("field notebook account recovery guards", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
     fireEvent.click(await screen.findByRole("button", { name: "Check Timeline" }));
-    fireEvent.change(screen.getByPlaceholderText("Add what you observed."), {
+    const box = screen.getByPlaceholderText("Add what you observed.") as HTMLTextAreaElement;
+    expect(box.readOnly).toBe(true);
+    fireEvent.change(box, {
       target: { value: "typed while checking" },
     });
+    expect(box).toHaveValue(entry.note);
     finish([entry]);
     expect(await screen.findByRole("button", { name: "Yes, that's it" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Yes, that's it" }));
-    expect(await screen.findByPlaceholderText("Add what you observed.")).toHaveValue(
-      "typed while checking",
-    );
+    expect(await screen.findByPlaceholderText("Add what you observed.")).toHaveValue("");
   });
 
   it("navigates to Timeline without dropping the in-memory draft", async () => {

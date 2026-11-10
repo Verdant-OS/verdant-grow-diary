@@ -51,14 +51,16 @@ describe("uncertain save keeps the submitted attempt fixed", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
     fireEvent.click(await screen.findByRole("button", { name: "Check Timeline" }));
     const before = readNotebookDraft("flower");
-    fireEvent.change(screen.getByPlaceholderText("Add what you observed."), {
+    const box = screen.getByPlaceholderText("Add what you observed.") as HTMLTextAreaElement;
+    expect(box.readOnly).toBe(true);
+    fireEvent.change(box, {
       target: { value: "  observation A  " },
     });
     const after = readNotebookDraft("flower");
     expect(after.phase).toBe("uncertain");
     expect(after.writeBlocked).toBe(true);
     expect(after.attempt).toEqual(before.attempt);
-    expect(after.note).toBe("  observation A  ");
+    expect(after.note).toBe("observation A");
     expect(screen.getByRole("button", { name: "Save to Flower Tent 2" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
@@ -80,12 +82,14 @@ describe("uncertain save keeps the submitted attempt fixed", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
     await screen.findByRole("button", { name: "Check Timeline" });
-    fireEvent.change(screen.getByPlaceholderText("Add what you observed."), {
+    const box = screen.getByPlaceholderText("Add what you observed.") as HTMLTextAreaElement;
+    expect(box.readOnly).toBe(true);
+    fireEvent.change(box, {
       target: { value: "observation B" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Check Timeline" }));
     expect(await screen.findByText("Entry found")).toBeInTheDocument();
-    expect(readNotebookDraft("flower").note).toBe("observation B");
+    expect(readNotebookDraft("flower").note).toBe("observation A");
     expect(readNotebookDraft("flower").verifiedEntry?.note).toBe("observation A");
     expect(onSave).toHaveBeenCalledTimes(1);
   });
@@ -123,12 +127,15 @@ describe("uncertain save keeps the submitted attempt fixed", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
     await screen.findByRole("button", { name: "Check Timeline" });
-    fireEvent.change(screen.getByPlaceholderText("Add what you observed."), {
+    const box = screen.getByPlaceholderText("Add what you observed.") as HTMLTextAreaElement;
+    expect(box.readOnly).toBe(true);
+    fireEvent.change(box, {
       target: { value: "observation B" },
     });
+    expect(box).toHaveValue("observation A");
     fireEvent.click(screen.getByRole("button", { name: "Check Timeline" }));
     fireEvent.click(await screen.findByRole("button", { name: "Yes, that's it" }));
-    expect(screen.getByPlaceholderText("Add what you observed.")).toHaveValue("observation B");
+    expect(screen.getByPlaceholderText("Add what you observed.")).toHaveValue("");
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: "Saving..." })).not.toBeInTheDocument();
   });

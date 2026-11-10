@@ -58,7 +58,7 @@ describe("a note that may not have saved stays with the signed-in account", () =
     expect(onSave).toHaveBeenCalledOnce();
     const box = screen.getByPlaceholderText("Add what you observed.") as HTMLTextAreaElement;
     expect(box.value).toBe("leaves are pale");
-    expect(box.readOnly).toBe(false);
+    expect(box.readOnly).toBe(true);
     const again = screen.getByRole("button", { name: "Save again (won't duplicate)" });
     expect(again).toBeEnabled();
     const firstKey = onSave.mock.calls[0][0].idempotencyKey;

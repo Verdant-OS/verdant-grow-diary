@@ -42,7 +42,7 @@ describe("uncertain save with no event id", () => {
     const checked = draftAfterTimelineCheck(uncertain, "maybe saved", { status: "none" });
     expect(checked.note).toBe("maybe saved");
     expect(checked.phase).toBe("uncertain");
-    expect(checked.writeBlocked).toBe(false);
+    expect(checked.writeBlocked).toBe(true);
     expect(mayRetry(checked)).toBe(false);
 
     const onSave = vi
@@ -82,17 +82,13 @@ describe("uncertain save with no event id", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
     fireEvent.click(await screen.findByRole("button", { name: "Check Timeline" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Save to Flower Tent 2" })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Save to Flower Tent 2" })).toBeDisabled(),
     );
     expect(screen.getByRole("button", { name: "Check Timeline" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText("Add what you observed.")).toHaveValue("maybe saved");
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
-    expect(await screen.findByText(/Saved to Flower Tent 2/)).toBeInTheDocument();
-    expect(onSave).toHaveBeenCalledTimes(2);
-    expect(onSave.mock.calls[0][0].note).toBe("maybe saved");
-    expect(onSave.mock.calls[1][0].note).toBe("maybe saved");
-    expect(onSave.mock.calls[0][0].idempotencyKey).toBe(onSave.mock.calls[1][0].idempotencyKey);
+    expect(onSave).toHaveBeenCalledTimes(1);
   });
 
   it("offers Retry for a confirmed failure and not Check Timeline", async () => {

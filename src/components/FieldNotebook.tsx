@@ -166,6 +166,7 @@ export default function FieldNotebook({
       ...ready,
       phase: "saving",
       attempt,
+      saveAgainRejected: kind === "save_again" ? ready.saveAgainRejected === true : false,
       knownEventId: null,
       verifiedEntry: null,
       serverOccurredAt: null,
@@ -282,6 +283,7 @@ export default function FieldNotebook({
     tentName: selected.name,
     serverTimeLabel: clockLabel,
     noteChanged,
+    saveAgainRejected: draft.saveAgainRejected === true,
   });
   const foundLabel =
     draft.verifiedEntry && clockLabel
@@ -435,7 +437,8 @@ export default function FieldNotebook({
               Check Timeline
             </button>
           ) : null}
-          {draft.idempotencyRetracted || draft.saveAgainRejected ? (
+          {draft.phase === "uncertain" &&
+          (draft.idempotencyRetracted || draft.saveAgainRejected) ? (
             <button
               type="button"
               className="min-h-11 rounded-md border px-3 text-sm font-medium"

@@ -7,9 +7,11 @@
  *
  * Clear failure: evidence this attempt did not create an entry.
  * Uncertain: the write may have landed. The note stays visible and read-only.
- * Save again resends that same idempotency key. not_authenticated and
- * transport or unknown outcomes stay uncertain. Any other definitive
- * rejection of that resend proves no row exists and offers a new note.
+ * Save again resends that same idempotency key. not_authenticated, offline,
+ * and transport or unknown outcomes stay uncertain. A post-key-lookup
+ * definitive rejection proves no row exists and offers a new note while
+ * that attempt is still uncertain. Acknowledging the attempt, finding it
+ * on Timeline, retracting the key, or starting a new save clears that offer.
  * A retracted key keeps the note and offers a new note, and that new note
  * is a different attempt.
  */
@@ -57,6 +59,28 @@ export function reflectionComplete(reflection: RefreshReflection): boolean {
     reflection.countIncludesEntry &&
     reflection.lastActivityIncludesEntry
   );
+}
+
+/**
+ * Reasons returned only after quicklog_idempotency is read and only when that
+ * key has no row. A key hit returns reused before these checks. Client payload
+ * builds and the pre-lookup reasons (not_authenticated, invalid_idempotency_key)
+ * are absent on purpose.
+ */
+const POST_KEY_LOOKUP_NO_ROW_REASONS: ReadonlySet<string> = new Set([
+  "invalid_target_type",
+  "missing_target_id",
+  "unsupported_action",
+  "invalid_volume",
+  "invalid_details",
+  "invalid_logged_at",
+  "target_not_owned",
+  "grow_not_owned",
+  "plant_tent_grow_mismatch",
+]);
+
+export function definitiveRejectionProvesNoRow(reason: string): boolean {
+  return POST_KEY_LOOKUP_NO_ROW_REASONS.has(reason);
 }
 
 export function isClearFailure(transport: SaveTransport): boolean {
@@ -188,6 +212,7 @@ export function applyTransport(
       phase: "uncertain",
       writeBlocked: true,
       idempotencyRetracted: true,
+      saveAgainRejected: false,
       note: draft.attempt?.note ?? draft.note,
       knownEventId: null,
       verifiedEntry: null,
@@ -203,12 +228,14 @@ export function applyTransport(
         ...draft,
         phase: "uncertain",
         writeBlocked: true,
+        saveAgainRejected: false,
         knownEventId: null,
         verifiedEntry: null,
       };
     }
     const next: NotebookDraft = {
       ...draft,
+      saveAgainRejected: false,
       knownEventId: transport.entry.growEventId,
       serverOccurredAt: transport.entry.occurredAt,
       verifiedEntry: transport.entry,
@@ -227,11 +254,13 @@ export function applyTransport(
   }
   if (isClearFailure(transport)) {
     if (draft.writeBlocked && draft.attempt) {
-      // not_authenticated and an offline resend do not prove the first write
-      // missed. Any other definitive rejection runs only after a key miss, so
-      // no row exists. Keep the note and offer a new attempt.
+      // A client build rejection never reaches the key lookup. not_authenticated
+      // and invalid_idempotency_key return before that lookup. Offline is not
+      // a server result. Only a post-lookup rejection of a missing key proves
+      // no row exists.
       const provesNoRow =
-        transport.kind === "definitive_rejection" && transport.reason !== "not_authenticated";
+        transport.kind === "definitive_rejection" &&
+        definitiveRejectionProvesNoRow(transport.reason);
       return {
         ...draft,
         phase: "uncertain",
@@ -309,6 +338,7 @@ export function draftAfterTimelineCheck(
       serverOccurredAt: verified.occurredAt,
       knownEventId: verified.growEventId,
       writeBlocked: true,
+      saveAgainRejected: false,
       recoverySurface: "timeline",
     };
   }

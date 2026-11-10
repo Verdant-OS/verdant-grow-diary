@@ -67,6 +67,10 @@ export function formatUncertainLine(): string {
   return "This note may not have saved. Check Timeline. It stays here so you can copy it.";
 }
 
+export function formatNotSavedLine(): string {
+  return "This note was not saved. It stays here so you can copy it.";
+}
+
 export function formatClearFailureLine(): string {
   return "Couldn't save. Your note is still here.";
 }
@@ -89,6 +93,7 @@ export function statusView(input: {
   tentName: string;
   serverTimeLabel: string | null;
   noteChanged?: boolean;
+  saveAgainRejected?: boolean;
 }): StatusView {
   const save = formatSaveButton(input.tentName);
   switch (input.phase) {
@@ -134,7 +139,7 @@ export function statusView(input: {
     case "uncertain":
       return {
         phase: input.phase,
-        statusLine: formatUncertainLine(),
+        statusLine: input.saveAgainRejected ? formatNotSavedLine() : formatUncertainLine(),
         primaryLabel: save,
         primaryDisabled: true,
         showRetry: false,

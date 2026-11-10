@@ -173,15 +173,11 @@ describe("a proven rejection does not stick", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Save again (won't duplicate)" }));
     await screen.findByRole("button", { name: "Start a new note" });
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
-    fireEvent.click(screen.getByRole("button", { name: "Check Timeline" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save again (won't duplicate)" }));
-    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(3));
     expect(onSave.mock.calls[1]?.[0].idempotencyKey).toBe(onSave.mock.calls[0]?.[0].idempotencyKey);
-    expect(onSave.mock.calls[2]?.[0].idempotencyKey).toBe(onSave.mock.calls[0]?.[0].idempotencyKey);
     fireEvent.click(screen.getByRole("button", { name: "Start a new note" }));
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
-    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(4));
-    expect(onSave.mock.calls[3]?.[0].idempotencyKey).not.toBe(
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(3));
+    expect(onSave.mock.calls[2]?.[0].idempotencyKey).not.toBe(
       onSave.mock.calls[0]?.[0].idempotencyKey,
     );
   });

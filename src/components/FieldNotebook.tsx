@@ -184,6 +184,7 @@ export default function FieldNotebook({
       });
       settleSave(tentId, attempt, ownerAtSubmit, response.transport, response.reflection);
     } catch {
+      // A throw after dispatch is the same as no reply: the rejection offer does not survive it.
       settleSave(tentId, attempt, ownerAtSubmit, { kind: "dispatched_no_receipt" }, NONE);
     } finally {
       saveInFlight.current = false;

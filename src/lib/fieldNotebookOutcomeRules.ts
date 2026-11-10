@@ -10,11 +10,17 @@
  * Save again resends that same idempotency key. not_authenticated, offline,
  * and transport or unknown outcomes stay uncertain. A post-key-lookup
  * definitive rejection proves no row exists and offers a new note while
- * that attempt is still uncertain. Acknowledging the attempt, finding it
- * on Timeline, retracting the key, or starting a new save clears that offer.
+ * that attempt is still uncertain. A later Save again that was sent and got
+ * no reply clears that offer, and a reload does not bring it back.
+ * Acknowledging the attempt, finding it on Timeline, retracting the key,
+ * or starting a new save clears it too.
  * A retracted key keeps the note and offers a new note, and that new note
  * is a different attempt.
  */
+
+import { definitiveRejectionProvesNoRow } from "@/lib/quickLogManualRejectionRules";
+
+export { definitiveRejectionProvesNoRow };
 
 export type FieldNotebookPhase =
   "editing" | "saving" | "saved" | "clear_failure" | "uncertain" | "check_found" | "check_none";
@@ -59,28 +65,6 @@ export function reflectionComplete(reflection: RefreshReflection): boolean {
     reflection.countIncludesEntry &&
     reflection.lastActivityIncludesEntry
   );
-}
-
-/**
- * Reasons returned only after quicklog_idempotency is read and only when that
- * key has no row. A key hit returns reused before these checks. Client payload
- * builds and the pre-lookup reasons (not_authenticated, invalid_idempotency_key)
- * are absent on purpose.
- */
-const POST_KEY_LOOKUP_NO_ROW_REASONS: ReadonlySet<string> = new Set([
-  "invalid_target_type",
-  "missing_target_id",
-  "unsupported_action",
-  "invalid_volume",
-  "invalid_details",
-  "invalid_logged_at",
-  "target_not_owned",
-  "grow_not_owned",
-  "plant_tent_grow_mismatch",
-]);
-
-export function definitiveRejectionProvesNoRow(reason: string): boolean {
-  return POST_KEY_LOOKUP_NO_ROW_REASONS.has(reason);
 }
 
 export function isClearFailure(transport: SaveTransport): boolean {
@@ -272,10 +256,12 @@ export function applyTransport(
     }
     return { ...draft, phase: "clear_failure", writeBlocked: false, recoverySurface: "grow" };
   }
+  // A sent Save again with no reply may have landed. Drop a prior "not saved" claim.
   return {
     ...draft,
     phase: "uncertain",
     writeBlocked: true,
+    saveAgainRejected: false,
     knownEventId: null,
     verifiedEntry: null,
     serverOccurredAt: null,

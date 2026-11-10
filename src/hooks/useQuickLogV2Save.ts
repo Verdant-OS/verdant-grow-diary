@@ -16,6 +16,7 @@ import {
   matchesRetractedWaterReceipt,
   resolveStarterWaterReceiptTarget,
 } from "@/lib/quickLogWaterReceiptRules";
+import { DEFINITIVE_MANUAL_REJECTIONS } from "@/lib/quickLogManualRejectionRules";
 import {
   hasMatchingQuickLogNoteTarget,
   matchesActiveQuickLogNoteEvent,
@@ -69,19 +70,7 @@ export interface QuickLogV2SaveOptions {
 // These normal RPC responses are emitted before the manual event insert.
 // Missing/malformed replies, exceptions, save_failed and receipt failures do
 // not establish non-commit and must retain the caller's original submission.
-const DEFINITIVE_MANUAL_REJECTIONS = new Set([
-  "not_authenticated",
-  "invalid_idempotency_key",
-  "invalid_target_type",
-  "missing_target_id",
-  "unsupported_action",
-  "invalid_volume",
-  "invalid_details",
-  "invalid_logged_at",
-  "target_not_owned",
-  "grow_not_owned",
-  "plant_tent_grow_mismatch",
-]);
+const DEFINITIVE_MANUAL_REJECTION_SET = new Set<string>(DEFINITIVE_MANUAL_REJECTIONS);
 
 export function useQuickLogV2Save() {
   const [saving, setSaving] = useState(false);
@@ -128,7 +117,7 @@ export function useQuickLogV2Save() {
           return {
             ok: false,
             reason,
-            ...(r.ok === false && DEFINITIVE_MANUAL_REJECTIONS.has(reason)
+            ...(r.ok === false && DEFINITIVE_MANUAL_REJECTION_SET.has(reason)
               ? { definitiveRejected: true }
               : {}),
           };

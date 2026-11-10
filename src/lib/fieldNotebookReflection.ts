@@ -5,10 +5,15 @@ import type { RefreshReflection } from "@/lib/fieldNotebookOutcomeRules";
  * is the object-cache shape. An array counts only when it contains the event id.
  */
 function countShowsEntry(cache: unknown, id: string): boolean {
-  if (Array.isArray(cache)) return cache.length > 0 && containsId(cache, id);
-  if (!cache || typeof cache !== "object" || !("count" in cache)) return false;
-  const count = (cache as { count: unknown }).count;
-  return typeof count === "number" && Number.isFinite(count) && count > 0 && containsId(cache, id);
+  if (Array.isArray(cache)) return cache.some((item) => countShowsEntry(item, id));
+  if (!cache || typeof cache !== "object") return false;
+  if ("count" in cache) {
+    const count = (cache as { count: unknown }).count;
+    return (
+      typeof count === "number" && Number.isFinite(count) && count > 0 && containsId(cache, id)
+    );
+  }
+  return containsId(cache, id);
 }
 
 function containsId(value: unknown, id: string): boolean {

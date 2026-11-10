@@ -47,10 +47,10 @@ describe("returning Quick Log start screen", () => {
     const target = resolveReturningQuickLogStartTarget({ plants, ...room });
 
     expect(resolveReturningSignInRoute({ savedChoice: "quickLog", plants, ...room })).toBe(
-      `/grows/${GROW_A}`,
+      "/dashboard",
     );
     expect(target).toEqual({
-      route: `/grows/${GROW_A}`,
+      route: "/dashboard",
       plantId: PLANT_A,
       tentId: TENT_A,
       growId: GROW_A,
@@ -77,7 +77,7 @@ describe("returning Quick Log start screen", () => {
     const target = resolveReturningQuickLogStartTarget({ plants, ...room });
 
     expect(resolveReturningSignInRoute({ savedChoice: "quickLog", plants, ...room })).toBe(
-      `/grows/${GROW_B}`,
+      "/dashboard",
     );
     expect(target.plantId).toBe(PLANT_B);
     expect(target.tentId).toBe(TENT_B);

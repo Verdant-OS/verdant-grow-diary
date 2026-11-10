@@ -7,9 +7,11 @@
  *
  * Clear failure: evidence this attempt did not create an entry.
  * Uncertain: the write may have landed. The note stays visible and read-only.
- * Save again resends that same idempotency key. A rejection of that resend
- * stays uncertain. A retracted key keeps the note and offers a new note,
- * and that new note is a different attempt.
+ * Save again resends that same idempotency key. not_authenticated and
+ * transport or unknown outcomes stay uncertain. Any other definitive
+ * rejection of that resend proves no row exists and offers a new note.
+ * A retracted key keeps the note and offers a new note, and that new note
+ * is a different attempt.
  */
 
 export type FieldNotebookPhase =
@@ -145,6 +147,11 @@ export interface NotebookDraft {
   writeBlocked: boolean;
   /** The server retired this attempt's key. Save again must not mint a replacement. */
   idempotencyRetracted?: boolean;
+  /**
+   * A definitive rejection of Save again proved no row exists. The note stays
+   * visible. Start a new note is a different attempt.
+   */
+  saveAgainRejected?: boolean;
   recoverySurface: "grow" | "timeline";
 }
 
@@ -219,14 +226,18 @@ export function applyTransport(
     return { ...next, phase: "uncertain", writeBlocked: true };
   }
   if (isClearFailure(transport)) {
-    // A resend of an uncertain attempt can be rejected without proving the
-    // first write missed. Keep the note and the same key.
     if (draft.writeBlocked && draft.attempt) {
+      // not_authenticated and an offline resend do not prove the first write
+      // missed. Any other definitive rejection runs only after a key miss, so
+      // no row exists. Keep the note and offer a new attempt.
+      const provesNoRow =
+        transport.kind === "definitive_rejection" && transport.reason !== "not_authenticated";
       return {
         ...draft,
         phase: "uncertain",
         writeBlocked: true,
         idempotencyRetracted: false,
+        saveAgainRejected: provesNoRow || draft.saveAgainRejected === true,
         note: draft.attempt.note,
       };
     }

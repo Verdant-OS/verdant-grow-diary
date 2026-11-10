@@ -435,7 +435,7 @@ export default function FieldNotebook({
               Check Timeline
             </button>
           ) : null}
-          {draft.idempotencyRetracted ? (
+          {draft.idempotencyRetracted || draft.saveAgainRejected ? (
             <button
               type="button"
               className="min-h-11 rounded-md border px-3 text-sm font-medium"

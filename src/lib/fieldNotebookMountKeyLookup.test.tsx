@@ -118,7 +118,7 @@ describe("FieldNotebookMount key lookup", () => {
     expect(idempotencyMaybeSingle).not.toHaveBeenCalled();
   });
 
-  it("fails closed when the attempt key is null", async () => {
+  it("passes the attempt key into the lookup", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     renderMount();
     fireEvent.change(screen.getByPlaceholderText("Add what you observed."), {

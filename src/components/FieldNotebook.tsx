@@ -141,7 +141,7 @@ export default function FieldNotebook({
     setDrafts((prev) => ({ ...prev, [next.tentId]: next }));
   }
 
-  async function submit(kind: "save" | "retry") {
+  async function submit(kind: "save" | "retry" | "save_again") {
     const live = drafts[selected.id] ?? readNotebookDraft(selected.id);
     const ready =
       kind === "save" &&
@@ -149,11 +149,13 @@ export default function FieldNotebook({
       !notesMatchCanonical(live.note, live.completedNote)
         ? { ...live, phase: "editing" as const }
         : live;
+    if (kind === "save_again" && (live.phase !== "uncertain" || live.attempt == null)) return;
     if (kind === "save" && !maySubmit(ready)) return;
     if (kind === "retry" && live.phase !== "clear_failure") return;
     if (saveInFlight.current || readNotebookDraft(selected.id).phase === "saving") return;
     const reuseAttempt =
       kind === "retry" ||
+      kind === "save_again" ||
       (ready.attempt != null && notesMatchCanonical(ready.note, ready.attempt.note));
     const attempt = beginAttempt(ready, selected.name, reuseAttempt);
     const ownerAtSubmit = notebookSessionOwner();
@@ -416,6 +418,17 @@ export default function FieldNotebook({
               }}
             >
               Check Timeline
+            </button>
+          ) : null}
+          {draft.phase === "uncertain" && draft.attempt ? (
+            <button
+              type="button"
+              className="min-h-11 rounded-md border px-3 text-sm font-medium"
+              onClick={() => {
+                void submit("save_again");
+              }}
+            >
+              Save again (won't duplicate)
             </button>
           ) : null}
           {view.showCheckTimeline ? (

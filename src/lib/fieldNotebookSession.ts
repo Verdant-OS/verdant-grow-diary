@@ -1,9 +1,9 @@
 import { emptyDraft, type NotebookDraft } from "@/lib/fieldNotebookOutcomeRules";
 
 /**
- * One map per signed-in account. Uncertain notes are also stored in
- * localStorage under that account id so a reload keeps the text. Another
- * account never reads that key. A signed-out session is memory only.
+ * One map per signed-in account. Only an uncertain note is stored in
+ * localStorage under that account id, so a reload can offer Check Timeline
+ * and Save again. Sign-out removes that key. Another account never reads it.
  */
 const STORAGE_PREFIX = "verdant.fieldNotebook.v1:";
 
@@ -40,6 +40,11 @@ function readStoredDrafts(userId: string): Map<string, NotebookDraft> {
       if (!item || typeof item !== "object") continue;
       const draft = item as NotebookDraft;
       if (typeof draft.tentId !== "string" || draft.tentId.length === 0) continue;
+      if (draft.phase === "saving") {
+        map.set(draft.tentId, { ...draft, phase: "uncertain", writeBlocked: true });
+        continue;
+      }
+      if (draft.phase !== "uncertain") continue;
       map.set(draft.tentId, draft);
     }
   } catch {
@@ -48,10 +53,37 @@ function readStoredDrafts(userId: string): Map<string, NotebookDraft> {
   return map;
 }
 
+function draftToPersist(draft: NotebookDraft): NotebookDraft | null {
+  if (draft.phase === "uncertain") return draft;
+  if (draft.phase === "saving") {
+    return { ...draft, phase: "uncertain", writeBlocked: true };
+  }
+  return null;
+}
+
 function persistOwner(userId: string | null): void {
   if (!userId || typeof localStorage === "undefined") return;
-  const drafts = [...(stores.get(userId)?.values() ?? [])];
-  localStorage.setItem(storageKey(userId), JSON.stringify(drafts));
+  const drafts = [...(stores.get(userId)?.values() ?? [])]
+    .map(draftToPersist)
+    .filter((draft): draft is NotebookDraft => draft !== null);
+  try {
+    if (drafts.length === 0) {
+      localStorage.removeItem(storageKey(userId));
+      return;
+    }
+    localStorage.setItem(storageKey(userId), JSON.stringify(drafts));
+  } catch {
+    // A full or disabled store must not throw into typing or saving.
+  }
+}
+
+function removeStored(userId: string): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.removeItem(storageKey(userId));
+  } catch {
+    // Sign-out still drops memory when storage is unavailable.
+  }
 }
 
 function storeFor(userId: string | null): Map<string, NotebookDraft> {
@@ -68,10 +100,12 @@ export function notebookSessionOwner(): string | null {
   return activeOwnerId;
 }
 
-/** Drop the previous account's drafts, then publish the next owner. */
+/** Drop the previous account's memory. Sign-out also removes its stored notes. */
 export function adoptNotebookSessionOwner(userId: string | null): void {
   if (userId === activeOwnerId) return;
-  stores.delete(ownerKey(activeOwnerId));
+  const previous = activeOwnerId;
+  stores.delete(ownerKey(previous));
+  if (userId === null && previous) removeStored(previous);
   activeOwnerId = userId;
   storeFor(userId);
   notifyNotebookSession();

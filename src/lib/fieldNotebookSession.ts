@@ -28,11 +28,22 @@ function storageKey(userId: string): string {
   return `${STORAGE_PREFIX}${userId}`;
 }
 
+/** `typeof localStorage` throws when the browser blocks storage. Keep it inside try. */
+function safeStorage(): Storage | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    return localStorage;
+  } catch {
+    return null;
+  }
+}
+
 function readStoredDrafts(userId: string): Map<string, NotebookDraft> {
   const map = new Map<string, NotebookDraft>();
-  if (typeof localStorage === "undefined") return map;
+  const storage = safeStorage();
+  if (!storage) return map;
   try {
-    const raw = localStorage.getItem(storageKey(userId));
+    const raw = storage.getItem(storageKey(userId));
     if (!raw) return map;
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return map;
@@ -62,25 +73,28 @@ function draftToPersist(draft: NotebookDraft): NotebookDraft | null {
 }
 
 function persistOwner(userId: string | null): void {
-  if (!userId || typeof localStorage === "undefined") return;
+  if (!userId) return;
   const drafts = [...(stores.get(userId)?.values() ?? [])]
     .map(draftToPersist)
     .filter((draft): draft is NotebookDraft => draft !== null);
+  const storage = safeStorage();
+  if (!storage) return;
   try {
     if (drafts.length === 0) {
-      localStorage.removeItem(storageKey(userId));
+      storage.removeItem(storageKey(userId));
       return;
     }
-    localStorage.setItem(storageKey(userId), JSON.stringify(drafts));
+    storage.setItem(storageKey(userId), JSON.stringify(drafts));
   } catch {
     // A full or disabled store must not throw into typing or saving.
   }
 }
 
 function removeStored(userId: string): void {
-  if (typeof localStorage === "undefined") return;
+  const storage = safeStorage();
+  if (!storage) return;
   try {
-    localStorage.removeItem(storageKey(userId));
+    storage.removeItem(storageKey(userId));
   } catch {
     // Sign-out still drops memory when storage is unavailable.
   }
@@ -100,12 +114,26 @@ export function notebookSessionOwner(): string | null {
   return activeOwnerId;
 }
 
-/** Drop the previous account's memory. Sign-out also removes its stored notes. */
-export function adoptNotebookSessionOwner(userId: string | null): void {
-  if (userId === activeOwnerId) return;
+/**
+ * Drop the previous account's memory. Sign-out removes its stored notes even
+ * when this page load never adopted an owner (same-tab reload, then sign-out).
+ * `knownPreviousUserId` is that last resolved id.
+ */
+export function adoptNotebookSessionOwner(
+  userId: string | null,
+  knownPreviousUserId: string | null = null,
+): void {
+  if (userId === null) {
+    const target = activeOwnerId ?? knownPreviousUserId;
+    if (target) removeStored(target);
+  }
+  if (userId === activeOwnerId) {
+    if (userId === null) notifyNotebookSession();
+    return;
+  }
   const previous = activeOwnerId;
   stores.delete(ownerKey(previous));
-  if (userId === null && previous) removeStored(previous);
+  if (userId === null && previous && previous !== knownPreviousUserId) removeStored(previous);
   activeOwnerId = userId;
   storeFor(userId);
   notifyNotebookSession();
@@ -136,13 +164,18 @@ export function notebookDrafts(): NotebookDraft[] {
 
 export function clearNotebookSession(): void {
   stores.clear();
-  if (typeof localStorage !== "undefined") {
-    const keys: string[] = [];
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index);
-      if (key?.startsWith(STORAGE_PREFIX)) keys.push(key);
+  const storage = safeStorage();
+  if (storage) {
+    try {
+      const keys: string[] = [];
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (key?.startsWith(STORAGE_PREFIX)) keys.push(key);
+      }
+      for (const key of keys) storage.removeItem(key);
+    } catch {
+      // A blocked store must not throw out of a test or sign-out helper.
     }
-    for (const key of keys) localStorage.removeItem(key);
   }
   notifyNotebookSession();
 }

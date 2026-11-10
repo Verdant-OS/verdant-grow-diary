@@ -12,7 +12,7 @@ import {
 } from "@/lib/fieldNotebookSession";
 import { formatFoundTitle, formatServerClockLabel } from "@/lib/fieldNotebookViewModel";
 
-/** Recovery for attempts that navigated here. State stays in memory for this session. */
+/** Recovery for attempts that navigated here. An uncertain note is also stored for this account. */
 export default function FieldNotebookTimelineRecovery({
   growId = null,
 }: {

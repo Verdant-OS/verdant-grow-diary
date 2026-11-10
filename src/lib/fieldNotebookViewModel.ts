@@ -59,6 +59,10 @@ export function formatSaveButton(tentName: string): string {
   return `Save to ${tentName}`;
 }
 
+export function formatRetractedLine(): string {
+  return "This note was removed from Timeline. It stays here so you can copy it.";
+}
+
 export function formatUncertainLine(): string {
   return "This note may not have saved. Check Timeline. It stays here so you can copy it.";
 }

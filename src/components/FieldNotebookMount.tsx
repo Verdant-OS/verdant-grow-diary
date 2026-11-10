@@ -137,6 +137,12 @@ export default function FieldNotebookMount({
           reflection: EMPTY_REFLECTION,
         };
       }
+      if (result.reason === "idempotency_key_retracted") {
+        return {
+          transport: { kind: "idempotency_retracted" },
+          reflection: EMPTY_REFLECTION,
+        };
+      }
       if (result.definitiveRejected) {
         return {
           transport: { kind: "definitive_rejection", reason: result.reason ?? "rejected" },

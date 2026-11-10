@@ -13,9 +13,10 @@ import { adoptNotebookSessionOwner } from "@/lib/fieldNotebookSession";
 export function clearPrivateClientStateBeforeAuthIdentityChange(
   queryClient: Pick<QueryClient, "clear">,
   nextUserId: string | null = null,
+  previousUserId: string | null = null,
 ): void {
   flushSync(() => clearGlobalSearchPrivateState());
   queryClient.clear();
   clearGrowDataMeta();
-  adoptNotebookSessionOwner(nextUserId);
+  adoptNotebookSessionOwner(nextUserId, previousUserId);
 }

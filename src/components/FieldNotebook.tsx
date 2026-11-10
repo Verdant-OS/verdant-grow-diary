@@ -5,6 +5,7 @@ import {
   acknowledgeFound,
   applyTransport,
   backToNote,
+  emptyDraft,
   canonicalNotebookNote,
   draftAfterTimelineCheck,
   maySubmit,
@@ -26,6 +27,7 @@ import {
   FIELD_NOTEBOOK_EMPTY_NOTE_PLACEHOLDER,
   FIELD_NOTEBOOK_READING_MISSING,
   formatFoundTitle,
+  formatRetractedLine,
   formatReadingProvenance,
   formatReadingValue,
   formatServerClockLabel,
@@ -201,7 +203,10 @@ export default function FieldNotebook({
       transport,
       reflection,
     );
-    const next = { ...settled, note: current.note };
+    const next = {
+      ...settled,
+      note: settled.phase === "uncertain" && attempt ? attempt.note : current.note,
+    };
     writeNotebookDraft(next, ownerAtSubmit);
     setDrafts((prev) => ({ ...prev, [tentId]: next }));
   }
@@ -357,9 +362,9 @@ export default function FieldNotebook({
               className="min-h-24 w-full rounded-md border bg-background p-2 text-base"
               placeholder={FIELD_NOTEBOOK_EMPTY_NOTE_PLACEHOLDER}
               value={draft.note}
-              readOnly={draft.phase === "saving"}
+              readOnly={draft.phase === "saving" || draft.idempotencyRetracted === true}
               onChange={(event) => {
-                if (draft.phase === "saving") return;
+                if (draft.phase === "saving" || draft.idempotencyRetracted === true) return;
                 const note = event.target.value;
                 if (draft.writeBlocked) {
                   put({ ...draft, note });
@@ -383,9 +388,9 @@ export default function FieldNotebook({
             />
           </>
         )}
-        {view.statusLine ? (
+        {draft.idempotencyRetracted || view.statusLine ? (
           <p className="text-sm" data-testid="field-notebook-status">
-            {view.statusLine}
+            {draft.idempotencyRetracted ? formatRetractedLine() : view.statusLine}
           </p>
         ) : null}
         {draft.phase === "check_found" && draft.verifiedEntry ? (
@@ -420,7 +425,21 @@ export default function FieldNotebook({
               Check Timeline
             </button>
           ) : null}
-          {draft.phase === "uncertain" && draft.attempt ? (
+          {draft.idempotencyRetracted ? (
+            <button
+              type="button"
+              className="min-h-11 rounded-md border px-3 text-sm font-medium"
+              onClick={() => {
+                put({
+                  ...emptyDraft(draft.tentId),
+                  note: draft.attempt?.note ?? draft.note,
+                });
+              }}
+            >
+              Start a new note
+            </button>
+          ) : null}
+          {draft.phase === "uncertain" && draft.attempt && !draft.idempotencyRetracted ? (
             <button
               type="button"
               className="min-h-11 rounded-md border px-3 text-sm font-medium"

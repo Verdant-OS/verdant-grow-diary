@@ -20,6 +20,7 @@ import {
   type SignupAcquisitionRpcClient,
 } from "@/lib/oauthSignupAcquisitionRules";
 import { flushPendingReferralRedeem, type ReferralRedeemClient } from "@/lib/referralRedeem";
+import { adoptNotebookSessionOwner } from "@/lib/fieldNotebookSession";
 import {
   consumeOAuthHashSessionIfPresent,
   takeOAuthReturnHashStash,
@@ -161,6 +162,11 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
         // state update. Query cache removal is synchronous, so no render can
         // expose the next owner while the previous owner's rows remain.
         onBeforeAuthIdentityChange?.(previousUserId ?? null, nextUserId);
+      } else if (identityChangedInMemory) {
+        // Same-tab reload keeps the privacy fence quiet. The notebook still
+        // adopts this identity so a stored uncertain note comes back, and a
+        // later sign-out can name the account whose key to remove.
+        adoptNotebookSessionOwner(nextUserId, previousUserId ?? null);
       }
       writePersistedLastResolvedIdentity(nextUserId);
       if (nextUserId === null && signOutNavigationRef.current)

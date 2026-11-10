@@ -6,7 +6,10 @@
  * saved row. A client clock must never be passed in as server time.
  *
  * Clear failure: evidence this attempt did not create an entry.
- * Uncertain: the write may have landed. No retry, no second write.
+ * Uncertain: the write may have landed. The note stays visible and read-only.
+ * Save again resends that same idempotency key. A rejection of that resend
+ * stays uncertain. A retracted key keeps the note and offers a new note,
+ * and that new note is a different attempt.
  */
 
 export type FieldNotebookPhase =
@@ -37,7 +40,8 @@ export type SaveTransport =
   | { kind: "connection_lost_after_dispatch" }
   | { kind: "http_error_after_dispatch"; status: number }
   | { kind: "not_dispatched"; reason: string }
-  | { kind: "acknowledged"; entry: FieldNotebookServerEntry };
+  | { kind: "acknowledged"; entry: FieldNotebookServerEntry }
+  | { kind: "idempotency_retracted" };
 
 export interface RefreshReflection {
   timelineHasEntry: boolean;
@@ -70,6 +74,7 @@ export function isUncertain(transport: SaveTransport): boolean {
     case "definitive_rejection":
     case "not_dispatched":
     case "acknowledged":
+    case "idempotency_retracted":
       return false;
     default: {
       const _never: never = transport;
@@ -127,7 +132,7 @@ export function reconcileAttempt(
 export interface NotebookDraft {
   tentId: string;
   note: string;
-  /** In-memory only. Reload persistence is issue #2806 and is not this slice. */
+  /** Uncertain notes persist per signed-in account. Other phases stay in memory. */
   phase: FieldNotebookPhase;
   attempt: FieldNotebookAttempt | null;
   knownEventId: string | null;
@@ -138,6 +143,8 @@ export interface NotebookDraft {
   completedNote: string | null;
   /** True after an uncertain outcome until the grower confirms J1. Blocks a new write. */
   writeBlocked: boolean;
+  /** The server retired this attempt's key. Save again must not mint a replacement. */
+  idempotencyRetracted?: boolean;
   recoverySurface: "grow" | "timeline";
 }
 
@@ -166,6 +173,18 @@ export function applyTransport(
       ...draft,
       phase: draft.phase === "saving" ? "editing" : draft.phase,
       writeBlocked: false,
+    };
+  }
+  if (transport.kind === "idempotency_retracted") {
+    return {
+      ...draft,
+      phase: "uncertain",
+      writeBlocked: true,
+      idempotencyRetracted: true,
+      note: draft.attempt?.note ?? draft.note,
+      knownEventId: null,
+      verifiedEntry: null,
+      serverOccurredAt: null,
     };
   }
   if (transport.kind === "acknowledged") {
@@ -200,6 +219,17 @@ export function applyTransport(
     return { ...next, phase: "uncertain", writeBlocked: true };
   }
   if (isClearFailure(transport)) {
+    // A resend of an uncertain attempt can be rejected without proving the
+    // first write missed. Keep the note and the same key.
+    if (draft.writeBlocked && draft.attempt) {
+      return {
+        ...draft,
+        phase: "uncertain",
+        writeBlocked: true,
+        idempotencyRetracted: false,
+        note: draft.attempt.note,
+      };
+    }
     return { ...draft, phase: "clear_failure", writeBlocked: false, recoverySurface: "grow" };
   }
   return {
@@ -238,7 +268,8 @@ export function draftAfterTimelineCheck(
 ): NotebookDraft {
   const note = liveNote;
   // No event id, a missing row, or an unavailable lookup does not prove the
-  // write failed. Keep the submitted attempt fixed and offer only Check Timeline.
+  // write failed. Keep the submitted attempt fixed. Check Timeline and
+  // same-key Save again stay available. A retracted key does not.
   if (!started.knownEventId && reconciled.status !== "found") {
     return {
       ...started,

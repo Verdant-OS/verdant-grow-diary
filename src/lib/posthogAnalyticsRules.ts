@@ -320,22 +320,47 @@ const SDK_TRANSPORT_PROPERTY_KEYS = [
 
 const SDK_TRANSPORT_MAX_LENGTH = 200;
 
+/**
+ * The browser user agent and the fields posthog-js parses from it. PostHog
+ * ingestion classifies an event with no `$raw_user_agent` as Automation.
+ */
+const SDK_USER_AGENT_PROPERTY_KEYS = [
+  "$raw_user_agent",
+  "$browser",
+  "$browser_version",
+  "$os",
+  "$os_version",
+  "$device_type",
+] as const;
+
+const SDK_USER_AGENT_MAX_LENGTH = 512;
+
 function copySdkTransportProperties(
   source: Record<string, unknown>,
   out: Record<string, unknown>,
 ): void {
-  for (const key of SDK_TRANSPORT_PROPERTY_KEYS) {
+  copySafeSdkProperties(source, out, SDK_TRANSPORT_PROPERTY_KEYS, SDK_TRANSPORT_MAX_LENGTH);
+  copySafeSdkProperties(source, out, SDK_USER_AGENT_PROPERTY_KEYS, SDK_USER_AGENT_MAX_LENGTH);
+}
+
+function copySafeSdkProperties(
+  source: Record<string, unknown>,
+  out: Record<string, unknown>,
+  keys: readonly string[],
+  maxLength: number,
+): void {
+  for (const key of keys) {
     const value = source[key];
     if (typeof value === "string") {
-      if (isSafeSdkTransportString(value)) out[key] = value;
+      if (isSafeSdkTransportString(value, maxLength)) out[key] = value;
       continue;
     }
     if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
   }
 }
 
-function isSafeSdkTransportString(value: string): boolean {
-  if (!value || value.length > SDK_TRANSPORT_MAX_LENGTH) return false;
+function isSafeSdkTransportString(value: string, maxLength: number): boolean {
+  if (!value || value.length > maxLength) return false;
   if (value !== value.trim()) return false;
   if (value.includes("@") || value.includes("\n") || value.includes("\r")) return false;
   return true;

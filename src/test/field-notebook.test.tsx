@@ -92,7 +92,8 @@ describe("FieldNotebook", () => {
     expect(await screen.findByTestId("field-notebook-status")).toHaveTextContent(
       /Saved to Flower Tent 2/,
     );
-    expect(screen.getByTestId("field-notebook-status")).toHaveTextContent(/View in Timeline/);
+    expect(screen.getAllByRole("link", { name: "View in Timeline" })).toHaveLength(1);
+    expect(screen.getByTestId("field-notebook-status")).not.toHaveTextContent("View in Timeline");
   });
 
   it("offers one Retry on a definitive rejection and keeps the note", async () => {

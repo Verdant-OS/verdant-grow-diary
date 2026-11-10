@@ -93,9 +93,7 @@ describe("field notebook outcomes", () => {
     const saved = applyTransport(draft, ack, reflected);
     expect(saved.phase).toBe("saved");
     expect(saved.serverOccurredAt).toBe(entry.occurredAt);
-    expect(formatSavedLine("Flower Tent 2", "10:24 AM")).toBe(
-      "Saved to Flower Tent 2 · 10:24 AM · View in Timeline",
-    );
+    expect(formatSavedLine("Flower Tent 2", "10:24 AM")).toBe("Saved to Flower Tent 2 · 10:24 AM");
   });
 
   it("preserves the note on clear failure and allows exactly one retry phase", () => {

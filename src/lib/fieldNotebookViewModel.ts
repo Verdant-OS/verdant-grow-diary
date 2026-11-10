@@ -52,7 +52,7 @@ export function formatServerClockLabel(iso: string): string | null {
 }
 
 export function formatSavedLine(tentName: string, serverTimeLabel: string): string {
-  return `Saved to ${tentName} · ${serverTimeLabel} · View in Timeline`;
+  return `Saved to ${tentName} · ${serverTimeLabel}`;
 }
 
 export function formatSaveButton(tentName: string): string {

@@ -74,7 +74,11 @@ describe("Check Timeline resolves a no-event-id save by idempotency key", () => 
     });
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
     fireEvent.click(await screen.findByRole("button", { name: "Check Timeline" }));
-    expect(await screen.findByText("Not sure this saved · Check Timeline")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "This note may not have saved. Check Timeline. It stays here so you can copy it.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save to Flower Tent 2" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     expect(onSave).toHaveBeenCalledTimes(1);
@@ -96,7 +100,11 @@ describe("Check Timeline resolves a no-event-id save by idempotency key", () => 
     });
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
     fireEvent.click(await screen.findByRole("button", { name: "Check Timeline" }));
-    expect(await screen.findByText("Not sure this saved · Check Timeline")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "This note may not have saved. Check Timeline. It stays here so you can copy it.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Yes, that's it" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });

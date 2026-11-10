@@ -41,16 +41,14 @@ export function vpdAllowed(temp: ReadingSlot, rh: ReadingSlot): boolean {
   return temp.capturedAtMs === rh.capturedAtMs;
 }
 
-/** Format an authoritative ISO timestamp. Uses UTC so the label is the server clock, not the device. */
+/** Format an authoritative ISO timestamp in the grower's local time. */
 export function formatServerClockLabel(iso: string): string | null {
   const ms = Date.parse(iso);
   if (Number.isNaN(ms)) return null;
-  const clock = new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
-    timeZone: "UTC",
   }).format(ms);
-  return `${clock} UTC`;
 }
 
 export function formatSavedLine(tentName: string, serverTimeLabel: string): string {
@@ -62,7 +60,7 @@ export function formatSaveButton(tentName: string): string {
 }
 
 export function formatUncertainLine(): string {
-  return "Not sure this saved · Check Timeline";
+  return "This note may not have saved. Check Timeline. It stays here so you can copy it.";
 }
 
 export function formatClearFailureLine(): string {

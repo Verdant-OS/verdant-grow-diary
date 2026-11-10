@@ -95,4 +95,16 @@ describe("findNotebookEntryByIdempotencyKey", () => {
     });
     expect(failed).toEqual({ availability: "unavailable" });
   });
+
+  it("stays unavailable when the key is found and the grow_events read fails", async () => {
+    idempotencyMaybeSingle.mockResolvedValue({ data: { grow_event_id: eventId }, error: null });
+    eventMaybeSingle.mockResolvedValue({ data: null, error: { message: "grow_events down" } });
+    const failed = await findNotebookEntryByIdempotencyKey({
+      userId: "user-1",
+      idempotencyKey: "idem-1",
+      tentId: "flower",
+      tentName: "Flower Tent 2",
+    });
+    expect(failed).toEqual({ availability: "unavailable" });
+  });
 });

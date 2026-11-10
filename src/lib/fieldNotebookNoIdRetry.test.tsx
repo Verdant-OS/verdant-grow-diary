@@ -25,7 +25,7 @@ const tent = {
 };
 
 describe("uncertain save with no event id", () => {
-  it("keeps Check Timeline, keeps the note, and lets Save send the same attempt", async () => {
+  it("keeps Check Timeline, keeps the note, and does not resend", async () => {
     clearNotebookSession();
     const attempt: FieldNotebookAttempt = {
       attemptId: "attempt-1",

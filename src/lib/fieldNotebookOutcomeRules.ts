@@ -212,9 +212,9 @@ export function applyTransport(
   };
 }
 
-/** J2 "Back to note" keeps the uncertain attempt. It does not open a new save. */
+/** J2 "Back to note" keeps the text visible. It does not open a new save. */
 export function backToNote(draft: NotebookDraft): NotebookDraft {
-  return { ...draft, phase: "uncertain", writeBlocked: true };
+  return { ...draft, note: draft.note, phase: "uncertain", writeBlocked: true };
 }
 
 /**

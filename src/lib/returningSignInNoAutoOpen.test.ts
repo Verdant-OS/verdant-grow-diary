@@ -28,7 +28,7 @@ const room = {
 };
 
 describe("ordinary sign-in does not auto-open Quick Log", () => {
-  it("lands on the active plant without an open marker", () => {
+  it("lands on the dashboard without an open marker", () => {
     const target = resolveReturningQuickLogStartTarget(room);
     const route = resolveReturningSignInRoute({ savedChoice: "quickLog", ...room });
 

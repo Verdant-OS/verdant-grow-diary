@@ -32,7 +32,7 @@ describe("ordinary sign-in does not auto-open Quick Log", () => {
     const target = resolveReturningQuickLogStartTarget(room);
     const route = resolveReturningSignInRoute({ savedChoice: "quickLog", ...room });
 
-    expect(route).toBe(`/plants/${PLANT}`);
+    expect(route).toBe(`/grows/${GROW}`);
     expect(route).not.toContain("open=quick-log");
     expect(target.opensQuickLog).toBe(false);
     expect(target.growId).toBe(GROW);

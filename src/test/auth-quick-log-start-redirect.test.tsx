@@ -175,9 +175,7 @@ describe("Auth start-screen routing", () => {
     h.grows.mockResolvedValue({ data: [{ id: "grow-a", is_archived: false }], error: null });
     renderAuth("/auth");
     fireEvent.click(screen.getByRole("button", { name: /commit session/i }));
-    await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent("/plants/plant-a"),
-    );
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/grows/grow-a"));
     expect(screen.getByTestId("location").textContent).not.toContain("open=quick-log");
   });
 
@@ -208,9 +206,7 @@ describe("Auth start-screen routing", () => {
     h.grows.mockResolvedValue({ data: [{ id: "grow-a", is_archived: false }], error: null });
     h.user = { id: "user-1" };
     renderAuth("/auth", true);
-    await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent("/plants/plant-a"),
-    );
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/grows/grow-a"));
     expect(screen.getByTestId("location").textContent).not.toContain("open=quick-log");
     fireEvent.click(screen.getByRole("button", { name: /switch user/i }));
     fireEvent.click(screen.getByRole("button", { name: /return to auth/i }));

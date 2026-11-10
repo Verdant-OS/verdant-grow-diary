@@ -2,11 +2,11 @@
  * Returning sign-in destination for the saved Quick Log start screen.
  *
  * Setup still lands on `/plants/:id?open=quick-log`. A later sign-in with a
- * saved Quick Log preference lands on that plant with Quick Log closed.
+ * saved Quick Log preference lands on that plant's grow with Quick Log closed.
  * No eligible plant lands on the Dashboard, also closed.
  */
 import { isInactiveQuickLogPlant, type MinimalQuickLogPlant } from "@/lib/quickLogPlantOptionRules";
-import { plantDetailPath } from "@/lib/routes";
+import { growDetailPath } from "@/lib/routes";
 import { routeForStartScreen, type StartScreenChoice } from "@/lib/startScreenPreferences";
 
 export const DASHBOARD_WITHOUT_QUICK_LOG_ROUTE = "/dashboard" as const;
@@ -114,7 +114,7 @@ export function resolveReturningQuickLogStartTarget(input: {
   const plant = eligible.length === 1 ? eligible[0] : pickMostRecent(eligible);
   const tent = (input.tents ?? []).find((row) => row.id === plant.tent_id);
   return {
-    route: plantDetailPath(plant.id),
+    route: growDetailPath(plant.grow_id!),
     plantId: plant.id,
     tentId: tent?.id ?? plant.tent_id ?? null,
     growId: tent?.grow_id ?? plant.grow_id ?? null,

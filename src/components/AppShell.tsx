@@ -256,8 +256,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     setOpenScopedLog(false);
     setMobileLaunchTargetKey(null);
     setStructuredOpenIntent(null);
-    // Keep the guide prompt or activity. AC1 still leaves Quick Log closed:
-    // the one-shot marker is consumed so it cannot reopen later.
+    // An explicit open=quick-log marker reached this effect. Keep the guide
+    // prompt or activity, open Quick Log once, then drop the marker so a
+    // refresh does not open it again. A saved preference with no marker
+    // returned above and does not open Quick Log.
     setPrefill(guidePrefill ?? startPrefill);
     setOpenLog(true);
     nav(

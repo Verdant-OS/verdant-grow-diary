@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import FieldNotebook, {
   type FieldNotebookSaveRequest,
   type FieldNotebookSaveResponse,
@@ -9,7 +10,10 @@ import { readDashboardRecent } from "@/hooks/useDashboardScopedData";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
-import { findNotebookEntry } from "@/lib/fieldNotebookFindService";
+import {
+  findNotebookEntry,
+  findNotebookEntryByIdempotencyKey,
+} from "@/lib/fieldNotebookFindService";
 import { buildQuickLogGroupedTimelineQueryOptions } from "@/hooks/useQuickLogGroupedTimeline";
 import { reflectionFromEvidence } from "@/lib/fieldNotebookReflection";
 import type { FieldNotebookServerEntry, RefreshReflection } from "@/lib/fieldNotebookOutcomeRules";
@@ -177,15 +181,29 @@ export default function FieldNotebookMount({
       readingsByTent={readingsByTent}
       growId={growId}
       onSave={onSave}
-      onFindEntry={async (tentId, knownEventId) => {
+      onFindEntry={async (tentId, knownEventId, idempotencyKey) => {
         const tent = tents.find((item) => item.id === tentId);
-        const receipt = await findNotebookEntry({
+        const tentName = tent?.name ?? "";
+        if (knownEventId) {
+          const receipt = await findNotebookEntry({ tentId, tentName, knownEventId });
+          if (receipt.availability === "unavailable") return { availability: "unavailable" };
+          return receipt.candidates;
+        }
+        const { data } = await supabase.auth.getUser();
+        const receipt = await findNotebookEntryByIdempotencyKey({
+          userId: data.user?.id ?? null,
+          idempotencyKey: idempotencyKey ?? null,
           tentId,
-          tentName: tent?.name ?? "",
-          knownEventId,
+          tentName,
         });
-        if (receipt.availability === "unavailable") return { availability: "unavailable" };
-        return receipt.candidates;
+        if (receipt.availability === "unavailable" || !receipt.matchedEventId) {
+          return { availability: "unavailable" };
+        }
+        return {
+          availability: "authoritative",
+          candidates: receipt.candidates,
+          matchedEventId: receipt.matchedEventId,
+        };
       }}
     />
   );

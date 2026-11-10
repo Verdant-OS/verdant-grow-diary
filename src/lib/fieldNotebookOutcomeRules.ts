@@ -318,6 +318,7 @@ export function maySubmit(draft: NotebookDraft): boolean {
       canonicalNotebookNote(draft.note).length > 0
     );
   }
+  if (canonicalNotebookNote(draft.note).length === 0) return false;
   if (draft.phase !== "editing") return false;
   if (draft.completedNote !== null && notesMatchCanonical(draft.note, draft.completedNote)) {
     return false;

@@ -1,5 +1,9 @@
 import type { RefreshReflection } from "@/lib/fieldNotebookOutcomeRules";
 
+/**
+ * Production grouped-timeline caches are arrays of entries. A numeric `count`
+ * is the object-cache shape. An array counts only when it contains the event id.
+ */
 function countShowsEntry(cache: unknown, id: string): boolean {
   if (Array.isArray(cache)) return cache.length > 0 && containsId(cache, id);
   if (!cache || typeof cache !== "object" || !("count" in cache)) return false;

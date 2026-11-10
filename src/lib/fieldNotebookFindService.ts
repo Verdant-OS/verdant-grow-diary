@@ -5,6 +5,39 @@ export type NotebookFindReceipt =
   | { availability: "authoritative"; candidates: FieldNotebookServerEntry[] }
   | { availability: "unavailable" };
 
+/**
+ * Read-only owner lookup. A missing row or a failed read is unavailable,
+ * which stays uncertain. It is not proof the write failed.
+ */
+export async function findNotebookEntryByIdempotencyKey(input: {
+  userId: string | null;
+  idempotencyKey: string | null;
+  tentId: string;
+  tentName: string;
+}): Promise<NotebookFindReceipt & { matchedEventId?: string }> {
+  if (!input.userId || !input.idempotencyKey) return { availability: "unavailable" };
+  try {
+    const { data, error } = await supabase
+      .from("quicklog_idempotency")
+      .select("grow_event_id")
+      .eq("user_id", input.userId)
+      .eq("idempotency_key", input.idempotencyKey)
+      .maybeSingle();
+    if (error || data === null || typeof data.grow_event_id !== "string" || !data.grow_event_id) {
+      return { availability: "unavailable" };
+    }
+    const found = await findNotebookEntry({
+      tentId: input.tentId,
+      tentName: input.tentName,
+      knownEventId: data.grow_event_id,
+    });
+    if (found.availability === "unavailable") return found;
+    return { ...found, matchedEventId: data.grow_event_id };
+  } catch {
+    return { availability: "unavailable" };
+  }
+}
+
 export async function findNotebookEntry(input: {
   tentId: string;
   tentName: string;

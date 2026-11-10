@@ -33,7 +33,14 @@ import {
   vpdAllowed,
   type ReadingSlot,
 } from "@/lib/fieldNotebookViewModel";
-type FindResult = FieldNotebookServerEntry[] | { availability: "unavailable" };
+type FindResult =
+  | FieldNotebookServerEntry[]
+  | { availability: "unavailable" }
+  | {
+      availability: "authoritative";
+      candidates: FieldNotebookServerEntry[];
+      matchedEventId: string;
+    };
 
 export interface FieldNotebookTent {
   id: string;
@@ -91,7 +98,11 @@ export default function FieldNotebook({
   tents: FieldNotebookTent[];
   readingsByTent: Record<string, ReadingSlot[]>;
   onSave: (request: FieldNotebookSaveRequest) => Promise<FieldNotebookSaveResponse>;
-  onFindEntry: (tentId: string, knownEventId: string | null) => Promise<FindResult>;
+  onFindEntry: (
+    tentId: string,
+    knownEventId: string | null,
+    idempotencyKey?: string | null,
+  ) => Promise<FindResult>;
   growId?: string | null;
 }) {
   const saveInFlight = useRef(false);
@@ -199,16 +210,30 @@ export default function FieldNotebook({
     const ownerAtCheck = notebookSessionOwner();
     let receipt: Awaited<ReturnType<typeof onFindEntry>>;
     try {
-      receipt = await onFindEntry(tentId, started.knownEventId);
+      receipt = await onFindEntry(
+        tentId,
+        started.knownEventId,
+        started.attempt?.idempotencyKey ?? null,
+      );
     } catch {
       receipt = { availability: "unavailable" };
     }
-    const availability = Array.isArray(receipt) ? "authoritative" : "unavailable";
-    const reconciled = reconcileAttempt(
-      started.knownEventId,
-      Array.isArray(receipt) ? receipt : [],
-      availability,
-    );
+    const availability =
+      Array.isArray(receipt) ||
+      ("candidates" in receipt && receipt.availability === "authoritative")
+        ? "authoritative"
+        : "unavailable";
+    const candidates = Array.isArray(receipt)
+      ? receipt
+      : "candidates" in receipt
+        ? receipt.candidates
+        : [];
+    const matchedEventId = Array.isArray(receipt)
+      ? started.knownEventId
+      : "matchedEventId" in receipt
+        ? receipt.matchedEventId
+        : started.knownEventId;
+    const reconciled = reconcileAttempt(matchedEventId, candidates, availability);
     setDrafts((prev) => {
       const live = prev[tentId] ?? started;
       if (started.attempt && live.attempt?.attemptId !== started.attempt.attemptId) {

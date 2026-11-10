@@ -94,6 +94,7 @@ export default function FieldNotebook({
   onFindEntry: (tentId: string, knownEventId: string | null) => Promise<FindResult>;
   growId?: string | null;
 }) {
+  const saveInFlight = useRef(false);
   const [selectedId, setSelectedId] = useState(tents[0]?.id ?? "");
   const [drafts, setDrafts] = useState<Record<string, NotebookDraft>>(() => {
     const initial: Record<string, NotebookDraft> = {};
@@ -139,11 +140,11 @@ export default function FieldNotebook({
         : live;
     if (kind === "save" && !maySubmit(ready)) return;
     if (kind === "retry" && live.phase !== "clear_failure") return;
-    const attempt = beginAttempt(
-      ready,
-      selected.name,
-      kind === "retry" || (ready.phase === "uncertain" && ready.attempt != null),
-    );
+    if (saveInFlight.current || readNotebookDraft(selected.id).phase === "saving") return;
+    const reuseAttempt =
+      kind === "retry" ||
+      (ready.attempt != null && notesMatchCanonical(ready.note, ready.attempt.note));
+    const attempt = beginAttempt(ready, selected.name, reuseAttempt);
     const ownerAtSubmit = notebookSessionOwner();
     const tentId = selected.id;
     const frozen: NotebookDraft = {
@@ -155,6 +156,7 @@ export default function FieldNotebook({
       serverOccurredAt: null,
       recoverySurface: "grow",
     };
+    saveInFlight.current = true;
     put(frozen);
     try {
       const response = await onSave({
@@ -167,6 +169,8 @@ export default function FieldNotebook({
       settleSave(tentId, attempt, ownerAtSubmit, response.transport, response.reflection);
     } catch {
       settleSave(tentId, attempt, ownerAtSubmit, { kind: "dispatched_no_receipt" }, NONE);
+    } finally {
+      saveInFlight.current = false;
     }
   }
 
@@ -179,8 +183,12 @@ export default function FieldNotebook({
   ) {
     const current = readNotebookDraft(tentId);
     if (current.attempt?.attemptId !== attempt.attemptId || current.phase !== "saving") return;
-    if (canonicalNotebookNote(current.note) !== attempt.note) return;
-    const next = applyTransport(current, transport, reflection);
+    const settled = applyTransport(
+      { ...current, attempt, note: attempt.note },
+      transport,
+      reflection,
+    );
+    const next = { ...settled, note: current.note };
     writeNotebookDraft(next, ownerAtSubmit);
     setDrafts((prev) => ({ ...prev, [tentId]: next }));
   }
@@ -189,7 +197,12 @@ export default function FieldNotebook({
     const tentId = selected.id;
     const started = drafts[tentId] ?? readNotebookDraft(tentId);
     const ownerAtCheck = notebookSessionOwner();
-    const receipt = await onFindEntry(tentId, started.knownEventId);
+    let receipt: Awaited<ReturnType<typeof onFindEntry>>;
+    try {
+      receipt = await onFindEntry(tentId, started.knownEventId);
+    } catch {
+      receipt = { availability: "unavailable" };
+    }
     const availability = Array.isArray(receipt) ? "authoritative" : "unavailable";
     const reconciled = reconcileAttempt(
       started.knownEventId,
@@ -321,12 +334,23 @@ export default function FieldNotebook({
               onChange={(event) => {
                 if (draft.phase === "saving") return;
                 const note = event.target.value;
+                if (draft.writeBlocked) {
+                  put({ ...draft, note });
+                  return;
+                }
+                const sameAttempt =
+                  draft.attempt != null && notesMatchCanonical(note, draft.attempt.note);
+                if (sameAttempt && draft.phase === "clear_failure") {
+                  put({ ...draft, note });
+                  return;
+                }
                 const sameCompleted =
                   draft.completedNote !== null && notesMatchCanonical(note, draft.completedNote);
                 put({
                   ...draft,
                   note,
-                  phase: draft.writeBlocked ? draft.phase : sameCompleted ? "saved" : "editing",
+                  phase: sameCompleted ? "saved" : "editing",
+                  attempt: sameCompleted || sameAttempt ? draft.attempt : null,
                 });
               }}
             />
@@ -398,11 +422,7 @@ export default function FieldNotebook({
               disabled={
                 draft.phase === "saving" ||
                 (draft.phase === "editing" && !maySubmit(draft)) ||
-                (draft.phase === "uncertain" && !draft.writeBlocked
-                  ? false
-                  : draft.phase === "saved"
-                    ? false
-                    : view.primaryDisabled)
+                (draft.phase === "saved" ? false : view.primaryDisabled)
               }
               onClick={() => {
                 if (draft.phase === "saved" && !noteChanged) {

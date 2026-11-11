@@ -5,10 +5,10 @@
  * whether Timeline, the entry count, and Last Activity already show the
  * saved row. A client clock must never be passed in as server time.
  *
- * Clear failure: offline before the send, or a definitive rejection.
- * The note stays. Uncertain: the write may have landed. Save again
- * resends that same idempotency key. A retracted key and Save again
- * after a definitive rejection are follow-ups, not this slice.
+ * Clear failure: offline before the first send, or a definitive rejection
+ * that proves no row. An offline Save again after an uncertain send stays
+ * uncertain and keeps that key. The note stays. Save again resends the
+ * same idempotency key. A retracted key is a follow-up, not this slice.
  */
 
 import { definitiveRejectionProvesNoRow } from "@/lib/quickLogManualRejectionRules";
@@ -220,12 +220,13 @@ export function applyTransport(
     return { ...next, phase: "uncertain", writeBlocked: true };
   }
   if (isClearFailure(transport)) {
-    const stillUncertain =
-      draft.writeBlocked &&
-      draft.attempt != null &&
+    const resendMayHaveLanded = draft.writeBlocked && draft.attempt != null;
+    const offlineResend = resendMayHaveLanded && transport.kind === "offline_before_dispatch";
+    const rejectionDoesNotProveNoRow =
+      resendMayHaveLanded &&
       transport.kind === "definitive_rejection" &&
       !definitiveRejectionProvesNoRow(transport.reason);
-    if (stillUncertain) {
+    if (offlineResend || rejectionDoesNotProveNoRow) {
       return {
         ...draft,
         phase: "uncertain",

@@ -67,6 +67,11 @@ export function formatUncertainLine(): string {
   return "This note may not have saved. Check Timeline. It stays here so you can copy it.";
 }
 
+/** Shown beside Save again. The payload is the first attempt, not the box. */
+export function formatSaveAgainSendsOriginal(): string {
+  return "Save again sends the original note, not edits in the box.";
+}
+
 export function formatNotSavedLine(): string {
   return "This note was not saved. It stays here so you can copy it.";
 }

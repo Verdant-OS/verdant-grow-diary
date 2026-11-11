@@ -35,7 +35,11 @@ export function notebookSessionOwner(): string | null {
   return activeOwnerId;
 }
 
-/** Drop the previous account's in-memory notes when the signed-in account changes. */
+/**
+ * Drop the previous account's in-memory notes when the signed-in account changes.
+ * The notebook and Timeline recovery call this from the signed-in user id.
+ * A null owner means signed out: that account's notes are not readable.
+ */
 export function adoptNotebookSessionOwner(userId: string | null): void {
   if (userId === activeOwnerId) {
     if (userId === null) notifyNotebookSession();

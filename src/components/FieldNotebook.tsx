@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import NotebookRouteLink from "@/components/NotebookRouteLink";
+import { useNotebookSessionOwner } from "@/hooks/useNotebookSessionOwner";
 import { timelinePath } from "@/lib/routes";
 import {
   acknowledgeFound,
@@ -29,6 +30,7 @@ import {
   formatRetractedLine,
   formatReadingProvenance,
   formatReadingValue,
+  formatSaveAgainSendsOriginal,
   formatServerClockLabel,
   statusView,
   vpdAllowed,
@@ -106,6 +108,7 @@ export default function FieldNotebook({
   ) => Promise<FindResult>;
   growId?: string | null;
 }) {
+  useNotebookSessionOwner();
   const saveInFlight = useRef(false);
   const [selectedId, setSelectedId] = useState(tents[0]?.id ?? "");
   const [drafts, setDrafts] = useState<Record<string, NotebookDraft>>(() => {
@@ -205,7 +208,7 @@ export default function FieldNotebook({
     );
     const next = {
       ...settled,
-      note: settled.phase === "uncertain" && attempt ? attempt.note : current.note,
+      note: current.note,
     };
     writeNotebookDraft(next, ownerAtSubmit);
     setDrafts((prev) => ({ ...prev, [tentId]: next }));
@@ -243,6 +246,9 @@ export default function FieldNotebook({
     const reconciled = reconcileAttempt(matchedEventId, candidates, availability);
     setDrafts((prev) => {
       const live = readNotebookDraft(tentId);
+      if (live.phase === "saving" || live.attempt?.attemptId !== started.attempt?.attemptId) {
+        return prev;
+      }
       const next = draftAfterTimelineCheck(live, live.note, reconciled);
       writeNotebookDraft(next, ownerAtCheck);
       return { ...prev, [tentId]: next };
@@ -427,15 +433,20 @@ export default function FieldNotebook({
             </button>
           ) : null}
           {draft.phase === "uncertain" && draft.attempt && !draft.idempotencyRetracted ? (
-            <button
-              type="button"
-              className="min-h-11 rounded-md border px-3 text-sm font-medium"
-              onClick={() => {
-                void submit("save_again");
-              }}
-            >
-              Save again (won't duplicate)
-            </button>
+            <>
+              <p className="text-sm" data-testid="field-notebook-save-again-original">
+                {formatSaveAgainSendsOriginal()}
+              </p>
+              <button
+                type="button"
+                className="min-h-11 rounded-md border px-3 text-sm font-medium"
+                onClick={() => {
+                  void submit("save_again");
+                }}
+              >
+                Save again (won't duplicate)
+              </button>
+            </>
           ) : null}
           {view.showCheckTimeline ? (
             <NotebookRouteLink
@@ -444,6 +455,17 @@ export default function FieldNotebook({
             >
               Open Timeline
             </NotebookRouteLink>
+          ) : null}
+          {draft.phase === "check_found" ? (
+            <button
+              type="button"
+              className="min-h-11 rounded-md border px-3 text-sm font-medium"
+              onClick={() => {
+                put(backToNote(draft));
+              }}
+            >
+              Back to note
+            </button>
           ) : null}
           {draft.phase === "check_found" || draft.phase === "check_none" ? (
             <button

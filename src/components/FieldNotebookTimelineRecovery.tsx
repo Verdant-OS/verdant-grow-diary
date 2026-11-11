@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNotebookSessionOwner } from "@/hooks/useNotebookSessionOwner";
 import { useRouter } from "@tanstack/react-router";
 import NotebookRouteLink, { navigateNotebookHref } from "@/components/NotebookRouteLink";
 import { withGrowId } from "@/lib/routes";
@@ -12,13 +13,14 @@ import {
 } from "@/lib/fieldNotebookSession";
 import { formatFoundTitle, formatServerClockLabel } from "@/lib/fieldNotebookViewModel";
 
-/** Recovery for attempts that navigated here. An uncertain note is also stored for this account. */
+/** Recovery for attempts that navigated here. Notes belong to the signed-in user only. */
 export default function FieldNotebookTimelineRecovery({
   growId = null,
 }: {
   growId?: string | null;
 }) {
   const router = useRouter({ warn: false });
+  useNotebookSessionOwner();
   const [drafts, setDrafts] = useState<NotebookDraft[]>(() =>
     notebookDrafts().filter((draft) => draft.recoverySurface === "timeline"),
   );

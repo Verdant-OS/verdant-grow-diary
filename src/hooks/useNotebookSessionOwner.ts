@@ -5,21 +5,26 @@ import { useAuth } from "@/store/auth";
 /**
  * The notebook owner follows the signed-in user. A null user on the first
  * paint does not clear a draft a test already adopted. After a real user
- * id has been seen, a later null user clears that account's notes. A surface
- * that is not mounted does not see that change. AppShell calls this on every
- * signed-in page, above the return that unmounts the notebook.
+ * id has been seen, a later null user clears that account's notes.
+ * AppShell passes clearOnUnmount because sign-out unmounts the shell before
+ * the user id becomes null. A notebook surface does not clear on unmount.
  */
-export function useNotebookSessionOwner(): void {
+export function useNotebookSessionOwner(options?: { clearOnUnmount?: boolean }): void {
   const { user } = useAuth();
   const sawSignedInUser = useRef(false);
+  const clearOnUnmount = options?.clearOnUnmount === true;
 
   useLayoutEffect(() => {
     const id = user?.id ?? null;
     if (id) {
       sawSignedInUser.current = true;
       adoptNotebookSessionOwner(id);
-      return;
+    } else if (sawSignedInUser.current) {
+      adoptNotebookSessionOwner(null);
     }
-    if (sawSignedInUser.current) adoptNotebookSessionOwner(null);
-  }, [user?.id]);
+    if (!clearOnUnmount) return;
+    return () => {
+      adoptNotebookSessionOwner(null);
+    };
+  }, [user?.id, clearOnUnmount]);
 }

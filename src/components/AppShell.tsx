@@ -78,7 +78,7 @@ import {
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading, isSignOutNavigationPending } = useAuth();
-  useNotebookSessionOwner();
+  useNotebookSessionOwner({ clearOnUnmount: true });
   const hydrated = useHydrated();
   const observedLocation = useLocation();
   const protectedLocationRef = useRef(observedLocation);

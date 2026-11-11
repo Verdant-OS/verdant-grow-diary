@@ -109,12 +109,12 @@ export default function FieldNotebook({
   ) => Promise<FindResult>;
   growId?: string | null;
 }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const viewerId = user?.id ?? null;
   const saveInFlight = useRef(false);
   const [selectedId, setSelectedId] = useState(tents[0]?.id ?? "");
   const readForViewer = (tentId: string) =>
-    viewerId ? readNotebookDraft(tentId, viewerId) : readNotebookDraft(tentId);
+    loading ? readNotebookDraft(tentId) : readNotebookDraft(tentId, viewerId);
   const [drafts, setDrafts] = useState<Record<string, NotebookDraft>>(() => {
     const initial: Record<string, NotebookDraft> = {};
     for (const tent of tents) initial[tent.id] = readForViewer(tent.id);
@@ -130,16 +130,17 @@ export default function FieldNotebook({
       setDrafts((prev) => {
         const next = { ...prev };
         for (const tent of tents) {
-          next[tent.id] = viewerId
-            ? readNotebookDraft(tent.id, viewerId)
-            : readNotebookDraft(tent.id);
+          next[tent.id] = loading
+            ? readNotebookDraft(tent.id)
+            : readNotebookDraft(tent.id, viewerId);
         }
         return next;
       });
     };
+    const unsubscribe = subscribeNotebookSession(pull);
     pull();
-    return subscribeNotebookSession(pull);
-  }, [tents, viewerId]);
+    return unsubscribe;
+  }, [tents, viewerId, loading]);
   useNotebookSessionOwner();
 
   useEffect(() => {
@@ -447,14 +448,17 @@ export default function FieldNotebook({
               Check Timeline
             </button>
           ) : null}
-          {draft.phase === "uncertain" && draft.attempt && !draft.idempotencyRetracted ? (
+          {draft.phase === "uncertain" && draft.attempt ? (
             <>
-              <p className="text-sm" data-testid="field-notebook-save-again-original">
-                {formatSaveAgainSendsOriginal()}
-              </p>
+              {draft.idempotencyRetracted ? null : (
+                <p className="text-sm" data-testid="field-notebook-save-again-original">
+                  {formatSaveAgainSendsOriginal()}
+                </p>
+              )}
               <button
                 type="button"
                 className="min-h-11 rounded-md border px-3 text-sm font-medium"
+                hidden={draft.idempotencyRetracted === true}
                 onClick={() => {
                   void submit("save_again");
                 }}

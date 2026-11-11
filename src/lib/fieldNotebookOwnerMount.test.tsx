@@ -1,13 +1,16 @@
 import { readFileSync } from "node:fs";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import FieldNotebook, {
   type FieldNotebookSaveRequest,
   type FieldNotebookSaveResponse,
 } from "@/components/FieldNotebook";
+import AppShell from "@/components/AppShell";
 import FieldNotebookTimelineRecovery from "@/components/FieldNotebookTimelineRecovery";
-import { useNotebookSessionOwner } from "@/hooks/useNotebookSessionOwner";
+import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
+import * as notebookSession from "@/lib/fieldNotebookSession";
 import { emptyDraft } from "@/lib/fieldNotebookOutcomeRules";
 import {
   adoptNotebookSessionOwner,
@@ -25,6 +28,18 @@ const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
   signOut: vi.fn(),
   listeners: [] as Array<() => void | Promise<void>>,
+}));
+
+vi.mock("@/components/QuickLog", () => ({ default: () => null }));
+vi.mock("@/components/QuickLogV2Sheet", () => ({ default: () => null }));
+vi.mock("@/components/AppSidebar", () => ({ default: () => null }));
+vi.mock("@/components/MobileNav", () => ({ default: () => null }));
+vi.mock("@/hooks/useAlertsList", () => ({ useAlertsList: () => ({ alerts: [] }) }));
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    entitlement: { isActive: false, effectivePlanId: "free" },
+  }),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -103,12 +118,63 @@ function privateDraft() {
   };
 }
 
-/** Same shape as AppShell's signed-out return: the owner hook stays mounted and the notebook does not. */
-function OwnerAboveGate({ children }: { children?: ReactNode }) {
-  useNotebookSessionOwner();
-  const { user } = useAuth();
-  if (!user) return null;
-  return <>{children}</>;
+let signOutLease: { finish: () => void } | null = null;
+
+function BeginSignOut() {
+  const { beginSignOutNavigation } = useAuth();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        signOutLease = beginSignOutNavigation?.() ?? null;
+      }}
+    >
+      Begin sign-out
+    </button>
+  );
+}
+
+const realSubscribe = notebookSession.subscribeNotebookSession;
+const realAdopt = notebookSession.adoptNotebookSessionOwner;
+
+function watchDefenses() {
+  const order: string[] = [];
+  vi.spyOn(notebookSession, "subscribeNotebookSession").mockImplementation((listener) => {
+    order.push("subscribe");
+    return realSubscribe(listener);
+  });
+  vi.spyOn(notebookSession, "adoptNotebookSessionOwner").mockImplementation((userId) => {
+    order.push("adopt");
+    return realAdopt(userId);
+  });
+  return order;
+}
+
+function expectSubscribeBeforeAdopt(order: string[]) {
+  const subscribed = order.lastIndexOf("subscribe");
+  const adopted = order.lastIndexOf("adopt");
+  expect(subscribed).toBeGreaterThan(-1);
+  expect(adopted).toBeGreaterThan(subscribed);
+}
+
+function renderShell(child: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <Routes>
+          <Route
+            path="/dashboard"
+            element={
+              <AuthProvider>
+                <AppShell>{child}</AppShell>
+              </AuthProvider>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
 }
 
 async function flushAuth() {
@@ -119,6 +185,13 @@ async function flushAuth() {
 }
 
 describe("notebook owner without a mounted surface", () => {
+  afterEach(() => {
+    signOutLease?.finish();
+    signOutLease = null;
+    vi.spyOn(notebookSession, "subscribeNotebookSession").mockRestore();
+    vi.spyOn(notebookSession, "adoptNotebookSessionOwner").mockRestore();
+  });
+
   beforeEach(() => {
     forgetNotebookMemory();
     window.sessionStorage.clear();
@@ -126,56 +199,49 @@ describe("notebook owner without a mounted surface", () => {
     mocks.getSession.mockReset();
   });
 
-  async function leaveAThenMountB(kind: "sign-out" | "expiry") {
-    let session: ReturnType<typeof sessionFor> | null = sessionFor("user-a");
-    mocks.getSession.mockImplementation(async () => ({ data: { session }, error: null }));
-    const view = render(
-      <AuthProvider>
-        <OwnerAboveGate />
-      </AuthProvider>,
-    );
+  it("clears A's notes when sign-out unmounts AppShell before the user id changes", async () => {
+    const session = sessionFor("user-a");
+    mocks.getSession.mockResolvedValue({ data: { session }, error: null });
+    mocks.getUser.mockResolvedValue({ data: { user: session.user }, error: null });
+    renderShell(<BeginSignOut />);
     await waitFor(() => expect(notebookSessionOwner()).toBe("user-a"));
     writeNotebookDraft(privateDraft());
-    expect(readNotebookDraft("flower").note).toBe(privateNote);
+    fireEvent.click(screen.getByRole("button", { name: "Begin sign-out" }));
+    expect(await screen.findByText("Signing out…")).toBeInTheDocument();
+    expect(screen.queryByTestId("app-shell-header-row")).not.toBeInTheDocument();
+    expect(notebookSessionOwner()).toBeNull();
+    expect(readNotebookDraft("flower").note).toBe("");
+    expect(notebookDrafts().some((draft) => draft.note === privateNote)).toBe(false);
+  });
 
+  it("clears A's notes when the session expires without the sign-out screen", async () => {
+    let session: ReturnType<typeof sessionFor> | null = {
+      ...sessionFor("user-a"),
+      expires_at: Math.floor(Date.now() / 1000) - 120,
+    };
+    mocks.getSession.mockImplementation(async () => ({ data: { session }, error: null }));
+    mocks.getUser.mockImplementation(async () => ({
+      data: { user: session?.user ?? null },
+      error: session ? null : { message: "session expired" },
+    }));
+    renderShell(<p>Still signed in</p>);
+    await waitFor(() => expect(notebookSessionOwner()).toBe("user-a"));
+    writeNotebookDraft(privateDraft());
     session = null;
     await flushAuth();
     await waitFor(() => expect(notebookSessionOwner()).toBeNull());
+    expect(screen.queryByText("Signing out…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Still signed in")).not.toBeInTheDocument();
+    expect(readNotebookDraft("flower").note).toBe("");
     expect(notebookDrafts().some((draft) => draft.note === privateNote)).toBe(false);
-
-    session = sessionFor("user-b");
-    view.rerender(
-      <AuthProvider>
-        <OwnerAboveGate>
-          <FieldNotebook
-            tents={[tent]}
-            readingsByTent={{}}
-            onSave={vi.fn()}
-            onFindEntry={vi.fn()}
-          />
-          <FieldNotebookTimelineRecovery />
-        </OwnerAboveGate>
-      </AuthProvider>,
-    );
-    await flushAuth();
-    await waitFor(() => expect(notebookSessionOwner()).toBe("user-b"));
-    expect(screen.queryByText(privateNote)).not.toBeInTheDocument();
-    expect(screen.queryByDisplayValue(privateNote)).not.toBeInTheDocument();
-    expect(screen.queryByText("Not sure this saved")).not.toBeInTheDocument();
-    expect(kind).toBe(kind);
-  }
-
-  it("clears A's note when A signs out with no notebook mounted, then B mounts both surfaces", async () => {
-    await leaveAThenMountB("sign-out");
-  });
-
-  it("clears A's note when the session expires with no notebook mounted, then B mounts both surfaces", async () => {
-    await leaveAThenMountB("expiry");
   });
 
   it("adopts the signed-in user from Timeline recovery alone", async () => {
     adoptNotebookSessionOwner("user-a");
     writeNotebookDraft(privateDraft());
+    expect(readNotebookDraft("flower", "user-b").note).toBe("");
+    expect(notebookDrafts("user-b")).toEqual([]);
+    const order = watchDefenses();
     const session: ReturnType<typeof sessionFor> | null = sessionFor("user-b");
     mocks.getSession.mockImplementation(async () => ({ data: { session }, error: null }));
     render(
@@ -185,11 +251,15 @@ describe("notebook owner without a mounted surface", () => {
     );
     await waitFor(() => expect(notebookSessionOwner()).toBe("user-b"));
     expect(screen.queryByText(privateNote)).not.toBeInTheDocument();
+    expectSubscribeBeforeAdopt(order);
   });
 
   it("adopts the signed-in user from the notebook alone", async () => {
     adoptNotebookSessionOwner("user-a");
     writeNotebookDraft({ ...privateDraft(), recoverySurface: "grow" });
+    expect(readNotebookDraft("flower", "user-b").note).toBe("");
+    expect(notebookDrafts("user-b")).toEqual([]);
+    const order = watchDefenses();
     const session: ReturnType<typeof sessionFor> | null = sessionFor("user-b");
     mocks.getSession.mockImplementation(async () => ({ data: { session }, error: null }));
     render(
@@ -199,11 +269,21 @@ describe("notebook owner without a mounted surface", () => {
     );
     await waitFor(() => expect(notebookSessionOwner()).toBe("user-b"));
     expect(screen.queryByDisplayValue(privateNote)).not.toBeInTheDocument();
+    expectSubscribeBeforeAdopt(order);
+  });
+
+  it("returns nothing for B while the stored owner is still A", () => {
+    adoptNotebookSessionOwner("user-a");
+    writeNotebookDraft(privateDraft());
+    expect(readNotebookDraft("flower", "user-b").note).toBe("");
+    expect(readNotebookDraft("flower", "user-b").attempt).toBeNull();
+    expect(notebookDrafts("user-b")).toEqual([]);
+    expect(readNotebookDraft("flower").note).toBe(privateNote);
   });
 
   it("keeps AppShell's owner hook above the signed-out return", () => {
     const source = readFileSync("src/components/AppShell.tsx", "utf8");
-    const hookAt = source.indexOf("useNotebookSessionOwner()");
+    const hookAt = source.indexOf("useNotebookSessionOwner({ clearOnUnmount: true })");
     const gateAt = source.indexOf('if (!user || authStatus === "unauthenticated") return null;');
     // @source-scan-justified: the early return is what unmounts the notebook; the call has to stay above it, which is not a runtime value.
     expect(hookAt).toBeGreaterThan(0);
@@ -311,6 +391,7 @@ describe("pinned save guards", () => {
     expect(
       screen.queryByRole("button", { name: "Save again (won't duplicate)" }),
     ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Save again (won't duplicate)"));
     expect(onSave).toHaveBeenCalledTimes(1);
   });
 });

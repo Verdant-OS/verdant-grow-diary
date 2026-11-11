@@ -14,30 +14,26 @@ import {
 } from "@/lib/fieldNotebookSession";
 import { formatFoundTitle, formatServerClockLabel } from "@/lib/fieldNotebookViewModel";
 
-/** Recovery for attempts that navigated here. The list is empty unless the signed-in user is the stored owner, and it is read again after subscribe. */
+/** Recovery for attempts that navigated here. Subscribe runs before the owner effect. A signed-out read passes the viewer id, including null, and returns nothing unless that viewer is the stored owner. */
 export default function FieldNotebookTimelineRecovery({
   growId = null,
 }: {
   growId?: string | null;
 }) {
   const router = useRouter({ warn: false });
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const viewerId = user?.id ?? null;
   const visible = () =>
-    (viewerId ? notebookDrafts(viewerId) : notebookDrafts()).filter(
+    (loading ? notebookDrafts() : notebookDrafts(viewerId)).filter(
       (draft) => draft.recoverySurface === "timeline",
     );
   const [drafts, setDrafts] = useState<NotebookDraft[]>(visible);
   useLayoutEffect(() => {
-    const pull = () =>
-      setDrafts(
-        (viewerId ? notebookDrafts(viewerId) : notebookDrafts()).filter(
-          (draft) => draft.recoverySurface === "timeline",
-        ),
-      );
+    const pull = () => setDrafts(visible());
+    const unsubscribe = subscribeNotebookSession(pull);
     pull();
-    return subscribeNotebookSession(pull);
-  }, [viewerId]);
+    return unsubscribe;
+  }, [viewerId, loading]);
   useNotebookSessionOwner();
 
   if (drafts.length === 0) return null;

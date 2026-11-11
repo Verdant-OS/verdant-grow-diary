@@ -1379,11 +1379,18 @@ function QuickLogV2SheetForOwner({
           : EMPTY_QUICKLOG_FEEDING_FORM,
       );
       feedingTempEntryUnitRef.current = restorable?.feedingTempEntryUnit ?? null;
+      // A restored recipe that was a prefill stays a prefill, so a target
+      // change still clears it for the new plant.
+      const restoredPrefill =
+        restoredDraft?.action === "feed" ? restorable?.feedingPrefilledRecipe : undefined;
+      appliedFeedingDefaultsRef.current = restoredPrefill
+        ? { ...EMPTY_QUICKLOG_FEEDING_FORM, ...restoredPrefill }
+        : null;
       setWateringForm(restorable?.watering ?? EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = restorable?.wateringTempEntryUnit ?? null;
       clearLargeWaterConfirmation();
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
-      setFeedingDefaultsApplied(false);
+      setFeedingDefaultsApplied(Boolean(restoredPrefill));
       setWateringVolumeDefaultsApplied(false);
       setLocalError(restorable?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null);
       setNoteFirstSaveFailedMessage(
@@ -1502,6 +1509,14 @@ function QuickLogV2SheetForOwner({
         : {}),
       ...(draftDetails.feeding
         ? { feeding: draftDetails.feeding, feedingTempEntryUnit: feedingTempEntryUnitRef.current }
+        : {}),
+      ...(draftDetails.feeding && feedingDefaultsApplied && appliedFeedingDefaultsRef.current
+        ? {
+            feedingPrefilledRecipe: {
+              lineId: appliedFeedingDefaultsRef.current.lineId,
+              products: appliedFeedingDefaultsRef.current.products,
+            },
+          }
         : {}),
     });
     // localError is a trigger, not an input: when only the error flips, this

@@ -64,6 +64,12 @@ export interface QuickLogObservationDraft {
   feeding?: QuickLogFeedingFormState;
   /** Unit the feed water temperature was typed in. */
   feedingTempEntryUnit?: TemperatureUnitPreference | null;
+  /**
+   * The last-used recipe the sheet prefilled, when one was applied. Restoring
+   * it keeps the recipe marked as a prefill, so a target change still clears
+   * it for the new plant and never records it as the grower's own.
+   */
+  feedingPrefilledRecipe?: Pick<QuickLogFeedingFormState, "lineId" | "products">;
 }
 
 const WATERING_TEXT_FIELDS = [
@@ -299,6 +305,7 @@ export function parseQuickLogObservationDraft(value: unknown): QuickLogObservati
   // Details belong to their own action; a stray block for another action is dropped.
   const watering = record.action === "water" ? readWatering(wrapper.watering) : undefined;
   const feeding = record.action === "feed" ? readFeeding(wrapper.feeding) : undefined;
+  const prefilled = readFeeding(wrapper.feedingPrefilledRecipe);
   const chipStatus = (RESPONSE_CHECK_STATUSES as readonly unknown[]).includes(wrapper.chipStatus)
     ? (wrapper.chipStatus as ResponseCheckStatus)
     : null;
@@ -314,6 +321,9 @@ export function parseQuickLogObservationDraft(value: unknown): QuickLogObservati
       : {}),
     ...(feeding
       ? { feeding, feedingTempEntryUnit: readTemperatureUnit(wrapper.feedingTempEntryUnit) }
+      : {}),
+    ...(feeding && prefilled
+      ? { feedingPrefilledRecipe: { lineId: prefilled.lineId, products: prefilled.products } }
       : {}),
     form: {
       selectedKey: selectedKey.length > 0 ? selectedKey : null,

@@ -215,6 +215,27 @@ describe("parseQuickLogObservationDraft with Water and Feed details", () => {
     ).toEqual(EMPTY_QUICKLOG_FEEDING_FORM.products);
   });
 
+  it("keeps the prefilled recipe only alongside Feed details", () => {
+    const recipe = {
+      lineId: "line-1",
+      products: [{ name: "Grow A", amount: "2", unit: "ml_per_l" }],
+    };
+    const parsed = parseQuickLogObservationDraft({
+      form: FEED_FORM,
+      feeding: { ...recipe, ph: "6.0" },
+      feedingPrefilledRecipe: { ...recipe, ph: "ignored" },
+    });
+    expect(parsed?.feedingPrefilledRecipe).toEqual(recipe);
+    expect(
+      parseQuickLogObservationDraft({ form: FEED_FORM, feedingPrefilledRecipe: recipe })
+        ?.feedingPrefilledRecipe,
+    ).toBeUndefined();
+    expect(
+      parseQuickLogObservationDraft({ form: FEED_FORM, feeding: { ph: "6.0" } })
+        ?.feedingPrefilledRecipe,
+    ).toBeUndefined();
+  });
+
   it("reads an older draft with no detail blocks", () => {
     const parsed = parseQuickLogObservationDraft({ form: { ...WATER_FORM, note: "old" } });
     expect(parsed?.watering).toBeUndefined();

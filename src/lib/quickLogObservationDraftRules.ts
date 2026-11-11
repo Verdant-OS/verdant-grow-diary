@@ -9,6 +9,23 @@ import {
 } from "@/lib/quickLogStructuredReadingRules";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import {
+  EMPTY_FEEDING_PRODUCT_ROW,
+  EMPTY_QUICKLOG_FEEDING_FORM,
+  FEEDING_FORM_PRODUCT_CAP,
+  isFeedingFormPristine,
+  type QuickLogFeedingFormState,
+} from "@/lib/quickLogFeedingFormViewModel";
+import {
+  EMPTY_QUICKLOG_WATERING_FORM,
+  type QuickLogWateringFormState,
+} from "@/lib/quickLogWateringFormViewModel";
+import { WATER_ENTRY_UNITS, type WaterEntryUnit } from "@/lib/quickLogWaterVolumeUnitRules";
+import {
+  ROOT_ZONE_DRAINAGE_OBSERVATIONS,
+  ROOT_ZONE_MEDIUM_SURFACES,
+  ROOT_ZONE_POT_WEIGHT_FEELS,
+} from "@/lib/rootZoneManualObservationRules";
+import {
   RESPONSE_CHECK_STATUSES,
   removeChipAuthoredResponseLine,
   type ResponseCheckStatus,
@@ -39,6 +56,144 @@ export interface QuickLogObservationDraft {
   structured?: StructuredReadingTextInput;
   /** Unit the soil temperature was typed in, so a preference change cannot reinterpret it. */
   soilTempEntryUnit?: TemperatureUnitPreference | null;
+  /** Water details as typed, only while Water is the action. Absent in older drafts. */
+  watering?: QuickLogWateringFormState;
+  /** Unit the water temperature was typed in. */
+  wateringTempEntryUnit?: TemperatureUnitPreference | null;
+  /** Feed recipe and readings as typed, only while Feed is the action. Absent in older drafts. */
+  feeding?: QuickLogFeedingFormState;
+  /** Unit the feed water temperature was typed in. */
+  feedingTempEntryUnit?: TemperatureUnitPreference | null;
+}
+
+const WATERING_TEXT_FIELDS = [
+  "volumeMl",
+  "ph",
+  "ec",
+  "ppm",
+  "runoffMl",
+  "runoffPh",
+  "runoffEc",
+  "runoffPpm",
+  "waterTempC",
+] as const;
+
+const FEEDING_TEXT_FIELDS = [
+  "lineId",
+  "volumeMl",
+  "ph",
+  "ecIn",
+  "ppmIn",
+  "ecOut",
+  "ppmOut",
+  "runoffMl",
+  "runoffPh",
+  "runoffEc",
+  "runoffPpm",
+  "waterTempC",
+] as const;
+
+function readChoice<T extends string>(value: unknown, allowed: readonly T[]): T | "" {
+  return (allowed as readonly unknown[]).includes(value) ? (value as T) : "";
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readWatering(value: unknown): QuickLogWateringFormState | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const out: QuickLogWateringFormState = { ...EMPTY_QUICKLOG_WATERING_FORM };
+  for (const key of WATERING_TEXT_FIELDS) out[key] = readText(record[key]);
+  out.potWeightFeel = readChoice(record.potWeightFeel, ROOT_ZONE_POT_WEIGHT_FEELS);
+  out.mediumSurface = readChoice(record.mediumSurface, ROOT_ZONE_MEDIUM_SURFACES);
+  out.drainage = readChoice(record.drainage, ROOT_ZONE_DRAINAGE_OBSERVATIONS);
+  const unit = readChoice<WaterEntryUnit>(record.volumeEntryUnit, WATER_ENTRY_UNITS);
+  if (unit) out.volumeEntryUnit = unit;
+  if (typeof record.volumeEntryText === "string") out.volumeEntryText = record.volumeEntryText;
+  if (typeof record.runoffEntryText === "string") out.runoffEntryText = record.runoffEntryText;
+  return out;
+}
+
+function readFeeding(value: unknown): QuickLogFeedingFormState | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const out: QuickLogFeedingFormState = {
+    ...EMPTY_QUICKLOG_FEEDING_FORM,
+    // The note travels in form.note; the sheet hands it to the Feed field.
+    note: "",
+  };
+  for (const key of FEEDING_TEXT_FIELDS) out[key] = readText(record[key]);
+  const products = (Array.isArray(record.products) ? record.products : [])
+    .map(asRecord)
+    .filter((row): row is Record<string, unknown> => row !== null)
+    .slice(0, FEEDING_FORM_PRODUCT_CAP)
+    .map((row) => ({
+      name: readText(row.name),
+      amount: readText(row.amount),
+      unit: readText(row.unit) || EMPTY_FEEDING_PRODUCT_ROW.unit,
+    }));
+  out.products = products.length > 0 ? products : [{ ...EMPTY_FEEDING_PRODUCT_ROW }];
+  return out;
+}
+
+function isWateringFormEmpty(form: QuickLogWateringFormState): boolean {
+  return (
+    WATERING_TEXT_FIELDS.every((key) => form[key].trim() === "") &&
+    form.potWeightFeel === "" &&
+    form.mediumSurface === "" &&
+    form.drainage === ""
+  );
+}
+
+/**
+ * The Water details worth keeping in a draft, or null. A volume that only the
+ * last-watering prefill wrote is not the grower's entry: on its own it must not
+ * create a draft, or every reopen would claim to restore one.
+ */
+export function quickLogWateringDraftFields(
+  form: QuickLogWateringFormState,
+  prefilledVolumeMl: string | null,
+): QuickLogWateringFormState | null {
+  if (isWateringFormEmpty(form)) return null;
+  const onlyPrefill =
+    prefilledVolumeMl !== null &&
+    form.volumeMl === prefilledVolumeMl &&
+    form.volumeEntryText === undefined &&
+    isWateringFormEmpty({ ...form, volumeMl: "" });
+  return onlyPrefill ? null : form;
+}
+
+function feedingRecipeAndReadingsEqual(
+  a: QuickLogFeedingFormState,
+  b: QuickLogFeedingFormState,
+): boolean {
+  return (
+    FEEDING_TEXT_FIELDS.every((key) => a[key] === b[key]) &&
+    a.products.length === b.products.length &&
+    a.products.every((row, index) => {
+      const other = b.products[index];
+      return row.name === other.name && row.amount === other.amount && row.unit === other.unit;
+    })
+  );
+}
+
+/**
+ * The Feed recipe and readings worth keeping in a draft, or null. The note is
+ * left out (it travels in form.note). A form that still equals the last-used
+ * defaults the sheet applied is not the grower's entry.
+ */
+export function quickLogFeedingDraftFields(
+  form: QuickLogFeedingFormState,
+  appliedDefaults: QuickLogFeedingFormState | null,
+): QuickLogFeedingFormState | null {
+  const withoutNote = { ...form, note: "" };
+  if (isFeedingFormPristine(withoutNote)) return null;
+  if (appliedDefaults && feedingRecipeAndReadingsEqual(withoutNote, appliedDefaults)) return null;
+  return withoutNote;
 }
 
 function readTemperatureUnit(value: unknown): TemperatureUnitPreference | null {
@@ -92,7 +247,8 @@ export function restorableQuickLogObservationDraft(
   stored: QuickLogObservationDraft | null,
   defaultTargetKey: string | null | undefined,
 ): QuickLogObservationDraft | null {
-  if (!stored || isQuickLogObservationDraftEmpty(stored.form, stored.structured)) return null;
+  if (!stored || isQuickLogObservationDraftEmpty(stored.form, stored.structured, stored))
+    return null;
   const target = defaultTargetKey || null;
   if (stored.form.selectedKey === target) return stored;
   if (target !== null) return null;
@@ -102,8 +258,20 @@ export function restorableQuickLogObservationDraft(
     ? removeChipAuthoredResponseLine(stored.form.note, stored.chipStatus)
     : stored.form.note;
   const form = { ...stored.form, selectedKey: null, note };
-  if (isQuickLogObservationDraftEmpty(form, stored.structured)) return null;
+  if (isQuickLogObservationDraftEmpty(form, stored.structured, stored)) return null;
   return { ...stored, form, saveFailed: false, idempotencyKey: null, chipStatus: null };
+}
+
+/**
+ * There is one draft slot. Water or Feed details on their own never take it
+ * from an unsaved entry typed for a different target: that entry may hold a
+ * failed save and its key, and it must still be there when its target reopens.
+ */
+export function quickLogDraftSlotHeldByOtherTarget(
+  stored: QuickLogObservationDraft | null,
+  selectedKey: string | null,
+): boolean {
+  return stored !== null && stored.form.selectedKey !== selectedKey;
 }
 
 export function quickLogObservationDraftRestoredCopy(restored: QuickLogObservationDraft): string {
@@ -128,6 +296,9 @@ export function parseQuickLogObservationDraft(value: unknown): QuickLogObservati
   const soilTempEntryUnit = structured.soilTemp.trim()
     ? readTemperatureUnit(wrapper.soilTempEntryUnit)
     : null;
+  // Details belong to their own action; a stray block for another action is dropped.
+  const watering = record.action === "water" ? readWatering(wrapper.watering) : undefined;
+  const feeding = record.action === "feed" ? readFeeding(wrapper.feeding) : undefined;
   const chipStatus = (RESPONSE_CHECK_STATUSES as readonly unknown[]).includes(wrapper.chipStatus)
     ? (wrapper.chipStatus as ResponseCheckStatus)
     : null;
@@ -138,6 +309,12 @@ export function parseQuickLogObservationDraft(value: unknown): QuickLogObservati
     chipStatus,
     structured,
     soilTempEntryUnit,
+    ...(watering
+      ? { watering, wateringTempEntryUnit: readTemperatureUnit(wrapper.wateringTempEntryUnit) }
+      : {}),
+    ...(feeding
+      ? { feeding, feedingTempEntryUnit: readTemperatureUnit(wrapper.feedingTempEntryUnit) }
+      : {}),
     form: {
       selectedKey: selectedKey.length > 0 ? selectedKey : null,
       action: record.action,
@@ -153,9 +330,16 @@ export function parseQuickLogObservationDraft(value: unknown): QuickLogObservati
 export function isQuickLogObservationDraftEmpty(
   form: QuickLogV2FormState | null | undefined,
   structured?: StructuredReadingTextInput | null,
+  /** Water or Feed details already filtered by the draft-field helpers above. */
+  details?: {
+    watering?: QuickLogWateringFormState | null;
+    feeding?: QuickLogFeedingFormState | null;
+  } | null,
 ): boolean {
   if (!form) return true;
   return (
+    !details?.watering &&
+    !details?.feeding &&
     isStructuredReadingInputEmpty(structured) &&
     form.note.trim().length === 0 &&
     form.volumeMl.trim().length === 0 &&

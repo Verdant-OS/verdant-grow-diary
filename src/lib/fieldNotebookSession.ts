@@ -37,8 +37,9 @@ export function notebookSessionOwner(): string | null {
 
 /**
  * Drop the previous account's in-memory notes when the signed-in account changes.
- * The notebook and Timeline recovery call this from the signed-in user id.
- * A null owner means signed out: that account's notes are not readable.
+ * AppShell calls this while it is mounted, including after the notebook surfaces
+ * unmount. A null owner means signed out. A read that names a viewer returns
+ * nothing unless that viewer is the stored owner.
  */
 export function adoptNotebookSessionOwner(userId: string | null): void {
   if (userId === activeOwnerId) {
@@ -52,7 +53,8 @@ export function adoptNotebookSessionOwner(userId: string | null): void {
   notifyNotebookSession();
 }
 
-export function readNotebookDraft(tentId: string): NotebookDraft {
+export function readNotebookDraft(tentId: string, viewerId?: string | null): NotebookDraft {
+  if (viewerId !== undefined && viewerId !== activeOwnerId) return emptyDraft(tentId);
   return storeFor(activeOwnerId).get(tentId) ?? emptyDraft(tentId);
 }
 
@@ -70,7 +72,8 @@ export function writeNotebookDraft(
   return true;
 }
 
-export function notebookDrafts(): NotebookDraft[] {
+export function notebookDrafts(viewerId?: string | null): NotebookDraft[] {
+  if (viewerId !== undefined && viewerId !== activeOwnerId) return [];
   return [...storeFor(activeOwnerId).values()];
 }
 

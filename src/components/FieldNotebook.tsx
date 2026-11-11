@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import NotebookRouteLink from "@/components/NotebookRouteLink";
 import { useNotebookSessionOwner } from "@/hooks/useNotebookSessionOwner";
+import { useAuth } from "@/store/auth";
 import { timelinePath } from "@/lib/routes";
 import {
   acknowledgeFound,
@@ -108,28 +109,38 @@ export default function FieldNotebook({
   ) => Promise<FindResult>;
   growId?: string | null;
 }) {
-  useNotebookSessionOwner();
+  const { user } = useAuth();
+  const viewerId = user?.id ?? null;
   const saveInFlight = useRef(false);
   const [selectedId, setSelectedId] = useState(tents[0]?.id ?? "");
+  const readForViewer = (tentId: string) =>
+    viewerId ? readNotebookDraft(tentId, viewerId) : readNotebookDraft(tentId);
   const [drafts, setDrafts] = useState<Record<string, NotebookDraft>>(() => {
     const initial: Record<string, NotebookDraft> = {};
-    for (const tent of tents) initial[tent.id] = readNotebookDraft(tent.id);
+    for (const tent of tents) initial[tent.id] = readForViewer(tent.id);
     return initial;
   });
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const selected = tents.find((t) => t.id === selectedId) ?? tents[0];
-  const draft = selected ? (drafts[selected.id] ?? readNotebookDraft(selected.id)) : null;
+  const draft = selected ? (drafts[selected.id] ?? readForViewer(selected.id)) : null;
 
-  useEffect(() => {
-    return subscribeNotebookSession(() => {
+  useLayoutEffect(() => {
+    const pull = () => {
       setDrafts((prev) => {
         const next = { ...prev };
-        for (const tent of tents) next[tent.id] = readNotebookDraft(tent.id);
+        for (const tent of tents) {
+          next[tent.id] = viewerId
+            ? readNotebookDraft(tent.id, viewerId)
+            : readNotebookDraft(tent.id);
+        }
         return next;
       });
-    });
-  }, [tents]);
+    };
+    pull();
+    return subscribeNotebookSession(pull);
+  }, [tents, viewerId]);
+  useNotebookSessionOwner();
 
   useEffect(() => {
     const node = selected ? tabRefs.current[selected.id] : null;
@@ -153,7 +164,11 @@ export default function FieldNotebook({
       !notesMatchCanonical(live.note, live.completedNote)
         ? { ...live, phase: "editing" as const }
         : live;
-    if (kind === "save_again" && (live.phase !== "uncertain" || live.attempt == null)) return;
+    if (
+      kind === "save_again" &&
+      (live.phase !== "uncertain" || live.attempt == null || live.idempotencyRetracted === true)
+    )
+      return;
     if (kind === "save" && !maySubmit(ready)) return;
     if (kind === "retry" && live.phase !== "clear_failure") return;
     if (saveInFlight.current || readNotebookDraft(selected.id).phase === "saving") return;

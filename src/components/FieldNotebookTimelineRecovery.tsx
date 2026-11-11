@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { useNotebookSessionOwner } from "@/hooks/useNotebookSessionOwner";
+import { useAuth } from "@/store/auth";
 import { useRouter } from "@tanstack/react-router";
 import NotebookRouteLink, { navigateNotebookHref } from "@/components/NotebookRouteLink";
 import { withGrowId } from "@/lib/routes";
@@ -13,25 +14,31 @@ import {
 } from "@/lib/fieldNotebookSession";
 import { formatFoundTitle, formatServerClockLabel } from "@/lib/fieldNotebookViewModel";
 
-/** Recovery for attempts that navigated here. Notes belong to the signed-in user only. */
+/** Recovery for attempts that navigated here. The list is empty unless the signed-in user is the stored owner, and it is read again after subscribe. */
 export default function FieldNotebookTimelineRecovery({
   growId = null,
 }: {
   growId?: string | null;
 }) {
   const router = useRouter({ warn: false });
+  const { user } = useAuth();
+  const viewerId = user?.id ?? null;
+  const visible = () =>
+    (viewerId ? notebookDrafts(viewerId) : notebookDrafts()).filter(
+      (draft) => draft.recoverySurface === "timeline",
+    );
+  const [drafts, setDrafts] = useState<NotebookDraft[]>(visible);
+  useLayoutEffect(() => {
+    const pull = () =>
+      setDrafts(
+        (viewerId ? notebookDrafts(viewerId) : notebookDrafts()).filter(
+          (draft) => draft.recoverySurface === "timeline",
+        ),
+      );
+    pull();
+    return subscribeNotebookSession(pull);
+  }, [viewerId]);
   useNotebookSessionOwner();
-  const [drafts, setDrafts] = useState<NotebookDraft[]>(() =>
-    notebookDrafts().filter((draft) => draft.recoverySurface === "timeline"),
-  );
-
-  useEffect(
-    () =>
-      subscribeNotebookSession(() => {
-        setDrafts(notebookDrafts().filter((draft) => draft.recoverySurface === "timeline"));
-      }),
-    [],
-  );
 
   if (drafts.length === 0) return null;
   return (

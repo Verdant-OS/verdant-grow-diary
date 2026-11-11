@@ -2,7 +2,6 @@ import type { QueryClient } from "@tanstack/react-query";
 import { flushSync } from "react-dom";
 import { clearGrowDataMeta } from "@/hooks/useGrowData";
 import { clearGlobalSearchPrivateState } from "@/lib/globalSearchSession";
-import { adoptNotebookSessionOwner } from "@/lib/fieldNotebookSession";
 
 /**
  * Clear all private client state before AuthProvider publishes a resolved or
@@ -12,11 +11,8 @@ import { adoptNotebookSessionOwner } from "@/lib/fieldNotebookSession";
  */
 export function clearPrivateClientStateBeforeAuthIdentityChange(
   queryClient: Pick<QueryClient, "clear">,
-  nextUserId: string | null = null,
-  previousUserId: string | null = null,
 ): void {
   flushSync(() => clearGlobalSearchPrivateState());
   queryClient.clear();
   clearGrowDataMeta();
-  adoptNotebookSessionOwner(nextUserId, previousUserId);
 }

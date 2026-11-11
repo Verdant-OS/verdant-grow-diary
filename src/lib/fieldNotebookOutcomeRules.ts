@@ -5,22 +5,13 @@
  * whether Timeline, the entry count, and Last Activity already show the
  * saved row. A client clock must never be passed in as server time.
  *
- * Clear failure: evidence this attempt did not create an entry.
- * Uncertain: the write may have landed. The note stays visible and read-only.
- * Save again resends that same idempotency key. not_authenticated, offline,
- * and transport or unknown outcomes stay uncertain. A post-key-lookup
- * definitive rejection proves no row exists and offers a new note while
- * that attempt is still uncertain. A later Save again that was sent and got
- * no reply clears that offer, and a reload does not bring it back.
- * Acknowledging the attempt, finding it on Timeline, retracting the key,
- * or starting a new save clears it too.
- * A retracted key keeps the note and offers a new note, and that new note
- * is a different attempt.
+ * Clear failure: offline before the send, or a definitive rejection.
+ * The note stays. Uncertain: the write may have landed. Save again
+ * resends that same idempotency key. A retracted key and Save again
+ * after a definitive rejection are follow-ups, not this slice.
  */
 
 import { definitiveRejectionProvesNoRow } from "@/lib/quickLogManualRejectionRules";
-
-export { definitiveRejectionProvesNoRow };
 
 export type FieldNotebookPhase =
   "editing" | "saving" | "saved" | "clear_failure" | "uncertain" | "check_found" | "check_none";
@@ -153,13 +144,8 @@ export interface NotebookDraft {
   completedNote: string | null;
   /** True after an uncertain outcome until the grower confirms J1. Blocks a new write. */
   writeBlocked: boolean;
-  /** The server retired this attempt's key. Save again must not mint a replacement. */
+  /** The server retired this attempt's key. Save again stays hidden. A new attempt is a follow-up. */
   idempotencyRetracted?: boolean;
-  /**
-   * A definitive rejection of Save again proved no row exists. The note stays
-   * visible. Start a new note is a different attempt.
-   */
-  saveAgainRejected?: boolean;
   recoverySurface: "grow" | "timeline";
 }
 
@@ -196,7 +182,6 @@ export function applyTransport(
       phase: "uncertain",
       writeBlocked: true,
       idempotencyRetracted: true,
-      saveAgainRejected: false,
       note: draft.attempt?.note ?? draft.note,
       knownEventId: null,
       verifiedEntry: null,
@@ -212,14 +197,12 @@ export function applyTransport(
         ...draft,
         phase: "uncertain",
         writeBlocked: true,
-        saveAgainRejected: false,
         knownEventId: null,
         verifiedEntry: null,
       };
     }
     const next: NotebookDraft = {
       ...draft,
-      saveAgainRejected: false,
       knownEventId: transport.entry.growEventId,
       serverOccurredAt: transport.entry.occurredAt,
       verifiedEntry: transport.entry,
@@ -237,31 +220,31 @@ export function applyTransport(
     return { ...next, phase: "uncertain", writeBlocked: true };
   }
   if (isClearFailure(transport)) {
-    if (draft.writeBlocked && draft.attempt) {
-      // A client build rejection never reaches the key lookup. not_authenticated
-      // and invalid_idempotency_key return before that lookup. Offline is not
-      // a server result. Only a post-lookup rejection of a missing key proves
-      // no row exists.
-      const provesNoRow =
-        transport.kind === "definitive_rejection" &&
-        definitiveRejectionProvesNoRow(transport.reason);
+    const stillUncertain =
+      draft.writeBlocked &&
+      draft.attempt != null &&
+      transport.kind === "definitive_rejection" &&
+      !definitiveRejectionProvesNoRow(transport.reason);
+    if (stillUncertain) {
       return {
         ...draft,
         phase: "uncertain",
         writeBlocked: true,
-        idempotencyRetracted: false,
-        saveAgainRejected: provesNoRow || draft.saveAgainRejected === true,
-        note: draft.attempt.note,
+        note: draft.attempt?.note ?? draft.note,
       };
     }
-    return { ...draft, phase: "clear_failure", writeBlocked: false, recoverySurface: "grow" };
+    return {
+      ...draft,
+      phase: "clear_failure",
+      writeBlocked: false,
+      note: draft.attempt?.note ?? draft.note,
+      recoverySurface: "grow",
+    };
   }
-  // A sent Save again with no reply may have landed. Drop a prior "not saved" claim.
   return {
     ...draft,
     phase: "uncertain",
     writeBlocked: true,
-    saveAgainRejected: false,
     knownEventId: null,
     verifiedEntry: null,
     serverOccurredAt: null,
@@ -324,7 +307,6 @@ export function draftAfterTimelineCheck(
       serverOccurredAt: verified.occurredAt,
       knownEventId: verified.growEventId,
       writeBlocked: true,
-      saveAgainRejected: false,
       recoverySurface: "timeline",
     };
   }

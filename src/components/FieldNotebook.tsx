@@ -5,7 +5,6 @@ import {
   acknowledgeFound,
   applyTransport,
   backToNote,
-  emptyDraft,
   canonicalNotebookNote,
   draftAfterTimelineCheck,
   maySubmit,
@@ -166,7 +165,6 @@ export default function FieldNotebook({
       ...ready,
       phase: "saving",
       attempt,
-      saveAgainRejected: false,
       knownEventId: null,
       verifiedEntry: null,
       serverOccurredAt: null,
@@ -216,8 +214,6 @@ export default function FieldNotebook({
   async function checkTimeline() {
     const tentId = selected.id;
     const started = drafts[tentId] ?? readNotebookDraft(tentId);
-    const phaseAtStart = started.phase;
-    const attemptIdAtStart = started.attempt?.attemptId ?? null;
     const ownerAtCheck = notebookSessionOwner();
     let receipt: Awaited<ReturnType<typeof onFindEntry>>;
     try {
@@ -247,8 +243,6 @@ export default function FieldNotebook({
     const reconciled = reconcileAttempt(matchedEventId, candidates, availability);
     setDrafts((prev) => {
       const live = readNotebookDraft(tentId);
-      if (live.phase === "saving" || live.phase !== phaseAtStart) return prev;
-      if ((live.attempt?.attemptId ?? null) !== attemptIdAtStart) return prev;
       const next = draftAfterTimelineCheck(live, live.note, reconciled);
       writeNotebookDraft(next, ownerAtCheck);
       return { ...prev, [tentId]: next };
@@ -285,7 +279,6 @@ export default function FieldNotebook({
     tentName: selected.name,
     serverTimeLabel: clockLabel,
     noteChanged,
-    saveAgainRejected: draft.saveAgainRejected === true,
   });
   const foundLabel =
     draft.verifiedEntry && clockLabel
@@ -366,20 +359,14 @@ export default function FieldNotebook({
               className="min-h-24 w-full rounded-md border bg-background p-2 text-base"
               placeholder={FIELD_NOTEBOOK_EMPTY_NOTE_PLACEHOLDER}
               value={draft.note}
-              readOnly={
-                draft.phase === "saving" ||
-                draft.idempotencyRetracted === true ||
-                (draft.phase === "uncertain" && draft.attempt != null)
-              }
+              readOnly={draft.phase === "saving"}
               onChange={(event) => {
-                if (
-                  draft.phase === "saving" ||
-                  draft.idempotencyRetracted === true ||
-                  (draft.phase === "uncertain" && draft.attempt != null)
-                ) {
+                if (draft.phase === "saving" || draft.idempotencyRetracted === true) return;
+                const note = event.target.value;
+                if (draft.phase === "uncertain" && draft.attempt != null) {
+                  put({ ...draft, note });
                   return;
                 }
-                const note = event.target.value;
                 if (draft.writeBlocked) {
                   put({ ...draft, note });
                   return;
@@ -437,21 +424,6 @@ export default function FieldNotebook({
               }}
             >
               Check Timeline
-            </button>
-          ) : null}
-          {draft.phase === "uncertain" &&
-          (draft.idempotencyRetracted || draft.saveAgainRejected) ? (
-            <button
-              type="button"
-              className="min-h-11 rounded-md border px-3 text-sm font-medium"
-              onClick={() => {
-                put({
-                  ...emptyDraft(draft.tentId),
-                  note: draft.attempt?.note ?? draft.note,
-                });
-              }}
-            >
-              Start a new note
             </button>
           ) : null}
           {draft.phase === "uncertain" && draft.attempt && !draft.idempotencyRetracted ? (

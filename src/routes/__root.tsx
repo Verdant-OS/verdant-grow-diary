@@ -182,8 +182,7 @@ function RootErrorComponent({ error }: { error: unknown }) {
  */
 function useClearQueryCacheBeforeAuthIdentityChange() {
   const { queryClient } = Route.useRouteContext();
-  return (previousUserId: string | null, nextUserId: string | null) =>
-    clearPrivateClientStateBeforeAuthIdentityChange(queryClient, nextUserId, previousUserId);
+  return () => clearPrivateClientStateBeforeAuthIdentityChange(queryClient);
 }
 
 function AnalyticsShell() {

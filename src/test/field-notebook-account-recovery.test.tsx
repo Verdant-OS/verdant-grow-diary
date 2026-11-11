@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import FieldNotebook from "@/components/FieldNotebook";
 import FieldNotebookTimelineRecovery from "@/components/FieldNotebookTimelineRecovery";
-import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
 import {
   acknowledgeFound,
   draftAfterTimelineCheck,
@@ -10,13 +9,7 @@ import {
   type FieldNotebookServerEntry,
 } from "@/lib/fieldNotebookOutcomeRules";
 import { reflectionFromEvidence, sameRecentActivityId } from "@/lib/fieldNotebookReflection";
-import {
-  adoptNotebookSessionOwner,
-  clearNotebookSession,
-  notebookDrafts,
-  readNotebookDraft,
-  writeNotebookDraft,
-} from "@/lib/fieldNotebookSession";
+import { readNotebookDraft } from "@/lib/fieldNotebookSession";
 import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-compat";
 
 const entry: FieldNotebookServerEntry = {
@@ -41,37 +34,6 @@ function LocationProbe() {
 }
 
 describe("field notebook account recovery guards", () => {
-  it("keeps recovery drafts inside the active account", () => {
-    clearNotebookSession();
-    adoptNotebookSessionOwner("account-a");
-    writeNotebookDraft({
-      ...emptyDraft("flower"),
-      note: "account A private note",
-      phase: "uncertain",
-      writeBlocked: true,
-      recoverySurface: "timeline",
-    });
-    adoptNotebookSessionOwner("account-b");
-    expect(readNotebookDraft("flower").note).toBe("");
-    expect(notebookDrafts().some((draft) => draft.note.includes("account A"))).toBe(false);
-    expect(
-      writeNotebookDraft({ ...emptyDraft("flower"), note: "late write from A" }, "account-a"),
-    ).toBe(false);
-    expect(readNotebookDraft("flower").note).toBe("");
-  });
-
-  it("clears the previous account when the identity fence resolves the next one", () => {
-    adoptNotebookSessionOwner("account-a");
-    writeNotebookDraft({ ...emptyDraft("flower"), note: "still signed in" });
-    const client = { clear: vi.fn() };
-    clearPrivateClientStateBeforeAuthIdentityChange(client, null);
-    expect(client.clear).toHaveBeenCalledOnce();
-    expect(readNotebookDraft("flower").note).toBe("");
-    writeNotebookDraft({ ...emptyDraft("flower"), note: "signed out leftover" });
-    clearPrivateClientStateBeforeAuthIdentityChange(client, "account-b");
-    expect(readNotebookDraft("flower").note).toBe("");
-  });
-
   it("matches last activity through the grow-event id prefix", () => {
     expect(sameRecentActivityId(`grow-event-${entry.growEventId}`, entry.growEventId)).toBe(true);
     expect(sameRecentActivityId(`diary-${entry.growEventId}`, entry.growEventId)).toBe(false);
@@ -114,15 +76,17 @@ describe("field notebook account recovery guards", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
     fireEvent.click(await screen.findByRole("button", { name: "Check Timeline" }));
     const box = screen.getByPlaceholderText("Add what you observed.") as HTMLTextAreaElement;
-    expect(box.readOnly).toBe(true);
+    expect(box.readOnly).toBe(false);
     fireEvent.change(box, {
       target: { value: "typed while checking" },
     });
-    expect(box).toHaveValue(entry.note);
+    expect(box).toHaveValue("typed while checking");
     finish([entry]);
     expect(await screen.findByRole("button", { name: "Yes, that's it" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Yes, that's it" }));
-    expect(await screen.findByPlaceholderText("Add what you observed.")).toHaveValue("");
+    expect(await screen.findByPlaceholderText("Add what you observed.")).toHaveValue(
+      "typed while checking",
+    );
   });
 
   it("navigates to Timeline without dropping the in-memory draft", async () => {

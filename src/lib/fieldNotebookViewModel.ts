@@ -93,7 +93,6 @@ export function statusView(input: {
   tentName: string;
   serverTimeLabel: string | null;
   noteChanged?: boolean;
-  saveAgainRejected?: boolean;
 }): StatusView {
   const save = formatSaveButton(input.tentName);
   switch (input.phase) {
@@ -139,7 +138,7 @@ export function statusView(input: {
     case "uncertain":
       return {
         phase: input.phase,
-        statusLine: input.saveAgainRejected ? formatNotSavedLine() : formatUncertainLine(),
+        statusLine: formatUncertainLine(),
         primaryLabel: save,
         primaryDisabled: true,
         showRetry: false,

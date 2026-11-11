@@ -7,8 +7,8 @@ why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8 (se
 branch: claude/brave-fermat-u06ig6
 base: verdant-grow-diary
 checkout: git fetch origin claude/brave-fermat-u06ig6 verdant-grow-diary && git switch claude/brave-fermat-u06ig6
-pr: NOT_MEASURED until opened; see the PR for this branch
-head_sha: read from the PR; this file is written before the first push
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2934 (draft)
+head_sha: code at 805acc402414892a37945abd5c0ecc472d6f9819 (2026-11-11 19:01 UTC); a docs-only commit recording this PR link follows it, so read the current head from the PR
 state: implemented, local tests green, pushed draft
 current_step: draft PR open, required CI and independent review pending
 next_action: route one independent exact-head review (docs/agents/OWNERSHIP.md section 4.3) once the required checks are green at the PR head

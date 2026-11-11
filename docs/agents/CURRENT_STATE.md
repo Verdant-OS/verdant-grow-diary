@@ -2,7 +2,11 @@
 
 ## Start here (agents)
 
-Read this section first. It doesn't replace the observation log below.
+This section is the required startup read; the observation log below is read on demand. Before
+you act on, or state, a fact about production, deployment, applied migrations, approved scope, or
+a named PR, lock, hold or grant that this section does not settle, search the log for it
+(`grep -n '<PR number or term>' docs/agents/CURRENT_STATE.md`) and read the matching entries,
+newest first. The log stays the record; this section decides when you open it.
 
 - **OWNERSHIP.md still wins on ownership and review routing.** AGENTS.md §0.1 says so, and this file does not override it. GDP retired on 2026-09-29; Matthew has also retired Chemdawg/Grok 91. [PR #1971's current actor assignment and hold](OWNERSHIP.md#pr-1971-merge-actor-assignment-and-hold) names OG Kush to merge, Jack Herer to independently accept and Codex to repairs only, superseding the earlier Codex exception. No Harvest succession is inferred. This file is not a second precedence.
 - **Open workstream owners.** Each open PR or workstream has one current owner and one active writer, named here and in its `docs/agents/HANDOFF_LOG.md` block (`claimed_by` / `owner`). There is no shared working branch. Only that holder pushes, and no agent edits files on another holder's branch. On retirement, transfer the row in the same update as the handoff. When no successor is named, the default inheritor is **OG Kush (engineering lead)**. A review pass does not transfer with the row: it stays bound to the SHA it named. This amendment does not backfill historical rows; existing blocks keep the owner already recorded on them.

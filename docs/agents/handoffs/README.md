@@ -19,10 +19,12 @@ and pull requests were removed from the merge queue for conflicts in that one fi
 ## Reading
 
 `HANDOFF_LOG.md` plus this directory is the handoff log. Reading the log for
-`SENTINEL_ACK` or `open_handoffs_checked` means reading both. Use the deploy-branch copies:
+`SENTINEL_ACK` or `open_handoffs_checked` means reading `HANDOFF_LOG.md` and the entries
+here whose TASK line reads `status: OPEN`. Closed entries are history; open one only when a
+task needs it. Use the deploy-branch copies:
 
 ```bash
-git ls-tree --name-only origin/verdant-grow-diary docs/agents/handoffs/
+git grep -lE '^TASK .*status: OPEN' origin/verdant-grow-diary -- docs/agents/handoffs/
 ```
 
 ## File shape

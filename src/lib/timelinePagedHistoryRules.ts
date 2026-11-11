@@ -41,7 +41,8 @@ export interface TimelineRefreshMerge<T extends TimelinePagedRow> {
  * Merges a refetched newest page into what is already loaded.
  *
  * Older pages are kept only when the previous read reached strictly past the
- * refreshed page. Rows inside the refreshed page always come from the refresh,
+ * refreshed page and the refreshed page reaches a row already loaded, so the
+ * two are contiguous. Otherwise the refreshed page replaces everything. Rows inside the refreshed page always come from the refresh,
  * so an entry removed elsewhere disappears. A kept older row that was removed
  * elsewhere stays until the next full reload (scope or date-range change).
  */
@@ -55,7 +56,16 @@ export function mergeTimelineRefreshedFirstPage<T extends TimelinePagedRow>(
     firstPageCursor !== null &&
     isOlderThanCursor({ entry_at: previousCursor.entryAt, id: previousCursor.id }, firstPageCursor);
 
-  if (!reachedPastFirstPage || firstPageCursor === null) {
+  // The refreshed page must reach a row already loaded. If everything on
+  // screen is older than its last row, more than a page arrived in between
+  // and those rows were never fetched; keeping the old cursor would skip them.
+  const overlapsLoadedRows =
+    firstPageCursor !== null &&
+    [...input.previousRows, ...input.previousHiddenRows].some(
+      (row) => !isOlderThanCursor(row, firstPageCursor),
+    );
+
+  if (!reachedPastFirstPage || !overlapsLoadedRows || firstPageCursor === null) {
     return {
       rows: [...input.firstPageRows],
       cursor: firstPageCursor,

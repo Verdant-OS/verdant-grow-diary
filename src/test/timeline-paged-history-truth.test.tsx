@@ -319,6 +319,34 @@ describe("mergeTimelineRefreshedFirstPage", () => {
     expect(merged.keptOlderPages).toBe(false);
   });
 
+  it("replaces when the refreshed page does not reach the rows already loaded", () => {
+    // More than a page of new rows arrived: the refreshed page ends above
+    // everything on screen, so rows between it and the old page were never
+    // fetched. Keeping the old cursor would skip them for good.
+    const merged = mergeTimelineRefreshedFirstPage({
+      ...base,
+      previousRows: [N2, N3],
+      previousCursor: { entryAt: N3.entry_at, id: N3.id },
+      firstPageRows: [N0],
+      firstPageCursor: { entryAt: N0.entry_at, id: N0.id },
+    });
+    expect(merged.rows.map((row) => row.id)).toEqual(["n0"]);
+    expect(merged.cursor).toEqual({ entryAt: N0.entry_at, id: N0.id });
+    expect(merged.hiddenRows).toEqual([]);
+    expect(merged.keptOlderPages).toBe(false);
+  });
+
+  it("treats a hidden row inside the refreshed page as proof of overlap", () => {
+    const merged = mergeTimelineRefreshedFirstPage({
+      ...base,
+      previousRows: [N2],
+      previousHiddenRows: [{ id: "h", entry_at: N0.entry_at }],
+      previousCursor: { entryAt: N2.entry_at, id: N2.id },
+    });
+    expect(merged.rows.map((row) => row.id)).toEqual(["n0", "n1", "n2"]);
+    expect(merged.keptOlderPages).toBe(true);
+  });
+
   it("replaces when either cursor is missing", () => {
     expect(mergeTimelineRefreshedFirstPage({ ...base, previousCursor: null }).keptOlderPages).toBe(
       false,

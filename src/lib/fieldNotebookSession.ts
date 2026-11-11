@@ -52,7 +52,12 @@ function readStoredDrafts(userId: string): Map<string, NotebookDraft> {
       const draft = item as NotebookDraft;
       if (typeof draft.tentId !== "string" || draft.tentId.length === 0) continue;
       if (draft.phase === "saving") {
-        map.set(draft.tentId, { ...draft, phase: "uncertain", writeBlocked: true });
+        map.set(draft.tentId, {
+          ...draft,
+          phase: "uncertain",
+          writeBlocked: true,
+          saveAgainRejected: false,
+        });
         continue;
       }
       if (draft.phase !== "uncertain") continue;
@@ -67,7 +72,7 @@ function readStoredDrafts(userId: string): Map<string, NotebookDraft> {
 function draftToPersist(draft: NotebookDraft): NotebookDraft | null {
   if (draft.phase === "uncertain") return draft;
   if (draft.phase === "saving") {
-    return { ...draft, phase: "uncertain", writeBlocked: true };
+    return { ...draft, phase: "uncertain", writeBlocked: true, saveAgainRejected: false };
   }
   return null;
 }

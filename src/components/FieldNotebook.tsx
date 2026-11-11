@@ -166,7 +166,7 @@ export default function FieldNotebook({
       ...ready,
       phase: "saving",
       attempt,
-      saveAgainRejected: kind === "save_again" ? ready.saveAgainRejected === true : false,
+      saveAgainRejected: false,
       knownEventId: null,
       verifiedEntry: null,
       serverOccurredAt: null,
@@ -216,6 +216,8 @@ export default function FieldNotebook({
   async function checkTimeline() {
     const tentId = selected.id;
     const started = drafts[tentId] ?? readNotebookDraft(tentId);
+    const phaseAtStart = started.phase;
+    const attemptIdAtStart = started.attempt?.attemptId ?? null;
     const ownerAtCheck = notebookSessionOwner();
     let receipt: Awaited<ReturnType<typeof onFindEntry>>;
     try {
@@ -244,11 +246,10 @@ export default function FieldNotebook({
         : started.knownEventId;
     const reconciled = reconcileAttempt(matchedEventId, candidates, availability);
     setDrafts((prev) => {
-      const live = prev[tentId] ?? started;
-      if (started.attempt && live.attempt?.attemptId !== started.attempt.attemptId) {
-        return prev;
-      }
-      const next = draftAfterTimelineCheck(started, live.note, reconciled);
+      const live = readNotebookDraft(tentId);
+      if (live.phase === "saving" || live.phase !== phaseAtStart) return prev;
+      if ((live.attempt?.attemptId ?? null) !== attemptIdAtStart) return prev;
+      const next = draftAfterTimelineCheck(live, live.note, reconciled);
       writeNotebookDraft(next, ownerAtCheck);
       return { ...prev, [tentId]: next };
     });

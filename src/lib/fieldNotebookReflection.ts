@@ -1,8 +1,9 @@
 import type { RefreshReflection } from "@/lib/fieldNotebookOutcomeRules";
 
 /**
- * Production grouped-timeline caches are arrays of entries. A numeric `count`
- * is the object-cache shape. An array counts only when it contains the event id.
+ * A grouped timeline is an array of entries, and an entry counts when it holds
+ * the id. A numeric `count` must be above zero. A count-less wrapper such as
+ * timeline_memory (`{ items: [...] }`) does not count, even when a nested id matches.
  */
 function countShowsEntry(cache: unknown, id: string): boolean {
   if (Array.isArray(cache)) return cache.some((item) => countShowsEntry(item, id));
@@ -13,6 +14,7 @@ function countShowsEntry(cache: unknown, id: string): boolean {
       typeof count === "number" && Number.isFinite(count) && count > 0 && containsId(cache, id)
     );
   }
+  if ("items" in cache) return false;
   return containsId(cache, id);
 }
 

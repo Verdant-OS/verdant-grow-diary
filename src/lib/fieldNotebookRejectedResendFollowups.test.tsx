@@ -173,10 +173,33 @@ describe("a proven rejection does not stick", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Save again (won't duplicate)" }));
     await screen.findByRole("button", { name: "Start a new note" });
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: "Check Timeline" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save again (won't duplicate)" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(3));
     expect(onSave.mock.calls[1]?.[0].idempotencyKey).toBe(onSave.mock.calls[0]?.[0].idempotencyKey);
-    fireEvent.click(screen.getByRole("button", { name: "Start a new note" }));
+    expect(onSave.mock.calls[2]?.[0].idempotencyKey).toBe(onSave.mock.calls[0]?.[0].idempotencyKey);
+    expect(screen.queryByRole("button", { name: "Start a new note" })).not.toBeInTheDocument();
+  });
+
+  it("mints a fresh key when Start a new note is clicked while the rejection is current", async () => {
+    const onSave = vi
+      .fn<(request: FieldNotebookSaveRequest) => Promise<FieldNotebookSaveResponse>>()
+      .mockResolvedValueOnce({ transport: { kind: "dispatched_no_receipt" }, reflection: NONE })
+      .mockResolvedValueOnce({
+        transport: { kind: "definitive_rejection", reason: "target_not_owned" },
+        reflection: NONE,
+      })
+      .mockResolvedValue({ transport: { kind: "dispatched_no_receipt" }, reflection: NONE });
+    renderNotebook(onSave);
+    fireEvent.change(screen.getByLabelText("Observation"), {
+      target: { value: "leaves are pale" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save again (won't duplicate)" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Start a new note" }));
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(3));
+    expect(onSave.mock.calls[1]?.[0].idempotencyKey).toBe(onSave.mock.calls[0]?.[0].idempotencyKey);
     expect(onSave.mock.calls[2]?.[0].idempotencyKey).not.toBe(
       onSave.mock.calls[0]?.[0].idempotencyKey,
     );

@@ -16,14 +16,19 @@
  *    them: a parseable `snapshot_at`, a finite `snapshot_age_minutes`,
  *    a parseable `checked_at`, an age that agrees with
  *    `checked_at - snapshot_at`, and a grade that agrees with that age
- *    under the shared 48h window. Any missing, malformed, or mutually
+ *    under the shared freshness window (or, for a check saved before the
+ *    window moved from 48h to 24h, under that earlier window). Any missing,
+ *    malformed, or mutually
  *    contradictory field collapses to the neutral no-snapshot state, so
  *    corrupted rows can never present unknown telemetry as fresh.
  *    (Consistency is judged against CHECK time — never the current
  *    clock — so old-but-coherent entries keep their historical grade.)
  */
 import { AI_DOCTOR_READINESS_CHECK_KIND } from "@/lib/aiDoctorReadinessDiaryEntryRules";
+import { AI_DOCTOR_SNAPSHOT_FRESH_LEGACY_HOURS } from "@/constants/aiDoctorContextReadiness";
 import { AI_DOCTOR_SNAPSHOT_FRESH_MS } from "@/lib/aiDoctorContextRules";
+
+const LEGACY_FRESH_MS = AI_DOCTOR_SNAPSHOT_FRESH_LEGACY_HOURS * 60 * 60 * 1000;
 
 export type AiDoctorReadinessBadgeVariant = "positive" | "warning" | "neutral";
 
@@ -101,7 +106,7 @@ export function buildAiDoctorReadinessTimelineBadge(
   // for them AND that evidence must agree with itself at CHECK time:
   // the recorded age must match `checked_at - snapshot_at` (builder
   // floors to whole minutes; allow 1 minute of slack), and the recorded
-  // grade must match that age under the shared 48h window. A row saying
+  // grade must match that age under the shared freshness window. A row saying
   // "fresh" over a years-old timestamp with `snapshot_age_minutes: 5`
   // is corrupted, not fresh.
   const evidenceIsCoherent = (() => {
@@ -112,7 +117,11 @@ export function buildAiDoctorReadinessTimelineBadge(
     if (ageAtCheckMs < 0) return false;
     if (Math.abs(Math.floor(ageAtCheckMs / 60_000) - ageMinutes) > 1) return false;
     const gradeAtCheck = ageAtCheckMs <= AI_DOCTOR_SNAPSHOT_FRESH_MS ? "fresh" : "stale";
-    return gradeAtCheck === rawFreshness;
+    if (gradeAtCheck === rawFreshness) return true;
+    // A check saved while the window was 48h graded 24-48h snapshots as
+    // fresh. That is what the check recorded, so it stays readable; the age
+    // beside it shows how old the snapshot was.
+    return rawFreshness === "fresh" && ageAtCheckMs <= LEGACY_FRESH_MS;
   })();
 
   if (

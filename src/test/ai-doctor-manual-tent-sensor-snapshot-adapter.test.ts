@@ -153,17 +153,17 @@ describe("manualTentSensorRowsToAiDoctorContextSnapshots", () => {
     ).toEqual([]);
   });
 
-  it("keeps the seven-day readiness window and leaves the 48-hour freshness decision to readiness", () => {
-    const at30Hours = new Date(NOW - 30 * HOUR).toISOString();
-    const at49Hours = new Date(NOW - 49 * HOUR).toISOString();
+  it("keeps the seven-day readiness window and leaves the 24-hour freshness decision to readiness", () => {
+    const at20Hours = new Date(NOW - 20 * HOUR).toISOString();
+    const at30HoursOld = new Date(NOW - 30 * HOUR).toISOString();
     const atSevenDays = new Date(NOW - 7 * DAY).toISOString();
     const outsideSevenDays = new Date(NOW - 7 * DAY - 1).toISOString();
 
-    const fresh = adapt([reading({ captured_at: at30Hours })]);
-    const recentNotFresh = adapt([reading({ captured_at: at49Hours })]);
+    const fresh = adapt([reading({ captured_at: at20Hours })]);
+    const recentNotFresh = adapt([reading({ captured_at: at30HoursOld })]);
 
-    expect(fresh).toEqual([{ at: at30Hours, severity: "ok" }]);
-    expect(recentNotFresh).toEqual([{ at: at49Hours, severity: "ok" }]);
+    expect(fresh).toEqual([{ at: at20Hours, severity: "ok" }]);
+    expect(recentNotFresh).toEqual([{ at: at30HoursOld, severity: "ok" }]);
     expect(adapt([reading({ captured_at: atSevenDays })])).toHaveLength(1);
     expect(adapt([reading({ captured_at: outsideSevenDays })])).toEqual([]);
 

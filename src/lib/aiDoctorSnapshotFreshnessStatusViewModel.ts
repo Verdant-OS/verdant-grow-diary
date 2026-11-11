@@ -6,7 +6,7 @@
  * Hard constraints:
  *  - Pure: no React, no Supabase, no I/O, no globals.
  *  - Never claims a diagnosis. Only reports snapshot presence + age vs
- *    the shared 48h freshness cutoff.
+ *    the shared freshness cutoff.
  *  - Uses `AI_DOCTOR_SNAPSHOT_FRESH_MS` — never hardcodes a different
  *    freshness window.
  */

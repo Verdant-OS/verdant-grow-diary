@@ -32,14 +32,14 @@ describe("buildAiDoctorSnapshotStalenessExplanation — pluggable nowFallback", 
       -Infinity,
     ]) {
       const result = buildAiDoctorSnapshotStalenessExplanation({
-        latestSnapshotAtIso: "2026-01-13T12:00:00.000Z",
+        latestSnapshotAtIso: "2026-01-14T12:00:00.000Z",
         now: bad,
         nowFallback: clock,
       });
       expect(result.cutoffAtIso).toBe(
         new Date(FIXED_NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS).toISOString(),
       );
-      // 2026-01-13 is 48h before FIXED_NOW → exactly at boundary → fresh (not stale)
+      // 2026-01-14 is 24h before FIXED_NOW → exactly at boundary → fresh (not stale)
       expect(result.isStale).toBe(false);
     }
   });

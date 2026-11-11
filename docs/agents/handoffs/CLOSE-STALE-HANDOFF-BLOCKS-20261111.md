@@ -7,7 +7,7 @@ why: AGENTS.md section 12 requires a merged task to be CLOSED with the reason an
 branch: claude/dreamy-franklin-n68jd4
 base: verdant-grow-diary @ c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8
 checkout: git fetch origin claude/dreamy-franklin-n68jd4 verdant-grow-diary && git switch claude/dreamy-franklin-n68jd4 && git ls-remote origin claude/dreamy-franklin-n68jd4  # compare with the PR head before trusting any review
-pr: PR_URL_PLACEHOLDER
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2928 (draft)
 head_sha: the commit carrying this file; read the current head from the PR and verify with git ls-remote
 state: pushed draft; no review requested yet
 current_step: review routing
@@ -28,11 +28,11 @@ files_remaining: none
 blockers: none for the docs. Independent exact-head review and Matthew's per-item yes are the standing gates.
 open_questions: who owns each carried-forward item below (Matthew). Whether docs/agents/handoffs/ should join the OWNERSHIP.md low-risk review lane is still open from HANDOFF-LOG-PER-FILE (#2860).
 gotchas: an earlier pass in this session reported "93 of 93 closed" because it searched for the words status: CLOSED anywhere in a file; check the TASK line only. Some carried-forward blockers name pre-merge gates for PRs that have since merged; they are historical and kept verbatim. The open PRs #2922 and #2923 have no handoff entry on the deploy branch; that was not investigated here. Whether any carried-forward post-merge check was already measured elsewhere was not checked.
-links: none yet
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2928
 exclusions_for_review: Claude session_017UoYKuyQKXVV93JSwJJztt (this writer)
 reviewer_seat: none requested yet
 reviewer_sha: none
-session_state: no production access used; no paused workflows; no scheduled routines. This session subscribes to the PR's activity once it is opened.
+session_state: no production access used; no paused workflows; no scheduled routines. This session is subscribed to #2928's activity.
 claimed_by: Claude session_017UoYKuyQKXVV93JSwJJztt, 2026-11-11 (Matthew's assignment in this session)
 owner: Claude session_017UoYKuyQKXVV93JSwJJztt
 last_updated: 2026-11-11, by Claude session_017UoYKuyQKXVV93JSwJJztt

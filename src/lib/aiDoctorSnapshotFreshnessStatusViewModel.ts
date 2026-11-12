@@ -6,10 +6,11 @@
  * Hard constraints:
  *  - Pure: no React, no Supabase, no I/O, no globals.
  *  - Never claims a diagnosis. Only reports snapshot presence + age vs
- *    the shared 48h freshness cutoff.
+ *    the shared freshness cutoff.
  *  - Uses `AI_DOCTOR_SNAPSHOT_FRESH_MS` — never hardcodes a different
  *    freshness window.
  */
+import { MANUAL_SNAPSHOT_FUTURE_SKEW_MS } from "@/constants/sensorTiming";
 import { AI_DOCTOR_SNAPSHOT_FRESH_MS } from "@/lib/aiDoctorContextRules";
 
 export type AiDoctorSnapshotFreshnessState = "fresh" | "stale" | "missing";
@@ -76,6 +77,17 @@ export function buildAiDoctorSnapshotFreshnessStatus(
     };
   }
   const ageMs = now - t;
+  if (ageMs < -MANUAL_SNAPSHOT_FUTURE_SKEW_MS) {
+    // Dated further ahead than clock skew explains: the age is unknown, so
+    // it is not fresh, and the copy does not claim an age.
+    return {
+      state: "stale",
+      snapshotAtIso: iso,
+      ageMinutes: null,
+      label: "Stale · future time",
+      description: `Latest manual sensor snapshot is dated in the future, so its age is unknown. Add a new one to reach the ${hoursCutoff}h freshness window.`,
+    };
+  }
   const ageMinutes = Math.max(0, Math.floor(ageMs / 60_000));
   const ageText = formatAge(ageMs);
   const isFresh = ageMs <= freshMs;

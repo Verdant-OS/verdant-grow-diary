@@ -1,7 +1,8 @@
 # CLAUDE-HANDOFF-BULK-CLOSE-20261106
 
 ````text
-TASK CLAUDE-HANDOFF-BULK-CLOSE-20261106  priority: other  status: OPEN
+TASK CLAUDE-HANDOFF-BULK-CLOSE-20261106  priority: other  status: CLOSED
+closed: merged. #2916 merged into verdant-grow-diary on 2026-11-06 as 056ad2482347b362fec8e799188f62c211cb352c (final SHA; first-parent commit on origin/verdant-grow-diary, read 2026-11-11; merge date from the GitHub search API). Closed by Claude session_017UoYKuyQKXVV93JSwJJztt on 2026-11-11 at Matthew's request (source claim: his answer in that session). This close does not resolve the carried-forward items below; they still need owners.
 goal: Close 56 Claude handoff entries that still read OPEN although their PRs merged (55) or closed unmerged (1), without losing their unfinished items.
 why: AGENTS.md §12 requires a merged task to be CLOSED the same day with reason and final SHA. A 2026-11-06 audit found 56 OPEN Claude entries (one, DASHBOARD-SINGLE-LOG-ENTRY, found by review 5797091224 because its HANDOFF_LOG.md block has no ### heading) and no open Claude PR besides this one, so the log misled cold agents about what is in flight. Matthew chose "close them in one docs-only draft PR after #2913/#2914 merge" (source claim: his answer in this session, 2026-11-06).
 branch: claude/practical-johnson-6funir (restarted from verdant-grow-diary after #2914 merged)
@@ -35,7 +36,7 @@ reviewer_sha: efe574ec74762bcbd61fa0910e349fdb5d50f673 REQUEST_CHANGES (supersed
 session_state: no production access used. This session is subscribed to #2916's activity.
 claimed_by: Claude session_017UoYKyU27JPpmSh3Cbj7EK, 2026-11-06
 owner: Claude
-last_updated: 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (round 2)
+last_updated: 2026-11-11, by Claude session_017UoYKuyQKXVV93JSwJJztt (close-out; previous 2026-11-06, by Claude session_017UoYKyU27JPpmSh3Cbj7EK (round 2))
 ````
 
 ## Closed entries (56)

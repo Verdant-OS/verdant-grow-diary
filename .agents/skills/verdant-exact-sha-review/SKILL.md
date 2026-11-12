@@ -35,7 +35,7 @@ merge this PR. Every contributing Codex session and subagent remains excluded
 from independent acceptance. Jack Herer must be an actually available, eligible
 non-contributing outside session with verified provenance and a complete-scope
 exact-head receipt; the name alone is not acceptance. OG Kush's pre-check does
-not supply Jack Herer's PASS. Chemdawg/Grok 91 is retired and Harvest does not
+not supply Jack Herer's PASS. The retired merge-actor name (Chemdawg/Grok 91) routes nowhere and Harvest does not
 inherit this assignment. The current **do-not-merge-or-deploy hold** remains:
 OG Kush needs Matthew's later explicit hold release and per-item yes at the
 final reviewed full SHA after all gates pass. This skill and operating state

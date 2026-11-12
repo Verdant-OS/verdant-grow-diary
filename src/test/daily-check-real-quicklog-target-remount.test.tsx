@@ -139,9 +139,11 @@ beforeEach(() => {
 });
 
 describe("DailyCheck real QuickLog target lifetime", () => {
-  it("remounts the open dialog when same-mounted navigation changes the plant target", async () => {
+  it("does not auto-open Quick Log, and a later open uses the navigated plant target", async () => {
     renderRoute("/daily-check?plantId=plant-alpha&method=note");
 
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId("daily-grow-check-choose-quicklog"));
     await waitFor(() =>
       expect(screen.getByTestId("quick-log-target-plant")).toHaveTextContent("Alpha route target"),
     );
@@ -151,6 +153,8 @@ describe("DailyCheck real QuickLog target lifetime", () => {
 
     await navigateRoute("/daily-check?plantId=plant-beta&method=note");
 
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId("daily-grow-check-choose-quicklog"));
     await waitFor(() =>
       expect(screen.getByTestId("quick-log-target-plant")).toHaveTextContent("Beta route target"),
     );
@@ -168,6 +172,8 @@ describe("DailyCheck real QuickLog target lifetime", () => {
 
   it("remounts the closed dialog when the local target picker changes plants", async () => {
     renderRoute("/daily-check?plantId=plant-alpha&method=note");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId("daily-grow-check-choose-quicklog"));
     await waitFor(() =>
       expect(screen.getByTestId("quick-log-target-plant")).toHaveTextContent("Alpha route target"),
     );

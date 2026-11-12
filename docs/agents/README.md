@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-11-05.2**
+**Sentinel-Version: 2026-11-12.1**
 
 Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
 **Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.
@@ -43,7 +43,7 @@ platform actually auto-loads.
 ```text
 ROOT — auto-loaded by the platforms
   AGENTS.md                      universal constitution (canonical)
-  CLAUDE.md                      imports constitution + Claude role; requires pre-ack reads of CURRENT_STATE.md and HANDOFF_LOG.md
+  CLAUDE.md                      imports constitution + Claude role; requires pre-ack reads of CURRENT_STATE.md "Start here" and the open handoff log
   GEMINI.md                      mirrors the full constitution + Gemini role
   .grok/rules/verdant-grok-role.md   Grok's automatic role rules
 
@@ -52,7 +52,8 @@ ROLE DOCUMENTS
 
 OPERATING STATE
   docs/agents/CURRENT_STATE.md   the changing shift report
-  docs/agents/HANDOFF_LOG.md     template and existing task blocks; takes no new blocks
+  docs/agents/HANDOFF_LOG.md     template and the still-open task blocks; takes no new blocks
+  docs/agents/archive/HANDOFF_LOG_ARCHIVE.md  closed blocks, moved byte for byte; history, read on demand
   docs/agents/handoffs/          one current handoff entry per task
   docs/agents/HANDOFF_PROTOCOL.md  handoff format and rules
   docs/agents/cheek-approval-workflow.md  Cheek ship-authority decision workflow
@@ -67,13 +68,13 @@ HISTORICAL — never active instructions
 
 | Agent                    | Auto-loads                                  | Must also read                                                                                                                                         |
 | ------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Codex                    | `AGENTS.md`                                 | `docs/agents/roles/codex.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                                                                                     |
-| Claude                   | `CLAUDE.md` (imports constitution + role)   | `CURRENT_STATE.md`, `HANDOFF_LOG.md` — read before `SENTINEL_ACK`                                                                                      |
-| Grok                     | `AGENTS.md`, `.grok/rules/*`                | `docs/agents/roles/grok.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                                                                                      |
-| Gemini                   | `GEMINI.md`                                 | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`                                                                                    |
-| Additional role profiles | Platform-specific bootstrap, when available | `AGENTS.md`, `CURRENT_STATE.md`, `HANDOFF_LOG.md`, and the assigned `roles/{canopy,graft,root-cause,trellis,verdante,chemdawg,golden-toad,harvest}.md` |
+| Codex                    | `AGENTS.md`                                 | `docs/agents/roles/codex.md`, `CURRENT_STATE.md` "Start here", open handoff log                                                                                     |
+| Claude                   | `CLAUDE.md` (imports constitution + role)   | `CURRENT_STATE.md` "Start here", open handoff log — read before `SENTINEL_ACK`                                                                                      |
+| Grok                     | `AGENTS.md`, `.grok/rules/*`                | `docs/agents/roles/grok.md`, `CURRENT_STATE.md` "Start here", open handoff log                                                                                      |
+| Gemini                   | `GEMINI.md`                                 | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md` "Start here", open handoff log                                                                                    |
+| Additional role profiles | Platform-specific bootstrap, when available | `AGENTS.md`, `CURRENT_STATE.md` "Start here", open handoff log, and the assigned `roles/{canopy,graft,root-cause,trellis,verdante,chemdawg,golden-toad,harvest}.md` |
 
-Every agent reads `docs/agents/HANDOFF_LOG.md` before `SENTINEL_ACK` and records
+Every agent reads the open handoff log (`AGENTS.md` §12) before `SENTINEL_ACK` and records
 `open_handoffs_checked`. After acknowledgment, keep an explicit assignment. If
 unassigned, select the highest-priority open block as `AGENTS.md` defines it (a pushed
 branch and a PR, with no effective claim or a last activity older than 24 hours); do not take a fresh claim or bypass a named lock.

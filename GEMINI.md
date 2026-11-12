@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-11-05.2**
+**Sentinel-Version: 2026-11-12.1**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-11-05.2**
+**Sentinel-Version: 2026-11-12.1**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -354,7 +354,10 @@ Detail: `docs/agents/constitution/handoff-procedure.md`. Template:
 `docs/agents/HANDOFF_LOG.md`. The log is not a versioned governance file.
 
 The handoff log is `docs/agents/HANDOFF_LOG.md` plus `docs/agents/handoffs/`, and
-reading the log means reading both. Each task's entry lives in its own file,
+reading the log means reading `HANDOFF_LOG.md` and the open entries in
+`docs/agents/handoffs/` (TASK line `status: OPEN`). Closed blocks moved, byte for byte, to
+`docs/agents/archive/HANDOFF_LOG_ARCHIVE.md`; read closed entries and the archive only
+when a task needs them. Each task's entry lives in its own file,
 `docs/agents/handoffs/<TASK-ID>.md`. Do not add or edit blocks in `HANDOFF_LOG.md`.
 An existing block moves to its own file at its next update, and that file wins.
 
@@ -425,11 +428,12 @@ An existing block moves to its own file at its next update, and that file wins.
 
 ## 14. Startup gate
 
-Before tools beyond read-only context, or any edit, read this file,
-`docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned
-role file. The only action permitted before the gate is read-only acquisition
-of those four files so the acknowledgment can be truthful. Listing files solely
-to locate those four documents, or using a platform context-discovery command
+Before tools beyond read-only context, or any edit, read this file, the "Start here" section of `docs/agents/CURRENT_STATE.md`
+(everything above its `# Verdant — Current Operating State` heading), the handoff log
+as §12 defines it, and the assigned role file. Read the rest of `CURRENT_STATE.md` when
+that section says to. The only action permitted before the gate is read-only acquisition
+of those sources so the acknowledgment can be truthful. Listing files solely
+to locate those sources, or using a platform context-discovery command
 such as `grok inspect`, is also permitted. No application-code inspection,
 network mutation, recommendation, or repository write is permitted before the
 acknowledgment.
@@ -569,6 +573,8 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-11-12.1** — Live instruction text no longer routes to the retired Chemdawg / Grok 91 name. Mentions that meant a current duty now name the seat (Merge Readiness, the Coordinator or the Merge Steward). The roster gains stable labels (Writer A/B, Reviewer A–D, Grok Lead (Main), Grok Lead (Ultra)) and a rename-history note: Chemdawg was an earlier name, and the bot now holding Grok Lead (Main) once carried it. Roster only: UK Cheese holds the Coordinator seat, and OG Kush is retired. Historical sections stay word for word. No rule changes.
+- **2026-11-11.1** — Startup reads shrink. Agents read only the "Start here" section of `docs/agents/CURRENT_STATE.md` at startup, and the rest when that section says to. The handoff log read is `HANDOFF_LOG.md` plus the open entries in `docs/agents/handoffs/`; closed `HANDOFF_LOG.md` blocks moved byte for byte to `docs/agents/archive/HANDOFF_LOG_ARCHIVE.md`. No other rule changes.
 - **2026-11-05.2** — `CLAUDE.md` again says no root-level `*Rules.ts` imports the Supabase client: #2883 moved the cultivar slug route's read into a service, so the 2026-11-05.1 exception no longer exists. No rule changes.
 - **2026-11-05.1** — `CLAUDE.md` drops file counts that had drifted by about a third since 2026-08-21 and now tells agents to measure the tree. It also corrects one stale rule: a root-level `*Rules.ts` (`cultivarSlugRouteRules.ts`) has imported the Supabase client since #2777. No rule changes.
 - **2026-11-04.3** — `CLAUDE.md` no longer calls `package-lock.json` a synchronized compatibility lock. `#1873` retired it, and `bun.lock` is the only lockfile. No rule changes.
@@ -626,8 +632,8 @@ You are Verdant's QA, Search Integrity, and Release-Risk Auditor.
 
 Before auditing:
 
-1. Read the embedded constitution, `/docs/agents/CURRENT_STATE.md`, and
-   `/docs/agents/HANDOFF_LOG.md`.
+1. Read the embedded constitution, the "Start here" section of
+   `/docs/agents/CURRENT_STATE.md`, and the open handoff log (`AGENTS.md` §12).
 2. Read `/docs/agents/roles/gemini.md`; record `open_handoffs_checked` truthfully.
 3. Return the mandatory `SENTINEL_ACK` block.
 4. Do not implement fixes unless an explicit assignment or eligible coverage claim
@@ -661,7 +667,8 @@ say what would make it safe.
 ---
 
 The only action permitted before this gate is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
+`AGENTS.md`, the "Start here" section of `docs/agents/CURRENT_STATE.md`, the open handoff log
+(`docs/agents/HANDOFF_LOG.md` and open entries in `docs/agents/handoffs/`), and the assigned role file so the
 acknowledgment can be truthful. No application-code inspection, network mutation, or
 recommendation is permitted before the acknowledgment.
 

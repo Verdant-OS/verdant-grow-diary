@@ -503,7 +503,7 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     renderRoute("/daily-check?plantId=p-assigned&from=dashboard&method=note");
 
     await waitFor(() =>
-      expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "1"),
+      expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "0"),
     );
     expect(screen.getByTestId("mock-quicklog")).toHaveAttribute(
       "data-prefill-plant-id",
@@ -544,7 +544,7 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     async (status, path, nextGrowId) => {
       renderNavigableRoute("/daily-check?plantId=p-assigned&method=note");
       await waitFor(() =>
-        expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "1"),
+        expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "0"),
       );
 
       activityRenderMock.mockClear();
@@ -567,7 +567,7 @@ describe("DailyCheck target selector order and exact-target truth", () => {
   it("reconciles method changes on the same mounted plant route", async () => {
     renderNavigableRoute("/daily-check?plantId=p-assigned&from=dashboard&method=note");
     await waitFor(() =>
-      expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "1"),
+      expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "0"),
     );
 
     quickLogRenderMock.mockClear();
@@ -585,16 +585,13 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     quickLogRenderMock.mockClear();
     await navigateRoute("/daily-check?plantId=p-assigned&from=dashboard&method=note");
     await waitFor(() =>
-      expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "1"),
+      expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-open", "0"),
     );
     for (const [props] of quickLogRenderMock.mock.calls) {
       expect(props.prefill).toMatchObject({ plantId: "p-assigned", tentId: "t2" });
     }
-    // Renders before the commit still show the committed sensor state (closed);
-    // once open, QuickLog never closes again.
     const opens = quickLogRenderMock.mock.calls.map(([props]) => props.open);
-    expect(opens.at(-1)).toBe(true);
-    expect(opens.slice(opens.indexOf(true))).not.toContain(false);
+    expect(opens).not.toContain(true);
   });
 
   it("keeps local plant selection working while route identity is unchanged", async () => {

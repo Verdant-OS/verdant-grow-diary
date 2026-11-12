@@ -1,13 +1,11 @@
 /**
  * Returning sign-in destination for the saved Quick Log start screen.
  *
- * Quick Log may auto-open only when an active plant, its tent, and its grow
- * are already known. Setup still lands on `/plants/:id?open=quick-log`.
- * A later sign-in uses the same plant route when one active plant can be
- * chosen, and the Dashboard with no open marker when none can.
+ * Setup still lands on `/plants/:id?open=quick-log`. A later sign-in with a
+ * saved Quick Log preference lands on the Dashboard with Quick Log closed,
+ * whether or not an eligible plant exists.
  */
 import { isInactiveQuickLogPlant, type MinimalQuickLogPlant } from "@/lib/quickLogPlantOptionRules";
-import { plantDetailQuickLogHref } from "@/lib/startYourRoomRules";
 import { routeForStartScreen, type StartScreenChoice } from "@/lib/startScreenPreferences";
 
 export const DASHBOARD_WITHOUT_QUICK_LOG_ROUTE = "/dashboard" as const;
@@ -95,7 +93,7 @@ function pickMostRecent(plants: readonly QuickLogStartPlant[]): QuickLogStartPla
 
 /**
  * One active plant, or the most recently updated active plant among several.
- * No eligible plant → Dashboard, and Quick Log stays closed.
+ * Either way the route is the Dashboard, and Quick Log stays closed.
  */
 export function resolveReturningQuickLogStartTarget(input: {
   plants: readonly QuickLogStartPlant[] | null | undefined;
@@ -115,11 +113,11 @@ export function resolveReturningQuickLogStartTarget(input: {
   const plant = eligible.length === 1 ? eligible[0] : pickMostRecent(eligible);
   const tent = (input.tents ?? []).find((row) => row.id === plant.tent_id);
   return {
-    route: plantDetailQuickLogHref(plant.id),
+    route: DASHBOARD_WITHOUT_QUICK_LOG_ROUTE,
     plantId: plant.id,
     tentId: tent?.id ?? plant.tent_id ?? null,
     growId: tent?.grow_id ?? plant.grow_id ?? null,
-    opensQuickLog: true,
+    opensQuickLog: false,
   };
 }
 

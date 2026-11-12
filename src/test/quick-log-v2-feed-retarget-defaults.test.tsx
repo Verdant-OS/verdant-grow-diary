@@ -6,7 +6,7 @@
  */
 import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
@@ -158,6 +158,44 @@ describe("QuickLogV2Sheet — Feed target change A → B (#2172 / VER-195)", () 
   it("keeps a recipe the grower edited when the target changes", async () => {
     await openFeedOnPlantA();
     fireEvent.change(lineField(), { target: { value: "my custom mix" } });
+    fireEvent.change(targetProxy(), { target: { value: "plant:plant-b" } });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(lineField().value).toBe("my custom mix");
+  });
+
+  // Codex r4543048375 (#2936): the draft restores the whole Feed form, so it
+  // must also restore that the recipe was a prefill, or A's untouched recipe
+  // rides into B after a reopen.
+  it("still replaces A's prefilled recipe after the draft is restored", async () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+    await waitFor(() => expect(lineField().value).toBe("veg-week-3"));
+    fireEvent.change(volumeField(), { target: { value: "750" } });
+    await waitFor(() =>
+      expect(JSON.stringify({ ...window.sessionStorage })).toContain("veg-week-3"),
+    );
+    cleanup();
+
+    renderSheet();
+    await waitFor(() => expect(volumeField().value).toBe("750"));
+    expect(lineField().value).toBe("veg-week-3");
+    fireEvent.change(targetProxy(), { target: { value: "plant:plant-b" } });
+    await waitFor(() => expect(lineField().value).toBe("flower-week-1"));
+    expect(volumeField().value).toBe("750");
+  });
+
+  it("keeps a recipe the grower edited across a restore and a target change", async () => {
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+    await waitFor(() => expect(lineField().value).toBe("veg-week-3"));
+    fireEvent.change(lineField(), { target: { value: "my custom mix" } });
+    await waitFor(() =>
+      expect(JSON.stringify({ ...window.sessionStorage })).toContain("my custom mix"),
+    );
+    cleanup();
+
+    renderSheet();
+    await waitFor(() => expect(lineField().value).toBe("my custom mix"));
     fireEvent.change(targetProxy(), { target: { value: "plant:plant-b" } });
     await new Promise((r) => setTimeout(r, 50));
     expect(lineField().value).toBe("my custom mix");

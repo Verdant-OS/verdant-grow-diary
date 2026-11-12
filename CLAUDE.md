@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-11-05.2**
+**Sentinel-Version: 2026-11-12.1**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
@@ -14,8 +14,8 @@ including for Codex-authored work; **Durban Poison** remains eligible when avail
 Exclude every author and repairer even after a task transfer. A shared GitHub identity
 alone does not establish independence: record session, role, contributor exclusions,
 full 40-character head SHA, complete scope, evidence and verdict.
-Chemdawg's existing merge gate still requires **35/35 required checks** and an independent
-**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing
+The merge gate still requires **35/35 required checks** and an independent
+**PASS at the exact head SHA**, with no P1 or P2; seats are named only in the roster. **Graft** retains only its existing
 OWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,
 protected or mixed scopes still need an eligible outside reviewer. Required CI and
 supplemental evidence, protected-file gates, holds, merge queue and founder-only
@@ -43,15 +43,18 @@ Claude Code reads this file at the start of every project session. The two `@` i
 above load the universal constitution and Claude's assigned role. They are imports, not
 suggestions.
 
-**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file tool
-before you acknowledge.** Also read `docs/agents/HANDOFF_LOG.md` before acknowledging;
-these are the two required files beyond the imported constitution and role. Nothing about
+**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read its "Start here" section
+with a file tool before you acknowledge.** Also read the open handoff log
+(`docs/agents/HANDOFF_LOG.md` and the open entries in `docs/agents/handoffs/`, as `AGENTS.md`
+§12 defines it) before acknowledging; these are the two required reads beyond the imported
+constitution and role. Nothing about
 their authority has changed. Imported, CURRENT_STATE.md would be the largest file in the
 memory chain, re-sent on every turn of every session whether or not that session touched
 operating state. It is also the changing shift report, revised several times a day, so most
 of what it costs on any given turn is history that has already been superseded. Loading it
 on demand costs the same tokens once, in the sessions that actually need it, instead of in
-all of them.
+all of them. The same holds for the rest of the file and for closed handoff entries: read them
+when "Start here" or the task says to, by search (`grep -n`) and line ranges, not whole.
 
 CURRENT_STATE.md carries production, applied-migration and approved-scope evidence;
 HANDOFF_LOG.md records current task claims, branches, checkpoints and blockers. Confirm
@@ -60,8 +63,8 @@ from `AGENTS.md`, or from memory is how an agent ends up confidently wrong.
 
 Before planning, writing specifications, using tools, or proposing implementation:
 
-1. Read `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.
-   Also read `docs/agents/HANDOFF_LOG.md` as the fourth required context file before
+1. Read the "Start here" section of `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.
+   Also read the open handoff log as the fourth required context source before
    acknowledgment. `files_read:` must name all four truthfully, or
    state which was not read and why; `open_handoffs_checked:` records the log check.
 2. Report any conflicting instructions rather than silently picking one.
@@ -407,7 +410,8 @@ pre-resolution SHA do not count. See `docs/agents/merge-queue.md` and
 ---
 
 The only action permitted before this gate is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
+`AGENTS.md`, the "Start here" section of `docs/agents/CURRENT_STATE.md`, the open handoff log
+(`docs/agents/HANDOFF_LOG.md` and open entries in `docs/agents/handoffs/`), and the assigned role file so the
 acknowledgment can be truthful. No application-code inspection, network mutation, or
 recommendation is permitted before the acknowledgment.
 

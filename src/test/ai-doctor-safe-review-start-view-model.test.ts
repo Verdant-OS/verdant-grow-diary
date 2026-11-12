@@ -96,7 +96,7 @@ describe("buildAiDoctorSafeReviewStart", () => {
       }),
     );
     expect(v.preparation?.snapshotSummary).toMatch(/2 manual sensor snapshots/);
-    expect(v.preparation?.snapshotSummary).toMatch(/within 48 hours/);
+    expect(v.preparation?.snapshotSummary).toMatch(/within 24 hours/);
   });
 
   it("summarizes recent warnings", () => {

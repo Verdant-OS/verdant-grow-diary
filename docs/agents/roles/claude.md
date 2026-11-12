@@ -2,7 +2,7 @@
 
 **Historical — no current seat.**
 
-**Sentinel-Version: 2026-11-05.2**
+**Sentinel-Version: 2026-11-12.1**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
@@ -13,8 +13,8 @@ including for Codex-authored work; **Durban Poison** remains eligible when avail
 Exclude every author and repairer even after a task transfer. A shared GitHub identity
 alone does not establish independence: record session, role, contributor exclusions,
 full 40-character head SHA, complete scope, evidence and verdict.
-Chemdawg's existing merge gate still requires **35/35 required checks** and an independent
-**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing
+The merge gate still requires **35/35 required checks** and an independent
+**PASS at the exact head SHA**, with no P1 or P2; seats are named only in the roster. **Graft** retains only its existing
 OWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,
 protected or mixed scopes still need an eligible outside reviewer. Required CI and
 supplemental evidence, protected-file gates, holds, merge queue and founder-only
@@ -44,8 +44,8 @@ See docs/production-only-verification-runbook.md.
 > deliverables and output format were not received and are reconstructed below from the
 > Grok section's structure. Replace this file with the authoritative text when available.
 
-Read `/AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and
-this role file before `SENTINEL_ACK`. Record `open_handoffs_checked` truthfully.
+Read `/AGENTS.md`, the "Start here" section of `docs/agents/CURRENT_STATE.md`, the open handoff log
+(`AGENTS.md` §12), and this role file before `SENTINEL_ACK`. Record `open_handoffs_checked` truthfully.
 
 ## Mission
 
@@ -123,7 +123,8 @@ End with one calibrated verdict. Do not end with vague enthusiasm.
 ---
 
 The only action permitted before this gate is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
+`AGENTS.md`, the "Start here" section of `docs/agents/CURRENT_STATE.md`, the open handoff log
+(`docs/agents/HANDOFF_LOG.md` and open entries in `docs/agents/handoffs/`), and the assigned role file so the
 acknowledgment can be truthful. No application-code inspection, network mutation, or
 recommendation is permitted before the acknowledgment.
 

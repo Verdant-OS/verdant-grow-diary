@@ -53,11 +53,11 @@ export function authHookPayload(actionType = "signup", overrides: Row = {}): Row
 }
 
 export function authEmailHookHarness() {
-  const env = new Map([
-    ["LOVABLE_API_KEY", FIXTURE_LOVABLE_VALUE],
-    ["SUPABASE_URL", "https://fixture.invalid"],
-    ["SUPABASE_SERVICE_ROLE_KEY", "fixture-service-value"],
-  ]);
+  // The Supabase client is substituted, so any SUPABASE_* name the hook reads
+  // gets an inert placeholder; the harness never names or reads a real one.
+  const env = new Map([["LOVABLE_API_KEY", FIXTURE_LOVABLE_VALUE]]);
+  const envGet = (key: string) =>
+    env.get(key) ?? (key.startsWith("SUPABASE_") ? "https://fixture.invalid" : undefined);
   const sends: Array<{ message: Row; options: Row }> = [];
   const auditRows: Array<{ table: string; row: Row }> = [];
   const rpcCalls: Array<{ name: string; args: Row }> = [];
@@ -141,7 +141,7 @@ export function authEmailHookHarness() {
     Error,
     console: { log() {}, error() {}, warn() {} },
     Deno: {
-      env: { get: (key: string) => env.get(key) },
+      env: { get: envGet },
       serve: (fn: typeof handler) => {
         handler = fn;
       },

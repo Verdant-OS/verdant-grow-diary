@@ -30,9 +30,15 @@ import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { resolveTimelineSensorHandoffIds } from "@/lib/oneTentLoopNavigationRules";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  TIMELINE_LOAD_OLDER_ACTIVITY_ERROR_COPY,
+  appendTimelineOlderActivity,
+  mergeTimelineRefreshedActivity,
   mergeTimelineRefreshedFirstPage,
+  timelineActivityCursor,
+  timelineActivityTotalAfterOlderPage,
   timelineActivityTruncationNotice,
   timelineHiddenFetchedRows,
+  timelineLoadOlderActivityLabel,
   type TimelinePagedRow,
 } from "@/lib/timelinePagedHistoryRules";
 import { useGrows } from "@/store/grows";
@@ -676,8 +682,12 @@ export default function Timeline() {
   // settles, the page must not read as complete.
   const [directorySensorsLoading, setDirectorySensorsLoading] = useState(false);
   const [loadOlderError, setLoadOlderError] = useState(false);
+  const [loadingOlderActivity, setLoadingOlderActivity] = useState(false);
+  const [loadOlderActivityError, setLoadOlderActivityError] = useState(false);
   const readRequestIdRef = useRef(0);
   const entriesSnapshotRef = useRef<Entry[]>([]);
+  // Activity rows on screen, for the same-scope refresh merge below.
+  const growEventsSnapshotRef = useRef<GrowEventRowForRecent[]>([]);
   // What a same-scope refresh needs to keep already-loaded older pages: the
   // read key the rows on screen belong to, their keyset cursor, and the
   // fetched rows the page projection hid (the server count includes them).
@@ -830,6 +840,7 @@ export default function Timeline() {
   const activeReadKeyRef = useRef(activeReadKey);
   activeReadKeyRef.current = activeReadKey;
   entriesSnapshotRef.current = entries;
+  growEventsSnapshotRef.current = growEvents;
   oldestFetchedCursorRef.current = oldestFetchedCursor;
 
   // Same fail-closed grow-list gate as the owner name directory: no
@@ -871,6 +882,7 @@ export default function Timeline() {
       setSupplementalLoading(false);
       setCoreRead({ status: "idle" });
       setLoadOlderError(false);
+      setLoadOlderActivityError(false);
       setLoading(false);
       entriesReadKeyRef.current = null;
       hiddenFetchedRowsRef.current = [];
@@ -898,6 +910,7 @@ export default function Timeline() {
       setSupplementalLoading(false);
       setCoreRead({ status: "idle" });
       setLoadOlderError(false);
+      setLoadOlderActivityError(false);
       setLoading(false);
       entriesReadKeyRef.current = null;
       hiddenFetchedRowsRef.current = [];
@@ -915,6 +928,7 @@ export default function Timeline() {
     setManualSensorHistoryLimited(false);
     setSupplementalLoading(true);
     setLoadOlderError(false);
+    setLoadOlderActivityError(false);
 
     try {
       // `diary_entries` and `grow_events` are the two authoritative core
@@ -1010,8 +1024,9 @@ export default function Timeline() {
       // and is never allowed to hold the diary or watering history hostage.
       // A same-scope refresh (a save, a new reading) refetches only the
       // newest page. Keep the older pages the grower already loaded.
+      const sameScope = entriesReadKeyRef.current === requestedReadKey;
       const refreshed = mergeTimelineRefreshedFirstPage({
-        sameScope: entriesReadKeyRef.current === requestedReadKey,
+        sameScope,
         previousRows: entriesSnapshotRef.current,
         previousCursor: oldestFetchedCursorRef.current,
         previousHiddenRows: hiddenFetchedRowsRef.current,
@@ -1036,7 +1051,14 @@ export default function Timeline() {
           : null,
       );
       setOldestFetchedCursor(refreshed.cursor);
-      setGrowEvents(nextGrowEvents);
+      // Same rule for activity: older pages the grower loaded stay when the
+      // refreshed newest page reaches them.
+      const refreshedActivity = mergeTimelineRefreshedActivity({
+        sameScope,
+        previousRows: growEventsSnapshotRef.current,
+        firstPageRows: nextGrowEvents,
+      });
+      setGrowEvents(refreshedActivity.rows);
       setTimelineSensorEvents(nextSensorEvents);
       setTimelineLinkedRoots([]);
       setGrowEventsTotal(
@@ -1521,6 +1543,59 @@ export default function Timeline() {
       if (isCurrentPage()) setLoadOlderError(true);
     } finally {
       if (isCurrentPage()) setLoadingOlder(false);
+    }
+  }
+
+  // Older Quick Log activity, one keyset page at a time. Read-only; stays
+  // inside the applied date bounds like the diary pager above.
+  async function loadOlderActivity() {
+    if (
+      !activeGrowId ||
+      !activeReadKey ||
+      coreRead.status !== "success" ||
+      coreRead.readKey !== activeReadKey ||
+      loadingOlderActivity
+    )
+      return;
+    const cursor = timelineActivityCursor(growEvents);
+    if (!cursor) return;
+    const requestedGrowId = activeGrowId;
+    const requestedReadKey = activeReadKey;
+    const pageRequestId = readRequestIdRef.current;
+    const isCurrentPage = () =>
+      pageRequestId === readRequestIdRef.current && activeReadKeyRef.current === requestedReadKey;
+    setLoadingOlderActivity(true);
+    setLoadOlderActivityError(false);
+    try {
+      let olderQuery = orderNewestFirstStable(
+        filterOlderThanCursor(
+          supabase
+            .from("grow_events")
+            .select(ROOT_ZONE_GROW_EVENT_SELECT)
+            .eq("grow_id", requestedGrowId)
+            .eq("is_deleted", false),
+          "occurred_at",
+          cursor,
+        ),
+        "occurred_at",
+      ).limit(100);
+      if (timelineDateRangeBounds.startIso)
+        olderQuery = olderQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        olderQuery = olderQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
+      const olderResult = await olderQuery;
+      if (!isCurrentPage()) return;
+      if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
+      const olderPage = (olderResult.data as unknown as GrowEventRowForRecent[] | null) ?? [];
+      const nextRows = appendTimelineOlderActivity(growEventsSnapshotRef.current, olderPage);
+      setGrowEvents(nextRows);
+      setGrowEventsTotal((total) =>
+        timelineActivityTotalAfterOlderPage(total, nextRows.length, olderPage.length),
+      );
+    } catch {
+      if (isCurrentPage()) setLoadOlderActivityError(true);
+    } finally {
+      if (isCurrentPage()) setLoadingOlderActivity(false);
     }
   }
 
@@ -2759,6 +2834,43 @@ export default function Timeline() {
           >
             {activityTruncationNotice}
           </p>
+        )}
+        {!loading &&
+          growEvents.length > 0 &&
+          growEventsTotal !== null &&
+          growEventsTotal > growEvents.length && (
+            <button
+              type="button"
+              data-testid="timeline-load-older-activity"
+              className="text-xs underline text-muted-foreground hover:text-foreground disabled:opacity-50"
+              onClick={() => void loadOlderActivity()}
+              disabled={loadingOlderActivity}
+            >
+              {timelineLoadOlderActivityLabel(
+                growEvents.length,
+                growEventsTotal,
+                loadingOlderActivity,
+              )}
+            </button>
+          )}
+        {loadOlderActivityError && (
+          <div
+            className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"
+            role="alert"
+            data-testid="timeline-load-older-activity-error"
+          >
+            <p>{TIMELINE_LOAD_OLDER_ACTIVITY_ERROR_COPY}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              data-testid="timeline-load-older-activity-retry"
+              onClick={() => void loadOlderActivity()}
+            >
+              Try again
+            </Button>
+          </div>
         )}
         {/* Guard against the scope-switch race: while a grow reload is in
             flight the previous grow's entries (and cursor) are still in

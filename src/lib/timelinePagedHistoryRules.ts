@@ -99,6 +99,90 @@ export function timelineHiddenFetchedRows(
     .map((row) => ({ id: row.id, entry_at: row.entry_at }));
 }
 
+/** A Quick Log activity row as far as paging is concerned. */
+export interface TimelineActivityRow {
+  id: string;
+  occurred_at: string;
+}
+
+/**
+ * Keyset cursor for the next older activity page: the oldest loaded row by
+ * `(occurred_at, id)`. Computed, not taken from the last array position, so
+ * the order rows were appended in cannot move it.
+ */
+export function timelineActivityCursor(
+  rows: readonly TimelineActivityRow[],
+): TimelineKeysetCursor | null {
+  let cursor: TimelineKeysetCursor | null = null;
+  for (const row of rows) {
+    if (cursor === null || isOlderThanCursor({ entry_at: row.occurred_at, id: row.id }, cursor)) {
+      cursor = { entryAt: row.occurred_at, id: row.id };
+    }
+  }
+  return cursor;
+}
+
+/** Appends an older activity page, skipping rows already loaded. */
+export function appendTimelineOlderActivity<T extends TimelineActivityRow>(
+  loaded: readonly T[],
+  olderPage: readonly T[],
+): T[] {
+  const seen = new Set(loaded.map((row) => row.id));
+  return [...loaded, ...olderPage.filter((row) => !seen.has(row.id))];
+}
+
+/**
+ * Activity counterpart of {@link mergeTimelineRefreshedFirstPage}: a
+ * same-scope refresh keeps older activity pages only when the refreshed
+ * newest page reaches a row already loaded.
+ */
+export function mergeTimelineRefreshedActivity<T extends TimelineActivityRow>(input: {
+  sameScope: boolean;
+  previousRows: readonly T[];
+  firstPageRows: readonly T[];
+}): { rows: T[]; keptOlderPages: boolean } {
+  const wrap = (row: T) => ({ id: row.id, entry_at: row.occurred_at, row });
+  const merged = mergeTimelineRefreshedFirstPage({
+    sameScope: input.sameScope,
+    previousRows: input.previousRows.map(wrap),
+    previousCursor: timelineActivityCursor(input.previousRows),
+    previousHiddenRows: [],
+    firstPageRows: input.firstPageRows.map(wrap),
+    firstPageCursor: timelineActivityCursor(input.firstPageRows),
+    firstPageHiddenRows: [],
+  });
+  return { rows: merged.rows.map((item) => item.row), keptOlderPages: merged.keptOlderPages };
+}
+
+/**
+ * The activity total after an older page was appended. An empty page means
+ * the server has nothing older, whatever the earlier count said, so the
+ * total drops to what is loaded and the pager stops. The total never falls
+ * below the rows actually loaded.
+ */
+export function timelineActivityTotalAfterOlderPage(
+  total: number | null,
+  loadedAfter: number,
+  pageLength: number,
+): number | null {
+  if (total === null) return null;
+  if (pageLength === 0) return loadedAfter;
+  return Math.max(total, loadedAfter);
+}
+
+/** Label for the "load older activity" control. */
+export function timelineLoadOlderActivityLabel(
+  loaded: number,
+  total: number,
+  loadingOlder: boolean,
+): string {
+  if (loadingOlder) return "Loading older activity…";
+  return `Load older activity (${total - loaded} more)`;
+}
+
+export const TIMELINE_LOAD_OLDER_ACTIVITY_ERROR_COPY =
+  "Older activity could not be loaded. The activity already shown is unchanged.";
+
 /**
  * Copy for the Timeline header when the activity history panels hold fewer
  * Quick Log events than the server counted. `null` when nothing is withheld
@@ -109,5 +193,5 @@ export function timelineActivityTruncationNotice(
   total: number | null,
 ): string | null {
   if (total === null || total <= loaded) return null;
-  return `Activity history below shows the newest ${loaded} of ${total} Quick Log events. Set a date range to see older activity.`;
+  return `Activity history below shows the newest ${loaded} of ${total} Quick Log events. Load older activity, or set a date range.`;
 }

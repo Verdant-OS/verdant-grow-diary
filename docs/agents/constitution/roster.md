@@ -46,6 +46,26 @@ Ultra's open pull-request cap is 10.
 
 **Projects Manager has no Verdant delivery seat** (Matthew, 2026-11-05): it does not build, relay yeses, keep handoff files or route work; Ultra Relay (Roots) keeps handoff continuity.
 
+## Stable labels
+
+Matthew renames bots, so instruction files outside this roster name seats only, never bots (Matthew, 2026-11-12). Use these labels:
+
+| Label | Seat in the table above |
+| --- | --- |
+| Writer A, Writer B | Ultra Builder 1, Ultra Builder 2 |
+| Fixer | Ultra Fixer |
+| Reviewer A, B, C, D | Reviewer A, B, C, D (Main) |
+| Main lead | Coordinator (Main) |
+| Ultra lead | Ultra Relay |
+| Merge Steward, Merge Readiness, Steward Backup, QA | The seats of the same name |
+
+To find who holds a label today, read the table above. A bot name found in any other instruction file is history, not routing. If no holder is available for a label, record `BLOCKED` rather than waiting on a name.
+
+## Rename history
+
+- **Chemdawg / Grok 91** was an earlier name, not a current seat. Per Matthew on 2026-11-12, the Main lead now called UK Cheese once carried the name Chemdog. A historical mention of Chemdawg means whichever seat then did the merge pre-check, the reviewer assignment or the merge. Those duties now belong to Merge Readiness (pre-check and CI verdicts), the Coordinator (reviewer assignment) and the Merge Steward (merge). No current routing goes to the Chemdawg name, and no agent waits on it.
+- **Open for Matthew:** the table above names OG Kush as Coordinator, while Matthew's 2026-11-12 message names UK Cheese as the Main lead. This roster was not changed; Matthew decides which holder is current.
+
 **Historical, no current seat:** Codex, Claude, Chemdawg/Grok 91, GDP. Their historical attribution, receipts, and contributor exclusions are kept word for word below. **Handoff guard:** any active assignment or hold owned by a historical agent stays in force until the Coordinator posts an explicit handoff to a seat (or Matthew releases it, as he released Codex's work on 2026-10-30), so no work is abandoned and no two writers collide.
 
 ## Historical

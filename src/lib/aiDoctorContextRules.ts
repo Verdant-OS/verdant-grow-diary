@@ -86,6 +86,12 @@ export interface AiDoctorContextLatest {
    * Optional so older result literals stay valid; absent means false.
    */
   manualSnapshotFutureDated?: boolean;
+  /**
+   * Newest snapshot no more than MANUAL_SNAPSHOT_FUTURE_SKEW_MS ahead of `now`:
+   * the one the freshness grade uses. Null when every snapshot is future-dated
+   * or none exists. Optional so older result literals stay valid.
+   */
+  freshCandidateSnapshotAt?: string | null;
 }
 
 export interface AiDoctorContextResult {
@@ -171,6 +177,7 @@ export function evaluateAiDoctorContext(
   // A capture time beyond it is never current (isManualSnapshotCurrent), so
   // it cannot be fresh evidence, and it must not hide an older fresh one.
   let latestFreshCandidateAt: number | null = null;
+  let latestFreshCandidateIso: string | null = null;
   let recentSnaps = 0;
   let snapWarnings = 0;
   for (const s of snaps) {
@@ -191,6 +198,7 @@ export function evaluateAiDoctorContext(
       (latestFreshCandidateAt == null || t > latestFreshCandidateAt)
     ) {
       latestFreshCandidateAt = t;
+      latestFreshCandidateIso = typeof s.at === "string" ? s.at : new Date(t).toISOString();
     }
   }
   const freshSnap =
@@ -293,10 +301,24 @@ export function evaluateAiDoctorContext(
       manualSnapshotAt: latestSnapIso,
       manualSnapshotFutureDated:
         latestSnapAt != null && latestSnapAt - now > MANUAL_SNAPSHOT_FUTURE_SKEW_MS,
+      freshCandidateSnapshotAt: latestFreshCandidateIso,
     },
     safeNextStep: SAFE_NEXT_STEPS[readiness],
     diagnosisClaimed: false,
   };
+}
+
+/**
+ * The snapshot the freshness presenters (readiness chip, launch-dialog stale
+ * explanation, saved readiness check) should describe: the one the grade
+ * used. Falls back to the newest row when every snapshot is future-dated, so
+ * the presenters can say its age is unknown, and for results that predate
+ * `freshCandidateSnapshotAt`.
+ */
+export function selectAiDoctorFreshnessSnapshotAt(
+  result: Pick<AiDoctorContextResult, "latest">,
+): string | null {
+  return result.latest.freshCandidateSnapshotAt ?? result.latest.manualSnapshotAt;
 }
 
 export const AI_DOCTOR_INSUFFICIENT_NOTICE =

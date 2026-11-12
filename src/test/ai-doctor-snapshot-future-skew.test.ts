@@ -12,7 +12,11 @@
  *    fuzz test requires to agree with the chip.
  */
 import { describe, expect, it } from "vitest";
-import { evaluateAiDoctorContext } from "@/lib/aiDoctorContextRules";
+import {
+  evaluateAiDoctorContext,
+  selectAiDoctorFreshnessSnapshotAt,
+} from "@/lib/aiDoctorContextRules";
+import { buildAiDoctorReadinessDiaryEntry } from "@/lib/aiDoctorReadinessDiaryEntryRules";
 import { buildAiDoctorSafeReviewStart } from "@/lib/aiDoctorSafeReviewStartViewModel";
 import { buildAiDoctorSnapshotFreshnessStatus } from "@/lib/aiDoctorSnapshotFreshnessStatusViewModel";
 import { buildAiDoctorSnapshotStalenessExplanation } from "@/lib/aiDoctorSnapshotStalenessExplanationViewModel";
@@ -167,5 +171,54 @@ describe("buildAiDoctorSafeReviewStart — future-dated snapshot summary", () =>
       contextWithSnapshots([NOW + MANUAL_SNAPSHOT_FUTURE_SKEW_MS + 1]).latest
         .manualSnapshotFutureDated,
     ).toBe(true);
+  });
+});
+
+describe("presenter input — a future-dated row beside a fresh one", () => {
+  it("the presenters read the newest snapshot within the skew, not the future row", () => {
+    const r = contextWithSnapshots([NOW + HOUR, NOW - HOUR]);
+    expect(r.latest.manualSnapshotAt).toBe(iso(NOW + HOUR));
+    expect(selectAiDoctorFreshnessSnapshotAt(r)).toBe(iso(NOW - HOUR));
+    const chip = buildAiDoctorSnapshotFreshnessStatus({
+      latestSnapshotAtIso: selectAiDoctorFreshnessSnapshotAt(r),
+      now: NOW,
+    });
+    expect(chip.state).toBe("fresh");
+    const expl = buildAiDoctorSnapshotStalenessExplanation({
+      latestSnapshotAtIso: selectAiDoctorFreshnessSnapshotAt(r),
+      now: NOW,
+    });
+    expect(expl.isStale).toBe(false);
+  });
+
+  it("the saved readiness note agrees with a strong grade", () => {
+    const r = contextWithSnapshots([NOW + HOUR, NOW - HOUR]);
+    expect(r.readiness).toBe("strong");
+    const entry = buildAiDoctorReadinessDiaryEntry({
+      readiness: r.readiness,
+      latestSnapshotAtIso: selectAiDoctorFreshnessSnapshotAt(r),
+      growId: "g1",
+      now: NOW,
+    });
+    expect(entry.ok).toBe(true);
+    if (!entry.ok) return;
+    expect(entry.draft.details.snapshot_freshness).toBe("fresh");
+    expect(entry.draft.note).not.toMatch(/Stale/);
+  });
+
+  it("with only a future-dated row, the presenters still see it and say its age is unknown", () => {
+    const r = contextWithSnapshots([NOW + HOUR]);
+    expect(selectAiDoctorFreshnessSnapshotAt(r)).toBe(iso(NOW + HOUR));
+    const chip = buildAiDoctorSnapshotFreshnessStatus({
+      latestSnapshotAtIso: selectAiDoctorFreshnessSnapshotAt(r),
+      now: NOW,
+    });
+    expect(chip.label).toBe("Stale · future time");
+  });
+
+  it("falls back to manualSnapshotAt for results without the new field", () => {
+    const r = contextWithSnapshots([NOW - HOUR]);
+    const legacy = { ...r, latest: { manualSnapshotAt: r.latest.manualSnapshotAt } };
+    expect(selectAiDoctorFreshnessSnapshotAt(legacy)).toBe(iso(NOW - HOUR));
   });
 });

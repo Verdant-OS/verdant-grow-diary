@@ -1,7 +1,8 @@
 # SENTINEL-PARITY-MERGE-GROUP
 
 ```text
-TASK SENTINEL-PARITY-MERGE-GROUP  priority: P1  status: OPEN
+TASK SENTINEL-PARITY-MERGE-GROUP  priority: P1  status: CLOSED
+closed: merged. #2958 merged into verdant-grow-diary on 2026-11-12 at 12:22 UTC as 75e2a70d0de7b55c439855615a05d9716b08028b (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2958), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: let merge-queue entries land again by making "Governance files agree on Sentinel-Version" report on the queue's own test merge.
 why: The copilot-advisory-review ruleset (id 26731444, created 2026-11-06 22:25 UTC, last updated 2026-11-11 19:48 UTC) requires six contexts on refs/heads/verdant-grow-diary. Four of them never run on merge_group events: "Governance files agree on Sentinel-Version", "CodeQL", "Analyze (actions)", "Analyze (python)". The queue waits for them until check_response_timeout_minutes (360) and drops the entry. The deploy branch has stayed at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8 (2026-11-06 22:23 UTC) since. Measured 2026-11-12 08:51 UTC on #2938's queue group head 9e2d6309017b2395fa58ce53163e90c4b5613830: all 79 check runs complete and green, all 35 contexts of ruleset 24445196 present, the four contexts above absent. Matthew chose this fix on 2026-11-12 ("Workflow PR"), with CodeQL handled by him.
 branch: claude/sentinel-parity-merge-group
@@ -31,5 +32,5 @@ reviewer_sha: none
 session_state: one safety-net check-in scheduled by this session; pending human decision: the per-item merge yes
 claimed_by: Claude session_017UoYKve9UakRXv4mFpE95p, 2026-11-12 09:00 UTC
 owner: Claude session_017UoYKve9UakRXv4mFpE95p
-last_updated: 2026-11-12 10:00 UTC, by Claude session_017UoYKve9UakRXv4mFpE95p
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-12 10:00 UTC, by Claude session_017UoYKve9UakRXv4mFpE95p)
 ```

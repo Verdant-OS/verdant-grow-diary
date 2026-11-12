@@ -1,7 +1,8 @@
 # VERDANT-AUTO-HANDOFF-20261112
 
 ```text
-TASK VERDANT-AUTO-HANDOFF-20261112  priority: other  status: OPEN
+TASK VERDANT-AUTO-HANDOFF-20261112  priority: other  status: CLOSED
+closed: merged. #2949 merged into verdant-grow-diary on 2026-11-12 at 10:29 UTC as 9340ce3a67a7d18985372d922309edf134a507f3 (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2949), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: Long Claude Code sessions get an automatic handoff prompt. A PostToolUse hook reads the session's context size from the transcript, tells the agent once when it crosses about 150k tokens to refresh its handoff entry and push, and tells it after a compaction to re-read that entry before trusting the summary.
 why: Matthew asked for long-chat safeguards with an automatic handoff (2026-11-12). Compaction summaries are lossy, and a session that runs past its budget without a pushed handoff cannot be resumed (AGENTS.md section 12, handoff-procedure.md "Stop and retirement").
 branch: claude/project-thread-6gtedg
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access; no merge, publish or production write authorized
 claimed_by: Claude thread session (Taproot), 2026-11-12
 owner: Claude
-last_updated: 2026-11-12, by Claude thread session (Taproot)
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-12, by Claude thread session (Taproot))
 ```

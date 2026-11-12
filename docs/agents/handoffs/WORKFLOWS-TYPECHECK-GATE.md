@@ -1,7 +1,8 @@
 # WORKFLOWS-TYPECHECK-GATE
 
 ```text
-TASK WORKFLOWS-TYPECHECK-GATE  priority: P3  status: OPEN
+TASK WORKFLOWS-TYPECHECK-GATE  priority: P3  status: CLOSED
+closed: merged. #2947 merged into verdant-grow-diary on 2026-11-12 at 11:04 UTC as e2cd59379a3b84702ceba5933122350c22d72103 (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2947), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: Every workflow that typechecks the whole app does it through the `typecheck` package script, so there is one gate and one place to set its options.
 why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8. Two workflows ran `bunx tsc -p tsconfig.json --noEmit` themselves: demo-proof-walkthrough-readonly.yml (step "TypeScript check") and ecowitt-windows-tooling.yml (step "TypeScript app typecheck"). They bypass the package script, so the explicit heap ceiling #2938 adds to that script would not reach them, and any later change to the gate would silently skip them. Matthew asked for this fix directly ("fix the two workflows calling bare tsc next", 2026-11-12).
 branch: claude/workflows-typecheck-gate
@@ -34,5 +35,5 @@ reviewer_sha: none current (last reviewed head 6e9dd7be510888616e9b15245bcf931f4
 session_state: no routines, no paused workflows; pending human decisions: review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-12 03:00 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
-last_updated: 2026-11-12 02:40 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-12 02:40 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8)
 ```

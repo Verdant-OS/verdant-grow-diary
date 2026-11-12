@@ -1,7 +1,8 @@
 # LEAN-STARTUP-READS-20261111
 
 ```text
-TASK LEAN-STARTUP-READS-20261111  priority: other  status: OPEN
+TASK LEAN-STARTUP-READS-20261111  priority: other  status: CLOSED
+closed: merged. #2933 merged into verdant-grow-diary on 2026-11-12 at 09:14 UTC as d4b2ac06622b8ff3acc0ace7d2d2659305effa61 (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2933), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: Cut the required startup reads for Claude Code, Codex and Gemini from about 1.4 MB to about 0.2 MB (about 0.11 MB once the entries #2928 closes are archived) without changing any rule except which files are read at startup.
 why: Startup reads cost about 240k tokens per Claude Code, Codex or Gemini session (two mostly historical files plus every handoff file), so Claude's weekly usage runs out mid-week and grower-facing work stalls. Requested by Matthew on 2026-11-11 ("you can kick off the session now"), building the slice he was shown.
 branch: claude/project-thread-8cw7yi
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production access; no routines; nothing paused
 claimed_by: Claude Code thread session cfc4207e-79c9-57a9-a07a-0bd07dc11789, 2026-11-11 09:53 CT
 owner: Claude
-last_updated: 2026-11-11 09:53 CT, by Claude
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-11 09:53 CT, by Claude)
 ```

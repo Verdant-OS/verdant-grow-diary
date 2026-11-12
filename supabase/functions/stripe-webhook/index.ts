@@ -76,6 +76,28 @@ Deno.serve(async (req) => {
           .upsert(row, { onConflict: "environment,stripe_subscription_id" });
         return { ok: !error };
       },
+      // One UPDATE ... WHERE status <> 'canceled' statement, so an
+      // overlapping delivery cannot overwrite a cancellation.
+      updateRowUnlessCanceled: async (row) => {
+        const { data, error } = await db()
+          .from("subscriptions")
+          .update(row)
+          .eq("environment", row.environment)
+          .eq("stripe_subscription_id", row.stripe_subscription_id)
+          .eq("user_id", row.user_id)
+          .neq("status", "canceled")
+          .select("stripe_subscription_id");
+        if (error) return { ok: false };
+        return { ok: true, matched: Array.isArray(data) && data.length > 0 };
+      },
+      // INSERT ... ON CONFLICT DO NOTHING: an existing row is left alone.
+      insertRowIfAbsent: async (row) => {
+        const { error } = await db().from("subscriptions").upsert(row, {
+          onConflict: "environment,stripe_subscription_id",
+          ignoreDuplicates: true,
+        });
+        return { ok: !error };
+      },
       log: (fields) => console.warn(JSON.stringify(fields)),
     },
   );

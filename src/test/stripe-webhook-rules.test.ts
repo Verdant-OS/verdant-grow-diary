@@ -228,36 +228,85 @@ describe("buildStripeSubscriptionRow", () => {
 });
 
 function harness(
-  options: { stripeState?: unknown; existingOwner?: string | null; upsertOk?: boolean } = {},
+  options: {
+    stripeState?: unknown;
+    existingOwner?: string | null;
+    writeOk?: boolean;
+    /** Hold the first fetch after it has read Stripe, until release(). */
+    holdFirstFetch?: boolean;
+  } = {},
 ) {
+  // The subscriptions table, keyed on (environment, stripe_subscription_id),
+  // with the same conditional semantics as the real ports.
+  const table = new Map<string, StripeSubscriptionRowWrite>();
+  const keyOf = (row: StripeSubscriptionRowWrite) =>
+    `${row.environment}:${row.stripe_subscription_id}`;
   const writes: StripeSubscriptionRowWrite[] = [];
   const fetches: string[] = [];
   const logs: Record<string, string>[] = [];
   let state: unknown = options.stripeState ?? subscription();
+  let held = options.holdFirstFetch === true;
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let markHeld: () => void = () => {};
+  const heldRead = new Promise<void>((resolve) => {
+    markHeld = resolve;
+  });
+  const store = (row: StripeSubscriptionRowWrite) => {
+    table.set(keyOf(row), row);
+    writes.push(row);
+  };
   const ports: StripeWebhookPorts = {
     getEnv: (n) => ENV[n],
     resolveEnvironment: () => ({ ok: true, environment: "live" }),
     nowSeconds: () => NOW,
     fetchSubscription: async (_key, id) => {
       fetches.push(id);
-      return state === "down" ? { ok: false } : { ok: true, body: state };
+      const snapshot = typeof state === "function" ? (state as () => unknown)() : state;
+      if (held) {
+        held = false;
+        markHeld();
+        await gate;
+      }
+      return snapshot === "down" ? { ok: false } : { ok: true, body: snapshot };
     },
-    findExistingOwner: async () =>
-      options.existingOwner === "down"
-        ? { ok: false }
-        : { ok: true, userId: options.existingOwner ?? (writes.length ? writes[0].user_id : null) },
+    findExistingOwner: async (environment, id) => {
+      if (options.existingOwner === "down") return { ok: false };
+      if (options.existingOwner !== undefined) return { ok: true, userId: options.existingOwner };
+      return { ok: true, userId: table.get(`${environment}:${id}`)?.user_id ?? null };
+    },
     upsertRow: async (row) => {
-      if (options.upsertOk === false) return { ok: false };
-      writes.push(row);
+      if (options.writeOk === false) return { ok: false };
+      store(row);
+      return { ok: true };
+    },
+    updateRowUnlessCanceled: async (row) => {
+      if (options.writeOk === false) return { ok: false };
+      const existing = table.get(keyOf(row));
+      if (!existing || existing.user_id !== row.user_id || existing.status === "canceled") {
+        return { ok: true, matched: false };
+      }
+      store(row);
+      return { ok: true, matched: true };
+    },
+    insertRowIfAbsent: async (row) => {
+      if (options.writeOk === false) return { ok: false };
+      if (!table.has(keyOf(row))) store(row);
       return { ok: true };
     },
     log: (fields) => logs.push(fields),
   };
   return {
     ports,
+    table,
     writes,
     fetches,
     logs,
+    release: () => release(),
+    /** Resolves once the held delivery has read its (soon stale) snapshot. */
+    heldRead,
     setStripeState: (next: unknown) => {
       state = next;
     },
@@ -275,7 +324,8 @@ describe("processStripeWebhook", () => {
   it("records the re-read subscription after a valid signed event", async () => {
     const h = harness();
     await expect(h.deliver(completed)).resolves.toEqual({ status: 200, outcome: "recorded" });
-    expect(h.fetches).toEqual(["sub_A1"]);
+    // Read once to build the row, once more after writing to confirm it settled.
+    expect(h.fetches).toEqual(["sub_A1", "sub_A1"]);
     expect(h.writes.map((w) => [w.price_id, w.status])).toEqual([["pro_monthly", "active"]]);
   });
 
@@ -335,6 +385,56 @@ describe("processStripeWebhook", () => {
     expect(h.writes.map((w) => w.status)).toEqual(["canceled", "canceled"]);
   });
 
+  it("never lets an overlapping older delivery restore access after a cancellation", async () => {
+    const h = harness({ holdFirstFetch: true });
+    // Delivery A reads Stripe while the subscription is still active, then stalls.
+    const stale = h.deliver(event("customer.subscription.updated", { id: "sub_A1" }));
+    await h.heldRead;
+    // Delivery B runs after the grower cancels and records the cancellation.
+    h.setStripeState(subscription({ status: "canceled", ended_at: NOW }));
+    await expect(
+      h.deliver(event("customer.subscription.deleted", { id: "sub_A1" })),
+    ).resolves.toEqual({ status: 200, outcome: "recorded" });
+    // A resumes with its active snapshot: it must not overwrite the row.
+    h.release();
+    await expect(stale).resolves.toEqual({ status: 200, outcome: "recorded" });
+    const row = h.table.get("live:sub_A1");
+    expect(row?.status).toBe("canceled");
+    expect(row?.current_period_end).toBe(new Date(NOW * 1000).toISOString());
+    expect(h.writes.some((w) => w.status === "active")).toBe(false);
+  });
+
+  it("rewrites the newer state when an older non-final snapshot lands last", async () => {
+    const h = harness({
+      holdFirstFetch: true,
+      stripeState: subscription({ status: "past_due" }),
+    });
+    const stale = h.deliver(event("customer.subscription.updated", { id: "sub_A1" }));
+    await h.heldRead;
+    h.setStripeState(subscription({ status: "active" }));
+    await h.deliver(event("customer.subscription.updated", { id: "sub_A1" }));
+    h.release();
+    await expect(stale).resolves.toEqual({ status: 200, outcome: "recorded" });
+    // A wrote past_due over active, re-read Stripe, and put active back.
+    expect(h.writes.map((w) => w.status)).toEqual(["active", "past_due", "active"]);
+    expect(h.table.get("live:sub_A1")?.status).toBe("active");
+  });
+
+  it("asks Stripe to redeliver when the subscription keeps changing under it", async () => {
+    let flip = false;
+    const h = harness({
+      stripeState: () => {
+        flip = !flip;
+        return subscription({ status: flip ? "active" : "past_due" });
+      },
+    });
+    await expect(h.deliver(completed)).resolves.toEqual({
+      status: 503,
+      outcome: "snapshot_unsettled",
+    });
+    expect(h.writes).toHaveLength(3);
+  });
+
   it("never reassigns a subscription row to another user", async () => {
     const h = harness({ existingOwner: OTHER_USER });
     await expect(h.deliver(completed)).resolves.toEqual({
@@ -366,7 +466,7 @@ describe("processStripeWebhook", () => {
       status: 500,
       outcome: "database_unavailable",
     });
-    await expect(harness({ upsertOk: false }).deliver(completed)).resolves.toEqual({
+    await expect(harness({ writeOk: false }).deliver(completed)).resolves.toEqual({
       status: 500,
       outcome: "database_unavailable",
     });

@@ -198,6 +198,15 @@ export interface StripeSubscriptionRowWrite {
   environment: StripeBillingEnvironment;
 }
 
+/** True when two built rows would write the same values. */
+export function stripeRowsMatch(
+  a: StripeSubscriptionRowWrite,
+  b: StripeSubscriptionRowWrite,
+): boolean {
+  const keys = Object.keys(a) as Array<keyof StripeSubscriptionRowWrite>;
+  return keys.length === Object.keys(b).length && keys.every((key) => Object.is(a[key], b[key]));
+}
+
 export type StripeRowSkip =
   | "not_a_subscription"
   | "livemode_mismatch"

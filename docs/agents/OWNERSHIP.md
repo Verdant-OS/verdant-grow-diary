@@ -318,7 +318,7 @@ only when actually obtained. Codex posts `[READY]` only when the connector is me
 5. `[PRECHECK]`
 6. `[ROUTE]` and `[CLAIM]`
 7. `[VERDICT]`
-8. Merge Steward queues after 35/35 required checks and a non-author Reviewer APPROVE at the exact head
+8. Merge Steward queues after 35/35 required checks and an independent exact-head PASS
 9. `[MERGE]`
 10. Next sweep
 

@@ -37,8 +37,8 @@ export function notebookSessionOwner(): string | null {
 
 /**
  * Drop the previous account's in-memory notes when the signed-in account changes.
- * AppShell adopts the signed-in id and clears notes when that shell unmounts
- * on sign-out, or when a resolved user id becomes null. A read that names a
+ * AppShell adopts the signed-in id and clears notes on unmount only while a
+ * sign-out is pending, or when a resolved user id becomes null. A read that names a
  * viewer returns nothing unless that viewer is the stored owner.
  */
 export function adoptNotebookSessionOwner(userId: string | null): void {

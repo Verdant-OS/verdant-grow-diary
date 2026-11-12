@@ -9,7 +9,7 @@ import FieldNotebook, {
 } from "@/components/FieldNotebook";
 import AppShell from "@/components/AppShell";
 import FieldNotebookTimelineRecovery from "@/components/FieldNotebookTimelineRecovery";
-import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
+import { MemoryRouter, Route, Routes, useNavigate } from "@/lib/react-router-compat";
 import * as notebookSession from "@/lib/fieldNotebookSession";
 import { emptyDraft } from "@/lib/fieldNotebookOutcomeRules";
 import {
@@ -120,6 +120,15 @@ function privateDraft() {
 
 let signOutLease: { finish: () => void } | null = null;
 
+function Jump({ to, label }: { to: string; label: string }) {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(to)}>
+      {label}
+    </button>
+  );
+}
+
 function BeginSignOut() {
   const { beginSignOutNavigation } = useAuth();
   return (
@@ -212,6 +221,61 @@ describe("notebook owner without a mounted surface", () => {
     expect(notebookSessionOwner()).toBeNull();
     expect(readNotebookDraft("flower").note).toBe("");
     expect(notebookDrafts().some((draft) => draft.note === privateNote)).toBe(false);
+  });
+
+  it("keeps the note and key from dashboard to pricing and back", async () => {
+    const session = sessionFor("user-a");
+    mocks.getSession.mockResolvedValue({ data: { session }, error: null });
+    mocks.getUser.mockResolvedValue({ data: { user: session.user }, error: null });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/dashboard"]}>
+          <AuthProvider>
+            <Routes>
+              <Route
+                path="/dashboard"
+                element={
+                  <AppShell>
+                    <FieldNotebook
+                      tents={[tent]}
+                      readingsByTent={{}}
+                      onSave={vi.fn()}
+                      onFindEntry={vi.fn()}
+                    />
+                    <Jump to="/pricing" label="Open pricing" />
+                  </AppShell>
+                }
+              />
+              <Route
+                path="/pricing"
+                element={
+                  <>
+                    <p>Pricing page</p>
+                    <Jump to="/dashboard" label="Back to dashboard" />
+                  </>
+                }
+              />
+            </Routes>
+          </AuthProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(notebookSessionOwner()).toBe("user-a"));
+    writeNotebookDraft({ ...privateDraft(), recoverySurface: "grow" });
+    expect(await screen.findByDisplayValue(privateNote)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open pricing" }));
+    expect(await screen.findByText("Pricing page")).toBeInTheDocument();
+    expect(readNotebookDraft("flower").note).toBe(privateNote);
+    expect(readNotebookDraft("flower").attempt?.idempotencyKey).toBe("key-a");
+    fireEvent.click(screen.getByRole("button", { name: "Back to dashboard" }));
+    expect(await screen.findByDisplayValue(privateNote)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save again (won't duplicate)" }),
+    ).toBeInTheDocument();
+    expect(readNotebookDraft("flower").phase).toBe("uncertain");
+    expect(readNotebookDraft("flower").attempt?.idempotencyKey).toBe("key-a");
+    expect(notebookSessionOwner()).toBe("user-a");
   });
 
   it("clears A's notes when the session expires without the sign-out screen", async () => {

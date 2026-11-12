@@ -7,10 +7,12 @@ import { useAuth } from "@/store/auth";
  * paint does not clear a draft a test already adopted. After a real user
  * id has been seen, a later null user clears that account's notes.
  * AppShell passes clearOnUnmount because sign-out unmounts the shell before
- * the user id becomes null. A notebook surface does not clear on unmount.
+ * the user id becomes null. The cleanup clears only while that sign-out is
+ * pending. Leaving the shell for a public page keeps the note and its key.
+ * A notebook surface does not clear on unmount.
  */
 export function useNotebookSessionOwner(options?: { clearOnUnmount?: boolean }): void {
-  const { user } = useAuth();
+  const { user, isSignOutNavigationPending } = useAuth();
   const sawSignedInUser = useRef(false);
   const clearOnUnmount = options?.clearOnUnmount === true;
 
@@ -24,7 +26,8 @@ export function useNotebookSessionOwner(options?: { clearOnUnmount?: boolean }):
     }
     if (!clearOnUnmount) return;
     return () => {
+      if (isSignOutNavigationPending?.() !== true) return;
       adoptNotebookSessionOwner(null);
     };
-  }, [user?.id, clearOnUnmount]);
+  }, [user?.id, clearOnUnmount, isSignOutNavigationPending]);
 }

@@ -198,7 +198,7 @@ current actor, reviewer, repair-only role and hold are the named assignment abov
   Draft and backlog cleanup with no file change (closing a stale draft, refreshing a PR body) is also in the lane. Governance files are **not** docs-only and **not** low-risk, because editing them changes the rules: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.grok/`, `.agents/skills/`, `.claude/skills/`, `.github/` and everything under `docs/agents/` except `HANDOFF_LOG.md`. **Outside reviewers:** governance and protected scopes require an actually available, eligible independent session under §4.3. Migrations, payments or billing, workflows (`.github`), security or auth, and dependency or lockfile changes retain their supplemental evidence and protected-file gates. The same outside reviewer stays required for `supabase/`, Edge Functions, production config, the Action Queue, device control, a locked scorer, and any PR that mixes allowlisted files with any other file. Graft's PASS covers only the exact head SHA it names and is void once the head moves. This lane changes who may review; it does not change who may merge.
 
 - **Codex remains an equal independent exact-head reviewer** for non-Codex-authored work Codex did not repair. An available non-contributing Claude/Grok review session can accept Codex-authored work. A request or acknowledgment never counts as a verdict.
-- **A request from Chemdawg counts the same as one from GDP** when it names the PR, full SHA, reviewer session/role, contributor exclusions, complete scope and stay-draft limits. Check existing requests and receipts before sending it. A verdict never carries over to a new commit.
+- **A request from the Coordinator or Merge Readiness seat counts the same as one from GDP** when it names the PR, full SHA, reviewer session/role, contributor exclusions, complete scope and stay-draft limits. Check existing requests and receipts before sending it. A verdict never carries over to a new commit.
 - **No contributor accepts its own work.** See §4.3 for the single-request ledger and unavailable-reviewer transfer.
 
 ### Golden Toad and Toad Venom: finding bugs
@@ -217,10 +217,10 @@ current actor, reviewer, repair-only role and hold are the named assignment abov
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Webhook creation, secret, receiver code                  | Codex                                                                                                                                                |
 | Re-running or fixing a failed check                      | Codex                                                                                                                                                |
-| Deciding that a failed check blocks a PR, and posting it | Chemdawg                                                                                                                                             |
-| Pre-check rules and verdicts                             | Chemdawg                                                                                                                                             |
+| Deciding that a failed check blocks a PR, and posting it | Merge Readiness seat (holder in the roster)                                                                                                          |
+| Pre-check rules and verdicts                             | Merge Readiness seat (holder in the roster)                                                                                                          |
 | Code that consumes pre-check verdicts                    | Codex                                                                                                                                                |
-| Reviewer assignment and claim ledger                     | Chemdawg's pre-check under §4.3; GDP can route within the same independence and evidence gates                                                       |
+| Reviewer assignment and claim ledger                     | Coordinator seat under §4.3 (Merge Readiness pre-check); GDP can route within the same independence and evidence gates                                                       |
 | Review verdicts                                          | Available eligible independent session under §4.3; Codex excluded on Codex-authored/repaired work; Graft only within the existing low-risk allowlist |
 | Opening PRs                                              | Any agent with repository access may open its own authorized draft PR                                                                                                             |
 | Merging PRs                                              | Matthew's current explicit actor assignment; PR #1971 assigns OG Kush to merge and Jack Herer to independent acceptance, with Codex repair-only; merge remains held. Per-item exact-head approval, 35/35 required SUCCESS, applicable supplemental checks and an eligible independent full-head PASS remain required. |
@@ -253,8 +253,8 @@ current actor, reviewer, repair-only role and hold are the named assignment abov
   Failed checks: <names, FAIL only>
   https://github.com/Verdant-OS/verdant-grow-diary/pull/1763
   ```
-- **Next step fires on its own.** A PASS wakes Chemdawg's pre-check. A FAIL wakes Codex to triage CI.
-- **Retires** Chemdawg's per-PR watch routine once it is live.
+- **Next step fires on its own.** A PASS wakes the Merge Readiness pre-check. A FAIL wakes Codex to triage CI.
+- **Retires** the per-PR watch routine (formerly Chemdawg's) once it is live.
 
 ### 4.2 Routing channel with Grand Daddy Grok (Codex runs the integration)
 
@@ -267,7 +267,7 @@ current actor, reviewer, repair-only role and hold are the named assignment abov
   [ROUTE]    #N @sha -> <eligible reviewer session/role> (scope, exclusions, reason)   (bot / GDP)
   [CLAIM]    <reviewer> claims #N @sha
   [VERDICT]  <reviewer>: #N @sha PASS | PASS-with-P2 | FAIL | BLOCKED | NOT_MEASURED
-  [MERGE]    #N @sha merged to <branch>             (Chemdawg)
+  [MERGE]    #N @sha merged to <branch>             (Merge Steward)
   [SLICE]    Next: <slice id>, owner, closed file plan
   [SPEC]     OWNERSHIP.md updated @sha — <what changed>, next: <owner + action>
   [READY]    Connector <name> live — next: <owner + action>
@@ -289,7 +289,7 @@ current actor, reviewer, repair-only role and hold are the named assignment abov
 This corrects routing instructions only; it does not install or change runtime automation,
 hooks, channel membership, GitHub settings or existing assignments.
 
-- **Preconditions.** Chemdawg's pre-check still requires CI PASS at the full head SHA and READY for review. READY for review does not mark the PR ready or grant merge authority. Drafts remain draft. The existing merge actor, merge queue, exact-head guard, 35/35 required checks, supplemental evidence, no-P1/P2 rule, protected-file gates, holds and founder-only production controls remain.
+- **Preconditions.** The Merge Readiness pre-check still requires CI PASS at the full head SHA and READY for review. READY for review does not mark the PR ready or grant merge authority. Drafts remain draft. The existing merge actor, merge queue, exact-head guard, 35/35 required checks, supplemental evidence, no-P1/P2 rule, protected-file gates, holds and founder-only production controls remain.
 - **Eligibility, applied before routing.** Check actual availability, complete scope coverage and independence. Exclude every author and repairer, regardless of later ownership transfer. Codex cannot accept Codex-authored or repaired work. Non-contributing Claude/Grok review sessions may accept Codex-authored work; available Durban Poison remains eligible. Graft retains exactly the section 2 low-risk allowlist; governance, protected or mixed PRs need an eligible outside reviewer. Blue Dream and Critical Mass receive no future requests. Named holds and explicit assignments remain binding; this policy does not reassign a held task.
 - **One current request per PR/full head.** Before any ping, inspect the current full head, existing request and receipt. Preserve an independent PASS that is still valid for that head and its review conditions; do not issue a duplicate request. Keep one canonical ledger entry for each PR/full head with request owner, reviewer session/role, contributor exclusions and how verified, complete scope, evidence, request/receipt permalinks, timestamps, fallback-transfer count and state: `requested`, `running`, `blocked`, `verdict`, or `superseded`. Acknowledgments, pending requests and silence are not PASS. Do not invent a permalink for an unsent packet; mark delivery BLOCKED if the authorized transport is unavailable.
 - **Unavailable reviewer.** If the assigned session declines, is unavailable, or has been silent for 60 minutes, the request owner records the reason, supersedes that assignment and transfers the existing request once to one actually available eligible fallback. Recheck head and contributor exclusions before transfer. Never keep parallel active requests or repeatedly ping a retired/unavailable seat. If no eligible fallback is available, or the fallback is unavailable, record `blocked`, its owner and the exact missing evidence. Silence never becomes approval or task ownership.
@@ -318,7 +318,7 @@ only when actually obtained. Codex posts `[READY]` only when the connector is me
 5. `[PRECHECK]`
 6. `[ROUTE]` and `[CLAIM]`
 7. `[VERDICT]`
-8. Chemdawg merge call after 35/35 required checks and an independent exact-head PASS
+8. Merge Steward queues after 35/35 required checks and an independent exact-head PASS
 9. `[MERGE]`
 10. Next sweep
 
@@ -329,12 +329,12 @@ A FAIL at step 4 or step 7 goes back to step 3 automatically.
 - **Repo only.** Every change to this file, the spec, or a connector lands as a commit in the repo, never as a local scratch file. If it isn't in the repo, it isn't decided. Agents point at `docs/agents/OWNERSHIP.md` instead of passing files around.
 - **When this file or the connector spec changes on `verdant-grow-diary`:** a merge watcher posts `[SPEC]` in the routing channel, naming the next owner and action. GDP names the Codex slice without waiting on anyone.
 - **When a connector PR merges:** the same watcher posts `[READY]` and wakes the next dependent build. Webhook live starts the routing integration; routing live starts auto-assignment; webhook live also retires the per-PR watch list.
-- **When a new Copilot or Codex draft opens:** the watcher adds it to Chemdawg's pre-check intake, so no PR has to be added by hand.
+- **When a new Copilot or Codex draft opens:** the watcher adds it to the Merge Readiness pre-check intake, so no PR has to be added by hand.
 
 ## 7. Open items (owner in brackets)
 
 - **O1: superseded by Matthew's current standing order.** Earlier proposed self-integration phases grant no current authority. PR #1971 assigns OG Kush to merge, Jack Herer to independent acceptance and Codex to repairs only, superseding the earlier Codex exception. Codex cannot integrate #1971. Other explicit founder grants retain their separately recorded scope. Every authorized merge still needs 35/35 required checks, applicable supplemental gates and a clean eligible independent full-head PASS under §4.3 (Codex excluded on Codex-authored/repaired work). The current #1971 hold and later same-head founder approval remain required. Graft's outside-review lane remains limited to section 2 docs-only and low-risk work Graft did not author or repair.
-- **O2 [Codex + Chemdawg]: review truth.** Codex cannot give its own code, or a PR Codex repaired, an independent PASS (for example #1938). Publish-gate acceptance and all named owner locks remain. Historical review receipts retain their original reviewer and SHA.
+- **O2 [Codex + Merge Readiness]: review truth.** Codex cannot give its own code, or a PR Codex repaired, an independent PASS (for example #1938). Publish-gate acceptance and all named owner locks remain. Historical review receipts retain their original reviewer and SHA.
 - **O3 [Matthew + Codex]: scoped identity.** The current connector acts as Matthew's admin account. Matthew creates a separate scoped identity and protections; Codex then measures allowed and refused operations. No permissions have been granted by the setup document, and code-owner review does not itself reject file pushes.
 - **O4: historical receipt.** Critical Mass and Toad Venom joined the routing channel on 2026-09-28. MotorBreath is on call outside it. This historical receipt does not establish present availability or route future work to Critical Mass.
 - **O5 [Matthew, spend]: Cursor cloud agent launches fail with a usage error.** This is a spend-ceiling item, so it stays with Matthew under section 1.

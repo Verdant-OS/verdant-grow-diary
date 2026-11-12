@@ -71,7 +71,7 @@ export async function confirmManualSnapshotConflict(
   try {
     const { data, error: readError } = await supabase
       .from("sensor_readings")
-      .select("id,user_id,tent_id,source,metric,value,ts,captured_at,quality,device_id,raw_payload")
+      .select("id,user_id,tent_id,source,metric,value,ts,captured_at,quality,device_id,raw_payload,notes,unit_unconfirmed")
       .eq("tent_id", first.tent_id)
       .eq("source", "manual")
       .eq("captured_at", first.captured_at!)

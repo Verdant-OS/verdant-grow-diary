@@ -23,7 +23,7 @@ commands: bunx vitest run src/test/operator-plants-read-only.test.ts src/lib/per
 files_touched: supabase/migrations/20261112030000_operator_plants_read_only.sql (new); src/lib/permissions.ts; src/lib/permissions.test.ts; src/test/operator-plants-read-only.test.ts (new); this file
 files_remaining: none for this slice
 blockers: none
-open_questions: (1) supabase/tests/pheno_candidate_number_maintenance_paths.sql lines 154-160 carry a comment that names "Operators update all plants" as a way a non-owner reaches a plant row. The test logic does not depend on the policy (it runs under role none) and was not edited; the comment becomes stale once this is applied.
+open_questions: (1) supabase/tests/pheno_candidate_number_maintenance_paths.sql lines 154-160 carry a comment that names "Operators update all plants" as a way a non-owner reaches a plant row. The test logic does not depend on the policy (it runs under role none) and was not edited; the comment becomes stale once this is applied. (2) Correction to the same row-level security pass: it also reported that a grower can set profiles.current_badge to any text. That is true of committed migrations only (last guard definition 20260721194325 does not list current_badge). docs/knk-20260824-profiles-gamification-triggers-apply-ledger-operator-runbook.md records that production knkwiiywfkbqznbxwqfh was captured on 2026-08-24 with an UPDATE trigger that refuses current_badge changes and an INSERT trigger that nulls it (source claim; live state NOT_MEASURED since). That ledger closes #1120 and bars #1178 as the wrong artifact, so no migration was written. Owner decision 2026-11-12: drop the badge-lock slice. src/test/profiles-gamification-write-protection.test.ts and its integration twin still pin a client badge edit as succeeding, which matches committed history and not the recorded live trigger; left unchanged.
 gotchas: `bun run typecheck` (tsc) runs out of heap at Node's default in the authoring container; export NODE_OPTIONS=--max-old-space-size=8192 before committing until #2938 lands.
 links: none besides the PR
 artifacts: the test files above
@@ -32,5 +32,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows; pending human decisions: mark ready, review routing, exact-head approval for a migration PR, the per-item merge yes, and the production apply
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-12 01:00 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
-last_updated: 2026-11-11 19:00 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
+last_updated: 2026-11-11 20:10 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
 ```

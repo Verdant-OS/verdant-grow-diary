@@ -7,9 +7,9 @@ why: Migration 20261010120000_sensor_readings_notes_and_unit_unconfirmed.sql rea
 branch: claude/project-thread-k9mdpl
 base: verdant-grow-diary @ b7e05214ddb0c552d1c6d04a3101045a9f771ab8
 checkout: git fetch origin claude/project-thread-k9mdpl verdant-grow-diary && git switch claude/project-thread-k9mdpl && git ls-remote origin claude/project-thread-k9mdpl
-pr: not opened yet (waits on Matthew's yes)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2974 (draft; opened 2026-11-12 on Matthew's "Open the draft PR")
 head_sha: the commit carrying this file; verify with git ls-remote once pushed
-state: local only, not pushed
+state: pushed; draft PR open; CI is the first test run; no reviewer yet
 current_step: waiting on Matthew's yes to push and open the draft PR
 next_action: on his yes, push and open a draft PR against verdant-grow-diary, let CI run, report head SHA and check results. Then the Coordinator routes an eligible independent reviewer. This writer does not mark ready, request review, enqueue or merge.
 post_merge_check: on the merged deploy tip, git grep -n unit_unconfirmed src/integrations/supabase/types.ts finds the sensor_readings Row/Insert/Update fields, and the next Lovable session's regenerated types.ts shows no sensor_readings diff.

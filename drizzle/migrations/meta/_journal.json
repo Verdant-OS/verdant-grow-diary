@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794497977208,
+      "tag": "0000_perf_sensor_effective_and_diary_order_indexes",
+      "breakpoints": true
+    }
+  ]
+}

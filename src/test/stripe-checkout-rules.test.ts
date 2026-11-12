@@ -6,13 +6,22 @@
 import { describe, expect, it } from "vitest";
 import {
   STRIPE_CHECKOUT_PLAN_KEYS,
+  STRIPE_PRO_EXPECTED_PRICES,
   buildCheckoutSessionForm,
+  buildCustomerForm,
+  checkoutIdempotencyKey,
+  customerIdempotencyKey,
+  customerSearchQuery,
+  hasBlockingStripeSubscription,
+  pickCustomerFromSearch,
+  stripePriceMatchesPlan,
   keyModeMatchesEnvironment,
   parseCheckoutSessionUrl,
   resolveStripeCheckoutConfig,
   stripeKeyMode,
   stripePriceEnvName,
 } from "../../supabase/functions/_shared/stripeCheckoutRules.ts";
+import { PRICING } from "@/constants/pricing";
 
 // Built from parts so secret scanners do not mistake fixtures for keys.
 const LIVE_KEY = ["rk", "live", "fixture000"].join("_");
@@ -163,7 +172,7 @@ describe("buildCheckoutSessionForm", () => {
         priceId: "price_liveMonthly1",
         plan: "pro_monthly",
         userId: USER,
-        customerEmail: "grower@example.com",
+        customerId: "cus_A1",
       }),
     );
     expect(form.get("mode")).toBe("subscription");
@@ -172,7 +181,8 @@ describe("buildCheckoutSessionForm", () => {
     expect(form.get("client_reference_id")).toBe(USER);
     expect(form.get("subscription_data[metadata][user_id]")).toBe(USER);
     expect(form.get("subscription_data[metadata][plan_key]")).toBe("pro_monthly");
-    expect(form.get("customer_email")).toBe("grower@example.com");
+    expect(form.get("customer")).toBe("cus_A1");
+    expect(form.has("customer_email")).toBe(false);
   });
 
   it("redirects only to fixed paths on the production host", () => {
@@ -181,12 +191,11 @@ describe("buildCheckoutSessionForm", () => {
         priceId: "price_a",
         plan: "pro_annual",
         userId: USER,
-        customerEmail: null,
+        customerId: "cus_A1",
       }),
     );
     expect(form.get("success_url")).toBe("https://verdantgrowdiary.com/checkout/success");
     expect(form.get("cancel_url")).toBe("https://verdantgrowdiary.com/pricing?checkout=canceled");
-    expect(form.has("customer_email")).toBe(false);
   });
 
   it("is deterministic for the same input", () => {
@@ -194,7 +203,7 @@ describe("buildCheckoutSessionForm", () => {
       priceId: "price_a",
       plan: "pro_annual" as const,
       userId: USER,
-      customerEmail: null,
+      customerId: "cus_A1",
     };
     expect(buildCheckoutSessionForm(input)).toEqual(buildCheckoutSessionForm(input));
   });
@@ -220,5 +229,128 @@ describe("parseCheckoutSessionUrl", () => {
     ]) {
       expect(parseCheckoutSessionUrl(body)).toBeNull();
     }
+  });
+});
+
+describe("Stripe price must match what the site shows", () => {
+  it("expects the same Pro amounts as src/constants/pricing.ts, in cents", () => {
+    expect(STRIPE_PRO_EXPECTED_PRICES.pro_monthly).toEqual({
+      unitAmount: Math.round(PRICING.pro.monthlyPrice * 100),
+      interval: "month",
+    });
+    expect(STRIPE_PRO_EXPECTED_PRICES.pro_annual).toEqual({
+      unitAmount: Math.round(PRICING.pro.annualPrice * 100),
+      interval: "year",
+    });
+  });
+
+  const livePrice = (overrides: Record<string, unknown> = {}) => ({
+    object: "price",
+    active: true,
+    livemode: true,
+    currency: "usd",
+    type: "recurring",
+    unit_amount: 1200,
+    recurring: { interval: "month", interval_count: 1 },
+    ...overrides,
+  });
+
+  it("accepts the active live $12 monthly price for pro_monthly", () => {
+    expect(stripePriceMatchesPlan(livePrice(), "pro_monthly", "live")).toBe(true);
+    expect(
+      stripePriceMatchesPlan(
+        livePrice({ unit_amount: 9900, recurring: { interval: "year", interval_count: 1 } }),
+        "pro_annual",
+        "live",
+      ),
+    ).toBe(true);
+  });
+
+  it("fails closed on any amount, interval, currency, mode or state mismatch", () => {
+    for (const overrides of [
+      { unit_amount: 1999 },
+      { recurring: { interval: "year", interval_count: 1 } },
+      { recurring: { interval: "month", interval_count: 3 } },
+      { recurring: null },
+      { currency: "eur" },
+      { livemode: false },
+      { active: false },
+      { type: "one_time" },
+      { object: "product" },
+    ]) {
+      expect(stripePriceMatchesPlan(livePrice(overrides), "pro_monthly", "live")).toBe(false);
+    }
+    expect(stripePriceMatchesPlan(livePrice(), "pro_annual", "live")).toBe(false);
+    expect(stripePriceMatchesPlan(null, "pro_monthly", "live")).toBe(false);
+  });
+});
+
+describe("one customer and one checkout per grower", () => {
+  it("blocks a second checkout while any subscription is live or still paying", () => {
+    for (const status of ["active", "trialing", "past_due", "unpaid", "paused", "incomplete"]) {
+      expect(hasBlockingStripeSubscription({ data: [{ status }] })).toBe(true);
+    }
+    expect(hasBlockingStripeSubscription({ data: [] })).toBe(false);
+    expect(
+      hasBlockingStripeSubscription({
+        data: [{ status: "canceled" }, { status: "incomplete_expired" }],
+      }),
+    ).toBe(false);
+  });
+
+  it("fails closed when the subscription list is unreadable", () => {
+    expect(hasBlockingStripeSubscription(null)).toBe(true);
+    expect(hasBlockingStripeSubscription({ data: "x" })).toBe(true);
+  });
+
+  it("picks the caller's customer by our metadata, never by email", () => {
+    expect(
+      pickCustomerFromSearch(
+        {
+          data: [
+            { id: "cus_other", metadata: { user_id: "someone-else" }, email: "grower@example.com" },
+            { id: "cus_gone", deleted: true, metadata: { user_id: USER } },
+            { id: "cus_mine", metadata: { user_id: USER } },
+          ],
+        },
+        USER,
+      ),
+    ).toBe("cus_mine");
+    expect(pickCustomerFromSearch({ data: [] }, USER)).toBeNull();
+    expect(pickCustomerFromSearch(null, USER)).toBeNull();
+  });
+
+  it("builds a metadata-only search query that cannot be widened", () => {
+    expect(customerSearchQuery(USER)).toBe(`metadata['user_id']:'${USER}'`);
+    // Only UUID characters survive, so a value can never close the quote.
+    expect(customerSearchQuery("x' OR email:'a")).toBe("metadata['user_id']:'eaa'");
+  });
+
+  it("writes the user id into a new customer's metadata", () => {
+    expect(buildCustomerForm({ userId: USER, email: "grower@example.com" })).toEqual([
+      ["metadata[user_id]", USER],
+      ["email", "grower@example.com"],
+    ]);
+    expect(buildCustomerForm({ userId: USER, email: null })).toEqual([["metadata[user_id]", USER]]);
+  });
+
+  it("gives repeat starts in one ten-minute window the same idempotency key", () => {
+    const base = {
+      userId: USER,
+      plan: "pro_monthly" as const,
+      environment: "live" as const,
+      customerId: "cus_A1",
+    };
+    const t = 1_794_500_400_000;
+    expect(checkoutIdempotencyKey({ ...base, nowMs: t })).toBe(
+      checkoutIdempotencyKey({ ...base, nowMs: t + 5_000 }),
+    );
+    expect(checkoutIdempotencyKey({ ...base, nowMs: t })).not.toBe(
+      checkoutIdempotencyKey({ ...base, nowMs: t + 10 * 60 * 1000 }),
+    );
+    expect(checkoutIdempotencyKey({ ...base, nowMs: t })).not.toBe(
+      checkoutIdempotencyKey({ ...base, plan: "pro_annual", nowMs: t }),
+    );
+    expect(customerIdempotencyKey(USER, "live")).toBe(`verdant-customer-live-${USER}`);
   });
 });

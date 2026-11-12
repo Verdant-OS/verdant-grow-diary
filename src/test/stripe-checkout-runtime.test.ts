@@ -16,8 +16,18 @@ const USER = "0f8fad5b-d9cb-469f-a165-70867728950e";
 // Built from parts so secret scanners do not mistake the fixture for a key.
 const LIVE_KEY = ["rk", "live", "fixture000"].join("_");
 
-function loadHandler(options: { subscriptionRows?: Row[]; env?: Record<string, string> } = {}) {
-  const stripeCalls: Array<{ url: string; body: string }> = [];
+type StripeCall = { method: string; path: string; body: string; idempotencyKey: string | null };
+
+function loadHandler(
+  options: {
+    subscriptionRows?: Row[];
+    env?: Record<string, string>;
+    price?: Row;
+    searchCustomers?: Row[];
+    stripeSubscriptions?: Row[];
+  } = {},
+) {
+  const stripeCalls: StripeCall[] = [];
   const warnings: Row[] = [];
   const env = new Map(
     Object.entries({
@@ -45,11 +55,41 @@ function loadHandler(options: { subscriptionRows?: Row[]; env?: Record<string, s
     },
     from: () => query,
   };
-  const fetchFixture = async (url: string, init: { body?: string }) => {
-    stripeCalls.push({ url, body: init.body ?? "" });
-    return new Response(JSON.stringify({ url: "https://checkout.stripe.com/c/pay/cs_live_fx1" }), {
-      status: 200,
+  const price = options.price ?? {
+    object: "price",
+    active: true,
+    livemode: true,
+    currency: "usd",
+    type: "recurring",
+    unit_amount: 1200,
+    recurring: { interval: "month", interval_count: 1 },
+  };
+  const fetchFixture = async (
+    url: string,
+    init: { method?: string; body?: string; headers?: Record<string, string> },
+  ) => {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/^\/v1/, "");
+    const method = init.method ?? "GET";
+    stripeCalls.push({
+      method,
+      path: `${path}${parsed.search}`,
+      body: init.body ?? "",
+      idempotencyKey: init.headers?.["Idempotency-Key"] ?? null,
     });
+    const reply = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+    if (method === "GET" && path.startsWith("/prices/")) return reply(price);
+    if (method === "GET" && path === "/customers/search") {
+      return reply({ data: options.searchCustomers ?? [] });
+    }
+    if (method === "POST" && path === "/customers") return reply({ id: "cus_new1" });
+    if (method === "GET" && path === "/subscriptions") {
+      return reply({ data: options.stripeSubscriptions ?? [] });
+    }
+    if (method === "POST" && path === "/checkout/sessions") {
+      return reply({ url: "https://checkout.stripe.com/c/pay/cs_live_fx1" });
+    }
+    return new Response("{}", { status: 404 });
   };
   let handler!: (request: Request) => Promise<Response>;
   const context = createContext({
@@ -115,12 +155,104 @@ describe("stripe-checkout Edge function", () => {
       status: 200,
       body: { url: "https://checkout.stripe.com/c/pay/cs_live_fx1" },
     });
-    expect(h.stripeCalls).toHaveLength(1);
-    expect(h.stripeCalls[0].url).toBe("https://api.stripe.com/v1/checkout/sessions");
-    const form = new URLSearchParams(h.stripeCalls[0].body);
+    const session = h.stripeCalls.find((c) => c.path === "/checkout/sessions");
+    expect(session).toBeDefined();
+    const form = new URLSearchParams(session!.body);
     expect(form.get("client_reference_id")).toBe(USER);
     expect(form.get("subscription_data[metadata][user_id]")).toBe(USER);
-    expect(h.stripeCalls[0].body).not.toContain("attacker-chosen");
+    expect(form.get("customer")).toBe("cus_new1");
+    for (const call of h.stripeCalls) expect(call.body).not.toContain("attacker-chosen");
+  });
+
+  it("checks the price, finds or creates one customer, then checks for a live subscription", async () => {
+    const h = loadHandler();
+    await h.request({ plan: "pro_monthly" });
+    expect(h.stripeCalls.map((c) => `${c.method} ${c.path.split("?")[0]}`)).toEqual([
+      "GET /prices/price_liveMonthly1",
+      "GET /customers/search",
+      "POST /customers",
+      "GET /subscriptions",
+      "POST /checkout/sessions",
+    ]);
+    const create = h.stripeCalls.find((c) => c.path === "/customers")!;
+    expect(new URLSearchParams(create.body).get("metadata[user_id]")).toBe(USER);
+    expect(create.idempotencyKey).toBe(`verdant-customer-live-${USER}`);
+  });
+
+  it("gives two quick starts the same Stripe idempotency key, so one session", async () => {
+    const h = loadHandler();
+    await h.request({ plan: "pro_monthly" });
+    await h.request({ plan: "pro_monthly" });
+    const keys = h.stripeCalls
+      .filter((c) => c.path === "/checkout/sessions")
+      .map((c) => c.idempotencyKey);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toMatch(/^verdant-checkout-live-/);
+    expect(keys[0]).toBe(keys[1]);
+  });
+
+  it("reuses the customer on the grower's own Stripe row without searching Stripe", async () => {
+    const h = loadHandler({
+      subscriptionRows: [
+        {
+          id: "row-0",
+          user_id: USER,
+          billing_provider: "stripe",
+          stripe_subscription_id: "sub_old",
+          stripe_customer_id: "cus_A1",
+          paddle_subscription_id: null,
+          paddle_customer_id: null,
+          product_id: "prod_Pro1",
+          price_id: "pro_monthly",
+          status: "canceled",
+          current_period_end: "2026-01-01T00:00:00.000Z",
+          environment: "live",
+          created_at: "2025-12-01T00:00:00.000Z",
+        },
+      ],
+    });
+    expect((await h.request({ plan: "pro_monthly" })).status).toBe(200);
+    const paths = h.stripeCalls.map((c) => c.path.split("?")[0]);
+    expect(paths).not.toContain("/customers/search");
+    expect(paths).not.toContain("/customers");
+    const session = h.stripeCalls.find((c) => c.path === "/checkout/sessions")!;
+    expect(new URLSearchParams(session.body).get("customer")).toBe("cus_A1");
+  });
+
+  it("reuses a customer found by our metadata in Stripe instead of creating one", async () => {
+    const h = loadHandler({ searchCustomers: [{ id: "cus_found1", metadata: { user_id: USER } }] });
+    expect((await h.request({ plan: "pro_monthly" })).status).toBe(200);
+    expect(h.stripeCalls.some((c) => c.method === "POST" && c.path === "/customers")).toBe(false);
+    const session = h.stripeCalls.find((c) => c.path === "/checkout/sessions")!;
+    expect(new URLSearchParams(session.body).get("customer")).toBe("cus_found1");
+  });
+
+  it("refuses a second checkout when Stripe already has a live subscription the webhook has not recorded", async () => {
+    const h = loadHandler({ stripeSubscriptions: [{ id: "sub_new", status: "active" }] });
+    expect(await h.request({ plan: "pro_monthly" })).toEqual({
+      status: 409,
+      body: { error: "already_subscribed" },
+    });
+    expect(h.stripeCalls.some((c) => c.path === "/checkout/sessions")).toBe(false);
+  });
+
+  it("fails closed when the Stripe price is not the $12 monthly price the site shows", async () => {
+    const h = loadHandler({
+      price: {
+        object: "price",
+        active: true,
+        livemode: true,
+        currency: "usd",
+        type: "recurring",
+        unit_amount: 1999,
+        recurring: { interval: "month", interval_count: 1 },
+      },
+    });
+    expect(await h.request({ plan: "pro_monthly" })).toEqual({
+      status: 503,
+      body: { error: "stripe_not_configured" },
+    });
+    expect(h.stripeCalls.map((c) => c.path.split("?")[0])).toEqual(["/prices/price_liveMonthly1"]);
   });
 
   it("refuses an unsigned caller before any Stripe call", async () => {
@@ -138,11 +270,11 @@ describe("stripe-checkout Edge function", () => {
     expect(h.stripeCalls).toEqual([]);
   });
 
-  it("stays off when the plan's price env is unset, without naming the cause", async () => {
+  it("says Stripe is not configured when the plan's price env is unset", async () => {
     const h = loadHandler();
     expect(await h.request({ plan: "pro_annual" })).toEqual({
       status: 503,
-      body: { error: "checkout_unavailable" },
+      body: { error: "stripe_not_configured" },
     });
     expect(h.stripeCalls).toEqual([]);
     expect(h.warnings).toEqual([
@@ -154,7 +286,7 @@ describe("stripe-checkout Edge function", () => {
     const h = loadHandler({ env: { PAYMENTS_ENVIRONMENT: "" } });
     expect(await h.request({ plan: "pro_monthly" })).toEqual({
       status: 503,
-      body: { error: "checkout_unavailable" },
+      body: { error: "stripe_not_configured" },
     });
     expect(h.stripeCalls).toEqual([]);
   });

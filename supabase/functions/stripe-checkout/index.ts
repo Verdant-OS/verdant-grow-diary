@@ -6,8 +6,16 @@ import {
 } from "../_shared/unionEntitlementLookup.ts";
 import {
   buildCheckoutSessionForm,
+  buildCustomerForm,
+  checkoutIdempotencyKey,
+  customerIdempotencyKey,
+  customerSearchQuery,
+  hasBlockingStripeSubscription,
+  isStripeCustomerId,
   parseCheckoutSessionUrl,
+  pickCustomerFromSearch,
   resolveStripeCheckoutConfig,
+  stripePriceMatchesPlan,
   type StripeCheckoutRefusal,
 } from "../_shared/stripeCheckoutRules.ts";
 import { stripeRequest } from "../_shared/stripeApi.ts";
@@ -23,7 +31,16 @@ import { stripeRequest } from "../_shared/stripeApi.ts";
  *  - The environment is server-controlled (PAYMENTS_ENVIRONMENT must be
  *    explicitly live or sandbox), and the Stripe key's own mode must match it.
  *  - A caller who already holds an active paid plan is refused, so one person
- *    cannot be charged twice for Pro.
+ *    cannot be charged twice for Pro. So is a caller whose Stripe customer
+ *    already has a live or still-paying subscription (the window before the
+ *    webhook writes our row).
+ *  - The configured Stripe price must be the active USD price Verdant shows
+ *    (Pro $12/mo, $99/yr); a mismatch fails closed.
+ *  - One Stripe customer per user: reused from our row, then from Stripe's
+ *    metadata search, else created once (idempotency key). Repeat starts in a
+ *    ten-minute window share one Checkout Session (idempotency key).
+ *  - "Stripe is not set up here" answers 503 stripe_not_configured, so the
+ *    client can fall back to Paddle instead of showing a dead end.
  *  - Returns only { url }, a checkout.stripe.com address. Errors are fixed
  *    codes with no upstream text, key material or echo of input.
  */
@@ -42,6 +59,8 @@ type LogReason =
   | "environment_unavailable"
   | "entitlement_unavailable"
   | "already_subscribed"
+  | "price_mismatch"
+  | "customer_unavailable"
   | "stripe_unavailable"
   | "internal_error";
 
@@ -102,7 +121,7 @@ Deno.serve(async (req) => {
     const resolution = resolveRequiredServerBillingEnvironment();
     if (!resolution.ok) {
       logRefusal("environment_unavailable");
-      return json(503, { error: "checkout_unavailable" });
+      return json(503, { error: "stripe_not_configured" });
     }
     environment = resolution.environment;
 
@@ -115,7 +134,7 @@ Deno.serve(async (req) => {
     if (!config.ok) {
       logRefusal(config.reason, environment);
       const publicError =
-        REFUSAL_STATUS[config.reason] === 400 ? config.reason : "checkout_unavailable";
+        REFUSAL_STATUS[config.reason] === 400 ? config.reason : "stripe_not_configured";
       return json(REFUSAL_STATUS[config.reason], { error: publicError });
     }
 
@@ -130,15 +149,94 @@ Deno.serve(async (req) => {
       return json(409, { error: "already_subscribed" });
     }
 
+    const secretKey = config.secretKey;
+
+    // The configured price must be what the site shows. Fail closed.
+    const price = await stripeRequest({
+      secretKey,
+      method: "GET",
+      path: `/prices/${encodeURIComponent(config.priceId)}`,
+    });
+    if (!price.ok) {
+      logRefusal("stripe_unavailable", environment);
+      return json(502, { error: "checkout_unavailable" });
+    }
+    if (!stripePriceMatchesPlan(price.body, config.plan, environment)) {
+      logRefusal("price_mismatch", environment);
+      return json(503, { error: "stripe_not_configured" });
+    }
+
+    // One Stripe customer per user: our own row first, then Stripe's search
+    // on the metadata we wrote, then a single idempotent create.
+    let customerId: string | null = null;
+    const { data: ownRows } = await supabase
+      .from("subscriptions")
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .eq("environment", environment)
+      .eq("billing_provider", "stripe")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const ownCustomer = Array.isArray(ownRows) ? ownRows[0]?.stripe_customer_id : null;
+    if (isStripeCustomerId(ownCustomer)) customerId = ownCustomer;
+    if (customerId === null) {
+      const search = await stripeRequest({
+        secretKey,
+        method: "GET",
+        path: `/customers/search?query=${encodeURIComponent(customerSearchQuery(user.id))}`,
+      });
+      if (search.ok) customerId = pickCustomerFromSearch(search.body, user.id);
+    }
+    if (customerId === null) {
+      const created = await stripeRequest({
+        secretKey,
+        method: "POST",
+        path: "/customers",
+        form: buildCustomerForm({
+          userId: user.id,
+          email: typeof user.email === "string" ? user.email : null,
+        }),
+        idempotencyKey: customerIdempotencyKey(user.id, environment),
+      });
+      const createdId = created.ok ? (created.body as { id?: unknown } | null)?.id : null;
+      if (isStripeCustomerId(createdId)) customerId = createdId;
+    }
+    if (customerId === null) {
+      logRefusal("customer_unavailable", environment);
+      return json(502, { error: "checkout_unavailable" });
+    }
+
+    // A completed checkout whose webhook has not landed yet still blocks.
+    const existing = await stripeRequest({
+      secretKey,
+      method: "GET",
+      path: `/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=20`,
+    });
+    if (!existing.ok) {
+      logRefusal("stripe_unavailable", environment);
+      return json(502, { error: "checkout_unavailable" });
+    }
+    if (hasBlockingStripeSubscription(existing.body)) {
+      logRefusal("already_subscribed", environment);
+      return json(409, { error: "already_subscribed" });
+    }
+
     const session = await stripeRequest({
-      secretKey: config.secretKey,
+      secretKey,
       method: "POST",
       path: "/checkout/sessions",
       form: buildCheckoutSessionForm({
         priceId: config.priceId,
         plan: config.plan,
         userId: user.id,
-        customerEmail: typeof user.email === "string" ? user.email : null,
+        customerId,
+      }),
+      idempotencyKey: checkoutIdempotencyKey({
+        userId: user.id,
+        plan: config.plan,
+        environment,
+        customerId,
+        nowMs: Date.now(),
       }),
     });
     const url = session.ok ? parseCheckoutSessionUrl(session.body) : null;

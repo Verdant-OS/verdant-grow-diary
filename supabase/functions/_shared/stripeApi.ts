@@ -16,14 +16,17 @@ export async function stripeRequest(input: {
   method: "GET" | "POST";
   path: string;
   form?: ReadonlyArray<readonly [string, string]>;
+  /** Stripe Idempotency-Key for a POST, so a repeat returns the first result. */
+  idempotencyKey?: string;
   fetchImpl?: typeof fetch;
 }): Promise<StripeApiResult> {
-  const { secretKey, method, path, form, fetchImpl = fetch } = input;
+  const { secretKey, method, path, form, idempotencyKey, fetchImpl = fetch } = input;
   if (!path.startsWith("/") || path.includes("..")) return { ok: false, status: 0 };
   const headers: Record<string, string> = { Authorization: `Bearer ${secretKey}` };
   let body: string | undefined;
   if (method === "POST") {
     headers["Content-Type"] = "application/x-www-form-urlencoded";
+    if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
     body = new URLSearchParams(form ? form.map(([k, v]) => [k, v]) : []).toString();
   }
   let response: Response;

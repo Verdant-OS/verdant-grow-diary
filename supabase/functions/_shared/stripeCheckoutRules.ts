@@ -121,11 +121,12 @@ export function buildCheckoutSessionForm(input: {
   priceId: string;
   plan: StripeCheckoutPlanKey;
   userId: string;
-  customerEmail: string | null;
+  customerId: string;
 }): Array<[string, string]> {
-  const { priceId, plan, userId, customerEmail } = input;
+  const { priceId, plan, userId, customerId } = input;
   const fields: Array<[string, string]> = [
     ["mode", "subscription"],
+    ["customer", customerId],
     ["line_items[0][price]", priceId],
     ["line_items[0][quantity]", "1"],
     ["client_reference_id", userId],
@@ -139,10 +140,134 @@ export function buildCheckoutSessionForm(input: {
       `${STRIPE_CHECKOUT_SITE_ORIGIN}${STRIPE_CHECKOUT_CANCEL_PATH}?checkout=canceled`,
     ],
   ];
-  if (typeof customerEmail === "string" && customerEmail.includes("@")) {
-    fields.push(["customer_email", customerEmail]);
+  return fields;
+}
+
+/** Form fields for POST /v1/customers: one Stripe customer per Verdant user. */
+export function buildCustomerForm(input: {
+  userId: string;
+  email: string | null;
+}): Array<[string, string]> {
+  const fields: Array<[string, string]> = [["metadata[user_id]", input.userId]];
+  if (typeof input.email === "string" && input.email.includes("@")) {
+    fields.push(["email", input.email]);
   }
   return fields;
+}
+
+/**
+ * The amount and interval each Pro plan must have in Stripe, in cents. They
+ * mirror src/constants/pricing.ts (Pro $12/mo, $99/yr, Cheek 2026-11-12);
+ * src/test/stripe-checkout-rules.test.ts fails if the two drift apart.
+ */
+export const STRIPE_PRO_EXPECTED_PRICES: Readonly<
+  Record<StripeCheckoutPlanKey, { unitAmount: number; interval: "month" | "year" }>
+> = Object.freeze({
+  pro_monthly: { unitAmount: 1200, interval: "month" },
+  pro_annual: { unitAmount: 9900, interval: "year" },
+});
+
+/**
+ * True only when a Stripe Price object is the active, recurring, single-period
+ * USD price this plan sells at, in the right mode. Anything else fails closed,
+ * so a mistyped price id in env never charges a grower the wrong amount.
+ */
+export function stripePriceMatchesPlan(
+  price: unknown,
+  plan: StripeCheckoutPlanKey,
+  environment: StripeBillingEnvironment,
+): boolean {
+  if (price === null || typeof price !== "object") return false;
+  const p = price as Record<string, unknown>;
+  const recurring = p.recurring as Record<string, unknown> | null | undefined;
+  const expected = STRIPE_PRO_EXPECTED_PRICES[plan];
+  return (
+    p.object === "price" &&
+    p.active === true &&
+    p.livemode === (environment === "live") &&
+    p.currency === "usd" &&
+    p.type === "recurring" &&
+    p.unit_amount === expected.unitAmount &&
+    recurring != null &&
+    typeof recurring === "object" &&
+    recurring.interval === expected.interval &&
+    recurring.interval_count === 1
+  );
+}
+
+/** Stripe subscription statuses that mean "already buying or bought". */
+const BLOCKING_SUBSCRIPTION_STATUSES: ReadonlySet<string> = new Set([
+  "active",
+  "trialing",
+  "past_due",
+  "unpaid",
+  "paused",
+  "incomplete",
+]);
+
+/**
+ * True when a GET /v1/subscriptions list for the customer holds a
+ * subscription that is live or still paying. This closes the window where a
+ * checkout completed but the webhook has not written our row yet. An
+ * unreadable body counts as blocking (fail closed).
+ */
+export function hasBlockingStripeSubscription(list: unknown): boolean {
+  const data = (list as { data?: unknown } | null)?.data;
+  if (!Array.isArray(data)) return true;
+  return data.some(
+    (item) =>
+      item !== null &&
+      typeof item === "object" &&
+      BLOCKING_SUBSCRIPTION_STATUSES.has(String((item as { status?: unknown }).status)),
+  );
+}
+
+const CUSTOMER_ID_RE = /^cus_[A-Za-z0-9]+$/;
+
+export function isStripeCustomerId(value: unknown): value is string {
+  return typeof value === "string" && CUSTOMER_ID_RE.test(value);
+}
+
+/**
+ * The caller's customer from a GET /v1/customers/search result, matched on
+ * the metadata our own function wrote, never on email.
+ */
+export function pickCustomerFromSearch(body: unknown, userId: string): string | null {
+  const data = (body as { data?: unknown } | null)?.data;
+  if (!Array.isArray(data)) return null;
+  for (const item of data) {
+    if (item === null || typeof item !== "object") continue;
+    const c = item as { id?: unknown; deleted?: unknown; metadata?: { user_id?: unknown } };
+    if (c.deleted === true) continue;
+    if (c.metadata?.user_id === userId && isStripeCustomerId(c.id)) return c.id;
+  }
+  return null;
+}
+
+/** Search query for the caller's customer. userId is a verified UUID. */
+export function customerSearchQuery(userId: string): string {
+  return `metadata['user_id']:'${userId.replace(/[^0-9a-fA-F-]/g, "")}'`;
+}
+
+/** Stripe idempotency window for a checkout start: repeat starts share one session. */
+export const CHECKOUT_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
+
+export function checkoutIdempotencyKey(input: {
+  userId: string;
+  plan: StripeCheckoutPlanKey;
+  environment: StripeBillingEnvironment;
+  customerId: string;
+  nowMs: number;
+}): string {
+  const window = Math.floor(input.nowMs / CHECKOUT_IDEMPOTENCY_WINDOW_MS);
+  return `verdant-checkout-${input.environment}-${input.userId}-${input.plan}-${input.customerId}-${window}`;
+}
+
+export function customerIdempotencyKey(
+  userId: string,
+  environment: StripeBillingEnvironment,
+): string {
+  return `verdant-customer-${environment}-${userId}`;
 }
 
 /**

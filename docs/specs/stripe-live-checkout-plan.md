@@ -126,7 +126,12 @@ Migration `20261101180000` is the test-mode sink and must never be applied.
 
 1. Activate the Stripe account for live payments (business, bank, identity).
 2. In live mode, create the products and prices: Pro $12/mo and $99/yr; Craft $29/mo and
-   $249/yr if Craft launches now.
+   $249/yr if Craft launches now. `established fact`: these are the prices in
+   `src/constants/pricing.ts` on the deploy branch, which `src/config/pricing.ts` and the
+   `/pricing` page read, and `src/test/pricing-monthly-label-free-tent.test.tsx` pins Pro at
+   $12. `source claim`: project memory records Pro at $19.99/mo and $199/yr, decided
+   2026-08-12. The code and that note disagree; which price launches is Cheek's call (§9),
+   and the Stripe prices must match whatever the site shows.
 3. Create a restricted live key and add it, the price ids and later the webhook secret to
    Supabase Edge secrets yourself. Do not paste keys into chat, PRs or Lovable.
 4. Add the webhook endpoint (the `stripe-webhook` function URL) in Stripe with the four
@@ -156,6 +161,8 @@ Migration `20261101180000` is the test-mode sink and must never be applied.
 | Pro $99/yr | $3.17 | $0.69 | $3.86 | $95.14 |
 | Craft $29/mo | $1.14 | $0.20 | $1.34 | $27.66 |
 | Craft $249/yr | $7.52 | $1.74 | $9.26 | $239.74 |
+| Pro $19.99/mo (Aug 12 note, not in code) | $0.88 | $0.14 | $1.02 | $18.97 |
+| Pro $199/yr (Aug 12 note, not in code) | $6.07 | $1.39 | $7.46 | $191.54 |
 
 - `NOT_MEASURED`: whether Stripe returns the card fee on a refund. Budget about $0.65 for
   the step 6 test purchase.
@@ -177,7 +184,9 @@ Migration `20261101180000` is the test-mode sink and must never be applied.
 ## 9. Cheek's decisions
 
 1. Repo server-side Stripe path (recommended) or Lovable-managed Stripe.
-2. Launch Pro only, or Pro and Craft together.
+2. Launch Pro only, or Pro and Craft together, and at which Pro price: the $12/$99 the
+   site shows today, or the $19.99/$199 from the Aug 12 note (that needs its own pricing
+   PR first, since tests pin the copy).
 3. Yes on each Edge deploy and secret listed in §4 and §5, at the exact reviewed SHA.
 4. Whether to apply #2876 now or with the later credit-pack slice.
 5. Whether Paddle checkout is frozen or kept as a second option for new sales.

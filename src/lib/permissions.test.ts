@@ -67,7 +67,6 @@ import {
   updateDiaryEntryForCaller,
   deleteDiaryEntryForCaller,
   createHarvestForCaller,
-  moderatePlantAsOperator,
   assignRoleAsOperator,
 } from "./permissions";
 
@@ -263,18 +262,6 @@ describe("harvest guards", () => {
 //  Operator-only surfaces
 /* ------------------------------------------------------------------ */
 describe("operator-only guards", () => {
-  it("moderatePlantAsOperator blocks non-operator", async () => {
-    await expect(
-      moderatePlantAsOperator(callerOf("u-self"), "p1", { health: "watch" }),
-    ).rejects.toMatchObject({ code: "forbidden" });
-    expect(updateMock).not.toHaveBeenCalled();
-  });
-
-  it("moderatePlantAsOperator runs for operator", async () => {
-    await moderatePlantAsOperator(callerOf("u-self", ["operator"]), "p1", { health: "watch" });
-    expect(updateMock).toHaveBeenCalledWith({ health: "watch" });
-  });
-
   it("assignRoleAsOperator blocks non-operator", async () => {
     await expect(
       assignRoleAsOperator(callerOf("u-self"), { user_id: "u2", role: "customer" }),

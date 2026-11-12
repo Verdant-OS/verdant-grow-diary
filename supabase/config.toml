@@ -24,6 +24,10 @@ project_id = "knkwiiywfkbqznbxwqfh"
     verify_jwt = false
   [functions.payments-webhook]
     verify_jwt = false
+  # stripe-checkout starts a Stripe hosted Checkout for the signed-in caller.
+  # Gateway JWT required, and the handler re-verifies via auth.getUser.
+  [functions.stripe-checkout]
+    verify_jwt = true
   # checkout-status re-verifies the caller JWT inside the function via
   # auth.getUser (defence in depth) but keeps platform verify_jwt off so
   # tests / previews can hit it without editing project auth config.

@@ -5,8 +5,8 @@ why: Step 1 of the one-tap Watered plan. Matthew, 2026-11-12: "Let's go with one
 branch: claude/water-unit-liters-default
 base: verdant-grow-diary @ c2884348875b3dd39f2059ecc323ac10c33cfde5 (2026-11-12; draft was read at a6be0915, target files unchanged)
 checkout: git fetch origin claude/water-unit-liters-default verdant-grow-diary && git switch claude/water-unit-liters-default
-pr: none
-head_sha: none
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2966 (draft)
+head_sha: 4d6253e0b20156714559b619e610e6b061825047 (build commit; the handoff-only follow-up commit moves the head)
 state: Non-locked part of step 1 built on the branch as a draft PR. Locked tests not edited, so the older units suites are expected red until they are.
 current_step: Waiting on Matthew's approval for the five locked files.
 next_action: On Matthew's recorded approval, unlock the five files in spec §6.2 with scorer-lock, make the §6.2 edits, rerun spec §7, and push.

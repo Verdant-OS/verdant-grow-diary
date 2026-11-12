@@ -32,7 +32,7 @@
     "check:canonical-shape": "node scripts/validate-canonical-shape.mjs dist",
     "check:title-description": "node scripts/validate-title-description.mjs dist",
     "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "node --max-old-space-size=8192 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "typecheck:irrigation-harnesses": "tsc -p tsconfig.irrigation-harness.json --noEmit",
     "lighthouse": "node scripts/run-lighthouse-ci.mjs",
     "lighthouse:home": "node scripts/run-lighthouse-ci.mjs --home",
@@ -452,7 +452,7 @@
     "*.{ts,tsx}": [
       "prettier --write",
       "eslint --fix",
-      "bash -c 'tsc -p tsconfig.json --noEmit --skipLibCheck'"
+      "bash -c 'node --max-old-space-size=8192 node_modules/typescript/bin/tsc -p tsconfig.json --noEmit --skipLibCheck'"
     ],
     "*.{js,jsx,mjs,cjs,json,css,md,html,yml,yaml}": [
       "prettier --write"

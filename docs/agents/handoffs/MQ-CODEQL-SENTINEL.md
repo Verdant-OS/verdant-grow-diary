@@ -10,7 +10,7 @@ checkout: git fetch origin cursor/merge-group-codeql-sentinel-52b1 verdant-grow-
 pr: see the pull request opened from this branch
 head_sha: workflow commit 82bf263a3b27a70062afd9c244e5152e20c4b3ff; if a later handoff-only commit is the branch tip, use git rev-parse HEAD on origin/cursor/merge-group-codeql-sentinel-52b1
 state: implemented
-current_step: workflow and handoff written; merge_group execution is NOT_MEASURED
+current_step: pull-request CodeQL upload failed because default setup is still enabled; merge_group execution is NOT_MEASURED
 next_action: After an authorized merge, confirm the four contexts appear on a real merge_group commit, then a repo admin re-requires them. Do not re-require them before that confirmation.
 post_merge_check: On the first merge_group commit after this lands, confirm these contexts exist: Governance files agree on Sentinel-Version; Analyze (actions); Analyze (python); CodeQL. A missing context reopens this task with the same owner.
 active_writer: cursor cloud agent on cursor/merge-group-codeql-sentinel-52b1
@@ -20,7 +20,7 @@ commands: bunx vitest run src/test/ci-pr-concurrency.test.ts src/test/workflow-b
   Result 2026-11-12: 3 files, 61 passed, 0 failed. js-yaml parsed both workflows. actionlint was not installed (NOT_MEASURED). Pre-commit docs-safety PASS and one vitest file 67 passed (hook output).
 files_touched: .github/workflows/sentinel-version-parity.yml, .github/workflows/codeql.yml, docs/agents/handoffs/MQ-CODEQL-SENTINEL.md
 files_remaining: none in this slice
-blockers: A repo admin must disable CodeQL default setup (dynamic/github-code-scanning/codeql) before this workflow can upload. That setting is outside the pull request. Until then, analyze uploads can fail because default setup and advanced setup cannot both upload.
+blockers: A repo admin must disable CodeQL default setup (dynamic/github-code-scanning/codeql) before this workflow can upload. Measured on PR head 65f5bd5694475999ca59fdc2892dd49d143ada4e, run https://github.com/Verdant-OS/verdant-grow-diary/actions/runs/43190352700: Analyze (actions), Analyze (python), and Analyze (javascript-typescript) each uploaded SARIF and then failed with "CodeQL analyses from advanced configurations cannot be processed when the default setup is enabled". Copilot (Agent Merge) failed separately with a monthly quota error (run 43194784003); that is outside this slice.
 open_questions: Whether the CodeQL rollup context name stays exactly CodeQL after default setup is disabled.
 gotchas: merge_group runs cannot be proven until the queue runs the workflow. Do not enqueue or merge from this task. Do not re-require the four contexts until a real merge_group commit shows them.
 links: NOT_MEASURED until the pull request exists

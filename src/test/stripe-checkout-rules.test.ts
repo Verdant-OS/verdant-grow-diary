@@ -10,6 +10,8 @@ import {
   buildCheckoutSessionForm,
   buildCustomerForm,
   checkoutIdempotencyKey,
+  checkoutSessionExpiresAt,
+  planOpenCheckoutSessions,
   customerIdempotencyKey,
   customerSearchQuery,
   hasBlockingStripeSubscription,
@@ -173,6 +175,7 @@ describe("buildCheckoutSessionForm", () => {
         plan: "pro_monthly",
         userId: USER,
         customerId: "cus_A1",
+        expiresAt: 1_794_502_920,
       }),
     );
     expect(form.get("mode")).toBe("subscription");
@@ -182,6 +185,7 @@ describe("buildCheckoutSessionForm", () => {
     expect(form.get("subscription_data[metadata][user_id]")).toBe(USER);
     expect(form.get("subscription_data[metadata][plan_key]")).toBe("pro_monthly");
     expect(form.get("customer")).toBe("cus_A1");
+    expect(form.get("expires_at")).toBe("1794502920");
     expect(form.has("customer_email")).toBe(false);
   });
 
@@ -192,6 +196,7 @@ describe("buildCheckoutSessionForm", () => {
         plan: "pro_annual",
         userId: USER,
         customerId: "cus_A1",
+        expiresAt: 1_794_502_920,
       }),
     );
     expect(form.get("success_url")).toBe("https://verdantgrowdiary.com/checkout/success");
@@ -204,6 +209,7 @@ describe("buildCheckoutSessionForm", () => {
       plan: "pro_annual" as const,
       userId: USER,
       customerId: "cus_A1",
+      expiresAt: 1_794_502_920,
     };
     expect(buildCheckoutSessionForm(input)).toEqual(buildCheckoutSessionForm(input));
   });
@@ -327,11 +333,9 @@ describe("one customer and one checkout per grower", () => {
   });
 
   it("writes the user id into a new customer's metadata", () => {
-    expect(buildCustomerForm({ userId: USER, email: "grower@example.com" })).toEqual([
-      ["metadata[user_id]", USER],
-      ["email", "grower@example.com"],
-    ]);
-    expect(buildCustomerForm({ userId: USER, email: null })).toEqual([["metadata[user_id]", USER]]);
+    // Identical every time, so the create's idempotency key can never clash,
+    // even after the grower changes their email.
+    expect(buildCustomerForm({ userId: USER })).toEqual([["metadata[user_id]", USER]]);
   });
 
   it("gives repeat starts in one ten-minute window the same idempotency key", () => {
@@ -352,5 +356,88 @@ describe("one customer and one checkout per grower", () => {
       checkoutIdempotencyKey({ ...base, plan: "pro_annual", nowMs: t }),
     );
     expect(customerIdempotencyKey(USER, "live")).toBe(`verdant-customer-live-${USER}`);
+  });
+});
+
+describe("one payable Checkout Session at a time", () => {
+  it("expires every session 32 to 42 minutes after creation, the same value per window", () => {
+    const windowStart = 1_794_500_400_000; // a ten-minute boundary
+    for (const offset of [0, 1, 5 * 60_000, 10 * 60_000 - 1]) {
+      const now = windowStart + offset;
+      const lifetimeSeconds = checkoutSessionExpiresAt(now) - Math.floor(now / 1000);
+      expect(lifetimeSeconds).toBeGreaterThanOrEqual(32 * 60);
+      expect(lifetimeSeconds).toBeLessThanOrEqual(42 * 60);
+      expect(checkoutSessionExpiresAt(now)).toBe(checkoutSessionExpiresAt(windowStart));
+    }
+    expect(checkoutSessionExpiresAt(windowStart + 10 * 60_000)).toBe(
+      checkoutSessionExpiresAt(windowStart) + 10 * 60,
+    );
+  });
+
+  const NOW_S = 1_794_500_000;
+  const open = (overrides: Record<string, unknown> = {}) => ({
+    id: "cs_live_a1",
+    status: "open",
+    url: "https://checkout.stripe.com/c/pay/cs_live_a1",
+    expires_at: NOW_S + 20 * 60,
+    metadata: { plan_key: "pro_monthly", user_id: USER },
+    ...overrides,
+  });
+  const plan = (data: unknown[], p: "pro_monthly" | "pro_annual" = "pro_monthly") =>
+    planOpenCheckoutSessions({ data }, { plan: p, userId: USER, nowSeconds: NOW_S });
+
+  it("hands back an open session for the same plan instead of opening another", () => {
+    expect(plan([open()])).toEqual({
+      reuseUrl: "https://checkout.stripe.com/c/pay/cs_live_a1",
+      expireIds: [],
+    });
+  });
+
+  it("expires an open session for the other plan, or one about to expire", () => {
+    expect(plan([open()], "pro_annual")).toEqual({ reuseUrl: null, expireIds: ["cs_live_a1"] });
+    expect(plan([open({ expires_at: NOW_S + 60 })])).toEqual({
+      reuseUrl: null,
+      expireIds: ["cs_live_a1"],
+    });
+  });
+
+  it("keeps one reusable session and expires the rest", () => {
+    expect(
+      plan([open(), open({ id: "cs_live_b2", url: "https://checkout.stripe.com/c/b2" })]),
+    ).toEqual({
+      reuseUrl: "https://checkout.stripe.com/c/pay/cs_live_a1",
+      expireIds: ["cs_live_b2"],
+    });
+  });
+
+  it("ignores sessions that are not open and fails closed on an unreadable list", () => {
+    expect(plan([open({ status: "complete" }), open({ status: "expired" })])).toEqual({
+      reuseUrl: null,
+      expireIds: [],
+    });
+    expect(
+      planOpenCheckoutSessions(null, { plan: "pro_monthly", userId: USER, nowSeconds: NOW_S }),
+    ).toBeNull();
+  });
+
+  it("gives a start that expired other sessions a fresh session key", () => {
+    const base = {
+      userId: USER,
+      plan: "pro_monthly" as const,
+      environment: "live" as const,
+      customerId: "cus_A1",
+      nowMs: 1_794_500_400_000,
+    };
+    const plain = checkoutIdempotencyKey(base);
+    const superseding = checkoutIdempotencyKey({
+      ...base,
+      supersedes: ["cs_live_b2", "cs_live_a1"],
+    });
+    expect(superseding).not.toBe(plain);
+    expect(superseding).toBe(
+      checkoutIdempotencyKey({ ...base, supersedes: ["cs_live_a1", "cs_live_b2"] }),
+    );
+    expect(checkoutIdempotencyKey({ ...base, supersedes: [] })).toBe(plain);
+    expect(superseding.length).toBeLessThanOrEqual(255);
   });
 });

@@ -8,12 +8,14 @@ import {
   buildCheckoutSessionForm,
   buildCustomerForm,
   checkoutIdempotencyKey,
+  checkoutSessionExpiresAt,
   customerIdempotencyKey,
   customerSearchQuery,
   hasBlockingStripeSubscription,
   isStripeCustomerId,
   parseCheckoutSessionUrl,
   pickCustomerFromSearch,
+  planOpenCheckoutSessions,
   resolveStripeCheckoutConfig,
   stripePriceMatchesPlan,
   type StripeCheckoutRefusal,
@@ -59,7 +61,6 @@ type LogReason =
   | "environment_unavailable"
   | "entitlement_unavailable"
   | "already_subscribed"
-  | "price_mismatch"
   | "customer_unavailable"
   | "stripe_unavailable"
   | "internal_error";
@@ -74,6 +75,15 @@ function logRefusal(reason: LogReason, environment?: string): void {
         environment: environment ?? "(unresolved)",
       }),
     );
+  } catch {
+    // Telemetry must never break checkout.
+  }
+}
+
+/** Error-level, separate event: a Stripe setup that is wrong, not just absent. */
+function logMisconfiguration(reason: "price_mismatch", environment: string): void {
+  try {
+    console.error(JSON.stringify({ event: "stripe_checkout_misconfigured", reason, environment }));
   } catch {
     // Telemetry must never break checkout.
   }
@@ -162,8 +172,11 @@ Deno.serve(async (req) => {
       return json(502, { error: "checkout_unavailable" });
     }
     if (!stripePriceMatchesPlan(price.body, config.plan, environment)) {
-      logRefusal("price_mismatch", environment);
-      return json(503, { error: "stripe_not_configured" });
+      // A misconfiguration, not "not set up yet": logged as an error under
+      // its own event so a cutover cannot look live while sales quietly
+      // fall back to Paddle. The grower still falls back.
+      logMisconfiguration("price_mismatch", environment);
+      return json(503, { error: "stripe_price_mismatch" });
     }
 
     // One Stripe customer per user: our own row first, then Stripe's search
@@ -192,10 +205,7 @@ Deno.serve(async (req) => {
         secretKey,
         method: "POST",
         path: "/customers",
-        form: buildCustomerForm({
-          userId: user.id,
-          email: typeof user.email === "string" ? user.email : null,
-        }),
+        form: buildCustomerForm({ userId: user.id }),
         idempotencyKey: customerIdempotencyKey(user.id, environment),
       });
       const createdId = created.ok ? (created.body as { id?: unknown } | null)?.id : null;
@@ -221,6 +231,38 @@ Deno.serve(async (req) => {
       return json(409, { error: "already_subscribed" });
     }
 
+    // At most one payable session per grower: hand back an open one for the
+    // same plan, expire any other, then create.
+    const nowMs = Date.now();
+    const openSessions = await stripeRequest({
+      secretKey,
+      method: "GET",
+      path: `/checkout/sessions?customer=${encodeURIComponent(customerId)}&status=open&limit=10`,
+    });
+    const openPlan = openSessions.ok
+      ? planOpenCheckoutSessions(openSessions.body, {
+          plan: config.plan,
+          userId: user.id,
+          nowSeconds: Math.floor(nowMs / 1000),
+        })
+      : null;
+    if (openPlan === null) {
+      logRefusal("stripe_unavailable", environment);
+      return json(502, { error: "checkout_unavailable" });
+    }
+    for (const sessionId of openPlan.expireIds) {
+      const expired = await stripeRequest({
+        secretKey,
+        method: "POST",
+        path: `/checkout/sessions/${encodeURIComponent(sessionId)}/expire`,
+      });
+      if (!expired.ok) {
+        logRefusal("stripe_unavailable", environment);
+        return json(502, { error: "checkout_unavailable" });
+      }
+    }
+    if (openPlan.reuseUrl !== null) return json(200, { url: openPlan.reuseUrl });
+
     const session = await stripeRequest({
       secretKey,
       method: "POST",
@@ -230,13 +272,15 @@ Deno.serve(async (req) => {
         plan: config.plan,
         userId: user.id,
         customerId,
+        expiresAt: checkoutSessionExpiresAt(nowMs),
       }),
       idempotencyKey: checkoutIdempotencyKey({
         userId: user.id,
         plan: config.plan,
         environment,
         customerId,
-        nowMs: Date.now(),
+        nowMs,
+        supersedes: openPlan.expireIds,
       }),
     });
     const url = session.ok ? parseCheckoutSessionUrl(session.body) : null;

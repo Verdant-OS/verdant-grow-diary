@@ -25,10 +25,12 @@ function loadHandler(
     price?: Row;
     searchCustomers?: Row[];
     stripeSubscriptions?: Row[];
+    openSessions?: Row[];
   } = {},
 ) {
   const stripeCalls: StripeCall[] = [];
   const warnings: Row[] = [];
+  const errors: Row[] = [];
   const env = new Map(
     Object.entries({
       SUPABASE_URL: "https://fixture.invalid",
@@ -86,6 +88,12 @@ function loadHandler(
     if (method === "GET" && path === "/subscriptions") {
       return reply({ data: options.stripeSubscriptions ?? [] });
     }
+    if (method === "GET" && path === "/checkout/sessions") {
+      return reply({ data: options.openSessions ?? [] });
+    }
+    if (method === "POST" && /^\/checkout\/sessions\/cs_[A-Za-z0-9_]+\/expire$/.test(path)) {
+      return reply({ status: "expired" });
+    }
     if (method === "POST" && path === "/checkout/sessions") {
       return reply({ url: "https://checkout.stripe.com/c/pay/cs_live_fx1" });
     }
@@ -100,7 +108,11 @@ function loadHandler(
     JSON,
     Date,
     fetch: fetchFixture,
-    console: { log() {}, error() {}, warn: (line: string) => warnings.push(JSON.parse(line)) },
+    console: {
+      log() {},
+      error: (line: string) => errors.push(JSON.parse(line)),
+      warn: (line: string) => warnings.push(JSON.parse(line)),
+    },
     Deno: {
       env: { get: (key: string) => env.get(key) },
       serve: (fn: typeof handler) => {
@@ -144,7 +156,7 @@ function loadHandler(
     );
     return { status: res.status, body: (await res.json()) as Row };
   }
-  return { request, stripeCalls, warnings };
+  return { request, stripeCalls, warnings, errors };
 }
 
 describe("stripe-checkout Edge function", () => {
@@ -172,10 +184,20 @@ describe("stripe-checkout Edge function", () => {
       "GET /customers/search",
       "POST /customers",
       "GET /subscriptions",
+      "GET /checkout/sessions",
       "POST /checkout/sessions",
     ]);
     const create = h.stripeCalls.find((c) => c.path === "/customers")!;
     expect(new URLSearchParams(create.body).get("metadata[user_id]")).toBe(USER);
+    // No email in the create, so an email change cannot clash with the key.
+    expect(new URLSearchParams(create.body).has("email")).toBe(false);
+    const session = h.stripeCalls.find(
+      (c) => c.method === "POST" && c.path === "/checkout/sessions",
+    )!;
+    const expiresAt = Number(new URLSearchParams(session.body).get("expires_at"));
+    const lifetime = expiresAt - Math.floor(Date.now() / 1000);
+    expect(lifetime).toBeGreaterThanOrEqual(31 * 60);
+    expect(lifetime).toBeLessThanOrEqual(42 * 60);
     expect(create.idempotencyKey).toBe(`verdant-customer-live-${USER}`);
   });
 
@@ -250,9 +272,59 @@ describe("stripe-checkout Edge function", () => {
     });
     expect(await h.request({ plan: "pro_monthly" })).toEqual({
       status: 503,
-      body: { error: "stripe_not_configured" },
+      body: { error: "stripe_price_mismatch" },
     });
     expect(h.stripeCalls.map((c) => c.path.split("?")[0])).toEqual(["/prices/price_liveMonthly1"]);
+    // Logged as an error under its own event, not as "not configured".
+    expect(h.errors).toEqual([
+      { event: "stripe_checkout_misconfigured", reason: "price_mismatch", environment: "live" },
+    ]);
+  });
+
+  it("hands back the grower's open session for the same plan instead of opening another", async () => {
+    const h = loadHandler({
+      openSessions: [
+        {
+          id: "cs_live_open1",
+          status: "open",
+          url: "https://checkout.stripe.com/c/pay/cs_live_open1",
+          expires_at: Math.floor(Date.now() / 1000) + 20 * 60,
+          metadata: { plan_key: "pro_monthly", user_id: USER },
+        },
+      ],
+    });
+    expect(await h.request({ plan: "pro_monthly" })).toEqual({
+      status: 200,
+      body: { url: "https://checkout.stripe.com/c/pay/cs_live_open1" },
+    });
+    expect(h.stripeCalls.some((c) => c.method === "POST" && c.path === "/checkout/sessions")).toBe(
+      false,
+    );
+  });
+
+  it("expires an open session for the other plan before opening a new one, with a fresh key", async () => {
+    const h = loadHandler({
+      openSessions: [
+        {
+          id: "cs_live_annual1",
+          status: "open",
+          url: "https://checkout.stripe.com/c/pay/cs_live_annual1",
+          expires_at: Math.floor(Date.now() / 1000) + 20 * 60,
+          metadata: { plan_key: "pro_annual", user_id: USER },
+        },
+      ],
+    });
+    expect((await h.request({ plan: "pro_monthly" })).status).toBe(200);
+    const posts = h.stripeCalls.filter((c) => c.method === "POST").map((c) => c.path);
+    expect(posts).toEqual([
+      "/customers",
+      "/checkout/sessions/cs_live_annual1/expire",
+      "/checkout/sessions",
+    ]);
+    const session = h.stripeCalls.find(
+      (c) => c.path === "/checkout/sessions" && c.method === "POST",
+    )!;
+    expect(session.idempotencyKey).toMatch(/^verdant-checkout-live-.+-[0-9a-f]{8}$/);
   });
 
   it("refuses an unsigned caller before any Stripe call", async () => {

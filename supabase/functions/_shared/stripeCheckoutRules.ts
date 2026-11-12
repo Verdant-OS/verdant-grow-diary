@@ -122,11 +122,14 @@ export function buildCheckoutSessionForm(input: {
   plan: StripeCheckoutPlanKey;
   userId: string;
   customerId: string;
+  /** Unix seconds; from checkoutSessionExpiresAt, so repeats send the same value. */
+  expiresAt: number;
 }): Array<[string, string]> {
-  const { priceId, plan, userId, customerId } = input;
+  const { priceId, plan, userId, customerId, expiresAt } = input;
   const fields: Array<[string, string]> = [
     ["mode", "subscription"],
     ["customer", customerId],
+    ["expires_at", String(expiresAt)],
     ["line_items[0][price]", priceId],
     ["line_items[0][quantity]", "1"],
     ["client_reference_id", userId],
@@ -143,16 +146,14 @@ export function buildCheckoutSessionForm(input: {
   return fields;
 }
 
-/** Form fields for POST /v1/customers: one Stripe customer per Verdant user. */
-export function buildCustomerForm(input: {
-  userId: string;
-  email: string | null;
-}): Array<[string, string]> {
-  const fields: Array<[string, string]> = [["metadata[user_id]", input.userId]];
-  if (typeof input.email === "string" && input.email.includes("@")) {
-    fields.push(["email", input.email]);
-  }
-  return fields;
+/**
+ * Form fields for POST /v1/customers: one Stripe customer per Verdant user.
+ * Only the user id, so the request is identical every time and its
+ * idempotency key can never clash (an email change used to make it 502).
+ * Checkout collects the email on Stripe's page.
+ */
+export function buildCustomerForm(input: { userId: string }): Array<[string, string]> {
+  return [["metadata[user_id]", input.userId]];
 }
 
 /**
@@ -252,15 +253,91 @@ export function customerSearchQuery(userId: string): string {
 /** Stripe idempotency window for a checkout start: repeat starts share one session. */
 export const CHECKOUT_IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
 
+/** FNV-1a 32-bit, hex. Deterministic and short; not a security hash. */
+function fnv1aHex(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+/**
+ * Idempotency key for creating a Checkout Session. `supersedes` lists the
+ * open sessions this start just expired: a start that expired another
+ * session gets a fresh key, so Stripe never hands back a session that an
+ * earlier start already expired, while two simultaneous starts that expired
+ * the same sessions still share one new session.
+ */
 export function checkoutIdempotencyKey(input: {
   userId: string;
   plan: StripeCheckoutPlanKey;
   environment: StripeBillingEnvironment;
   customerId: string;
   nowMs: number;
+  supersedes?: readonly string[];
 }): string {
   const window = Math.floor(input.nowMs / CHECKOUT_IDEMPOTENCY_WINDOW_MS);
-  return `verdant-checkout-${input.environment}-${input.userId}-${input.plan}-${input.customerId}-${window}`;
+  const base = `verdant-checkout-${input.environment}-${input.userId}-${input.plan}-${input.customerId}-${window}`;
+  const superseded = [...(input.supersedes ?? [])].sort();
+  return superseded.length === 0 ? base : `${base}-${fnv1aHex(superseded.join(","))}`;
+}
+
+/**
+ * When a Checkout Session expires, in unix seconds. Fixed per idempotency
+ * window (window start + 42 minutes), so a repeat start sends identical
+ * parameters, and every session lives 32 to 42 minutes: above Stripe's
+ * 30-minute minimum with room for clock skew, and far below the 24-hour
+ * default that let two open sessions turn into two subscriptions.
+ */
+export function checkoutSessionExpiresAt(nowMs: number): number {
+  const windowStartMs =
+    Math.floor(nowMs / CHECKOUT_IDEMPOTENCY_WINDOW_MS) * CHECKOUT_IDEMPOTENCY_WINDOW_MS;
+  return Math.floor((windowStartMs + 42 * 60 * 1000) / 1000);
+}
+
+/** An open session must still have this long to run to be handed out again. */
+export const OPEN_SESSION_MIN_REMAINING_SECONDS = 5 * 60;
+
+/**
+ * Decide what to do with the customer's open Checkout Sessions (GET
+ * /v1/checkout/sessions?customer=...&status=open) before starting a new one:
+ * hand back an open session for the same plan and user that still has time,
+ * and expire every other open one, so a grower never holds two payable
+ * sessions at once. An unreadable list returns null (fail closed).
+ */
+export function planOpenCheckoutSessions(
+  list: unknown,
+  input: { plan: StripeCheckoutPlanKey; userId: string; nowSeconds: number },
+): { reuseUrl: string | null; expireIds: string[] } | null {
+  const data = (list as { data?: unknown } | null)?.data;
+  if (!Array.isArray(data)) return null;
+  let reuseUrl: string | null = null;
+  const expireIds: string[] = [];
+  for (const item of data) {
+    if (item === null || typeof item !== "object") continue;
+    const session = item as {
+      id?: unknown;
+      status?: unknown;
+      url?: unknown;
+      expires_at?: unknown;
+      metadata?: { plan_key?: unknown; user_id?: unknown } | null;
+    };
+    if (session.status !== "open") continue;
+    if (typeof session.id !== "string" || !/^cs_[A-Za-z0-9_]+$/.test(session.id)) continue;
+    const url = parseCheckoutSessionUrl(session);
+    const reusable =
+      reuseUrl === null &&
+      url !== null &&
+      session.metadata?.plan_key === input.plan &&
+      session.metadata?.user_id === input.userId &&
+      typeof session.expires_at === "number" &&
+      session.expires_at - input.nowSeconds >= OPEN_SESSION_MIN_REMAINING_SECONDS;
+    if (reusable) reuseUrl = url;
+    else expireIds.push(session.id);
+  }
+  return { reuseUrl, expireIds };
 }
 
 export function customerIdempotencyKey(

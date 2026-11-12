@@ -9,11 +9,11 @@ base: verdant-grow-diary at c2884348875b3dd39f2059ecc323ac10c33cfde5
 pr: draft, opened by this task (see the PR for its number and head)
 head_sha: see the PR; this block is written before the first push
 state: Plan written at docs/specs/stripe-live-checkout-plan.md. Docs only. No code, schema, RLS, Edge, secret, Lovable or production change.
-current_step: Waiting on Cheek's decisions in section 9 of the plan.
+current_step: Building Slice A (entitlement reader sees Stripe rows) on this branch after Cheek's "Start Pro build" (2026-11-12 14:56 UTC). Code only; no deploy, secret, migration, Stripe or Lovable change.
 next_action: On Cheek's yes, open Slice A (entitlement reader sees Stripe rows) as its own PR with one owner and an independent exact-head reviewer. First run the read-only production checks in section 6.
 post_merge_check: NOT_APPLICABLE for a docs-only plan.
 active_writer: Claude thread session for this task.
-decisions: Recommend the repo server-side path (hosted Stripe Checkout started by a JWT-verified Edge function; a signed webhook as the only writer of Stripe rows; readable plan keys kept as price_id so KNOWN_PRICE_TO_PLAN stays the one grant table). No new table expected.
+decisions: Pro price is $12/mo and $99/yr, picked by Cheek 2026-11-12 15:03 UTC; this supersedes the 2026-08-12 note of $19.99/mo and $199/yr, and src/constants/pricing.ts stays as is. Recommend the repo server-side path (hosted Stripe Checkout started by a JWT-verified Edge function; a signed webhook as the only writer of Stripe rows; readable plan keys kept as price_id so KNOWN_PRICE_TO_PLAN stays the one grant table). No new table expected.
 tried_and_rejected: Payment Links alone (the user id would come from a client-built URL, against AGENTS.md section 5).
 commands: git grep -il stripe origin/verdant-grow-diary -- 'supabase/functions/*' 'src/*.ts' 'src/*.tsx'
 files_touched: docs/specs/stripe-live-checkout-plan.md; docs/agents/handoffs/STRIPE-LIVE-CHECKOUT-PLAN.md
@@ -27,5 +27,5 @@ reviewer_sha: NOT_MEASURED
 session_state: No routines, watchers or paused workflows started by this task.
 claimed_by: Claude thread session, 2026-11-12
 owner: Claude (plan author)
-last_updated: 2026-11-12, by Claude thread session
+last_updated: 2026-11-12 15:05 UTC, by Claude thread session
 ```

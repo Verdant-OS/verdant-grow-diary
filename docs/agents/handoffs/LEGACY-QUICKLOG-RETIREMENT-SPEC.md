@@ -1,7 +1,8 @@
 # LEGACY-QUICKLOG-RETIREMENT-SPEC
 
 ```text
-TASK LEGACY-QUICKLOG-RETIREMENT-SPEC  priority: P3  status: OPEN
+TASK LEGACY-QUICKLOG-RETIREMENT-SPEC  priority: P3  status: CLOSED
+closed: merged. #2950 merged into verdant-grow-diary on 2026-11-12 at 10:47 UTC as 58286d66fb8ed7380977c25d5301ec7e4a882512 (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2950), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: Give the owner an evidence-based plan for retiring the legacy Quick Log dialog, so the build order is a decision and not a guess. Docs only.
 why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8 found two Quick Log implementations. Matthew asked for the retirement next and chose "Write the spec first" on the decision card (2026-11-12), after inspection showed the legacy dialog is still a live save surface with no retirement plan in the repo.
 branch: claude/legacy-quicklog-retirement-spec
@@ -33,5 +34,5 @@ reviewer_sha: none current (last reviewed head f468b29adfce84661e4142d670493f02b
 session_state: no routines, no paused workflows; pending human decisions: spec section 8 (six items), review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-12 07:10 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
-last_updated: 2026-11-12 02:35 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-12 02:35 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8)
 ```

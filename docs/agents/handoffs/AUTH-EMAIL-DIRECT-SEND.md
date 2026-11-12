@@ -1,7 +1,8 @@
 # AUTH-EMAIL-DIRECT-SEND
 
 ```text
-TASK AUTH-EMAIL-DIRECT-SEND  priority: P2  status: OPEN
+TASK AUTH-EMAIL-DIRECT-SEND  priority: P2  status: CLOSED
+closed: merged. #2961 merged into verdant-grow-diary on 2026-11-12 at 12:37 UTC as a6be091539a3a8613ad78192e2ba6c84a71405fa (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2961), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: Verdant's sign-in emails (signup, magic link, recovery, invite, email change, reauthentication) send from Verdant's own domain through Lovable's managed sender, and the repo stops undoing that setup on every GitHub sync.
 why: Lovable switched supabase/functions/auth-email-hook to a direct sendLovableEmail call in 4e598b046 (2026-11-01, on the lovable-sync-* branches). That commit never reached verdant-grow-diary, which kept the older auth_emails queue version. Lovable's editor shows "Email update undone" and "deploy your email function" (read-only browser look, 2026-11-12), and the project's email_send_log had zero auth-template rows in the 30 days to 2026-11-12 (aggregate read, 2026-11-12). Cheek picked "Reviewed PR first" over letting Lovable redo and publish it (2026-11-12 09:00 UTC, project timeline).
 branch: claude/project-thread-do02zz
@@ -29,5 +30,5 @@ reviewer_sha: 7bd0158cc0ab6cb60d6f9b8163b80cb08a2987ce (superseded)
 session_state: no routines, no paused workflows; pending human decisions: review routing, the per-item merge yes, and any Lovable deploy or Publish
 claimed_by: Claude thread session, 2026-11-12 09:25 UTC
 owner: Claude thread session for this task
-last_updated: 2026-11-12 04:55 CT
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-12 04:55 CT)
 ```

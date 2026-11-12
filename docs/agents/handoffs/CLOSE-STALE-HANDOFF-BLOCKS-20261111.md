@@ -1,7 +1,8 @@
 # CLOSE-STALE-HANDOFF-BLOCKS-20261111
 
 ```text
-TASK CLOSE-STALE-HANDOFF-BLOCKS-20261111  priority: other  status: OPEN
+TASK CLOSE-STALE-HANDOFF-BLOCKS-20261111  priority: other  status: CLOSED
+closed: merged. #2928 merged into verdant-grow-diary on 2026-11-12 at 10:30 UTC as d9fc27721c4a7b0fbebd174c13c4cbc2bd44003c (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2928), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: Close the 12 handoff tasks that still read OPEN on the deploy branch although their PRs merged, without losing their unfinished items.
 why: AGENTS.md section 12 requires a merged task to be CLOSED with the reason and final SHA. A read-only audit on 2026-11-11 found 12 TASK lines reading OPEN: 11 legacy blocks in docs/agents/HANDOFF_LOG.md with no per-task file, and the 2026-11-06 bulk-close task's own file. GitHub listed only two open PRs (#2922, #2923), neither of them one of these, so the log misled cold agents about what is in flight. Matthew chose "Yes, draft the close-out" (source claim: his answer in this session, 2026-11-11).
 branch: claude/dreamy-franklin-n68jd4
@@ -35,7 +36,7 @@ reviewer_sha: none
 session_state: no production access used; no paused workflows; no scheduled routines. This session is subscribed to #2928's activity.
 claimed_by: Claude session_017UoYKuyQKXVV93JSwJJztt, 2026-11-11 (Matthew's assignment in this session)
 owner: Claude session_017UoYKuyQKXVV93JSwJJztt
-last_updated: 2026-11-11, by Claude session_017UoYKuyQKXVV93JSwJJztt
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-11, by Claude session_017UoYKuyQKXVV93JSwJJztt)
 ```
 
 ## Closed entries (12)

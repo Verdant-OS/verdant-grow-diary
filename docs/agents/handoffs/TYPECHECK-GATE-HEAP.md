@@ -1,7 +1,8 @@
 # TYPECHECK-GATE-HEAP
 
 ```text
-TASK TYPECHECK-GATE-HEAP  priority: P2  status: OPEN
+TASK TYPECHECK-GATE-HEAP  priority: P2  status: CLOSED
+closed: merged. #2938 merged into verdant-grow-diary on 2026-11-12 at 09:14 UTC as 9e2d6309017b2395fa58ce53163e90c4b5613830 (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2938), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: `bun run typecheck` and the pre-commit typecheck stop aborting with "JavaScript heap out of memory" and stop depending on the host's default Node heap.
 why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8, finding 6; Matthew asked for this slice in the audit session. Measured on that commit: `tsc -p tsconfig.json --noEmit --extendedDiagnostics` reports 8,310 files and Memory used 4,488,022K. In the authoring container (15 GB RAM, Node v22.23.4) the default heap limit is 2,096 MB and the bare command aborted after 46 s, exit 134. A 16 GB GitHub runner defaults to roughly 4 GB, so required CI passes today within a few hundred MB of the limit. The pre-commit hook runs the same compiler through lint-staged, so local commits of .ts files aborted too.
 branch: claude/typecheck-heap-gate
@@ -31,5 +32,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows; pending human decisions: mark ready, review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-11 21:20 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
-last_updated: 2026-11-11 15:20 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-11 15:20 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8)
 ```

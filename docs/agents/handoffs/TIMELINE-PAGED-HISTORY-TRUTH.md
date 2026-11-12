@@ -1,7 +1,8 @@
 # TIMELINE-PAGED-HISTORY-TRUTH
 
 ```text
-TASK TIMELINE-PAGED-HISTORY-TRUTH  priority: P2  status: OPEN
+TASK TIMELINE-PAGED-HISTORY-TRUTH  priority: P2  status: CLOSED
+closed: merged. #2934 merged into verdant-grow-diary on 2026-11-12 at 12:35 UTC as c50c422a92e377c25c737ce1e5ceb14c35ab0fe4 (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2934), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: Timeline keeps the older pages a grower already loaded when a save refreshes the newest page, counts a deletion made from the edit dialog, and says when the activity history panels hold fewer Quick Log events than exist.
 why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8 (session chat, Matthew chose this slice). Three confirmed defects in src/pages/Timeline.tsx: (1) the verdant:entry-created listener calls load(), which replaced the loaded rows and cursor with page one; (2) EntryEditDialog onDeleted filtered rows but left entriesTotal, so "Load older entries (N more)" read one too high; (3) grow_events is read with .limit(100) and nothing disclosed it.
 branch: claude/brave-fermat-u06ig6
@@ -32,5 +33,5 @@ reviewer_sha: none current (last reviewed head d4977722022d351fa7eebe51e9dc13938
 session_state: PR activity subscription held by the authoring session; no routines, no paused workflows; pending human decisions: review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-11 19:00 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
-last_updated: 2026-11-12 05:40 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-12 05:40 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8)
 ```

@@ -1,7 +1,8 @@
 # POSTHOG-USER-AGENT-AUTOMATION
 
 ```text
-TASK POSTHOG-USER-AGENT-AUTOMATION  priority: other  status: OPEN
+TASK POSTHOG-USER-AGENT-AUTOMATION  priority: other  status: CLOSED
+closed: merged. #2923 merged into verdant-grow-diary on 2026-11-12 at 12:06 UTC as 9c2d542aa6e1a84ae78ed5c980460eb243221609 (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2923), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: Keep the browser user agent on allowlisted PostHog events so that PostHog does not classify real growers as Automation traffic.
 why: A PostHog inbox report flagged most production web events as Automation with no user agent. PostHog SQL showed that the same sessions send an $identify with a real Chrome user agent (Regular) and pageviews, pageleaves, web vitals and product events with none (Automation / no_user_agent). The before_send allowlist in src/lib/posthogAnalyticsRules.ts dropped $raw_user_agent. The traffic is real users, not a crawler.
 branch: posthog-self-driving/investigateanalytics-production-traffic-6192c2 (name set by the PostHog run; it does not follow the <agent>/<slug> convention)
@@ -29,5 +30,5 @@ reviewer_sha: NOT_MEASURED
 session_state: no production writes; no GitHub comments; auto-merge off
 claimed_by: Claude PostHog self-driving session, 2026-11-10
 owner: OG Kush (default inheritor; this session ends after the draft PR)
-last_updated: 2026-11-10 03:00 CT, by Claude
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-10 03:00 CT, by Claude)
 ```

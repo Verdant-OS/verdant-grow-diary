@@ -1,7 +1,8 @@
 # OPERATOR-PLANTS-READ-ONLY
 
 ```text
-TASK OPERATOR-PLANTS-READ-ONLY  priority: P2  status: OPEN
+TASK OPERATOR-PLANTS-READ-ONLY  priority: P2  status: CLOSED
+closed: merged. #2941 merged into verdant-grow-diary on 2026-11-12 at 11:04 UTC as 5c3006159664bf84ad7fb41c9197fa15c2cea1df (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2941), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: An account holding the operator role can read growers' plants but can no longer UPDATE them. Growers' own plant edits are unchanged.
 why: Row-level security pass 2026-11-12 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8. Migration 20260517010926 created "Operators update all plants" (FOR UPDATE, USING and WITH CHECK on has_role(auth.uid(), 'operator') only): any operator could change every column of every grower's plant row. It is the only operator write policy on a core grow table, and no application surface used it (the only caller was the example helper moderatePlantAsOperator in src/lib/permissions.ts, referenced only by its own two unit tests). Matthew chose "Operator plants read-only" on the decision card.
 branch: claude/operator-plants-read-only
@@ -32,5 +33,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows; pending human decisions: mark ready, review routing, exact-head approval for a migration PR, the per-item merge yes, and the production apply
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-12 01:00 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
-last_updated: 2026-11-11 20:10 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-11 20:10 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8)
 ```

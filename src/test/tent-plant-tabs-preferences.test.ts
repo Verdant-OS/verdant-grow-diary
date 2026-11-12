@@ -51,12 +51,13 @@ describe("tentPlantTabsPreferences", () => {
   });
 
   it("does not write when tentId is missing or invalid", () => {
+    const before = window.localStorage.length;
     writeTentPlantTabsSelectedPlantId(null, "plant-1");
     writeTentPlantTabsSelectedPlantId(undefined, "plant-1");
     writeTentPlantTabsSelectedPlantId("   ", "plant-1");
     expect(tentPlantTabsSelectedKey(null)).toBeNull();
     expect(tentPlantTabsSelectedKey("   ")).toBeNull();
-    expect(window.localStorage.length).toBe(0);
+    expect(window.localStorage.length).toBe(before);
   });
 
   it("does not read when tentId is missing", () => {

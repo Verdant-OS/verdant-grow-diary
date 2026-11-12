@@ -7,11 +7,11 @@ why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8. Tw
 branch: claude/workflows-typecheck-gate
 base: verdant-grow-diary at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8
 checkout: git fetch origin claude/workflows-typecheck-gate verdant-grow-diary && git switch claude/workflows-typecheck-gate
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2947 (draft)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2947 (ready for review since 2026-11-12 06:53 UTC)
 head_sha: code at a96d3fcfb5eb7fa50c07bd204e02a54ad04945e6 (2026-11-12); a docs-only commit recording this PR link follows it, so read the current head from the PR
-state: implemented, local checks green, pushed draft
-current_step: draft PR open; required CI runs once it is marked ready
-next_action: mark ready when the owner says so, then route one independent exact-head review
+state: implemented, marked ready by owner decision; required CI and Codex review ran at ceeca580
+current_step: ready for review; Codex P2 (wrong runner platform in this handoff) corrected in the follow-up docs commit
+next_action: route one independent exact-head review once required checks are green at the current head
 post_merge_check: none on production (CI-only change). After merge, the next run of each of the two workflows should show the step executing `bun run typecheck` and passing. NOT_MEASURED until those workflows run.
 active_writer: Claude session_017UoYKvCNSMryxiQZyBbit8
 lane_note: docs/agents/OWNERSHIP.md lists CI infrastructure (workflows) under Codex's default lane. This slice was assigned to Claude by Matthew's explicit instruction, which controls under AGENTS.md section 0.1. No other workflow was touched.
@@ -24,13 +24,13 @@ commands: bunx vitest run src/test/workflows-typecheck-gate.test.ts src/test/eco
 files_touched: .github/workflows/demo-proof-walkthrough-readonly.yml; .github/workflows/ecowitt-windows-tooling.yml; src/test/workflows-typecheck-gate.test.ts (new); this file
 files_remaining: none for this slice
 blockers: none
-open_questions: ecowitt-windows-tooling.yml runs on a Windows runner; `bun run typecheck` there was not exercised locally (NOT_MEASURED). docs/bridge-trust-phase-a-freshness-checklist.md line 231 still shows the direct tsc command as a manual step; docs were not edited.
+open_questions: both workflows run on ubuntu-latest (ecowitt-windows-tooling.yml line 29, demo-proof-walkthrough-readonly.yml line 56); despite its name, the EcoWitt workflow does not use a Windows runner, so a hosted run does not exercise Windows. Neither workflow has run with this change yet (NOT_MEASURED). `bun run typecheck` on Windows is a separate, unmeasured question that this slice does not depend on. docs/bridge-trust-phase-a-freshness-checklist.md line 231 still shows the direct tsc command as a manual step; docs were not edited.
 gotchas: `bun run typecheck` (tsc) needs NODE_OPTIONS=--max-old-space-size=8192 in the authoring container until #2938 lands.
 links: #2938 (the heap ceiling on the typecheck script)
 artifacts: the test file above
 reviewer_seat: none routed yet
 reviewer_sha: none
-session_state: no routines, no paused workflows; pending human decisions: mark ready, review routing and the per-item merge yes
+session_state: no routines, no paused workflows; pending human decisions: review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-12 03:00 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
 last_updated: 2026-11-11 21:00 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8

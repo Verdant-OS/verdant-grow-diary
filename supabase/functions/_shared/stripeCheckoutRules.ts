@@ -128,6 +128,10 @@ export function buildCheckoutSessionForm(input: {
   const { priceId, plan, userId, customerId, expiresAt } = input;
   const fields: Array<[string, string]> = [
     ["mode", "subscription"],
+    // Cards only (Apple Pay and Google Pay are card wallets here). A card is
+    // settled before the subscription turns active; a delayed method such as
+    // a bank debit can fail days after Checkout completes, after Pro unlocked.
+    ["payment_method_types[0]", "card"],
     ["customer", customerId],
     ["expires_at", String(expiresAt)],
     ["line_items[0][price]", priceId],
@@ -264,22 +268,24 @@ function fnv1aHex(text: string): string {
 }
 
 /**
- * Idempotency key for creating a Checkout Session. `supersedes` lists the
- * open sessions this start just expired: a start that expired another
- * session gets a fresh key, so Stripe never hands back a session that an
- * earlier start already expired, while two simultaneous starts that expired
- * the same sessions still share one new session.
+ * Idempotency key for creating a Checkout Session. It names the customer,
+ * not the plan: two tabs starting monthly and annual at the same moment send
+ * one key with different parameters, so Stripe creates the first session and
+ * refuses the second, and the grower never holds two payable sessions.
+ * `supersedes` lists the open sessions this start just expired: a start that
+ * expired another session (a plan switch) gets a fresh key, so Stripe never
+ * hands back a session that an earlier start already expired, while two
+ * simultaneous starts that expired the same sessions still share one key.
  */
 export function checkoutIdempotencyKey(input: {
   userId: string;
-  plan: StripeCheckoutPlanKey;
   environment: StripeBillingEnvironment;
   customerId: string;
   nowMs: number;
   supersedes?: readonly string[];
 }): string {
   const window = Math.floor(input.nowMs / CHECKOUT_IDEMPOTENCY_WINDOW_MS);
-  const base = `verdant-checkout-${input.environment}-${input.userId}-${input.plan}-${input.customerId}-${window}`;
+  const base = `verdant-checkout-${input.environment}-${input.userId}-${input.customerId}-${window}`;
   const superseded = [...(input.supersedes ?? [])].sort();
   return superseded.length === 0 ? base : `${base}-${fnv1aHex(superseded.join(","))}`;
 }
@@ -338,6 +344,39 @@ export function planOpenCheckoutSessions(
     else expireIds.push(session.id);
   }
   return { reuseUrl, expireIds };
+}
+
+/**
+ * After creating a session, decide whether it may be handed out. Reads the
+ * customer's open sessions again: when another open session also exists (a
+ * second tab that raced past the idempotency window), the one created first
+ * wins, ties broken by id, so every racing start agrees on one keeper. Ours is
+ * kept only when it is listed and ranks first; otherwise it is expired and
+ * the start is refused. An unreadable list returns null (fail closed).
+ */
+export function keepCreatedCheckoutSession(list: unknown, sessionId: string): boolean | null {
+  const data = (list as { data?: unknown } | null)?.data;
+  if (!Array.isArray(data)) return null;
+  const open: Array<{ id: string; created: number }> = [];
+  for (const item of data) {
+    if (item === null || typeof item !== "object") continue;
+    const session = item as { id?: unknown; status?: unknown; created?: unknown };
+    if (session.status !== "open") continue;
+    if (typeof session.id !== "string" || !/^cs_[A-Za-z0-9_]+$/.test(session.id)) continue;
+    const created = typeof session.created === "number" ? session.created : Number.MAX_SAFE_INTEGER;
+    open.push({ id: session.id, created });
+  }
+  if (!open.some((session) => session.id === sessionId)) return false;
+  open.sort((a, b) => a.created - b.created || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return open[0].id === sessionId;
+}
+
+/** The id and hosted URL of a created Checkout Session, or null. */
+export function parseCreatedCheckoutSession(body: unknown): { id: string; url: string } | null {
+  const url = parseCheckoutSessionUrl(body);
+  const id = (body as { id?: unknown } | null)?.id;
+  if (url === null || typeof id !== "string" || !/^cs_[A-Za-z0-9_]+$/.test(id)) return null;
+  return { id, url };
 }
 
 export function customerIdempotencyKey(

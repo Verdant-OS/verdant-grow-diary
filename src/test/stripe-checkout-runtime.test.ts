@@ -26,6 +26,8 @@ function loadHandler(
     searchCustomers?: Row[];
     stripeSubscriptions?: Row[];
     openSessions?: Row[];
+    /** Another tab's session that appears right after ours is created. */
+    racingSession?: Row;
   } = {},
 ) {
   const stripeCalls: StripeCall[] = [];
@@ -66,6 +68,10 @@ function loadHandler(
     unit_amount: 1200,
     recurring: { interval: "month", interval_count: 1 },
   };
+  // Checkout Sessions as Stripe holds them; `created` counts up from 100.
+  const sessions: Row[] = (options.openSessions ?? []).map((session) => ({ ...session }));
+  const idempotency = new Map<string, { body: string; session: Row }>();
+  let clock = 100;
   const fetchFixture = async (
     url: string,
     init: { method?: string; body?: string; headers?: Record<string, string> },
@@ -80,6 +86,13 @@ function loadHandler(
       idempotencyKey: init.headers?.["Idempotency-Key"] ?? null,
     });
     const reply = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+    if (method === "GET" && path === "/prices/price_liveAnnual1") {
+      return reply({
+        ...price,
+        unit_amount: 9900,
+        recurring: { interval: "year", interval_count: 1 },
+      });
+    }
     if (method === "GET" && path.startsWith("/prices/")) return reply(price);
     if (method === "GET" && path === "/customers/search") {
       return reply({ data: options.searchCustomers ?? [] });
@@ -89,13 +102,46 @@ function loadHandler(
       return reply({ data: options.stripeSubscriptions ?? [] });
     }
     if (method === "GET" && path === "/checkout/sessions") {
-      return reply({ data: options.openSessions ?? [] });
+      return reply({ data: sessions.filter((session) => session.status === "open") });
     }
-    if (method === "POST" && /^\/checkout\/sessions\/cs_[A-Za-z0-9_]+\/expire$/.test(path)) {
+    const expire = /^\/checkout\/sessions\/(cs_[A-Za-z0-9_]+)\/expire$/.exec(path);
+    if (method === "POST" && expire) {
+      const session = sessions.find((candidate) => candidate.id === expire[1]);
+      if (session) session.status = "expired";
       return reply({ status: "expired" });
     }
     if (method === "POST" && path === "/checkout/sessions") {
-      return reply({ url: "https://checkout.stripe.com/c/pay/cs_live_fx1" });
+      // Stripe's idempotency: same key and body replays the session, same
+      // key with a different body is refused.
+      const key = init.headers?.["Idempotency-Key"] ?? "";
+      const seen = idempotency.get(key);
+      if (seen) {
+        if (seen.body !== (init.body ?? "")) {
+          return new Response(JSON.stringify({ error: { type: "idempotency_error" } }), {
+            status: 400,
+          });
+        }
+        return reply(seen.session);
+      }
+      const form = new URLSearchParams(init.body ?? "");
+      clock += 1;
+      const id = `cs_live_fx${clock}`;
+      const session: Row = {
+        id,
+        object: "checkout.session",
+        status: "open",
+        created: clock,
+        url: `https://checkout.stripe.com/c/pay/${id}`,
+        expires_at: Number(form.get("expires_at")),
+        metadata: {
+          plan_key: form.get("metadata[plan_key]"),
+          user_id: form.get("metadata[user_id]"),
+        },
+      };
+      sessions.push(session);
+      idempotency.set(key, { body: init.body ?? "", session });
+      if (options.racingSession) sessions.push({ status: "open", ...options.racingSession });
+      return reply(session);
     }
     return new Response("{}", { status: 404 });
   };
@@ -156,7 +202,9 @@ function loadHandler(
     );
     return { status: res.status, body: (await res.json()) as Row };
   }
-  return { request, stripeCalls, warnings, errors };
+  const openSessionIds = () =>
+    sessions.filter((session) => session.status === "open").map((session) => session.id);
+  return { request, stripeCalls, warnings, errors, openSessionIds };
 }
 
 describe("stripe-checkout Edge function", () => {
@@ -165,7 +213,7 @@ describe("stripe-checkout Edge function", () => {
     const res = await h.request({ plan: "pro_monthly", user_id: "attacker-chosen" });
     expect(res).toEqual({
       status: 200,
-      body: { url: "https://checkout.stripe.com/c/pay/cs_live_fx1" },
+      body: { url: "https://checkout.stripe.com/c/pay/cs_live_fx101" },
     });
     const session = h.stripeCalls.find((c) => c.path === "/checkout/sessions");
     expect(session).toBeDefined();
@@ -186,6 +234,7 @@ describe("stripe-checkout Edge function", () => {
       "GET /subscriptions",
       "GET /checkout/sessions",
       "POST /checkout/sessions",
+      "GET /checkout/sessions",
     ]);
     const create = h.stripeCalls.find((c) => c.path === "/customers")!;
     expect(new URLSearchParams(create.body).get("metadata[user_id]")).toBe(USER);
@@ -203,14 +252,59 @@ describe("stripe-checkout Edge function", () => {
 
   it("gives two quick starts the same Stripe idempotency key, so one session", async () => {
     const h = loadHandler();
-    await h.request({ plan: "pro_monthly" });
-    await h.request({ plan: "pro_monthly" });
+    const [first, second] = await Promise.all([
+      h.request({ plan: "pro_monthly" }),
+      h.request({ plan: "pro_monthly" }),
+    ]);
     const keys = h.stripeCalls
-      .filter((c) => c.path === "/checkout/sessions")
+      .filter((c) => c.method === "POST" && c.path === "/checkout/sessions")
       .map((c) => c.idempotencyKey);
     expect(keys).toHaveLength(2);
     expect(keys[0]).toMatch(/^verdant-checkout-live-/);
     expect(keys[0]).toBe(keys[1]);
+    expect(first).toEqual(second);
+    expect(first.status).toBe(200);
+  });
+
+  it("lets monthly and annual started together open only one payable checkout", async () => {
+    const h = loadHandler({ env: { STRIPE_PRICE_PRO_ANNUAL_LIVE: "price_liveAnnual1" } });
+    const results = await Promise.all([
+      h.request({ plan: "pro_monthly" }),
+      h.request({ plan: "pro_annual" }),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 502]);
+    expect(h.openSessionIds()).toHaveLength(1);
+  });
+
+  it("expires its own session and refuses when another tab's session came first", async () => {
+    const h = loadHandler({
+      racingSession: {
+        id: "cs_live_othertab",
+        created: 50,
+        url: "https://checkout.stripe.com/c/pay/cs_live_othertab",
+        metadata: { plan_key: "pro_annual", user_id: USER },
+      },
+    });
+    expect(await h.request({ plan: "pro_monthly" })).toEqual({
+      status: 409,
+      body: { error: "checkout_in_progress" },
+    });
+    expect(h.openSessionIds()).toEqual(["cs_live_othertab"]);
+  });
+
+  it("keeps its own session when another tab's session came later", async () => {
+    const h = loadHandler({
+      racingSession: {
+        id: "cs_live_othertab",
+        created: 999,
+        url: "https://checkout.stripe.com/c/pay/cs_live_othertab",
+        metadata: { plan_key: "pro_annual", user_id: USER },
+      },
+    });
+    expect(await h.request({ plan: "pro_monthly" })).toEqual({
+      status: 200,
+      body: { url: "https://checkout.stripe.com/c/pay/cs_live_fx101" },
+    });
   });
 
   it("reuses the customer on the grower's own Stripe row without searching Stripe", async () => {

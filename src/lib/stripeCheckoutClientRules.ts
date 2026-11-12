@@ -41,6 +41,7 @@ export function readStripeCheckoutUrl(data: unknown): string | null {
 export function stripeCheckoutErrorMessage(code: string | null): string {
   if (code === "already_subscribed") return STRIPE_CHECKOUT_COPY.alreadySubscribed;
   if (code === "auth_required") return STRIPE_CHECKOUT_COPY.signInRequired;
+  if (code === "checkout_in_progress") return STRIPE_CHECKOUT_COPY.inProgress;
   return STRIPE_CHECKOUT_COPY.unavailable;
 }
 

@@ -13,7 +13,8 @@ import {
   customerSearchQuery,
   hasBlockingStripeSubscription,
   isStripeCustomerId,
-  parseCheckoutSessionUrl,
+  keepCreatedCheckoutSession,
+  parseCreatedCheckoutSession,
   pickCustomerFromSearch,
   planOpenCheckoutSessions,
   resolveStripeCheckoutConfig,
@@ -63,6 +64,7 @@ type LogReason =
   | "already_subscribed"
   | "customer_unavailable"
   | "stripe_unavailable"
+  | "checkout_in_progress"
   | "internal_error";
 
 /** One JSON line, no user id, no keys, no Stripe ids, no request echo. */
@@ -276,19 +278,41 @@ Deno.serve(async (req) => {
       }),
       idempotencyKey: checkoutIdempotencyKey({
         userId: user.id,
-        plan: config.plan,
         environment,
         customerId,
         nowMs,
         supersedes: openPlan.expireIds,
       }),
     });
-    const url = session.ok ? parseCheckoutSessionUrl(session.body) : null;
-    if (url === null) {
+    const created = session.ok ? parseCreatedCheckoutSession(session.body) : null;
+    if (created === null) {
       logRefusal("stripe_unavailable", environment);
       return json(502, { error: "checkout_unavailable" });
     }
-    return json(200, { url });
+
+    // A second tab that raced past the idempotency key would leave two
+    // payable sessions. Read the open sessions again: only the first-created
+    // one is handed out, and ours is expired if it is not that one.
+    const afterCreate = await stripeRequest({
+      secretKey,
+      method: "GET",
+      path: `/checkout/sessions?customer=${encodeURIComponent(customerId)}&status=open&limit=10`,
+    });
+    const keep = afterCreate.ok ? keepCreatedCheckoutSession(afterCreate.body, created.id) : null;
+    if (keep !== true) {
+      await stripeRequest({
+        secretKey,
+        method: "POST",
+        path: `/checkout/sessions/${encodeURIComponent(created.id)}/expire`,
+      });
+      if (keep === false) {
+        logRefusal("checkout_in_progress", environment);
+        return json(409, { error: "checkout_in_progress" });
+      }
+      logRefusal("stripe_unavailable", environment);
+      return json(502, { error: "checkout_unavailable" });
+    }
+    return json(200, { url: created.url });
   } catch {
     logRefusal("internal_error", environment);
     return json(500, { error: "checkout_unavailable" });

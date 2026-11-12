@@ -11,6 +11,8 @@ import {
   buildCustomerForm,
   checkoutIdempotencyKey,
   checkoutSessionExpiresAt,
+  keepCreatedCheckoutSession,
+  parseCreatedCheckoutSession,
   planOpenCheckoutSessions,
   customerIdempotencyKey,
   customerSearchQuery,
@@ -189,6 +191,19 @@ describe("buildCheckoutSessionForm", () => {
     expect(form.has("customer_email")).toBe(false);
   });
 
+  it("takes cards only, so Pro never unlocks on a payment that can still fail", () => {
+    const fields = buildCheckoutSessionForm({
+      priceId: "price_liveMonthly1",
+      plan: "pro_monthly",
+      userId: USER,
+      customerId: "cus_A1",
+      expiresAt: 1_794_502_920,
+    });
+    expect(fields.filter(([name]) => name.startsWith("payment_method_types"))).toEqual([
+      ["payment_method_types[0]", "card"],
+    ]);
+  });
+
   it("redirects only to fixed paths on the production host", () => {
     const form = new Map(
       buildCheckoutSessionForm({
@@ -341,7 +356,6 @@ describe("one customer and one checkout per grower", () => {
   it("gives repeat starts in one ten-minute window the same idempotency key", () => {
     const base = {
       userId: USER,
-      plan: "pro_monthly" as const,
       environment: "live" as const,
       customerId: "cus_A1",
     };
@@ -351,9 +365,6 @@ describe("one customer and one checkout per grower", () => {
     );
     expect(checkoutIdempotencyKey({ ...base, nowMs: t })).not.toBe(
       checkoutIdempotencyKey({ ...base, nowMs: t + 10 * 60 * 1000 }),
-    );
-    expect(checkoutIdempotencyKey({ ...base, nowMs: t })).not.toBe(
-      checkoutIdempotencyKey({ ...base, plan: "pro_annual", nowMs: t }),
     );
     expect(customerIdempotencyKey(USER, "live")).toBe(`verdant-customer-live-${USER}`);
   });
@@ -423,7 +434,6 @@ describe("one payable Checkout Session at a time", () => {
   it("gives a start that expired other sessions a fresh session key", () => {
     const base = {
       userId: USER,
-      plan: "pro_monthly" as const,
       environment: "live" as const,
       customerId: "cus_A1",
       nowMs: 1_794_500_400_000,
@@ -439,5 +449,59 @@ describe("one payable Checkout Session at a time", () => {
     );
     expect(checkoutIdempotencyKey({ ...base, supersedes: [] })).toBe(plain);
     expect(superseding.length).toBeLessThanOrEqual(255);
+  });
+});
+
+describe("a second tab cannot open a second payable checkout", () => {
+  it("names the customer, not the plan, in the session key", () => {
+    // Monthly and annual at the same moment send one key with different
+    // parameters, so Stripe creates the first session and refuses the second.
+    const key = checkoutIdempotencyKey({
+      userId: USER,
+      environment: "live",
+      customerId: "cus_A1",
+      nowMs: 1_794_500_400_000,
+    });
+    expect(key).not.toMatch(/pro_monthly|pro_annual/);
+  });
+
+  const open = (id: string, created: number, status = "open") => ({ id, created, status });
+
+  it("keeps the session created first and refuses the later one", () => {
+    const list = { data: [open("cs_live_b2", 200), open("cs_live_a1", 100)] };
+    expect(keepCreatedCheckoutSession(list, "cs_live_a1")).toBe(true);
+    expect(keepCreatedCheckoutSession(list, "cs_live_b2")).toBe(false);
+  });
+
+  it("breaks a tie on the id, so both racing starts agree", () => {
+    const list = { data: [open("cs_live_b2", 100), open("cs_live_a1", 100)] };
+    expect(keepCreatedCheckoutSession(list, "cs_live_a1")).toBe(true);
+    expect(keepCreatedCheckoutSession(list, "cs_live_b2")).toBe(false);
+  });
+
+  it("ignores sessions that are not open, and refuses ours when it is gone", () => {
+    expect(
+      keepCreatedCheckoutSession(
+        { data: [open("cs_live_a1", 50, "expired"), open("cs_live_b2", 100)] },
+        "cs_live_b2",
+      ),
+    ).toBe(true);
+    expect(keepCreatedCheckoutSession({ data: [open("cs_live_b2", 100)] }, "cs_live_a1")).toBe(
+      false,
+    );
+    expect(keepCreatedCheckoutSession({ error: "x" }, "cs_live_a1")).toBeNull();
+  });
+
+  it("reads a created session's id and hosted URL, and nothing else", () => {
+    expect(
+      parseCreatedCheckoutSession({
+        id: "cs_live_a1",
+        url: "https://checkout.stripe.com/c/pay/cs_live_a1",
+      }),
+    ).toEqual({ id: "cs_live_a1", url: "https://checkout.stripe.com/c/pay/cs_live_a1" });
+    expect(parseCreatedCheckoutSession({ url: "https://checkout.stripe.com/c/pay/x" })).toBeNull();
+    expect(
+      parseCreatedCheckoutSession({ id: "cs_live_a1", url: "https://evil.example/c" }),
+    ).toBeNull();
   });
 });

@@ -66,6 +66,9 @@ describe("stripeCheckoutErrorMessage", () => {
       STRIPE_CHECKOUT_COPY.alreadySubscribed,
     );
     expect(stripeCheckoutErrorMessage("auth_required")).toBe(STRIPE_CHECKOUT_COPY.signInRequired);
+    expect(stripeCheckoutErrorMessage("checkout_in_progress")).toBe(
+      STRIPE_CHECKOUT_COPY.inProgress,
+    );
     for (const code of ["checkout_unavailable", "plan_not_sold", "<script>", null]) {
       expect(stripeCheckoutErrorMessage(code)).toBe(STRIPE_CHECKOUT_COPY.unavailable);
     }

@@ -16,18 +16,18 @@ post_merge_check: after a deploy that Cheek approves, request a sign-in email fo
 active_writer: Claude thread session for project thread cmsg_01P7pGxx3V5wxVuLXvJUxaGsDb2mPjWBxVLtwJZkM4i1Cw
 decisions: (1) Restore exactly the auth-email-hook file from 4e598b046 rather than hand-writing a new send path, so the repo matches what Lovable's managed setup expects. (2) Only the sign-in hook moves. Owner alerts, receipts and other app email keep the queue (process-email-queue, send-transactional-email) unchanged. (3) No migration change: email_send_log already allows sent, suppressed and failed. The merged migration 20260707153206_email_infra.sql is untouched (AGENTS.md section 5). (4) The From display name stays "verdantgrowdiary-com"; changing it is Cheek's open decision.
 tried_and_rejected: Lovable's own restore plan (2026-11-12, plan mode, not approved): it also rewrites the six templates, adds handle-email-events, moves all app email to the managed helper, and deletes four functions plus the merged migration. Rejected for this slice: larger scope, and deleting a merged migration breaks the published-migration integrity gate.
-commands: node scripts/check-edge-function-domain-reach.mjs ; node --test scripts/check-edge-function-domain-reach.test.mjs ; bunx vitest run src/test/auth-email-hook-direct-send-guard.test.ts --reporter=dot
-files_touched: supabase/functions/auth-email-hook/index.ts; config/edge-function-domain-reach.json; src/test/auth-email-hook-direct-send-guard.test.ts (new); docs/agents/handoffs/AUTH-EMAIL-DIRECT-SEND.md (new)
+commands: node scripts/check-edge-function-domain-reach.mjs ; node --test scripts/check-edge-function-domain-reach.test.mjs ; bunx vitest run src/test/auth-email-hook-direct-send-guard.test.ts src/test/auth-email-hook-runtime.test.ts --reporter=dot
+files_touched: supabase/functions/auth-email-hook/index.ts; config/edge-function-domain-reach.json; src/test/auth-email-hook-direct-send-guard.test.ts (new); src/test/auth-email-hook-runtime.test.ts (new); src/test/helpers/authEmailHookHarness.ts (new); docs/agents/handoffs/AUTH-EMAIL-DIRECT-SEND.md (new)
 files_remaining: none for this slice
 blockers: bun install --frozen-lockfile fails here (403 on the pinned registry tarballs), so typecheck, lint and the full suite were not run locally; CI owns them.
 open_questions: (1) Whether Lovable's managed setup also needs the retired queue files removed before it shows the update as applied (Lovable's claim, unverified). (2) Display name. (3) Whether the production Supabase send-email hook is on.
-gotchas: the guard test is a declared source scan (Deno module with npm: imports). Keep the manifest entry for auth-email-hook in step with the hook's RPC calls.
+gotchas: the runtime harness (src/test/helpers/authEmailHookHarness.ts) runs the real hook in a vm with the Lovable libraries, React Email and Supabase substituted; the signature check is the stub's, so real verification stays the library's. The guard test is a declared source scan (Deno module with npm: imports). Keep the manifest entry for auth-email-hook in step with the hook's RPC calls.
 links: Lovable sandbox commit 4e598b046 (lovable-sync-1793513359 and siblings)
 artifacts: the guard test above
-reviewer_seat: none routed yet
-reviewer_sha: none
+reviewer_seat: Codex connector review (non-author) ran at 7bd0158cc0ab6cb60d6f9b8163b80cb08a2987ce and found one P1 (no runtime harness); fixed by the runtime harness commit. A new exact-head review is needed at the new head.
+reviewer_sha: 7bd0158cc0ab6cb60d6f9b8163b80cb08a2987ce (superseded)
 session_state: no routines, no paused workflows; pending human decisions: review routing, the per-item merge yes, and any Lovable deploy or Publish
 claimed_by: Claude thread session, 2026-11-12 09:25 UTC
 owner: Claude thread session for this task
-last_updated: 2026-11-12 03:25 CT
+last_updated: 2026-11-12 04:55 CT
 ```

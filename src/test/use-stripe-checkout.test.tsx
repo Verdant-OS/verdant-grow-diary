@@ -14,6 +14,14 @@ vi.mock("@/lib/stripeCheckoutService", () => ({
   requestStripeCheckout: (...args: unknown[]) => requestMock(...args),
 }));
 vi.mock("@/hooks/use-toast", () => ({ toast: (...args: unknown[]) => toastMock(...args) }));
+const trackMock = vi.fn();
+const markMock = vi.fn();
+vi.mock("@/lib/funnelAnalytics", () => ({
+  trackFunnelEvent: (...args: unknown[]) => trackMock(...args),
+}));
+vi.mock("@/lib/checkoutContextRules", () => ({
+  markCheckoutStarted: (...args: unknown[]) => markMock(...args),
+}));
 
 describe("useStripeCheckout", () => {
   const assign = vi.fn();
@@ -21,6 +29,8 @@ describe("useStripeCheckout", () => {
   beforeEach(() => {
     requestMock.mockReset();
     toastMock.mockReset();
+    trackMock.mockReset();
+    markMock.mockReset();
     assign.mockReset();
     Object.defineProperty(window, "location", {
       configurable: true,
@@ -108,5 +118,33 @@ describe("useStripeCheckout", () => {
       outcome = await result.current.startStripeCheckout("pro_monthly");
     });
     expect(outcome).toBe("redirecting");
+  });
+
+  it("records checkout_started and the checkout marker before leaving for Stripe", async () => {
+    requestMock.mockResolvedValue({ ok: true, url: "https://checkout.stripe.com/c/pay/cs_1" });
+    assign.mockImplementation(() => {
+      // Both must already be recorded when the browser leaves.
+      expect(trackMock).toHaveBeenCalledWith("checkout_started", { plan: "pro_annual" });
+      expect(markMock).toHaveBeenCalledWith(expect.any(Number), "plan");
+    });
+    const { result } = renderHook(() => useStripeCheckout());
+    await act(async () => {
+      await result.current.startStripeCheckout("pro_annual");
+    });
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
+  it("records nothing when it falls back to Paddle or is refused", async () => {
+    requestMock.mockResolvedValue({ ok: false, code: "stripe_not_configured", status: 503 });
+    const { result } = renderHook(() => useStripeCheckout());
+    await act(async () => {
+      await result.current.startStripeCheckout("pro_monthly");
+    });
+    requestMock.mockResolvedValue({ ok: false, code: "already_subscribed", status: 409 });
+    await act(async () => {
+      await result.current.startStripeCheckout("pro_monthly");
+    });
+    expect(trackMock).not.toHaveBeenCalled();
+    expect(markMock).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
+import { markCheckoutStarted } from "@/lib/checkoutContextRules";
+import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { requestStripeCheckout } from "@/lib/stripeCheckoutService";
 import {
   shouldFallBackToPaddle,
@@ -17,6 +19,8 @@ export type StripeCheckoutOutcome = "redirecting" | "fallback" | "failed" | "bus
  *   stays disabled through the redirect.
  * - "fallback" means the Stripe side is not live here; the caller opens
  *   Paddle instead, and no error is shown.
+ * - On a valid session it records checkout_started and the checkout-context
+ *   marker before leaving, as the Paddle path does.
  * - Coming Back from Stripe restores the page from the back-forward cache
  *   with `loading` still true, so a `pageshow` from that cache resets it and
  *   the Pro button works again.
@@ -45,6 +49,12 @@ export function useStripeCheckout(): {
       setLoading(true);
       const result = await requestStripeCheckout(plan);
       if (result.ok) {
+        // Same funnel ping and same-device checkout marker as the Paddle
+        // path, so /checkout/success shows "confirming" and can record
+        // subscription_activated. Only after the server handed back a valid
+        // session: a fallback to Paddle records its own start.
+        trackFunnelEvent("checkout_started", { plan });
+        markCheckoutStarted(Date.now(), "plan");
         window.location.assign(result.url);
         return "redirecting";
       }

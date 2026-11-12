@@ -111,6 +111,7 @@ for (const mode of ["close/reopen", "reload onto another plant"] as const) {
       await fenceBrowser(context, f.env);
       const otherBefore = fingerprint(await witnessRows(f));
       expect(await wateringRows(f.other)).toEqual([]);
+      await context.addInitScript(() => localStorage.setItem("verdant:waterVolumeEntryUnit", "ml"));
       await signIn(page, f);
       await page.goto(plantUrl(f, f.primary));
       await openQuickLog(page);

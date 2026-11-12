@@ -7,11 +7,11 @@ why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8. Tw
 branch: claude/workflows-typecheck-gate
 base: verdant-grow-diary at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8
 checkout: git fetch origin claude/workflows-typecheck-gate verdant-grow-diary && git switch claude/workflows-typecheck-gate
-pr: not opened yet when this block was written; read it from the branch
-head_sha: read the current head from the PR
-state: implemented, local checks green
-current_step: committed locally; push target awaiting the owner's choice
-next_action: push and open a draft PR once the owner confirms the branch; then mark ready on request and route one independent exact-head review
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2947 (draft)
+head_sha: code at a96d3fcfb5eb7fa50c07bd204e02a54ad04945e6 (2026-11-12); a docs-only commit recording this PR link follows it, so read the current head from the PR
+state: implemented, local checks green, pushed draft
+current_step: draft PR open; required CI runs once it is marked ready
+next_action: mark ready when the owner says so, then route one independent exact-head review
 post_merge_check: none on production (CI-only change). After merge, the next run of each of the two workflows should show the step executing `bun run typecheck` and passing. NOT_MEASURED until those workflows run.
 active_writer: Claude session_017UoYKvCNSMryxiQZyBbit8
 lane_note: docs/agents/OWNERSHIP.md lists CI infrastructure (workflows) under Codex's default lane. This slice was assigned to Claude by Matthew's explicit instruction, which controls under AGENTS.md section 0.1. No other workflow was touched.
@@ -30,7 +30,7 @@ links: #2938 (the heap ceiling on the typecheck script)
 artifacts: the test file above
 reviewer_seat: none routed yet
 reviewer_sha: none
-session_state: no routines, no paused workflows; pending human decisions: push target, mark ready, review routing and the per-item merge yes
+session_state: no routines, no paused workflows; pending human decisions: mark ready, review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-12 03:00 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
 last_updated: 2026-11-11 21:00 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8

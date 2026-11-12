@@ -111,14 +111,14 @@ customer portal, tax, coupons, removing Paddle. Each is its own later slice.
 
 ## 4. Schema, RLS and Edge changes, each flagged for Cheek's yes
 
-| Change | Kind | Needs his yes |
-| --- | --- | --- |
-| None to tables or RLS | `inference`: columns exist per migration `20261104184500` | Read-only production check first (§6) |
-| Shared entitlement reader | Edge (shared code) redeploy | Yes |
-| `stripe-checkout` | New Edge function | Yes |
-| `stripe-webhook` + `config.toml` | New Edge function, gateway setting | Yes |
-| Migration `20261104233500` (#2876) apply | Production SQL | Yes; needed before credit packs, not for subscriptions |
-| Any migration the production check shows is missing | New additive migration | Yes |
+| Change                                              | Kind                                                      | Needs his yes                                          |
+| --------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------ |
+| None to tables or RLS                               | `inference`: columns exist per migration `20261104184500` | Read-only production check first (§6)                  |
+| Shared entitlement reader                           | Edge (shared code) redeploy                               | Yes                                                    |
+| `stripe-checkout`                                   | New Edge function                                         | Yes                                                    |
+| `stripe-webhook` + `config.toml`                    | New Edge function, gateway setting                        | Yes                                                    |
+| Migration `20261104233500` (#2876) apply            | Production SQL                                            | Yes; needed before credit packs, not for subscriptions |
+| Any migration the production check shows is missing | New additive migration                                    | Yes                                                    |
 
 Migration `20261101180000` is the test-mode sink and must never be applied.
 
@@ -155,14 +155,14 @@ Migration `20261101180000` is the test-mode sink and must never be applied.
 - Stripe Billing (subscriptions): 0.7% of Billing volume, pay as you go.
 - `inference` (arithmetic on those rates, before tax or international cards):
 
-| Plan | Card fee | Billing fee | Total fee | Net |
-| --- | --- | --- | --- | --- |
-| Pro $12/mo | $0.65 | $0.08 | $0.73 | $11.27 |
-| Pro $99/yr | $3.17 | $0.69 | $3.86 | $95.14 |
-| Craft $29/mo | $1.14 | $0.20 | $1.34 | $27.66 |
-| Craft $249/yr | $7.52 | $1.74 | $9.26 | $239.74 |
-| Pro $19.99/mo (Aug 12 note, not in code) | $0.88 | $0.14 | $1.02 | $18.97 |
-| Pro $199/yr (Aug 12 note, not in code) | $6.07 | $1.39 | $7.46 | $191.54 |
+| Plan                                     | Card fee | Billing fee | Total fee | Net     |
+| ---------------------------------------- | -------- | ----------- | --------- | ------- |
+| Pro $12/mo                               | $0.65    | $0.08       | $0.73     | $11.27  |
+| Pro $99/yr                               | $3.17    | $0.69       | $3.86     | $95.14  |
+| Craft $29/mo                             | $1.14    | $0.20       | $1.34     | $27.66  |
+| Craft $249/yr                            | $7.52    | $1.74       | $9.26     | $239.74 |
+| Pro $19.99/mo (Aug 12 note, not in code) | $0.88    | $0.14       | $1.02     | $18.97  |
+| Pro $199/yr (Aug 12 note, not in code)   | $6.07    | $1.39       | $7.46     | $191.54 |
 
 - `NOT_MEASURED`: whether Stripe returns the card fee on a refund. Budget about $0.65 for
   the step 6 test purchase.
@@ -176,7 +176,7 @@ Migration `20261101180000` is the test-mode sink and must never be applied.
   Slice B and accepting only signed Stripe events in Slice C.
 - **Sandbox grants live:** prevented by the environment filter plus the `livemode` check.
 - **Double charge or duplicate rows:** the unique key on `(environment,
-  stripe_subscription_id)` plus re-read-then-upsert.
+stripe_subscription_id)` plus re-read-then-upsert.
 - **Rollback:** unset the Stripe price env vars (checkout refuses at once) and point the
   CTAs back to Paddle. Rows already written keep their paid access until period end.
   No migration to reverse.

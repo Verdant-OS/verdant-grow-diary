@@ -9,8 +9,10 @@ base: verdant-grow-diary
 checkout: git fetch origin claude/brave-fermat-u06ig6 verdant-grow-diary && git switch claude/brave-fermat-u06ig6
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2934 (draft)
 head_sha: code at 805acc402414892a37945abd5c0ecc472d6f9819 (2026-11-11 19:01 UTC); a docs-only commit recording this PR link follows it, so read the current head from the PR
-state: implemented, local tests green, pushed draft
-current_step: draft PR open, required CI and independent review pending
+state: implemented, ready for review; a third fix landed 2026-11-12 after a Codex P1 raised on the stacked PR #2951
+current_step: required CI and Codex review rerun at the new head; independent review pending
+revision_reload: a reload that follows a change to an existing row (history-panel onEntryChanged, integrity-controls onChanged, the remove-button fallback, a confirmed manual sensor correction) goes through reloadAfterRevision(), which makes the next committed read replace every loaded page. Before this, a retraction or correction on an older loaded page stayed on screen because only the newest page was refetched. A new save (verdant:entry-created, verdant:sensor-reading-created) still keeps loaded older pages.
+scorer_lock_2026_11_12: one tracked scorer modified, unlock declared before the edit: src/test/timeline-merge-wireup.test.ts. Its two source pins on the manual-correction subscription moved from `void load()` and `[ownerId, load]` to `reloadAfterRevision()` and `[ownerId, reloadAfterRevision]`; one assertion added that reloadAfterRevision still calls load().
 next_action: route one independent exact-head review (docs/agents/OWNERSHIP.md section 4.3) once the required checks are green at the PR head
 post_merge_check: after live /version.json reports the merge SHA, on the disposable fixture grow: open Timeline, press "Load older entries", save one Quick Log note tagged [smoke <timestamp>], and confirm the older entries are still listed. NOT_MEASURED until then.
 active_writer: Claude session_017UoYKvCNSMryxiQZyBbit8
@@ -30,5 +32,5 @@ reviewer_sha: none
 session_state: PR activity subscription held by the authoring session; no routines, no paused workflows; pending human decisions: review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-11 19:00 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
-last_updated: 2026-11-11 14:10 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
+last_updated: 2026-11-12 01:35 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
 ```

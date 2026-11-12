@@ -684,6 +684,10 @@ export default function Timeline() {
   const entriesReadKeyRef = useRef<string | null>(null);
   const oldestFetchedCursorRef = useRef<TimelineKeysetCursor | null>(null);
   const hiddenFetchedRowsRef = useRef<TimelinePagedRow[]>([]);
+  // Set when an existing row was corrected, retracted or removed. The next
+  // committed read then replaces every loaded page: a refetch of the newest
+  // page alone cannot show what changed on an older one.
+  const discardLoadedPagesRef = useRef(false);
   const directorySensorGenerationRef = useRef(0);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
@@ -1011,7 +1015,7 @@ export default function Timeline() {
       // A same-scope refresh (a save, a new reading) refetches only the
       // newest page. Keep the older pages the grower already loaded.
       const refreshed = mergeTimelineRefreshedFirstPage({
-        sameScope: entriesReadKeyRef.current === requestedReadKey,
+        sameScope: entriesReadKeyRef.current === requestedReadKey && !discardLoadedPagesRef.current,
         previousRows: entriesSnapshotRef.current,
         previousCursor: oldestFetchedCursorRef.current,
         previousHiddenRows: hiddenFetchedRowsRef.current,
@@ -1021,6 +1025,7 @@ export default function Timeline() {
       });
       const committedRows = refreshed.rows;
       entriesReadKeyRef.current = requestedReadKey;
+      discardLoadedPagesRef.current = false;
       hiddenFetchedRowsRef.current = refreshed.hiddenRows;
       setEntries(committedRows);
       setDiaryPhotoIds((current) =>
@@ -1524,6 +1529,13 @@ export default function Timeline() {
     }
   }
 
+  // Reload after a change to a row that already exists. Unlike a new save,
+  // this must not keep older loaded pages.
+  const reloadAfterRevision = useCallback(() => {
+    discardLoadedPagesRef.current = true;
+    void load();
+  }, [load]);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -1538,9 +1550,9 @@ export default function Timeline() {
   useEffect(
     () =>
       subscribeManualSensorCorrections(ownerId, () => {
-        void load();
+        reloadAfterRevision();
       }),
-    [ownerId, load],
+    [ownerId, reloadAfterRevision],
   );
   useEffect(() => {
     const h = () => load();
@@ -2992,7 +3004,7 @@ export default function Timeline() {
           dateFiltered={Boolean(effectiveStartDate || effectiveEndDate)}
           targetNames={recentLaneTargetNames}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -3013,7 +3025,7 @@ export default function Timeline() {
           reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -3024,7 +3036,7 @@ export default function Timeline() {
           reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -3034,7 +3046,7 @@ export default function Timeline() {
           rawEntries={scopedHistoryEntries}
           limit={20}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -3044,7 +3056,7 @@ export default function Timeline() {
           rawEntries={scopedHistoryEntries}
           limit={20}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -3054,7 +3066,7 @@ export default function Timeline() {
           rawEntries={scopedMeasurementEntries}
           limit={20}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -3067,7 +3079,7 @@ export default function Timeline() {
             if (findTimelinePhotoIndexById(lightboxItems, id) >= 0) setLightboxPhotoId(id);
           }}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -3373,7 +3385,7 @@ export default function Timeline() {
                                       ...timelineSensorEvents,
                                     ])}
                                     environmentCheckDetails={e.details}
-                                    onChanged={() => void load()}
+                                    onChanged={() => reloadAfterRevision()}
                                   />
                                 ) : !isTimelineSensorDerivedDiaryId(e.id) ? (
                                   <>
@@ -3417,7 +3429,7 @@ export default function Timeline() {
                                               // A same-scope refresh may still include this deletion
                                               // or already count it. Reload after confirmation instead
                                               // of guessing, superseding any older in-flight read.
-                                              void load();
+                                              reloadAfterRevision();
                                             }
                                             return;
                                           }
@@ -3891,7 +3903,7 @@ export default function Timeline() {
                 environmentCheckDetails={detailView.entry.details}
                 onChanged={() => {
                   setDetailRecordRefreshKey((key) => key + 1);
-                  void load();
+                  reloadAfterRevision();
                 }}
               />
             ) : null

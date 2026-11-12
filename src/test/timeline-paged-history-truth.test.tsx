@@ -27,6 +27,7 @@ const harness = vi.hoisted(() => ({
   reloadActionResponseMemory: vi.fn(),
   createSignedUrls: vi.fn(),
   entryEditOnDeleted: null as ((id: string) => void) | null,
+  activityPanelOnEntryChanged: null as (() => void) | null,
   growsState: {
     activeGrow: null as Record<string, unknown> | null,
     activeGrowId: null as string | null,
@@ -195,7 +196,10 @@ vi.mock("@/components/WateringHistoryPanel", () => ({ default: () => null }));
 vi.mock("@/components/FeedingHistoryPanel", () => ({ default: () => null }));
 vi.mock("@/components/PhotoHistoryPanel", () => ({ default: () => null }));
 vi.mock("@/components/QuickLogHistoryPanels", () => ({
-  RecentQuickLogActivityPanel: () => null,
+  RecentQuickLogActivityPanel: (props: { onEntryChanged?: () => void }) => {
+    harness.activityPanelOnEntryChanged = props.onEntryChanged ?? null;
+    return null;
+  },
   PestDiseaseHistoryPanel: () => null,
   TrainingHistoryPanel: () => null,
   MeasurementHistoryPanel: () => null,
@@ -417,6 +421,7 @@ describe("Timeline paged history", () => {
     harness.createSignedUrls.mockReset();
     harness.createSignedUrls.mockResolvedValue({ data: [], error: null });
     harness.entryEditOnDeleted = null;
+    harness.activityPanelOnEntryChanged = null;
     Object.assign(harness.growsState, {
       activeGrow: GROW_A,
       activeGrowId: GROW_A.id,
@@ -531,5 +536,36 @@ describe("Timeline paged history", () => {
 
     expect(await screen.findByText("Note n1.")).toBeInTheDocument();
     expect(screen.queryByTestId("timeline-activity-truncation-notice")).not.toBeInTheDocument();
+  });
+  it("drops loaded older pages after a correction or retraction, so no stale row stays", async () => {
+    const server = serve({
+      firstPage: [N1],
+      total: 3,
+      olderPages: { [N1.entry_at]: [N2] },
+    });
+
+    renderTimeline();
+    fireEvent.click(await screen.findByTestId("timeline-load-older"));
+    expect(await screen.findByText("Note n2.")).toBeInTheDocument();
+
+    // The grower retracts n2 from a history panel. The server no longer
+    // returns it; a reload of the newest page alone cannot know that.
+    server.total = 2;
+    server.olderPages = { [N1.entry_at]: [N3] };
+    expect(harness.activityPanelOnEntryChanged).not.toBeNull();
+    act(() => {
+      harness.activityPanelOnEntryChanged?.();
+    });
+
+    await waitFor(() => expect(screen.queryByText("Note n2.")).not.toBeInTheDocument());
+    expect(screen.getAllByTestId("timeline-entry")).toHaveLength(1);
+    expect(screen.getByTestId("timeline-load-older")).toHaveTextContent(
+      "Load older entries (1 more)",
+    );
+
+    // Paging starts again from the newest page and reads current rows.
+    fireEvent.click(screen.getByTestId("timeline-load-older"));
+    expect(await screen.findByText("Note n3.")).toBeInTheDocument();
+    expect(screen.queryByText("Note n2.")).not.toBeInTheDocument();
   });
 });

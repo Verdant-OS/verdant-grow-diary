@@ -276,6 +276,8 @@ export default function Pricing() {
    * panel's Dismiss button.
    */
   function isSkuBlocked(sku: string): boolean {
+    // A Stripe Pro checkout is not blocked by Paddle's state.
+    if (shouldUseStripeCheckout(sku, PRO_CHECKOUT_PROVIDER)) return false;
     if (unavailableMessage) return true;
     if (!blockedReason) return false;
     // Unattributed failure — blocked, but we don't know which SKU it belongs
@@ -311,13 +313,14 @@ export default function Pricing() {
     }
     lastCheckoutSkuRef.current = planId;
     setInterestPlan(planId);
-    setRecoveryRequested(true);
     trackPricingEvent(eventName, { source });
-    // Off while PRO_CHECKOUT_PROVIDER is "paddle" (src/config/checkoutProvider.ts).
+    // Pro goes to Stripe when PRO_CHECKOUT_PROVIDER is "stripe"
+    // (src/config/checkoutProvider.ts); the Paddle recovery panel stays out of it.
     if (shouldUseStripeCheckout(planId, PRO_CHECKOUT_PROVIDER)) {
       void startStripeCheckout(planId);
       return;
     }
+    setRecoveryRequested(true);
     if (isSkuBlocked(planId)) {
       trackPricingEvent("pricing_checkout_blocked", {
         plan: planId,

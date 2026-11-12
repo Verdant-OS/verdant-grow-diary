@@ -94,6 +94,11 @@ vi.mock("@/lib/pricingAnalytics", () => ({
 
 import Pricing from "@/pages/Pricing";
 
+// This file covers the Paddle Pro checkout path, which the provider switch
+// keeps frozen behind "paddle" (src/config/checkoutProvider.ts). New Pro sales
+// default to Stripe; pricing-stripe-pro-checkout.test.tsx covers that path.
+vi.mock("@/config/checkoutProvider", () => ({ PRO_CHECKOUT_PROVIDER: "paddle" }));
+
 function renderPricing() {
   return render(
     <MemoryRouter initialEntries={["/pricing"]}>

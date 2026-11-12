@@ -1,8 +1,8 @@
 /**
  * Slice D (docs/specs/stripe-live-checkout-plan.md): the client picks the
  * provider, reads the function's answer and refuses to redirect anywhere but
- * Stripe's hosted checkout. The switch ships as "paddle", so merging this
- * changes no live checkout.
+ * Stripe's hosted checkout. The switch ships as "stripe" (Cheek's pick); a
+ * "paddle" switch restores the previous Pro checkout.
  */
 import { describe, expect, it } from "vitest";
 import { PRO_CHECKOUT_PROVIDER } from "@/config/checkoutProvider";
@@ -14,9 +14,14 @@ import {
 } from "@/lib/stripeCheckoutClientRules";
 
 describe("Pro checkout provider switch", () => {
-  it("ships set to Paddle, so today's checkout is unchanged", () => {
-    expect(PRO_CHECKOUT_PROVIDER).toBe("paddle");
-    expect(shouldUseStripeCheckout("pro_monthly", PRO_CHECKOUT_PROVIDER)).toBe(false);
+  it("ships set to Stripe for new Pro sales (Cheek, 2026-11-12)", () => {
+    expect(PRO_CHECKOUT_PROVIDER).toBe("stripe");
+    expect(shouldUseStripeCheckout("pro_monthly", PRO_CHECKOUT_PROVIDER)).toBe(true);
+  });
+
+  it("sends nothing to Stripe when the switch is on Paddle", () => {
+    expect(shouldUseStripeCheckout("pro_monthly", "paddle")).toBe(false);
+    expect(shouldUseStripeCheckout("pro_annual", "paddle")).toBe(false);
   });
 
   it("routes only Pro plans to Stripe when the switch says Stripe", () => {

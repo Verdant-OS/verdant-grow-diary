@@ -344,14 +344,14 @@ describe("DailyCheck · ?method= handling", () => {
     // ensure no leftover step state across renders (RTL renders new tree)
   });
 
-  it("method=note focuses the QuickLog choose option and opens the QuickLog dialog", async () => {
+  it("method=note focuses the QuickLog choose option and does not open the QuickLog dialog", async () => {
     renderRoute("/daily-check?plantId=p1&from=dashboard&method=note");
     const choose = await screen.findByTestId("daily-grow-check-choose");
     expect(choose.getAttribute("data-method-hint")).toBe("note");
     const noteBtn = within(choose).getByTestId("daily-grow-check-choose-quicklog");
     expect(noteBtn.getAttribute("data-method-focused")).toBe("1");
     const ql = await screen.findByTestId("mock-quicklog");
-    expect(ql.getAttribute("data-open")).toBe("1");
+    expect(ql.getAttribute("data-open")).toBe("0");
   });
 
   it("method=sensor focuses the sensor snapshot option when the plant has a tent", async () => {

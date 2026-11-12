@@ -1,0 +1,461 @@
+import { readFileSync } from "node:fs";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import FieldNotebook, {
+  type FieldNotebookSaveRequest,
+  type FieldNotebookSaveResponse,
+} from "@/components/FieldNotebook";
+import AppShell from "@/components/AppShell";
+import FieldNotebookTimelineRecovery from "@/components/FieldNotebookTimelineRecovery";
+import { MemoryRouter, Route, Routes, useNavigate } from "@/lib/react-router-compat";
+import * as notebookSession from "@/lib/fieldNotebookSession";
+import { emptyDraft } from "@/lib/fieldNotebookOutcomeRules";
+import {
+  adoptNotebookSessionOwner,
+  forgetNotebookMemory,
+  notebookDrafts,
+  notebookSessionOwner,
+  readNotebookDraft,
+  writeNotebookDraft,
+} from "@/lib/fieldNotebookSession";
+import { formatRetractedLine } from "@/lib/fieldNotebookViewModel";
+import { AuthProvider, useAuth } from "@/store/auth";
+
+const mocks = vi.hoisted(() => ({
+  getSession: vi.fn(),
+  getUser: vi.fn(),
+  signOut: vi.fn(),
+  listeners: [] as Array<() => void | Promise<void>>,
+}));
+
+vi.mock("@/components/QuickLog", () => ({ default: () => null }));
+vi.mock("@/components/QuickLogV2Sheet", () => ({ default: () => null }));
+vi.mock("@/components/AppSidebar", () => ({ default: () => null }));
+vi.mock("@/components/MobileNav", () => ({ default: () => null }));
+vi.mock("@/hooks/useAlertsList", () => ({ useAlertsList: () => ({ alerts: [] }) }));
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    entitlement: { isActive: false, effectivePlanId: "free" },
+  }),
+}));
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    auth: {
+      getSession: (...args: unknown[]) => mocks.getSession(...args),
+      getUser: (...args: unknown[]) => mocks.getUser(...args),
+      signOut: (...args: unknown[]) => mocks.signOut(...args),
+      onAuthStateChange: (listener: () => void | Promise<void>) => {
+        mocks.listeners.push(listener);
+        return {
+          data: {
+            subscription: {
+              unsubscribe: () => {
+                const index = mocks.listeners.indexOf(listener);
+                if (index >= 0) mocks.listeners.splice(index, 1);
+              },
+            },
+          },
+        };
+      },
+    },
+    rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
+    functions: { invoke: vi.fn().mockResolvedValue({ data: null, error: null }) },
+  },
+}));
+
+const tent = {
+  id: "flower",
+  name: "Flower Tent 2",
+  weekLabel: "Week 3",
+  ageLabel: "Age: 22 days",
+  startedLabel: "Jan 8, 2025",
+};
+
+const NONE = {
+  timelineHasEntry: false,
+  countIncludesEntry: false,
+  lastActivityIncludesEntry: false,
+};
+
+const entry = {
+  growEventId: "11111111-1111-4111-8111-111111111111",
+  tentId: "flower",
+  tentName: "Flower Tent 2",
+  note: "leaves are pale",
+  occurredAt: "2025-01-08T15:24:00.000Z",
+};
+
+const privateNote = "account A private note";
+
+function sessionFor(id: string) {
+  return {
+    access_token: `access-${id}`,
+    refresh_token: `refresh-${id}`,
+    expires_at: 4102444800,
+    token_type: "bearer",
+    user: { id, email: `${id}@example.com`, email_confirmed_at: "2026-07-01T00:00:00Z" },
+  };
+}
+
+function privateDraft() {
+  return {
+    ...emptyDraft("flower"),
+    note: privateNote,
+    phase: "uncertain" as const,
+    writeBlocked: true,
+    recoverySurface: "timeline" as const,
+    attempt: {
+      attemptId: "attempt-a",
+      idempotencyKey: "key-a",
+      note: privateNote,
+      tentId: "flower",
+      tentName: "Flower Tent 2",
+    },
+  };
+}
+
+let signOutLease: { finish: () => void } | null = null;
+
+function Jump({ to, label }: { to: string; label: string }) {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(to)}>
+      {label}
+    </button>
+  );
+}
+
+function BeginSignOut() {
+  const { beginSignOutNavigation } = useAuth();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        signOutLease = beginSignOutNavigation?.() ?? null;
+      }}
+    >
+      Begin sign-out
+    </button>
+  );
+}
+
+const realSubscribe = notebookSession.subscribeNotebookSession;
+const realAdopt = notebookSession.adoptNotebookSessionOwner;
+
+function watchDefenses() {
+  const order: string[] = [];
+  vi.spyOn(notebookSession, "subscribeNotebookSession").mockImplementation((listener) => {
+    order.push("subscribe");
+    return realSubscribe(listener);
+  });
+  vi.spyOn(notebookSession, "adoptNotebookSessionOwner").mockImplementation((userId) => {
+    order.push("adopt");
+    return realAdopt(userId);
+  });
+  return order;
+}
+
+function expectSubscribeBeforeAdopt(order: string[]) {
+  const subscribed = order.lastIndexOf("subscribe");
+  const adopted = order.lastIndexOf("adopt");
+  expect(subscribed).toBeGreaterThan(-1);
+  expect(adopted).toBeGreaterThan(subscribed);
+}
+
+function renderShell(child: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <Routes>
+          <Route
+            path="/dashboard"
+            element={
+              <AuthProvider>
+                <AppShell>{child}</AppShell>
+              </AuthProvider>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+async function flushAuth() {
+  await act(async () => {
+    await Promise.all(mocks.listeners.map((listener) => listener()));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  });
+}
+
+describe("notebook owner without a mounted surface", () => {
+  afterEach(() => {
+    signOutLease?.finish();
+    signOutLease = null;
+    vi.spyOn(notebookSession, "subscribeNotebookSession").mockRestore();
+    vi.spyOn(notebookSession, "adoptNotebookSessionOwner").mockRestore();
+  });
+
+  beforeEach(() => {
+    forgetNotebookMemory();
+    window.sessionStorage.clear();
+    mocks.listeners.length = 0;
+    mocks.getSession.mockReset();
+  });
+
+  it("clears A's notes when sign-out unmounts AppShell before the user id changes", async () => {
+    const session = sessionFor("user-a");
+    mocks.getSession.mockResolvedValue({ data: { session }, error: null });
+    mocks.getUser.mockResolvedValue({ data: { user: session.user }, error: null });
+    renderShell(<BeginSignOut />);
+    await waitFor(() => expect(notebookSessionOwner()).toBe("user-a"));
+    writeNotebookDraft(privateDraft());
+    fireEvent.click(screen.getByRole("button", { name: "Begin sign-out" }));
+    expect(await screen.findByText("Signing out…")).toBeInTheDocument();
+    expect(screen.queryByTestId("app-shell-header-row")).not.toBeInTheDocument();
+    expect(notebookSessionOwner()).toBeNull();
+    expect(readNotebookDraft("flower").note).toBe("");
+    expect(notebookDrafts().some((draft) => draft.note === privateNote)).toBe(false);
+  });
+
+  it("keeps the note and key from dashboard to pricing and back", async () => {
+    const session = sessionFor("user-a");
+    mocks.getSession.mockResolvedValue({ data: { session }, error: null });
+    mocks.getUser.mockResolvedValue({ data: { user: session.user }, error: null });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/dashboard"]}>
+          <AuthProvider>
+            <Routes>
+              <Route
+                path="/dashboard"
+                element={
+                  <AppShell>
+                    <FieldNotebook
+                      tents={[tent]}
+                      readingsByTent={{}}
+                      onSave={vi.fn()}
+                      onFindEntry={vi.fn()}
+                    />
+                    <Jump to="/pricing" label="Open pricing" />
+                  </AppShell>
+                }
+              />
+              <Route
+                path="/pricing"
+                element={
+                  <>
+                    <p>Pricing page</p>
+                    <Jump to="/dashboard" label="Back to dashboard" />
+                  </>
+                }
+              />
+            </Routes>
+          </AuthProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(notebookSessionOwner()).toBe("user-a"));
+    writeNotebookDraft({ ...privateDraft(), recoverySurface: "grow" });
+    expect(await screen.findByDisplayValue(privateNote)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open pricing" }));
+    expect(await screen.findByText("Pricing page")).toBeInTheDocument();
+    expect(readNotebookDraft("flower").note).toBe(privateNote);
+    expect(readNotebookDraft("flower").attempt?.idempotencyKey).toBe("key-a");
+    fireEvent.click(screen.getByRole("button", { name: "Back to dashboard" }));
+    expect(await screen.findByDisplayValue(privateNote)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save again (won't duplicate)" }),
+    ).toBeInTheDocument();
+    expect(readNotebookDraft("flower").phase).toBe("uncertain");
+    expect(readNotebookDraft("flower").attempt?.idempotencyKey).toBe("key-a");
+    expect(notebookSessionOwner()).toBe("user-a");
+  });
+
+  it("clears A's notes when the session expires without the sign-out screen", async () => {
+    let session: ReturnType<typeof sessionFor> | null = {
+      ...sessionFor("user-a"),
+      expires_at: Math.floor(Date.now() / 1000) - 120,
+    };
+    mocks.getSession.mockImplementation(async () => ({ data: { session }, error: null }));
+    mocks.getUser.mockImplementation(async () => ({
+      data: { user: session?.user ?? null },
+      error: session ? null : { message: "session expired" },
+    }));
+    renderShell(<p>Still signed in</p>);
+    await waitFor(() => expect(notebookSessionOwner()).toBe("user-a"));
+    writeNotebookDraft(privateDraft());
+    session = null;
+    await flushAuth();
+    await waitFor(() => expect(notebookSessionOwner()).toBeNull());
+    expect(screen.queryByText("Signing out…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Still signed in")).not.toBeInTheDocument();
+    expect(readNotebookDraft("flower").note).toBe("");
+    expect(notebookDrafts().some((draft) => draft.note === privateNote)).toBe(false);
+  });
+
+  it("adopts the signed-in user from Timeline recovery alone", async () => {
+    adoptNotebookSessionOwner("user-a");
+    writeNotebookDraft(privateDraft());
+    expect(readNotebookDraft("flower", "user-b").note).toBe("");
+    expect(notebookDrafts("user-b")).toEqual([]);
+    const order = watchDefenses();
+    const session: ReturnType<typeof sessionFor> | null = sessionFor("user-b");
+    mocks.getSession.mockImplementation(async () => ({ data: { session }, error: null }));
+    render(
+      <AuthProvider>
+        <FieldNotebookTimelineRecovery />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(notebookSessionOwner()).toBe("user-b"));
+    expect(screen.queryByText(privateNote)).not.toBeInTheDocument();
+    expectSubscribeBeforeAdopt(order);
+  });
+
+  it("adopts the signed-in user from the notebook alone", async () => {
+    adoptNotebookSessionOwner("user-a");
+    writeNotebookDraft({ ...privateDraft(), recoverySurface: "grow" });
+    expect(readNotebookDraft("flower", "user-b").note).toBe("");
+    expect(notebookDrafts("user-b")).toEqual([]);
+    const order = watchDefenses();
+    const session: ReturnType<typeof sessionFor> | null = sessionFor("user-b");
+    mocks.getSession.mockImplementation(async () => ({ data: { session }, error: null }));
+    render(
+      <AuthProvider>
+        <FieldNotebook tents={[tent]} readingsByTent={{}} onSave={vi.fn()} onFindEntry={vi.fn()} />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(notebookSessionOwner()).toBe("user-b"));
+    expect(screen.queryByDisplayValue(privateNote)).not.toBeInTheDocument();
+    expectSubscribeBeforeAdopt(order);
+  });
+
+  it("returns nothing for B while the stored owner is still A", () => {
+    adoptNotebookSessionOwner("user-a");
+    writeNotebookDraft(privateDraft());
+    expect(readNotebookDraft("flower", "user-b").note).toBe("");
+    expect(readNotebookDraft("flower", "user-b").attempt).toBeNull();
+    expect(notebookDrafts("user-b")).toEqual([]);
+    expect(readNotebookDraft("flower").note).toBe(privateNote);
+  });
+
+  it("keeps AppShell's owner hook above the signed-out return", () => {
+    const source = readFileSync("src/components/AppShell.tsx", "utf8");
+    const hookAt = source.indexOf("useNotebookSessionOwner({ clearOnUnmount: true })");
+    const gateAt = source.indexOf('if (!user || authStatus === "unauthenticated") return null;');
+    // @source-scan-justified: the early return is what unmounts the notebook; the call has to stay above it, which is not a runtime value.
+    expect(hookAt).toBeGreaterThan(0);
+    expect(hookAt).toBeLessThan(gateAt);
+  });
+});
+
+describe("pinned save guards", () => {
+  beforeEach(() => {
+    forgetNotebookMemory();
+    adoptNotebookSessionOwner("account-a");
+  });
+
+  it("drops a Check Timeline result when the attempt id changed and the note is not saving", async () => {
+    let release: (value: unknown) => void = () => {};
+    const onFindEntry = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    const onSave = vi
+      .fn<(request: FieldNotebookSaveRequest) => Promise<FieldNotebookSaveResponse>>()
+      .mockResolvedValue({ transport: { kind: "dispatched_no_receipt" }, reflection: NONE });
+    render(
+      <FieldNotebook
+        tents={[tent]}
+        readingsByTent={{}}
+        onSave={onSave}
+        onFindEntry={onFindEntry as never}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Observation"), {
+      target: { value: "leaves are pale" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
+    expect(
+      await screen.findByRole("button", { name: "Save again (won't duplicate)" }),
+    ).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Check Timeline" }));
+    await waitFor(() => expect(onFindEntry).toHaveBeenCalled());
+    const current = readNotebookDraft("flower");
+    writeNotebookDraft({
+      ...current,
+      phase: "uncertain",
+      attempt: current.attempt
+        ? { ...current.attempt, attemptId: "attempt-replaced" }
+        : current.attempt,
+    });
+    await act(async () => {
+      release({
+        availability: "authoritative",
+        candidates: [entry],
+        matchedEventId: entry.growEventId,
+      });
+    });
+    expect(screen.queryByText("Yes, that's it")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save again (won't duplicate)" })).toBeEnabled();
+  });
+
+  it("drops a save reply that arrives after the draft left saving", async () => {
+    const onSave = vi.fn(async () => {
+      const current = readNotebookDraft("flower");
+      writeNotebookDraft({ ...current, phase: "editing" });
+      return {
+        transport: { kind: "acknowledged" as const, entry },
+        reflection: {
+          timelineHasEntry: true,
+          countIncludesEntry: true,
+          lastActivityIncludesEntry: true,
+        },
+      };
+    });
+    render(
+      <FieldNotebook tents={[tent]} readingsByTent={{}} onSave={onSave} onFindEntry={vi.fn()} />,
+    );
+    fireEvent.change(screen.getByLabelText("Observation"), {
+      target: { value: "leaves are pale" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(screen.queryByText(/Saved to Flower Tent 2/)).not.toBeInTheDocument();
+    expect(readNotebookDraft("flower").phase).not.toBe("saved");
+  });
+
+  it("drops a write whose owner is not the stored owner", () => {
+    writeNotebookDraft(privateDraft());
+    const wrote = writeNotebookDraft({ ...privateDraft(), note: "account B overwrites" }, "user-b");
+    expect(wrote).toBe(false);
+    expect(readNotebookDraft("flower").note).toBe(privateNote);
+  });
+
+  it("hides Save again when the idempotency key was retracted", async () => {
+    const onSave = vi
+      .fn<(request: FieldNotebookSaveRequest) => Promise<FieldNotebookSaveResponse>>()
+      .mockResolvedValue({ transport: { kind: "idempotency_retracted" }, reflection: NONE });
+    render(
+      <FieldNotebook tents={[tent]} readingsByTent={{}} onSave={onSave} onFindEntry={vi.fn()} />,
+    );
+    fireEvent.change(screen.getByLabelText("Observation"), {
+      target: { value: "leaves are pale" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
+    expect(await screen.findByText(formatRetractedLine())).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Save again (won't duplicate)" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Save again (won't duplicate)"));
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+});

@@ -7,8 +7,8 @@ why: Repository audit 2026-11-11/12 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8.
 branch: claude/dead-module-cleanup
 base: verdant-grow-diary at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8
 checkout: git fetch origin claude/dead-module-cleanup verdant-grow-diary && git switch claude/dead-module-cleanup
-pr: not opened yet when this block was written; read it from the branch
-head_sha: read the current head from the PR
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2946 (draft)
+head_sha: code at f00e77e8a36f3cfc314cec0126adace80e423418 (2026-11-12); a docs-only commit recording this PR link follows it, so read the current head from the PR
 state: implemented, local checks green, pushed draft
 current_step: draft PR open; required CI runs once it is marked ready
 next_action: owner decides when to mark ready; then one independent exact-head review

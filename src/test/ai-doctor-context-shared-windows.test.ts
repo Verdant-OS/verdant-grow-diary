@@ -28,16 +28,16 @@ describe("AI Doctor Context — shared recency-window constants", () => {
     expect(AI_DOCTOR_SNAPSHOT_FRESH_MS).toBe(AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs);
   });
 
-  it("shared window matches documented 7 days / 48 hours", () => {
+  it("shared window matches documented 7 days / 24 hours", () => {
     expect(AI_DOCTOR_RECENT_EVENT_WINDOW_DAYS).toBe(7);
-    expect(AI_DOCTOR_SNAPSHOT_FRESH_HOURS).toBe(48);
+    expect(AI_DOCTOR_SNAPSHOT_FRESH_HOURS).toBe(24);
     expect(AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs).toBe(7 * 24 * 60 * 60 * 1000);
-    expect(AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs).toBe(48 * 60 * 60 * 1000);
+    expect(AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs).toBe(24 * 60 * 60 * 1000);
   });
 
-  it("tooltip copy references the shared 7d / 48h windows", () => {
+  it("tooltip copy references the shared 7d / 24h windows", () => {
     expect(AI_DOCTOR_CONTEXT_TOOLTIPS["recent-timeline-activity"]).toMatch(/7 days/);
-    expect(AI_DOCTOR_CONTEXT_TOOLTIPS["fresh-manual-sensor-snapshot"]).toMatch(/48 hours/);
+    expect(AI_DOCTOR_CONTEXT_TOOLTIPS["fresh-manual-sensor-snapshot"]).toMatch(/24 hours/);
   });
 
   it("no panel/component file hard-codes the window in ms", () => {
@@ -49,8 +49,10 @@ describe("AI Doctor Context — shared recency-window constants", () => {
     ];
     for (const f of files) {
       const src = read(f);
-      // 7d = 604800000 ms, 48h = 172800000 ms — must not be inlined.
+      // 7d = 604800000 ms, 24h = 86400000 ms (and the former 48h =
+      // 172800000 ms) — must not be inlined.
       expect(src).not.toMatch(/604800000/);
+      expect(src).not.toMatch(/86400000/);
       expect(src).not.toMatch(/172800000/);
     }
   });

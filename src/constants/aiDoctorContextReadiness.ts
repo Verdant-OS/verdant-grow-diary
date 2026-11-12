@@ -9,10 +9,22 @@
  *    components never duplicate these values inside JSX.
  */
 
+import { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS } from "./sensorTiming";
+
 /** How far back a timeline event counts as "recent". */
 export const AI_DOCTOR_RECENT_EVENT_WINDOW_DAYS = 7;
-/** How fresh a manual sensor snapshot must be to count as "fresh". */
-export const AI_DOCTOR_SNAPSHOT_FRESH_HOURS = 48;
+/**
+ * How fresh a manual sensor snapshot must be to count as "fresh". This is the
+ * manual snapshot "current" window, not a second number: readiness, the AI
+ * Doctor engine and the snapshot quality rules must agree on when a manual
+ * reading stops being current.
+ */
+export const AI_DOCTOR_SNAPSHOT_FRESH_HOURS = MANUAL_SNAPSHOT_CURRENT_STALE_HOURS;
+/**
+ * The readiness window before 2026-11-11. Only for reading readiness checks
+ * that were saved to the diary under it; never used to grade a new check.
+ */
+export const AI_DOCTOR_SNAPSHOT_FRESH_LEGACY_HOURS = 48;
 
 /** Shared, immutable readiness thresholds (in ms). */
 export const AI_DOCTOR_CONTEXT_READINESS_CONFIG = Object.freeze({
@@ -39,8 +51,7 @@ export const AI_DOCTOR_CONTEXT_TOOLTIPS: Readonly<Record<string, string>> = Obje
   "recent-watering-or-feeding": "Present when a watering or feeding entry was logged recently.",
   "recent-manual-sensor-snapshot":
     "Present when a manual sensor snapshot was logged in the last 7 days.",
-  "fresh-manual-sensor-snapshot":
-    "Present when a manual sensor snapshot was logged in the last 48 hours.",
+  "fresh-manual-sensor-snapshot": `Present when a manual sensor snapshot was logged in the last ${AI_DOCTOR_SNAPSHOT_FRESH_HOURS} hours.`,
   "recent-warnings": "Present when recent warnings or invalid sensor snapshots exist.",
 });
 

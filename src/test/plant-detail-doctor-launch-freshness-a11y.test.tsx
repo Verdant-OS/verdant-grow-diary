@@ -1,7 +1,7 @@
 /**
  * Doctor launch dialog — freshness surface ARIA / screen-reader coverage.
  *
- * Pins the a11y contract for the 48h snapshot-freshness gate:
+ * Pins the a11y contract for the 24h snapshot-freshness gate:
  *  - the stale-snapshot explanation is a polite live region with the
  *    exact ISO instants exposed as data attributes (locale-independent),
  *  - the readiness notice is a polite live region,
@@ -45,10 +45,10 @@ const NOW = new Date("2026-06-01T12:00:00.000Z");
 const CUTOFF_ISO = new Date(NOW.getTime() - AI_DOCTOR_SNAPSHOT_FRESH_MS).toISOString();
 // Two diary events well inside the 7d activity window.
 const RECENT_ACTIVITY_ISO = "2026-05-31T08:00:00.000Z";
-// 74h old: past the 48h cutoff but inside the 7d window → readiness "partial".
+// 74h old: past the 24h cutoff but inside the 7d window → readiness "partial".
 const STALE_SNAPSHOT_ISO = "2026-05-29T10:00:00.000Z";
-// 26h old: inside the 48h cutoff.
-const FRESH_SNAPSHOT_ISO = "2026-05-31T10:00:00.000Z";
+// 2h old: inside the 24h cutoff.
+const FRESH_SNAPSHOT_ISO = "2026-06-01T10:00:00.000Z";
 
 const activityItems = () => [
   {
@@ -121,10 +121,10 @@ describe("Doctor launch dialog — freshness a11y", () => {
     expect(staleBox.getAttribute("role")).toBe("status");
     expect(staleBox.getAttribute("aria-live")).toBe("polite");
     // Locale-independent: assert the machine-readable instants, and the
-    // exact cutoff arithmetic (now - 48h) against the shared constant.
+    // exact cutoff arithmetic (now - 24h) against the shared constant.
     expect(staleBox.getAttribute("data-snapshot-at")).toBe(STALE_SNAPSHOT_ISO);
     expect(staleBox.getAttribute("data-cutoff-at")).toBe(CUTOFF_ISO);
-    expect(CUTOFF_ISO).toBe("2026-05-30T12:00:00.000Z");
+    expect(CUTOFF_ISO).toBe("2026-05-31T12:00:00.000Z");
     // The sentence exists and is non-empty (text itself is locale-formatted).
     expect(
       screen.getByTestId("plant-detail-doctor-launch-snapshot-stale-sentence").textContent

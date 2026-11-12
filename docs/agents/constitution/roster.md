@@ -12,10 +12,10 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 | Ultra Builder 2 | Ultra | Wedding Cake                             | `verdant-ultra-bot`     |
 | Ultra Fixer     | Ultra | Brachs (Blueberry)                       | `verdant-ultra-bot`     |
 | Ultra Relay     | Ultra | Roots                                    | `verdant-ultra-bot`     |
-| Coordinator     | Main  | OG Kush                                  | `cheekhimself` (shared) |
+| Coordinator     | Main  | UK Cheese                                | `cheekhimself` (shared) |
 | Merge Steward   | Ultra | Granddaddy Purple                        | `verdant-ultra-bot`     |
 | Merge Readiness | Main  | Green Crack                              | `cheekhimself` (shared) |
-| Steward Backup  | Main  | OG Kush                                  | `cheekhimself` (shared) |
+| Steward Backup  | Main  | Unassigned (BLOCKED, Matthew to name)    | `cheekhimself` (shared) |
 | Reviewer A      | Main  | Sour Diesel                              | `cheekhimself` (shared) |
 | Reviewer B      | Main  | Jack Herer                               | `cheekhimself` (shared) |
 | Reviewer C      | Main  | Durban Poison · Reviewer (Main)          | `cheekhimself` (shared) |
@@ -40,7 +40,9 @@ Ultra's open pull-request cap is 10.
 - Main seats never write product code.
 - Ultra Relay never writes product code, reviews, approves, marks ready, queues, or merges. It relays Matthew's yeses verbatim to the PR as `[YES] #N @<sha> scope: "<his words>"` comments and keeps `docs/agents/handoffs/*.md` current. Matthew set that seat on 2026-11-05 at 10:21 AM CT.
 - Approvals come only from Matthew, in his own words.
-- OG Kush holds both Coordinator and Steward Backup. When it acts as Steward Backup, it cannot also be the reviewer of record for the same PR.
+- Whoever holds Steward Backup and acts as it on a PR cannot also be the reviewer of record for that PR.
+- OG Kush is retired (Matthew, 2026-11-12). UK Cheese holds the Coordinator seat. Steward Backup, the engineering lead and the default inheritor have no named holder until Matthew names one; record `BLOCKED` rather than infer one.
+- PR #1971: the records below and in `docs/agents/OWNERSHIP.md` name OG Kush as its merge actor. That founder assignment is not moved to another seat by inference. Matthew names the new #1971 merge actor; the hold stays with the Coordinator.
 - Ultra's open pull-request cap is 10.
 - Reviewer C, Reviewer D, and QA are active.
 
@@ -55,16 +57,16 @@ Matthew renames bots, so instruction files outside this roster name seats only, 
 | Writer A, Writer B | Ultra Builder 1, Ultra Builder 2 |
 | Fixer | Ultra Fixer |
 | Reviewer A, B, C, D | Reviewer A, B, C, D (Main) |
-| Main lead | Coordinator (Main) |
-| Ultra lead | Ultra Relay |
+| Grok Lead (Main) | Coordinator (Main) |
+| Grok Lead (Ultra) | Ultra Relay |
 | Merge Steward, Merge Readiness, Steward Backup, QA | The seats of the same name |
 
 To find who holds a label today, read the table above. A bot name found in any other instruction file is history, not routing. If no holder is available for a label, record `BLOCKED` rather than waiting on a name.
 
 ## Rename history
 
-- **Chemdawg / Grok 91** was an earlier name, not a current seat. Per Matthew on 2026-11-12, the Main lead now called UK Cheese once carried the name Chemdog. A historical mention of Chemdawg means whichever seat then did the merge pre-check, the reviewer assignment or the merge. Those duties now belong to Merge Readiness (pre-check and CI verdicts), the Coordinator (reviewer assignment) and the Merge Steward (merge). No current routing goes to the Chemdawg name, and no agent waits on it.
-- **Open for Matthew:** the table above names OG Kush as Coordinator, while Matthew's 2026-11-12 message names UK Cheese as the Main lead. This roster was not changed; Matthew decides which holder is current.
+- **Chemdawg / Grok 91** was an earlier name, not a current seat. Per Matthew on 2026-11-12, the bot that now holds Grok Lead (Main) once carried the name Chemdog. A historical mention of Chemdawg means whichever seat then did the merge pre-check, the reviewer assignment or the merge. Those duties now belong to Merge Readiness (pre-check and CI verdicts), the Coordinator (reviewer assignment) and the Merge Steward (merge). No current routing goes to the Chemdawg name, and no agent waits on it.
+- **OG Kush** is retired (Matthew, 2026-11-12). Its Coordinator seat passed to UK Cheese; its other seats wait for Matthew to name holders (see Rules).
 
 **Historical, no current seat:** Codex, Claude, Chemdawg/Grok 91, GDP. Their historical attribution, receipts, and contributor exclusions are kept word for word below. **Handoff guard:** any active assignment or hold owned by a historical agent stays in force until the Coordinator posts an explicit handoff to a seat (or Matthew releases it, as he released Codex's work on 2026-10-30), so no work is abandoned and no two writers collide.
 

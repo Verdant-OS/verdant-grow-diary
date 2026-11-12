@@ -16,24 +16,29 @@ post_merge_check: NOT_APPLICABLE for app behavior (docs only). After merge, grep
 active_writer: Claude session_017UoYKvVZYWXWayQWJ9z81a
 decisions:
   - Treated Chemdawg as a renamed seat, not a deleted one (coordinator guidance). Each live mention now names the duty it meant: pre-check and CI verdicts go to Merge Readiness, reviewer assignment to the Coordinator, merging to the Merge Steward.
-  - Roster gains "Stable labels" (Writer A/B, Fixer, Reviewer A-D, Main lead, Ultra lead, Merge Steward, Merge Readiness, Steward Backup, QA) and "Rename history". Holders stay only in the roster.
+  - Roster gains "Stable labels" (Writer A/B, Fixer, Reviewer A-D, Grok Lead (Main), Grok Lead (Ultra), Merge Steward, Merge Readiness, Steward Backup, QA) and "Rename history". Holders stay only in the roster.
   - Header paragraph in CLAUDE.md, the Grok rule file and the claude, codex and grok role files now reads "The merge gate still requires ... seats are named only in the roster."
   - Sections marked "kept word for word" or "Historical routing" are untouched (HANDOFF_PROTOCOL.md, README.md, roster "Historical", OWNERSHIP.md historical profile and receipts).
   - Sentinel-Version bumped to 2026-11-12.1 on all eighteen files; GEMINI.md mirror re-synced; AGENTS.md section 17 entry added.
-  - The roster holder for Coordinator was not changed (roster says OG Kush; Matthew's message names UK Cheese as the Main lead). Recorded as an open question for Matthew.
+  - Matthew, 2026-11-12 (relayed): UK Cheese holds the Coordinator seat and OG Kush is retired. Roster updated. Steward Backup, engineering lead and default inheritor are BLOCKED until Matthew names holders.
+  - PR #1971 merge actor (OG Kush in OWNERSHIP.md, the exact-SHA review skill and three role files) is not reassigned by inference (handoff guard). Matthew names the new actor; the hold stays with the Coordinator.
+  - Matthew, 2026-11-12 (relayed): seats tied to an agent use role labels, not bot names. The two leads are now "Grok Lead (Main)" (Coordinator) and "Grok Lead (Ultra)" (Ultra Relay) in the roster's Stable labels table.
 tried_and_rejected: replacing the header in HANDOFF_PROTOCOL.md and README.md historical blocks (reverted: those blocks are kept word for word); renaming roles/chemdawg.md (scripts and tests pin the filename).
 commands: node scripts/sync-sentinel-mirror.mjs --set-version=2026-11-12.1 ; node scripts/sync-sentinel-mirror.mjs ; node scripts/sync-sentinel-mirror.mjs --check ; node scripts/check-sentinel-version-parity.mjs c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8 ; node scripts/check-sentinel-version-parity.mjs 29c958fc813763d573d42a6bf6fb89300b88ae5c ; the parity test and the docs-safety asserts
-validation: mirror --check in sync (exit 0); parity vs c03ea6fd OK; parity vs 29c958fc OK; parity test fail 0; docs-safety PASS; no test, script, e2e or config file pins any removed line. vitest, eslint and build NOT_MEASURED locally (bun install returns 403 here); CI's 35 required checks are the gate.
+validation (latest commit, roster update): mirror --check in sync; parity vs c03ea6fd OK; parity vs 29c958fc OK. Earlier commit: mirror --check in sync (exit 0); parity vs c03ea6fd OK; parity vs 29c958fc OK; parity test fail 0; docs-safety PASS; no test, script, e2e or config file pins any removed line. vitest, eslint and build NOT_MEASURED locally (bun install returns 403 here); CI's 35 required checks are the gate.
 files_touched: AGENTS.md; CLAUDE.md; GEMINI.md; .grok/rules/verdant-grok-role.md; docs/agents/README.md and HANDOFF_PROTOCOL.md (version line only); docs/agents/OWNERSHIP.md; docs/agents/claude-slices.md; docs/agents/constitution/roster.md; docs/agents/roles/*.md (twelve; content changes in claude, codex, grok, verdante, canopy; version line in the rest); .agents/skills/verdant-exact-sha-review/SKILL.md; docs/production-only-verification-runbook.md; this file (new)
 files_remaining: none
 out_of_scope: code and CI that still say Chemdawg (.github/workflows/claude-slices.yml, plugins rules.ts) - the brief allows no code or CI change; the roles/chemdawg.md filename; dated docs, specs, archives, HANDOFF_LOG.md and CURRENT_STATE.md.
 open_questions:
-  - Matthew: the roster names OG Kush as Coordinator, but your 2026-11-12 message names UK Cheese as the Main lead. Which holds the Coordinator seat? (OG Kush is also Steward Backup, so it cannot be reviewer of record on the same PR.)
+  - Matthew: who holds Steward Backup now that OG Kush is retired?
+  - Matthew: who is the engineering lead and default inheritor?
+  - Matthew: who is the new PR #1971 merge actor?
+  - Matthew: are "Grok Lead (Main)" and "Grok Lead (Ultra)" the labels you want?
   - Matthew: the roster says Ultra seats and Ultra Relay never review, but your message names the Ultra Team via Roots as reviewers. Should the roster change?
   - Matthew: the roster lists Codex as historical, but your message names Codex as a reviewer. Should Codex be a current Reviewer seat?
 blockers: none for the docs.
 exclusions_for_review: session_017UoYKvVZYWXWayQWJ9z81a (this writer); every author of #2933 for the stacked commit 29c958fc
-reviewer_seat: requested; proposed a non-author Main Reviewer seat (A-D) routed by the Main lead, or Codex if Matthew confirms Codex as a current reviewer. Governance scope: Graft's low-risk allowlist does not cover it.
+reviewer_seat: requested; proposed a non-author Main Reviewer seat (A-D) routed by the Coordinator (Grok Lead (Main)), or Codex if Matthew confirms Codex as a current reviewer. Governance scope: Graft's low-risk allowlist does not cover it.
 reviewer_sha: none yet
 review_verdict: NOT_MEASURED
 session_state: no production access used. No live /version.json read. No messages outside this project.

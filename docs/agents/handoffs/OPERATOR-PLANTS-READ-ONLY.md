@@ -7,8 +7,8 @@ why: Row-level security pass 2026-11-12 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6
 branch: claude/operator-plants-read-only
 base: verdant-grow-diary at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8
 checkout: git fetch origin claude/operator-plants-read-only verdant-grow-diary && git switch claude/operator-plants-read-only
-pr: not opened yet when this block was written; read it from the branch
-head_sha: read the current head from the PR
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2941 (draft)
+head_sha: code at b300c9c8171a66029e3f2523f458db3ba46b993d (2026-11-12); a docs-only commit recording this PR link follows it, so read the current head from the PR
 state: implemented, local checks green, pushed draft
 current_step: draft PR open; required CI runs once it is marked ready
 next_action: owner decides when to mark ready; then one independent exact-head review. This is a migration PR: it stays out of the merge queue until a human approves the exact head SHA, and applying it to production is the founder's own step.

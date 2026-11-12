@@ -346,6 +346,9 @@ describe("mergeTimelineRefreshedFirstPage", () => {
     firstPageRows: [N0, N1],
     firstPageCursor: { entryAt: N1.entry_at, id: N1.id },
     firstPageHiddenRows: [],
+    // The server counted two rows before and three now: N0 is the one new row.
+    previousServerCount: 2,
+    firstPageServerCount: 3,
   };
 
   it("keeps rows older than the refreshed page and the older cursor", () => {
@@ -399,6 +402,8 @@ describe("mergeTimelineRefreshedFirstPage", () => {
       previousRows: [N2],
       previousHiddenRows: [{ id: "h", entry_at: N0.entry_at }],
       previousCursor: { entryAt: N2.entry_at, id: N2.id },
+      // N0 and N1 are both new to this page.
+      firstPageServerCount: 4,
     });
     expect(merged.rows.map((row) => row.id)).toEqual(["n0", "n1", "n2"]);
     expect(merged.keptOlderPages).toBe(true);
@@ -426,7 +431,10 @@ describe("mergeTimelineRefreshedFirstPage", () => {
       previousCursor: { entryAt: tiedA.entry_at, id: tiedA.id },
       firstPageRows: [N1, tiedB],
       firstPageCursor: { entryAt: tiedB.entry_at, id: tiedB.id },
+      previousServerCount: 3,
+      firstPageServerCount: 3,
     });
+    expect(merged.keptOlderPages).toBe(true);
     expect(merged.rows.map((row) => row.id)).toEqual(["n1", "b", "a"]);
   });
 
@@ -439,6 +447,51 @@ describe("mergeTimelineRefreshedFirstPage", () => {
       firstPageHiddenRows: [hiddenOnPage],
     });
     expect(merged.hiddenRows.map((row) => row.id)).toEqual(["h-page", "h-old"]);
+  });
+
+  it("replaces when the server counts a new row the refreshed page does not hold", () => {
+    // A save backdated between two loaded pages: the count grew by one, the
+    // refreshed page holds no new row, so the new row sits behind the kept
+    // cursor and would never be fetched.
+    const merged = mergeTimelineRefreshedFirstPage({
+      ...base,
+      firstPageRows: [N1],
+      firstPageCursor: { entryAt: N1.entry_at, id: N1.id },
+      previousServerCount: 3,
+      firstPageServerCount: 4,
+    });
+    expect(merged.rows.map((row) => row.id)).toEqual(["n1"]);
+    expect(merged.cursor).toEqual({ entryAt: N1.entry_at, id: N1.id });
+    expect(merged.keptOlderPages).toBe(false);
+  });
+
+  it("replaces when a new row is on the refreshed page and another is not", () => {
+    const merged = mergeTimelineRefreshedFirstPage({ ...base, firstPageServerCount: 4 });
+    expect(merged.rows.map((row) => row.id)).toEqual(["n0", "n1"]);
+    expect(merged.keptOlderPages).toBe(false);
+  });
+
+  it("replaces when the server count fell, so a kept row may be gone", () => {
+    const merged = mergeTimelineRefreshedFirstPage({ ...base, firstPageServerCount: 2 });
+    expect(merged.keptOlderPages).toBe(false);
+  });
+
+  it("counts a new hidden row on the refreshed page as accounted for", () => {
+    const merged = mergeTimelineRefreshedFirstPage({
+      ...base,
+      firstPageHiddenRows: [{ id: "h-new", entry_at: N0.entry_at }],
+      firstPageServerCount: 4,
+    });
+    expect(merged.keptOlderPages).toBe(true);
+  });
+
+  it("replaces when either server count is unknown", () => {
+    expect(
+      mergeTimelineRefreshedFirstPage({ ...base, previousServerCount: null }).keptOlderPages,
+    ).toBe(false);
+    expect(
+      mergeTimelineRefreshedFirstPage({ ...base, firstPageServerCount: null }).keptOlderPages,
+    ).toBe(false);
   });
 });
 
@@ -487,6 +540,8 @@ describe("activity paging rules", () => {
       sameScope: true,
       previousRows: [E1, E2, E3],
       firstPageRows: [E0, E1],
+      previousServerCount: 3,
+      firstPageServerCount: 4,
     });
     expect(merged.keptOlderPages).toBe(true);
     expect(merged.rows.map((row) => row.id)).toEqual(["e0", "e1", "e2", "e3"]);
@@ -498,6 +553,8 @@ describe("activity paging rules", () => {
         sameScope: false,
         previousRows: [E1, E2, E3],
         firstPageRows: [E0, E1],
+        previousServerCount: 3,
+        firstPageServerCount: 4,
       }).rows.map((row) => row.id),
     ).toEqual(["e0", "e1"]);
     // Everything loaded is older than the refreshed page: rows in between
@@ -507,6 +564,8 @@ describe("activity paging rules", () => {
         sameScope: true,
         previousRows: [E2, E3],
         firstPageRows: [E0],
+        previousServerCount: 2,
+        firstPageServerCount: 3,
       }).rows.map((row) => row.id),
     ).toEqual(["e0"]);
   });
@@ -516,8 +575,25 @@ describe("activity paging rules", () => {
       sameScope: true,
       previousRows: [E0, E1, E2, E3],
       firstPageRows: [E0, E2],
+      previousServerCount: 4,
+      firstPageServerCount: 3,
     });
-    expect(merged.rows.map((row) => row.id)).toEqual(["e0", "e2", "e3"]);
+    // The count fell, so no older row is kept: any of them may be the one gone.
+    expect(merged.rows.map((row) => row.id)).toEqual(["e0", "e2"]);
+    expect(merged.keptOlderPages).toBe(false);
+  });
+
+  it("replaces the activity when the server counts an event the refreshed page does not hold", () => {
+    // An event backdated between two loaded activity pages.
+    const merged = mergeTimelineRefreshedActivity({
+      sameScope: true,
+      previousRows: [E1, E2, E3],
+      firstPageRows: [E1],
+      previousServerCount: 3,
+      firstPageServerCount: 4,
+    });
+    expect(merged.rows.map((row) => row.id)).toEqual(["e1"]);
+    expect(merged.keptOlderPages).toBe(false);
   });
 
   it("stops offering more when an older page comes back empty", () => {
@@ -860,5 +936,47 @@ describe("Timeline paged history", () => {
       ),
     );
     expect(screen.getByTestId("timeline-load-older-activity")).not.toBeDisabled();
+  });
+
+  it("shows a save backdated between loaded pages and never strands the pager", async () => {
+    const server = serve({
+      firstPage: [N1],
+      total: 3,
+      olderPages: { [N1.entry_at]: [N2], [N2.entry_at]: [N3] },
+    });
+
+    renderTimeline();
+    fireEvent.click(await screen.findByTestId("timeline-load-older"));
+    expect(await screen.findByText("Note n2.")).toBeInTheDocument();
+
+    // A Quick Log save with an earlier "Reading time" lands between n1 and
+    // n2. The newest page is unchanged; only the count grows.
+    server.total = 4;
+    server.olderPages = {
+      [N1.entry_at]: [N1B],
+      [N1B.entry_at]: [N2],
+      [N2.entry_at]: [N3],
+    };
+    act(() => {
+      window.dispatchEvent(new Event("verdant:entry-created"));
+    });
+
+    // The loaded older page cannot be trusted, so paging starts again.
+    await waitFor(() =>
+      expect(screen.getByTestId("timeline-load-older")).toHaveTextContent(
+        "Load older entries (3 more)",
+      ),
+    );
+    expect(screen.getAllByTestId("timeline-entry")).toHaveLength(1);
+
+    for (const text of ["Note n1b.", "Note n2.", "Note n3."]) {
+      fireEvent.click(screen.getByTestId("timeline-load-older"));
+      expect(await screen.findByText(text)).toBeInTheDocument();
+    }
+    expect(screen.getAllByTestId("timeline-entry")).toHaveLength(4);
+    await waitFor(() =>
+      expect(screen.queryByTestId("timeline-load-older")).not.toBeInTheDocument(),
+    );
+    expect(server.cursors).toEqual([N1.entry_at, N1.entry_at, N1B.entry_at, N2.entry_at]);
   });
 });

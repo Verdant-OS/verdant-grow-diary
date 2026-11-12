@@ -688,6 +688,7 @@ export default function Timeline() {
   const entriesSnapshotRef = useRef<Entry[]>([]);
   // Activity rows on screen, for the same-scope refresh merge below.
   const growEventsSnapshotRef = useRef<GrowEventRowForRecent[]>([]);
+  const growEventsTotalRef = useRef<number | null>(null);
   // What a same-scope refresh needs to keep already-loaded older pages: the
   // read key the rows on screen belong to, their keyset cursor, and the
   // fetched rows the page projection hid (the server count includes them).
@@ -698,6 +699,7 @@ export default function Timeline() {
   // committed read then replaces every loaded page: a refetch of the newest
   // page alone cannot show what changed on an older one.
   const discardLoadedPagesRef = useRef(false);
+  const entriesTotalRef = useRef<number | null>(null);
   const directorySensorGenerationRef = useRef(0);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
@@ -845,7 +847,9 @@ export default function Timeline() {
   activeReadKeyRef.current = activeReadKey;
   entriesSnapshotRef.current = entries;
   growEventsSnapshotRef.current = growEvents;
+  growEventsTotalRef.current = growEventsTotal;
   oldestFetchedCursorRef.current = oldestFetchedCursor;
+  entriesTotalRef.current = entriesTotal;
 
   // Same fail-closed grow-list gate as the owner name directory: no
   // supplemental tents / sensor_readings while ownership proof is
@@ -1041,6 +1045,12 @@ export default function Timeline() {
         firstPageRows: coreRows,
         firstPageCursor: entriesPage.oldestFetchedCursor,
         firstPageHiddenRows: timelineHiddenFetchedRows(entriesResult.data as Entry[], rows),
+        // entriesTotal is the server count minus the hidden fetched rows.
+        previousServerCount:
+          entriesTotalRef.current === null
+            ? null
+            : entriesTotalRef.current + hiddenFetchedRowsRef.current.length,
+        firstPageServerCount: typeof entriesResult.count === "number" ? entriesResult.count : null,
       });
       const committedRows = refreshed.rows;
       entriesReadKeyRef.current = requestedReadKey;
@@ -1066,6 +1076,9 @@ export default function Timeline() {
         sameScope,
         previousRows: growEventsSnapshotRef.current,
         firstPageRows: nextGrowEvents,
+        previousServerCount: growEventsTotalRef.current,
+        firstPageServerCount:
+          typeof growEventsResult.count === "number" ? growEventsResult.count : null,
       });
       setGrowEvents(refreshedActivity.rows);
       setTimelineSensorEvents(nextSensorEvents);

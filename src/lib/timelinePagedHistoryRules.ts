@@ -26,6 +26,10 @@ export interface TimelineRefreshMergeInput<T extends TimelinePagedRow> {
   firstPageRows: readonly T[];
   firstPageCursor: TimelineKeysetCursor | null;
   firstPageHiddenRows: readonly TimelinePagedRow[];
+  /** Server row count for the scope before this refresh, hidden rows included. */
+  previousServerCount: number | null;
+  /** Server row count returned with the refreshed page, hidden rows included. */
+  firstPageServerCount: number | null;
 }
 
 export interface TimelineRefreshMerge<T extends TimelinePagedRow> {
@@ -42,9 +46,13 @@ export interface TimelineRefreshMerge<T extends TimelinePagedRow> {
  *
  * Older pages are kept only when the previous read reached strictly past the
  * refreshed page and the refreshed page reaches a row already loaded, so the
- * two are contiguous. Otherwise the refreshed page replaces everything. Rows inside the refreshed page always come from the refresh,
- * so an entry removed elsewhere disappears. A kept older row that was removed
- * on another device stays until the next full reload. A correction, retraction
+ * two are contiguous, and the server's row count changed by exactly the rows
+ * that are new on the refreshed page. A count that grew by more means a row
+ * landed somewhere the refresh did not read (a save backdated between loaded
+ * pages); a count that fell means a row is gone. Either way the kept rows and
+ * cursor cannot be trusted. Otherwise the refreshed page replaces everything.
+ * Rows inside the refreshed page always come from the refresh, so an entry
+ * removed elsewhere disappears. A correction, retraction
  * or removal made on this page is not such a case: the caller passes
  * `sameScope: false` for the reload that follows it, so nothing stale is kept.
  */
@@ -67,7 +75,25 @@ export function mergeTimelineRefreshedFirstPage<T extends TimelinePagedRow>(
       (row) => !isOlderThanCursor(row, firstPageCursor),
     );
 
-  if (!reachedPastFirstPage || !overlapsLoadedRows || firstPageCursor === null) {
+  // Every row the server now counts must be one already loaded or one on the
+  // refreshed page. Otherwise a row sits where no kept page or cursor reaches.
+  const loadedIds = new Set(
+    [...input.previousRows, ...input.previousHiddenRows].map((row) => row.id),
+  );
+  const newOnFirstPage = [...input.firstPageRows, ...input.firstPageHiddenRows].filter(
+    (row) => !loadedIds.has(row.id),
+  ).length;
+  const countReconciles =
+    input.previousServerCount !== null &&
+    input.firstPageServerCount !== null &&
+    input.firstPageServerCount - input.previousServerCount === newOnFirstPage;
+
+  if (
+    !reachedPastFirstPage ||
+    !overlapsLoadedRows ||
+    !countReconciles ||
+    firstPageCursor === null
+  ) {
     return {
       rows: [...input.firstPageRows],
       cursor: firstPageCursor,
@@ -136,12 +162,17 @@ export function appendTimelineOlderActivity<T extends TimelineActivityRow>(
 /**
  * Activity counterpart of {@link mergeTimelineRefreshedFirstPage}: a
  * same-scope refresh keeps older activity pages only when the refreshed
- * newest page reaches a row already loaded.
+ * newest page reaches a row already loaded and the server count changed by
+ * exactly the rows that are new on that page.
  */
 export function mergeTimelineRefreshedActivity<T extends TimelineActivityRow>(input: {
   sameScope: boolean;
   previousRows: readonly T[];
   firstPageRows: readonly T[];
+  /** Server activity count for the scope before this refresh. */
+  previousServerCount: number | null;
+  /** Server activity count returned with the refreshed page. */
+  firstPageServerCount: number | null;
 }): { rows: T[]; keptOlderPages: boolean } {
   const wrap = (row: T) => ({ id: row.id, entry_at: row.occurred_at, row });
   const merged = mergeTimelineRefreshedFirstPage({
@@ -152,6 +183,8 @@ export function mergeTimelineRefreshedActivity<T extends TimelineActivityRow>(in
     firstPageRows: input.firstPageRows.map(wrap),
     firstPageCursor: timelineActivityCursor(input.firstPageRows),
     firstPageHiddenRows: [],
+    previousServerCount: input.previousServerCount,
+    firstPageServerCount: input.firstPageServerCount,
   });
   return { rows: merged.rows.map((item) => item.row), keptOlderPages: merged.keptOlderPages };
 }

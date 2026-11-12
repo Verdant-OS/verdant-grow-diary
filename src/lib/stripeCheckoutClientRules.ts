@@ -45,8 +45,10 @@ export function stripeCheckoutErrorMessage(code: string | null): string {
 }
 
 /**
- * The Stripe side is not live here: the server said it is not configured, or
- * the function is not deployed (404). The click then falls back to Paddle.
+ * The Stripe side is not usable here: the server said it is not configured,
+ * the configured Stripe price does not match the site (a misconfiguration
+ * the server logs as an error), or the function is not deployed (404). The
+ * click then falls back to Paddle.
  */
 export function shouldFallBackToPaddle(result: {
   ok: boolean;
@@ -54,5 +56,9 @@ export function shouldFallBackToPaddle(result: {
   status?: number | null;
 }): boolean {
   if (result.ok) return false;
-  return result.code === "stripe_not_configured" || result.status === 404;
+  return (
+    result.code === "stripe_not_configured" ||
+    result.code === "stripe_price_mismatch" ||
+    result.status === 404
+  );
 }

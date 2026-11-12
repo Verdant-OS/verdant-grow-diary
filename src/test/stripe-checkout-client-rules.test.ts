@@ -78,6 +78,9 @@ describe("shouldFallBackToPaddle", () => {
       true,
     );
     expect(shouldFallBackToPaddle({ ok: false, code: null, status: 404 })).toBe(true);
+    expect(shouldFallBackToPaddle({ ok: false, code: "stripe_price_mismatch", status: 503 })).toBe(
+      true,
+    );
   });
 
   it("does not fall back on real refusals or transient failures", () => {

@@ -81,4 +81,32 @@ describe("useStripeCheckout", () => {
     expect(toastMock).toHaveBeenCalledTimes(1);
     expect(result.current.loading).toBe(false);
   });
+
+  it("re-enables the Pro button when the grower comes Back from Stripe", async () => {
+    requestMock.mockResolvedValue({ ok: true, url: "https://checkout.stripe.com/c/pay/cs_1" });
+    const { result } = renderHook(() => useStripeCheckout());
+    await act(async () => {
+      await result.current.startStripeCheckout("pro_monthly");
+    });
+    expect(result.current.loading).toBe(true);
+    // A normal pageshow (not from the back-forward cache) changes nothing.
+    await act(async () => {
+      const fresh = new Event("pageshow") as PageTransitionEvent;
+      Object.defineProperty(fresh, "persisted", { value: false });
+      window.dispatchEvent(fresh);
+    });
+    expect(result.current.loading).toBe(true);
+    await act(async () => {
+      const restored = new Event("pageshow") as PageTransitionEvent;
+      Object.defineProperty(restored, "persisted", { value: true });
+      window.dispatchEvent(restored);
+    });
+    expect(result.current.loading).toBe(false);
+    requestMock.mockResolvedValue({ ok: true, url: "https://checkout.stripe.com/c/pay/cs_2" });
+    let outcome: string | undefined;
+    await act(async () => {
+      outcome = await result.current.startStripeCheckout("pro_monthly");
+    });
+    expect(outcome).toBe("redirecting");
+  });
 });

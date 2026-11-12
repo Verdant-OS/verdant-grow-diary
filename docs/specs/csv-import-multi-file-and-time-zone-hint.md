@@ -48,7 +48,7 @@ A fourth item, data-quality notes (soil moisture stuck at 0 or 100, long gaps), 
 - **R2.6** The whole set is one import batch with one `import_batch_id`, so one undo removes it all (the undo from #2909).
 - **R2.7** Destination (grow, tent, plant), unit and mapping choices work the same as one file, and apply to the whole set.
 
-**Acceptance:** selecting the five files from this export, with America/Regina picked, gives one preview covering Sep 3 to Nov 4. The two sensor files repeat the soil readings of the September and October device files. Matching values are saved once, and the few rows whose values differ (_practical observation:_ one September row by up to 1.4, one October row by 0.02 EC) are counted, not saved. Confirm writes once, undo removes every row from the set, and re-importing the same set adds 0 rows. A separate test covers byte-identical copies (R2.4).
+**Acceptance:** selecting the five files from this export, with America/Regina picked, gives one preview covering Sep 3 to Nov 4. The two sensor files repeat the soil readings of the September and October device files. Matching values are saved once, and the few rows whose values differ (_practical observation:_ one September row by up to 1.4, one October row by 0.02 EC) are counted, not saved. Confirm writes once, and re-importing the same set while it is saved adds 0 rows. Undo removes every row from the set, and importing the same set after that undo saves its rows again. A separate test covers byte-identical copies (R2.4).
 
 ### Slice 3: accurate soil message
 
@@ -79,7 +79,7 @@ Paths are from deploy head `c03ea6fd`. Line numbers are where the code stands to
 | `src/components/EnvironmentCsvImportModal.tsx`                             | `multiple` on the input (`:329`). Keep a list of files instead of one `fileRef`. Parse each with the chosen zone (`:204`). Hash each file with `crypto.subtle` and pass the hashes into the rules.                              |
 | `src/lib/environmentCsvImportViewModel.ts`                                 | Combined preview model: one row per file plus a total. Held-row counts (`:92`, `:104`, `:326`) summed across files.                                                                                                             |
 | `src/lib/environmentCsvImportPersistence.ts`                               | Pass the merged rows through the existing write path with one `import_batch_id` (`:53-54`, `:135-139`). _Inference:_ no change beyond the caller, since the batch id is already caller-supplied. Confirm by reading `:380-425`. |
-| `src/lib/sensorHistoryImportReplayGuard.ts`                                | Fingerprint each file in the set. A file already imported is listed as such and left out, as one file is today.                                                                                                                 |
+| `src/lib/sensorHistoryImportReplayGuard.ts`                                | No change. It has no production caller today, and this slice does not add one (see Replay below).                                                                                                                               |
 | `src/components/CsvPreviewReviewGate.tsx`, `src/lib/csvImportPlanRules.ts` | Read first. Change only if they assume one file.                                                                                                                                                                                |
 
 ### Slice 3: accurate soil message
@@ -120,7 +120,7 @@ Paths are from deploy head `c03ea6fd`. Line numbers are where the code stands to
 - **The same reading in two files** means the same tent, source, metric and `captured_at`, the key the unique index already uses. Equal values after the parser's normalization: saved once. Different values: neither is saved, and the preview counts them as conflicts by file pair. No tolerance and no “newer wins”: a conflict is the grower's to look at.
 - **A file that fails** (no sensor data, wrong format, over a limit) is listed with its reason and left out. The rest still import. The grower can remove it from the list before confirming.
 - **One undo.** Generate one `import_batch_id` for the whole set, the same way a single file gets one today, and pass it on every row. The existing batch undo (#2909) then removes the whole set. _Inference to confirm:_ nothing in persistence assumes one file per batch.
-- **Replay.** Each file is fingerprinted by the existing replay guard. A file already imported is shown as already imported and left out, as one file is today.
+- **Replay.** Re-import protection stays where it is today: the unique index `sensor_readings_dedupe_uidx`. The write path skips rows whose key already exists and counts them, so re-importing a set that is still saved adds 0 rows. After a batch undo those rows are gone, so importing the same set again must save them again. _Established fact, read 2026-11-12:_ the fingerprint helpers in `src/lib/sensorHistoryImportReplayGuard.ts` have no production caller, and the batch undo in `EnvironmentCsvImportLauncher.tsx` clears no fingerprints. This slice does not wire that guard in. A later slice that does must clear or reconcile a set's fingerprints on undo, or it would block a valid re-import.
 - **Order.** Sort the files by their first `captured_at`, then by file name, so the preview and the merged rows don't depend on the order the browser lists them.
 
 ### Slice 3: the soil message
@@ -163,8 +163,9 @@ Every new test is shown failing before its fix, and the failing count goes in th
 
 - New `src/test/csv-import-multi-file-modal.test.tsx`: pick three files, see one row per file and a total, confirm, and every insert carries one `import_batch_id`.
 - Extend `src/test/csv-import-idempotency.test.ts`: importing the same set twice adds nothing the second time.
-- Extend `src/test/csv-history-duplicate-import-regression.test.tsx`: a set that includes an already-imported file leaves that file out.
+- Extend `src/test/csv-history-duplicate-import-regression.test.tsx`: a set that includes an already-imported file saves that file's new rows only, and counts the rest as skipped duplicates.
 - One batch undo removes rows from every file in the set (extend the #2909 undo test).
+- Import a set, undo it, import the same set again: the second import saves the rows again, with no row skipped as already imported.
 
 ### Slice 3
 

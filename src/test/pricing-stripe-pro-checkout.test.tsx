@@ -1,20 +1,26 @@
 /**
- * /pricing with the provider switch on "stripe" (Cheek, 2026-11-12): Pro CTAs
- * start the Stripe checkout, never the Paddle overlay, and Paddle's own
- * blocked or unavailable state does not relabel or block Pro. Credit packs
- * stay on Paddle. The Paddle Pro path is covered by the files that pin the
- * switch to "paddle".
+ * /pricing in a build with VITE_PRO_CHECKOUT_PROVIDER=stripe (Cheek's pick,
+ * 2026-11-12): Pro CTAs start the Stripe checkout, never the Paddle overlay,
+ * and Paddle's own blocked or unavailable state does not relabel or block
+ * Pro. If the server says Stripe is not set up, the same click falls back to
+ * Paddle. The Pro button stays disabled while the browser leaves for Stripe.
+ * Credit packs stay on Paddle.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import Pricing from "@/pages/Pricing";
-import { PRO_CHECKOUT_PROVIDER } from "@/config/checkoutProvider";
 
 const openCheckoutMock = vi.fn();
 const startStripeCheckoutMock = vi.fn();
 const paddleState = { unavailableMessage: null as string | null };
+const stripeState = { loading: false };
+
+vi.mock("@/config/checkoutProvider", () => ({
+  PRO_CHECKOUT_PROVIDER: "stripe",
+  resolveProCheckoutProvider: (raw: unknown) => (raw === "stripe" ? "stripe" : "paddle"),
+}));
 
 vi.mock("@/hooks/usePaddleCheckout", () => ({
   usePaddleCheckout: () => ({
@@ -31,7 +37,10 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
 }));
 
 vi.mock("@/hooks/useStripeCheckout", () => ({
-  useStripeCheckout: () => ({ startStripeCheckout: startStripeCheckoutMock, loading: false }),
+  useStripeCheckout: () => ({
+    startStripeCheckout: startStripeCheckoutMock,
+    loading: stripeState.loading,
+  }),
 }));
 
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
@@ -45,15 +54,13 @@ function renderPricing() {
   );
 }
 
-describe("/pricing sends new Pro sales to Stripe", () => {
+describe("/pricing sends new Pro sales to Stripe when the flag is on", () => {
   beforeEach(() => {
     openCheckoutMock.mockReset();
     startStripeCheckoutMock.mockReset();
+    startStripeCheckoutMock.mockResolvedValue("redirecting");
     paddleState.unavailableMessage = null;
-  });
-
-  it("ships with the switch on Stripe", () => {
-    expect(PRO_CHECKOUT_PROVIDER).toBe("stripe");
+    stripeState.loading = false;
   });
 
   it("Pro Annual starts the Stripe checkout and never opens Paddle", async () => {
@@ -83,5 +90,28 @@ describe("/pricing sends new Pro sales to Stripe", () => {
     await user.click(cta);
     expect(startStripeCheckoutMock).toHaveBeenCalledWith("pro_annual");
     expect(openCheckoutMock).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Paddle on the same click when Stripe is not set up", async () => {
+    startStripeCheckoutMock.mockResolvedValue("fallback");
+    const user = userEvent.setup();
+    renderPricing();
+    await user.click(screen.getByTestId("pricing-cta-pro-annual"));
+    await waitFor(() => expect(openCheckoutMock).toHaveBeenCalledWith({ priceId: "pro_annual" }));
+  });
+
+  it("does not open Paddle after a real Stripe refusal", async () => {
+    startStripeCheckoutMock.mockResolvedValue("failed");
+    const user = userEvent.setup();
+    renderPricing();
+    await user.click(screen.getByTestId("pricing-cta-pro-annual"));
+    await waitFor(() => expect(startStripeCheckoutMock).toHaveBeenCalled());
+    expect(openCheckoutMock).not.toHaveBeenCalled();
+  });
+
+  it("disables the Pro button while the Stripe checkout starts and redirects", () => {
+    stripeState.loading = true;
+    renderPricing();
+    expect(screen.getByTestId("pricing-cta-pro-annual")).toBeDisabled();
   });
 });

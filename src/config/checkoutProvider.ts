@@ -1,17 +1,25 @@
 /**
  * Which provider opens a NEW Pro checkout from /pricing.
  *
- * "stripe" sends new Pro sales to the stripe-checkout Edge function. Cheek
- * chose this on 2026-11-12 15:55 UTC ("Switch to Stripe"; plan decision 5 in
- * docs/specs/stripe-live-checkout-plan.md). Paddle code is frozen, not
- * removed: existing Paddle subscribers keep working and credit packs still
- * use Paddle. "paddle" restores the previous Pro checkout.
+ * Cheek chose Stripe for new Pro sales on 2026-11-12 15:55 UTC ("Switch to
+ * Stripe"; plan decision 5 in docs/specs/stripe-live-checkout-plan.md). The
+ * switch takes effect only when the site is built with
+ * VITE_PRO_CHECKOUT_PROVIDER=stripe, which is set after stripe-checkout and
+ * stripe-webhook are deployed with their secrets and price ids. Until then,
+ * and for any other value, Pro stays on Paddle, so a frontend that ships
+ * before the Stripe side is live never shows a dead Pro button.
  *
- * Release order matters: this only works once stripe-checkout and
- * stripe-webhook are deployed and their secrets and price ids are set. Ship
- * the frontend with "stripe" before that and the Pro button shows
- * "Checkout isn't available right now" instead of opening Paddle.
+ * Paddle code is frozen, not removed: existing Paddle subscribers keep
+ * working and credit packs still use Paddle. Even with the flag on, a click
+ * falls back to Paddle when the server says Stripe is not configured.
  */
 export type ProCheckoutProvider = "paddle" | "stripe";
 
-export const PRO_CHECKOUT_PROVIDER: ProCheckoutProvider = "stripe";
+/** Only the exact value "stripe" turns Stripe on. Anything else is Paddle. */
+export function resolveProCheckoutProvider(raw: unknown): ProCheckoutProvider {
+  return raw === "stripe" ? "stripe" : "paddle";
+}
+
+export const PRO_CHECKOUT_PROVIDER: ProCheckoutProvider = resolveProCheckoutProvider(
+  import.meta.env.VITE_PRO_CHECKOUT_PROVIDER,
+);

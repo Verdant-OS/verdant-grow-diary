@@ -1,22 +1,31 @@
 /**
  * Slice D (docs/specs/stripe-live-checkout-plan.md): the client picks the
  * provider, reads the function's answer and refuses to redirect anywhere but
- * Stripe's hosted checkout. The switch ships as "stripe" (Cheek's pick); a
- * "paddle" switch restores the previous Pro checkout.
+ * Stripe's hosted checkout. Cheek picked Stripe; the switch takes effect only
+ * in a build with VITE_PRO_CHECKOUT_PROVIDER=stripe, and otherwise stays on
+ * Paddle so an early frontend never shows a dead Pro button.
  */
 import { describe, expect, it } from "vitest";
-import { PRO_CHECKOUT_PROVIDER } from "@/config/checkoutProvider";
+import { PRO_CHECKOUT_PROVIDER, resolveProCheckoutProvider } from "@/config/checkoutProvider";
 import { STRIPE_CHECKOUT_COPY } from "@/constants/stripeCheckoutCopy";
 import {
   readStripeCheckoutUrl,
+  shouldFallBackToPaddle,
   shouldUseStripeCheckout,
   stripeCheckoutErrorMessage,
 } from "@/lib/stripeCheckoutClientRules";
 
 describe("Pro checkout provider switch", () => {
-  it("ships set to Stripe for new Pro sales (Cheek, 2026-11-12)", () => {
-    expect(PRO_CHECKOUT_PROVIDER).toBe("stripe");
-    expect(shouldUseStripeCheckout("pro_monthly", PRO_CHECKOUT_PROVIDER)).toBe(true);
+  it("stays on Paddle in a build without VITE_PRO_CHECKOUT_PROVIDER=stripe", () => {
+    expect(PRO_CHECKOUT_PROVIDER).toBe("paddle");
+    expect(shouldUseStripeCheckout("pro_monthly", PRO_CHECKOUT_PROVIDER)).toBe(false);
+  });
+
+  it("turns Stripe on only for the exact flag value", () => {
+    expect(resolveProCheckoutProvider("stripe")).toBe("stripe");
+    for (const raw of [undefined, "", "paddle", "Stripe", "STRIPE", "true", "1", null]) {
+      expect(resolveProCheckoutProvider(raw)).toBe("paddle");
+    }
   });
 
   it("sends nothing to Stripe when the switch is on Paddle", () => {
@@ -59,6 +68,27 @@ describe("stripeCheckoutErrorMessage", () => {
     expect(stripeCheckoutErrorMessage("auth_required")).toBe(STRIPE_CHECKOUT_COPY.signInRequired);
     for (const code of ["checkout_unavailable", "plan_not_sold", "<script>", null]) {
       expect(stripeCheckoutErrorMessage(code)).toBe(STRIPE_CHECKOUT_COPY.unavailable);
+    }
+  });
+});
+
+describe("shouldFallBackToPaddle", () => {
+  it("falls back when Stripe is not configured or not deployed", () => {
+    expect(shouldFallBackToPaddle({ ok: false, code: "stripe_not_configured", status: 503 })).toBe(
+      true,
+    );
+    expect(shouldFallBackToPaddle({ ok: false, code: null, status: 404 })).toBe(true);
+  });
+
+  it("does not fall back on real refusals or transient failures", () => {
+    for (const result of [
+      { ok: true },
+      { ok: false, code: "already_subscribed", status: 409 },
+      { ok: false, code: "auth_required", status: 401 },
+      { ok: false, code: "checkout_unavailable", status: 502 },
+      { ok: false, code: null, status: null },
+    ]) {
+      expect(shouldFallBackToPaddle(result)).toBe(false);
     }
   });
 });

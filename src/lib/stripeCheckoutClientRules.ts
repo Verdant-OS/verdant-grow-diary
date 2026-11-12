@@ -43,3 +43,16 @@ export function stripeCheckoutErrorMessage(code: string | null): string {
   if (code === "auth_required") return STRIPE_CHECKOUT_COPY.signInRequired;
   return STRIPE_CHECKOUT_COPY.unavailable;
 }
+
+/**
+ * The Stripe side is not live here: the server said it is not configured, or
+ * the function is not deployed (404). The click then falls back to Paddle.
+ */
+export function shouldFallBackToPaddle(result: {
+  ok: boolean;
+  code?: string | null;
+  status?: number | null;
+}): boolean {
+  if (result.ok) return false;
+  return result.code === "stripe_not_configured" || result.status === 404;
+}

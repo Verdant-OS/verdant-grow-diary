@@ -7,11 +7,11 @@ why: Row-level security pass 2026-11-12 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6
 branch: claude/operator-plants-read-only
 base: verdant-grow-diary at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8
 checkout: git fetch origin claude/operator-plants-read-only verdant-grow-diary && git switch claude/operator-plants-read-only
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2941 (draft)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2941 (ready for review since 2026-11-12 01:36 UTC)
 head_sha: code at b300c9c8171a66029e3f2523f458db3ba46b993d (2026-11-12); a docs-only commit recording this PR link follows it, so read the current head from the PR
-state: implemented, local checks green, pushed draft
-current_step: draft PR open; required CI runs once it is marked ready
-next_action: owner decides when to mark ready; then one independent exact-head review. This is a migration PR: it stays out of the merge queue until a human approves the exact head SHA, and applying it to production is the founder's own step.
+state: implemented, marked ready by owner decision; required CI and Codex review running
+current_step: ready for review; Codex P2 on the newest-migration assertion fixed in the follow-up commit
+next_action: one independent exact-head review once required checks are green. This is a migration PR: it stays out of the merge queue until a human approves the exact head SHA, and applying it to production is the founder's own step.
 post_merge_check: after the operator applies the migration in production, in the SQL editor: select policyname, cmd from pg_policies where schemaname = 'public' and tablename = 'plants' order by 1; expect no row named "Operators update all plants", and "Operators view all plants" plus "Users update own plants" still present. Before that apply, production behavior is NOT_MEASURED and unchanged.
 active_writer: Claude session_017UoYKvCNSMryxiQZyBbit8
 decisions: (1) One new additive migration, 20261112030000_operator_plants_read_only.sql: DROP POLICY IF EXISTS plus a postflight DO block that raises if the policy is still present. No published migration is edited. (2) moderatePlantAsOperator and its two unit tests are removed, because after the policy is gone the helper would report success while updating zero rows. (3) The operator SELECT policy on plants is kept.
@@ -23,7 +23,7 @@ commands: bunx vitest run src/test/operator-plants-read-only.test.ts src/lib/per
 files_touched: supabase/migrations/20261112030000_operator_plants_read_only.sql (new); src/lib/permissions.ts; src/lib/permissions.test.ts; src/test/operator-plants-read-only.test.ts (new); this file
 files_remaining: none for this slice
 blockers: none
-open_questions: (1) supabase/tests/pheno_candidate_number_maintenance_paths.sql lines 154-160 carry a comment that names "Operators update all plants" as a way a non-owner reaches a plant row. The test logic does not depend on the policy (it runs under role none) and was not edited; the comment becomes stale once this is applied. (2) src/test/operator-plants-read-only.test.ts asserts this file is the newest migration, so a later migration added before this merges must renegotiate that case or this file's timestamp.
+open_questions: (1) supabase/tests/pheno_candidate_number_maintenance_paths.sql lines 154-160 carry a comment that names "Operators update all plants" as a way a non-owner reaches a plant row. The test logic does not depend on the policy (it runs under role none) and was not edited; the comment becomes stale once this is applied.
 gotchas: `bun run typecheck` (tsc) runs out of heap at Node's default in the authoring container; export NODE_OPTIONS=--max-old-space-size=8192 before committing until #2938 lands.
 links: none besides the PR
 artifacts: the test files above

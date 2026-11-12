@@ -11,6 +11,7 @@ import * as permissions from "@/lib/permissions";
 const ROOT = resolve(__dirname, "../..");
 const MIGRATIONS = resolve(ROOT, "supabase/migrations");
 const FILE = "20261112030000_operator_plants_read_only.sql";
+const CREATOR_PREFIX = "20260517010926_";
 const PATH = resolve(MIGRATIONS, FILE);
 const sql = (): string => readFileSync(PATH, "utf8");
 const statements = (): string =>
@@ -29,12 +30,23 @@ describe("operator plants read-only", () => {
     );
   });
 
-  it("is the newest migration, so it applies after the policy's creator", () => {
-    const newest = readdirSync(MIGRATIONS)
+  it("sorts after the migration that created the policy, so it applies later", () => {
+    const names = readdirSync(MIGRATIONS)
       .filter((name) => name.endsWith(".sql"))
-      .sort()
-      .at(-1);
-    expect(newest).toBe(FILE);
+      .sort();
+    const creator = names.findIndex((name) => name.startsWith(CREATOR_PREFIX));
+    expect(creator).toBeGreaterThanOrEqual(0);
+    expect(names.indexOf(FILE)).toBeGreaterThan(creator);
+  });
+
+  it("is the only later migration that mentions the policy, so nothing re-creates it", () => {
+    const later = readdirSync(MIGRATIONS)
+      .filter((name) => name.endsWith(".sql") && name > CREATOR_PREFIX && name !== FILE)
+      .filter((name) =>
+        readFileSync(resolve(MIGRATIONS, name), "utf8").includes("Operators update all plants"),
+      )
+      .filter((name) => !name.startsWith(CREATOR_PREFIX));
+    expect(later).toEqual([]);
   });
 
   it("creates no policy and grants nothing", () => {

@@ -7,10 +7,10 @@ why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8 fou
 branch: claude/legacy-quicklog-retirement-spec
 base: verdant-grow-diary at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8
 checkout: git fetch origin claude/legacy-quicklog-retirement-spec verdant-grow-diary && git switch claude/legacy-quicklog-retirement-spec
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2950 (draft)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2950 (ready for review since 2026-11-12 07:06 UTC)
 head_sha: spec at c16379e49b43209dc623d843ff6b5570a7f75dd2 (2026-11-12); a docs-only commit recording this PR link follows it, so read the current head from the PR
-state: spec written, pushed draft
-current_step: draft PR open
+state: spec written, marked ready by owner decision; two Codex P2 findings corrected in the follow-up commit
+current_step: ready for review
 next_action: owner answers the five decisions in section 8 of docs/specs/legacy-quick-log-retirement.md; no stage is approved for build until then
 post_merge_check: none (docs only)
 active_writer: Claude session_017UoYKvCNSMryxiQZyBbit8
@@ -29,7 +29,7 @@ links: docs/specs/one-tent-loop-quicklog-single-write-path.md (the write path th
 artifacts: the spec
 reviewer_seat: none routed yet
 reviewer_sha: none
-session_state: no routines, no paused workflows; pending human decisions: spec section 8, mark ready, review routing and the per-item merge yes
+session_state: no routines, no paused workflows; pending human decisions: spec section 8, review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-12 07:10 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
 last_updated: 2026-11-12 01:10 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8

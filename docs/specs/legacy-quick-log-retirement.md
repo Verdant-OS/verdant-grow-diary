@@ -77,14 +77,25 @@ So the split today is by entry path, and by what the entry needs to capture.
   (`src/components/QuickLog.tsx` line 446; frozen by
   `docs/specs/one-tent-loop-quicklog-single-write-path.md`).
 - Legacy maps its form to that RPC through `src/lib/legacyQuickLogUnifiedSave.ts`,
-  which accepts only `watering`, `observation` and `note` and rejects every other
-  event type with `unsupported_event_type`.
+  which accepts `watering`, `observation`, `note` and `environment`
+  (`SUPPORTED_LEGACY_EVENT_TYPES`, lines 52-57) and rejects every other event type
+  with `unsupported_event_type`.
+- An `environment` save keeps the environment-check envelope and sends air
+  temperature, humidity and VPD through the RPC's first-class parameters, so
+  `quicklog_save_manual` persists the structured `environment_events` row. That is an
+  existing persistence contract the retirement has to preserve.
 - Legacy makes one extra write after a confirmed save: `grows.update({ stage })`
   (line 1864), reported separately if it fails ("stage save unconfirmed").
 - `src/components/QuickLogAllActivitiesSection.tsx` (2,284 lines) saves through
   `useQuickLogActivitySave`, which calls `quicklog_save_manual` and
   `quicklog_save_event`, and uploads photos to the `diary-photos` bucket. It is
   imported only by legacy `QuickLog.tsx` and `DailyCheck.tsx`.
+- That section does **not** persist a manual sensor reading. It sets
+  `canPersistManualSensor = false` (line 734) and shows either a launcher
+  (`onOpenManualSensorReading`) or instructions to use the separate card;
+  `useQuickLogActivitySave` does not save the `manual_sensor_reading` route. The
+  writer for that capture is `src/components/ManualSensorReadingCard.tsx`, hosted on
+  `DailyCheck.tsx` and `src/pages/Sensors.tsx`.
 
 Retirement therefore removes no writer the single-write-path spec protects. The grow
 stage write-back is the one behavior with no V2 counterpart found (`inference`, from
@@ -97,31 +108,32 @@ from running both surfaces side by side. A "no" means V2 does not import the mod
 or render the test id that implements it in legacy. Every row is `inference` until a
 behavioral comparison is done in the stage that touches it.
 
-| Capability                                                                | Legacy                  | V2                                | Evidence                                                                |
-| ------------------------------------------------------------------------- | ----------------------- | --------------------------------- | ----------------------------------------------------------------------- |
-| Note                                                                      | yes                     | yes                               | V2 action set is `water`, `note`, `feed` (`src/lib/quickLogV2Rules.ts`) |
-| Watering with volume                                                      | yes                     | yes, dedicated form               | `QuickLogWateringForm`                                                  |
-| Feeding with recipe                                                       | via All Activities      | yes, dedicated form               | `QuickLogFeedingForm`                                                   |
-| Photo                                                                     | via All Activities      | yes                               | `quickLogPhotoDiaryEntry`                                               |
-| Video                                                                     | no                      | yes                               | `quickLogVideoDiaryEntry`                                               |
-| Structured readings on a note                                             | hardware readings block | yes                               | `quickLogStructuredReadingRules`                                        |
-| Maturity evidence fields                                                  | no                      | yes                               | `QuickLogMaturityEvidenceFields`                                        |
-| Session draft that survives reopen                                        | no                      | yes                               | `quickLogObservationDraftRules` (see #2936)                             |
-| Duplicate-submit guard                                                    | no dedicated module     | yes                               | `quickLogDuplicateSubmitGuard`                                          |
-| Environment check section                                                 | yes                     | no                                | `environmentCheckQuickLogRules`                                         |
-| Training, defoliation, issue observation, manual sensor snapshot, harvest | yes, via All Activities | no                                | `src/constants/quickLogActivityTypes.ts`                                |
-| Reminder event type                                                       | yes                     | no                                | `eventType === "reminder"` branch                                       |
-| Early-stage milestones and vigor chips                                    | yes                     | no                                | `earlyStageQuickLogRules`                                               |
-| Harvest Watch inspection preview                                          | yes                     | no                                | `harvestInspectionQuickLogPreviewRules`                                 |
-| Pheno evidence goal capture                                               | yes                     | no                                | `PhenoEvidenceQuickLogPanel`                                            |
-| Public starter draft handoff and consume-once                             | yes                     | no                                | `publicQuickLogStarterDraftStore`                                       |
-| Draft preview panel for handoffs                                          | yes                     | no                                | `quickLogDraftPreviewViewModel`                                         |
-| Sensor snapshot attach toggle and strip                                   | yes                     | gate rules only                   | `QuickLogSensorSnapshotStrip` vs `quickLogSensorSnapshotGateRules`      |
-| Grow and plant pickers inside the form                                    | yes                     | target panel                      | `quick-log-grow-select`, `QuickLogTargetPanel`                          |
-| Recent-target suggestion (accept or dismiss)                              | yes                     | yes                               | both import `quickLogRecentTargetStore`                                 |
-| Grow stage write-back                                                     | yes                     | no                                | `quickLogGrowStageWritebackRules`                                       |
-| Review-issues summary with jump links                                     | yes                     | no                                | `quick-log-review-issues`                                               |
-| Post-save panel                                                           | yes                     | navigation to the timeline anchor | `quick-log-post-save`, `timelineAnchorNavigation`                       |
+| Capability                                                    | Legacy                                            | V2                                | Evidence                                                                |
+| ------------------------------------------------------------- | ------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------- |
+| Note                                                          | yes                                               | yes                               | V2 action set is `water`, `note`, `feed` (`src/lib/quickLogV2Rules.ts`) |
+| Watering with volume                                          | yes                                               | yes, dedicated form               | `QuickLogWateringForm`                                                  |
+| Feeding with recipe                                           | via All Activities                                | yes, dedicated form               | `QuickLogFeedingForm`                                                   |
+| Photo                                                         | via All Activities                                | yes                               | `quickLogPhotoDiaryEntry`                                               |
+| Video                                                         | no                                                | yes                               | `quickLogVideoDiaryEntry`                                               |
+| Structured readings on a note                                 | hardware readings block                           | yes                               | `quickLogStructuredReadingRules`                                        |
+| Maturity evidence fields                                      | no                                                | yes                               | `QuickLogMaturityEvidenceFields`                                        |
+| Session draft that survives reopen                            | no                                                | yes                               | `quickLogObservationDraftRules` (see #2936)                             |
+| Duplicate-submit guard                                        | no dedicated module                               | yes                               | `quickLogDuplicateSubmitGuard`                                          |
+| Environment check section, saved with structured air readings | yes                                               | no                                | `environmentCheckQuickLogRules`, `SUPPORTED_LEGACY_EVENT_TYPES`         |
+| Training, defoliation, issue observation, harvest             | yes, via All Activities                           | no                                | `src/constants/quickLogActivityTypes.ts`                                |
+| Manual sensor snapshot                                        | launcher only; saved by `ManualSensorReadingCard` | no                                | `canPersistManualSensor = false`                                        |
+| Reminder event type                                           | yes                                               | no                                | `eventType === "reminder"` branch                                       |
+| Early-stage milestones and vigor chips                        | yes                                               | no                                | `earlyStageQuickLogRules`                                               |
+| Harvest Watch inspection preview                              | yes                                               | no                                | `harvestInspectionQuickLogPreviewRules`                                 |
+| Pheno evidence goal capture                                   | yes                                               | no                                | `PhenoEvidenceQuickLogPanel`                                            |
+| Public starter draft handoff and consume-once                 | yes                                               | no                                | `publicQuickLogStarterDraftStore`                                       |
+| Draft preview panel for handoffs                              | yes                                               | no                                | `quickLogDraftPreviewViewModel`                                         |
+| Sensor snapshot attach toggle and strip                       | yes                                               | gate rules only                   | `QuickLogSensorSnapshotStrip` vs `quickLogSensorSnapshotGateRules`      |
+| Grow and plant pickers inside the form                        | yes                                               | target panel                      | `quick-log-grow-select`, `QuickLogTargetPanel`                          |
+| Recent-target suggestion (accept or dismiss)                  | yes                                               | yes                               | both import `quickLogRecentTargetStore`                                 |
+| Grow stage write-back                                         | yes                                               | no                                | `quickLogGrowStageWritebackRules`                                       |
+| Review-issues summary with jump links                         | yes                                               | no                                | `quick-log-review-issues`                                               |
+| Post-save panel                                               | yes                                               | navigation to the timeline anchor | `quick-log-post-save`, `timelineAnchorNavigation`                       |
 
 Reading: V2 is the stronger surface for note, water and feed. Legacy is the only
 surface for about a dozen capture types and handoffs.
@@ -172,13 +184,21 @@ Two options, to be chosen in section 8:
 
 - **2A, host the activity editor without the dialog.** `QuickLogAllActivitiesSection`
   already saves through the shared hook. Mount it in V2 (or as its own sheet) for
-  training, defoliation, issue observation, manual sensor snapshot, harvest and
-  environment check.
-- **2B, port each capture type into V2.** More work, one surface at the end.
+  training, defoliation, issue observation and harvest. Two capture types need more
+  than that mount:
+  - **Manual sensor snapshot.** The section only launches it. 2A must also keep and
+    wire the existing `ManualSensorReadingCard` flow from the new host, or the
+    capture type has no working editor there.
+  - **Environment check.** Today it saves through the legacy adapter, not the
+    activity editor. 2A must name where it lives and keep its structured save.
+- **2B, port each capture type into V2.** More work, one surface at the end. The same
+  two capture types need explicit handling.
 
 Acceptance either way: each capture type saves through the existing RPCs only, with
-the same provenance labels; a manual sensor snapshot stays labeled manual; nothing
-writes the Action Queue.
+the same provenance labels; a manual sensor reading is still written by its existing
+card and stays labeled manual; an environment check still sends temperature, humidity
+and VPD as first-class RPC parameters and produces the `environment_events` row;
+nothing writes the Action Queue.
 
 ### Stage 3 — Daily Check
 

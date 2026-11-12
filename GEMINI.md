@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-11-11.1**
+**Sentinel-Version: 2026-11-12.1**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-11-11.1**
+**Sentinel-Version: 2026-11-12.1**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -573,6 +573,7 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-11-12.1** — Live instruction text no longer routes to the retired Chemdawg / Grok 91 name. Mentions that meant a current duty now name the seat (Merge Readiness, the Coordinator or the Merge Steward). The roster gains stable labels (Writer A/B, Reviewer A–D, Grok Lead (Main), Grok Lead (Ultra)) and a rename-history note: Chemdawg was an earlier name, and the bot now holding Grok Lead (Main) once carried it. Roster only: UK Cheese holds the Coordinator seat, and OG Kush is retired. Historical sections stay word for word. No rule changes.
 - **2026-11-11.1** — Startup reads shrink. Agents read only the "Start here" section of `docs/agents/CURRENT_STATE.md` at startup, and the rest when that section says to. The handoff log read is `HANDOFF_LOG.md` plus the open entries in `docs/agents/handoffs/`; closed `HANDOFF_LOG.md` blocks moved byte for byte to `docs/agents/archive/HANDOFF_LOG_ARCHIVE.md`. No other rule changes.
 - **2026-11-05.2** — `CLAUDE.md` again says no root-level `*Rules.ts` imports the Supabase client: #2883 moved the cultivar slug route's read into a service, so the 2026-11-05.1 exception no longer exists. No rule changes.
 - **2026-11-05.1** — `CLAUDE.md` drops file counts that had drifted by about a third since 2026-08-21 and now tells agents to measure the tree. It also corrects one stale rule: a root-level `*Rules.ts` (`cultivarSlugRouteRules.ts`) has imported the Supabase client since #2777. No rule changes.

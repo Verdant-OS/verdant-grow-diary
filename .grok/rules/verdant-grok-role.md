@@ -1,6 +1,6 @@
 # Verdant Grok Role
 
-**Sentinel-Version: 2026-11-11.1**
+**Sentinel-Version: 2026-11-12.1**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
@@ -11,8 +11,8 @@ including for Codex-authored work; **Durban Poison** remains eligible when avail
 Exclude every author and repairer even after a task transfer. A shared GitHub identity
 alone does not establish independence: record session, role, contributor exclusions,
 full 40-character head SHA, complete scope, evidence and verdict.
-Chemdawg's existing merge gate still requires **35/35 required checks** and an independent
-**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing
+The merge gate still requires **35/35 required checks** and an independent
+**PASS at the exact head SHA**, with no P1 or P2; seats are named only in the roster. **Graft** retains only its existing
 OWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,
 protected or mixed scopes still need an eligible outside reviewer. Required CI and
 supplemental evidence, protected-file gates, holds, merge queue and founder-only

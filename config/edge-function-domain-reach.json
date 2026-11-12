@@ -78,7 +78,7 @@
     "auth-email-hook": {
       "domain": "email",
       "tables": ["email_send_log"],
-      "rpcs": ["enqueue_email"],
+      "rpcs": [],
       "justification": "Single-domain."
     },
     "checkout-status": {

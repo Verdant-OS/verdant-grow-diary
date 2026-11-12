@@ -1,6 +1,6 @@
 import * as React from "npm:react@18.3.1";
 import { renderAsync } from "npm:@react-email/components@0.0.22";
-import { parseEmailWebhookPayload } from "npm:@lovable.dev/email-js";
+import { parseEmailWebhookPayload, sendLovableEmail, EmailAPIError } from "npm:@lovable.dev/email-js@0.6.0";
 import { WebhookError, verifyWebhookRequest } from "npm:@lovable.dev/webhooks-js";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SignupEmail } from "../_shared/email-templates/signup.tsx";
@@ -242,17 +242,15 @@ async function handleWebhook(req: Request): Promise<Response> {
 
   const messageId = crypto.randomUUID();
 
-  // Log pending BEFORE enqueue so we have a record even if enqueue crashes
-  await supabase.from("email_send_log").insert({
-    message_id: messageId,
-    template_name: emailType,
-    recipient_email: payload.data.email,
-    status: "pending",
-  });
-
-  const { error: enqueueError } = await supabase.rpc("enqueue_email", {
-    queue_name: "auth_emails",
-    payload: {
+  const writeLog = async (status: "sent" | "suppressed" | "failed", errorMessage?: string) => {
+    const { error } = await supabase.from("email_send_log").insert({
+      message_id: messageId, template_name: emailType, recipient_email: payload.data.email,
+      status, error_message: errorMessage ?? null,
+    });
+    if (error) console.error("Auth email audit failed", { code: error.code, message: error.message });
+  };
+  try {
+    await sendLovableEmail({
       run_id,
       message_id: messageId,
       to: payload.data.email,
@@ -263,28 +261,21 @@ async function handleWebhook(req: Request): Promise<Response> {
       text,
       purpose: "transactional",
       label: emailType,
-      queued_at: new Date().toISOString(),
-    },
-  });
-
-  if (enqueueError) {
-    console.error("Failed to enqueue auth email", { error: enqueueError, run_id, emailType });
-    await supabase.from("email_send_log").insert({
-      message_id: messageId,
-      template_name: emailType,
-      recipient_email: payload.data.email,
-      status: "failed",
-      error_message: "Failed to enqueue email",
-    });
-    return new Response(JSON.stringify({ error: "Failed to enqueue email" }), {
+      idempotency_key: run_id,
+    }, { apiKey, sendUrl: Deno.env.get("LOVABLE_SEND_URL") });
+    await writeLog("sent");
+  } catch (error) {
+    await writeLog(error instanceof EmailAPIError && error.code === "recipient_suppressed" ? "suppressed" : "failed",
+      error instanceof Error ? error.message.slice(0, 1000) : "Email send failed");
+    return new Response(JSON.stringify({ error: "Email send failed" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  console.log("Auth email enqueued", { emailType, email: payload.data.email, run_id });
+  console.log("Auth email sent", { emailType, run_id });
 
-  return new Response(JSON.stringify({ success: true, queued: true }), {
+  return new Response(JSON.stringify({ success: true }), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });

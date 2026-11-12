@@ -688,6 +688,7 @@ export default function Timeline() {
   // committed read then replaces every loaded page: a refetch of the newest
   // page alone cannot show what changed on an older one.
   const discardLoadedPagesRef = useRef(false);
+  const entriesTotalRef = useRef<number | null>(null);
   const directorySensorGenerationRef = useRef(0);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
@@ -835,6 +836,7 @@ export default function Timeline() {
   activeReadKeyRef.current = activeReadKey;
   entriesSnapshotRef.current = entries;
   oldestFetchedCursorRef.current = oldestFetchedCursor;
+  entriesTotalRef.current = entriesTotal;
 
   // Same fail-closed grow-list gate as the owner name directory: no
   // supplemental tents / sensor_readings while ownership proof is
@@ -1022,6 +1024,12 @@ export default function Timeline() {
         firstPageRows: coreRows,
         firstPageCursor: entriesPage.oldestFetchedCursor,
         firstPageHiddenRows: timelineHiddenFetchedRows(entriesResult.data as Entry[], rows),
+        // entriesTotal is the server count minus the hidden fetched rows.
+        previousServerCount:
+          entriesTotalRef.current === null
+            ? null
+            : entriesTotalRef.current + hiddenFetchedRowsRef.current.length,
+        firstPageServerCount: typeof entriesResult.count === "number" ? entriesResult.count : null,
       });
       const committedRows = refreshed.rows;
       entriesReadKeyRef.current = requestedReadKey;

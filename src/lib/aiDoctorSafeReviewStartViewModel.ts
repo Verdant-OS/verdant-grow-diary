@@ -79,9 +79,13 @@ function formatSnapshotSummary(result: AiDoctorContextResult): string {
   const n = result.counts.recentManualSnapshots;
   if (n <= 0) return "No manual sensor snapshot in the last 7 days.";
   const fresh = result.evidence.includes("fresh-manual-sensor-snapshot");
+  // A snapshot dated beyond clock skew has an unknown age: say so rather
+  // than claim it is older than the window.
   const freshPart = fresh
     ? `Most recent snapshot is within ${AI_DOCTOR_SNAPSHOT_FRESH_HOURS} hours.`
-    : `Most recent snapshot is older than ${AI_DOCTOR_SNAPSHOT_FRESH_HOURS} hours.`;
+    : result.latest.manualSnapshotFutureDated
+      ? "Most recent snapshot is dated in the future, so its age is unknown."
+      : `Most recent snapshot is older than ${AI_DOCTOR_SNAPSHOT_FRESH_HOURS} hours.`;
   return `${n} manual sensor snapshot${n === 1 ? "" : "s"} in the last 7 days. ${freshPart}`;
 }
 

@@ -80,6 +80,12 @@ export interface AiDoctorContextCounts {
 
 export interface AiDoctorContextLatest {
   manualSnapshotAt: string | null;
+  /**
+   * True when that newest snapshot is dated more than
+   * MANUAL_SNAPSHOT_FUTURE_SKEW_MS ahead of `now`, so its age is unknown.
+   * Optional so older result literals stay valid; absent means false.
+   */
+  manualSnapshotFutureDated?: boolean;
 }
 
 export interface AiDoctorContextResult {
@@ -283,7 +289,11 @@ export function evaluateAiDoctorContext(
     missing,
     evidence,
     counts,
-    latest: { manualSnapshotAt: latestSnapIso },
+    latest: {
+      manualSnapshotAt: latestSnapIso,
+      manualSnapshotFutureDated:
+        latestSnapAt != null && latestSnapAt - now > MANUAL_SNAPSHOT_FUTURE_SKEW_MS,
+    },
     safeNextStep: SAFE_NEXT_STEPS[readiness],
     diagnosisClaimed: false,
   };

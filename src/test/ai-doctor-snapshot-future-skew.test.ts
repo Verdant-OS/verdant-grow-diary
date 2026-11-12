@@ -13,6 +13,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { evaluateAiDoctorContext } from "@/lib/aiDoctorContextRules";
+import { buildAiDoctorSafeReviewStart } from "@/lib/aiDoctorSafeReviewStartViewModel";
 import { buildAiDoctorSnapshotFreshnessStatus } from "@/lib/aiDoctorSnapshotFreshnessStatusViewModel";
 import { buildAiDoctorSnapshotStalenessExplanation } from "@/lib/aiDoctorSnapshotStalenessExplanationViewModel";
 import {
@@ -142,5 +143,29 @@ describe("buildAiDoctorSnapshotStalenessExplanation — future-dated snapshot", 
       });
       expect(chip.state === "stale").toBe(expl.isStale);
     }
+  });
+});
+
+describe("buildAiDoctorSafeReviewStart — future-dated snapshot summary", () => {
+  it("does not claim a future-dated snapshot is older than the window", () => {
+    const view = buildAiDoctorSafeReviewStart(contextWithSnapshots([NOW + HOUR]));
+    const summary = view.preparation?.snapshotSummary ?? "";
+    expect(summary).toMatch(/dated in the future, so its age is unknown/);
+    expect(summary).not.toMatch(/older than/);
+  });
+
+  it("still says older than the window for a genuinely stale snapshot", () => {
+    const view = buildAiDoctorSafeReviewStart(contextWithSnapshots([NOW - 30 * HOUR]));
+    expect(view.preparation?.snapshotSummary ?? "").toMatch(/older than 24 hours/);
+  });
+
+  it("flags the newest snapshot as future-dated only beyond the skew", () => {
+    expect(
+      contextWithSnapshots([NOW + MANUAL_SNAPSHOT_FUTURE_SKEW_MS]).latest.manualSnapshotFutureDated,
+    ).toBe(false);
+    expect(
+      contextWithSnapshots([NOW + MANUAL_SNAPSHOT_FUTURE_SKEW_MS + 1]).latest
+        .manualSnapshotFutureDated,
+    ).toBe(true);
   });
 });

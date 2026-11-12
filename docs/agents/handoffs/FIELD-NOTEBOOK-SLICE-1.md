@@ -1,4 +1,6 @@
-TASK FIELD-NOTEBOOK-SLICE-1 priority: other status: OPEN
+```text
+TASK FIELD-NOTEBOOK-SLICE-1 priority: other status: CLOSED
+closed: merged. #2922 merged into verdant-grow-diary on 2026-11-12 at 09:50 UTC as 42f867b510ece2edf365c469be5cc920cb4e98a3 (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2922), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: Direction A field-notebook slice 1 — save outcomes, occurred_at on the note readback, no Quick Log auto-open, and the notebook card on the dashboard.
 why: Owner approvals through the pending-sign-out unmount fix. PR #2922. This fix sits on pushed parent 7768a4869c59512165600323e383917680c4d518. This handoff does not name this commit's own SHA.
 branch: cursor/field-notebook-slice-1-4799
@@ -26,5 +28,6 @@ reviewer_sha: b6c1cf7f9e2833f67f211e2f9712e9109b123d09
 session_state: no production access
 claimed_by: Cursor cloud agent, 2026-11-09
 owner: Cursor cloud agent
-last_updated: 2026-11-11 18:45 CT, by Cursor cloud agent
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-11 18:45 CT, by Cursor cloud agent)
 resume here
+```

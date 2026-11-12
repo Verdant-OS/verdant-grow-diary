@@ -17,6 +17,7 @@ import { describe, it, expect } from "vitest";
 import { buildAiDoctorSnapshotFreshnessStatus } from "@/lib/aiDoctorSnapshotFreshnessStatusViewModel";
 import { buildAiDoctorSnapshotStalenessExplanation } from "@/lib/aiDoctorSnapshotStalenessExplanationViewModel";
 import { AI_DOCTOR_SNAPSHOT_FRESH_MS } from "@/lib/aiDoctorContextRules";
+import { MANUAL_SNAPSHOT_FUTURE_SKEW_MS } from "@/constants/sensorTiming";
 
 // Deterministic PRNG so failures are reproducible across runs / OSes.
 function mulberry32(seed: number): () => number {
@@ -152,9 +153,12 @@ describe("AI Doctor freshness — property: classification follows sign(age - fr
       });
 
       if (ageMs < 0) {
-        // Future snapshot: still "fresh" (age clamped to 0) and NOT stale.
-        expect(fresh.state).toBe("fresh");
-        expect(stale.isStale).toBe(false);
+        // Future snapshot: fresh only within the tolerated clock skew
+        // (MANUAL_SNAPSHOT_FUTURE_SKEW_MS); further ahead it is stale, and
+        // the two helpers still agree.
+        const withinSkew = -ageMs <= MANUAL_SNAPSHOT_FUTURE_SKEW_MS;
+        expect(fresh.state).toBe(withinSkew ? "fresh" : "stale");
+        expect(stale.isStale).toBe(!withinSkew);
         continue;
       }
       const expectFresh = ageMs <= FRESH;

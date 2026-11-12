@@ -1,7 +1,8 @@
 # AI-DOCTOR-SNAPSHOT-FRESH-WINDOW
 
 ```text
-TASK AI-DOCTOR-SNAPSHOT-FRESH-WINDOW  priority: P2  status: OPEN
+TASK AI-DOCTOR-SNAPSHOT-FRESH-WINDOW  priority: P2  status: CLOSED
+closed: merged. #2940 merged into verdant-grow-diary on 2026-11-12 at 09:42 UTC as caac9166625d133309e7d5f76d05d3567dc5fc2c (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2940), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: AI Doctor readiness uses the same 24-hour rule as the AI Doctor engine and the manual snapshot quality rules for when a manual sensor snapshot stops being fresh. One window, one constant.
 why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8, security/sensor pass finding 1. src/constants/aiDoctorContextReadiness.ts set AI_DOCTOR_SNAPSHOT_FRESH_HOURS = 48 while src/constants/sensorTiming.ts sets MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 24, which the engine (aiDoctorEnginePhase1Foundation) and manualSensorSnapshotQualityRules use. A 30-hour-old manual reading was "fresh" in readiness and "stale" everywhere else. Owner decision (Matthew, audit session, 2026-11-11, pop-up answer "Align to 24 hours"): one 24-hour window; saved badges graded under 48 hours stay readable; the edge mirror under supabase/ is regenerated.
 branch: claude/ai-doctor-snapshot-fresh-window
@@ -32,5 +33,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows; pending human decisions: mark ready, review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-11 23:45 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
-last_updated: 2026-11-11 17:45 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-11 17:45 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8)
 ```

@@ -1,7 +1,8 @@
 # DEAD-MODULE-CLEANUP-ZERO-REFERENCE
 
 ```text
-TASK DEAD-MODULE-CLEANUP-ZERO-REFERENCE  priority: P3  status: OPEN
+TASK DEAD-MODULE-CLEANUP-ZERO-REFERENCE  priority: P3  status: CLOSED
+closed: merged. #2946 merged into verdant-grow-diary on 2026-11-12 at 09:58 UTC as 4fb9f4389646ba9b468d7aa00384e08b0ec2c700 (final SHA; first-parent commit on origin/verdant-grow-diary whose subject ends (#2946), read 2026-11-12; merge time from GitHub). Closed in bulk by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f on 2026-11-12 at Matthew's request (source claim: his message relayed in that thread's brief). This close does not resolve the post-merge check, open questions or blockers below; they are carried forward in docs/agents/handoffs/CLOSE-STALE-HANDOFF-BLOCKS-20261112.md.
 goal: Remove the seven source files that nothing imports and nothing names, so readers and agents stop paying for code no screen, script, edge function or test uses.
 why: Repository audit 2026-11-11/12 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8. A static import graph over every tracked code file found 273 of 2,418 non-test source files unreachable from any route, server entry, script or edge function; 238 are reached only by tests; 30 have no importer at all. Of those 30, seven have no textual reference in code, config or workflows either. Matthew chose "The 7 clean files" on the decision card.
 branch: claude/dead-module-cleanup
@@ -33,5 +34,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows; pending human decisions: mark ready, review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-12 02:15 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
-last_updated: 2026-11-11 20:15 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
+last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-11 20:15 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8)
 ```

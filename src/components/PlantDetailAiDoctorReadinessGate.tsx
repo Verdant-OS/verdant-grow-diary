@@ -20,7 +20,10 @@ import {
   buildAiDoctorSnapshotFreshnessStatus,
   type AiDoctorSnapshotFreshnessState,
 } from "@/lib/aiDoctorSnapshotFreshnessStatusViewModel";
-import type { AiDoctorContextReadiness } from "@/lib/aiDoctorContextRules";
+import {
+  selectAiDoctorFreshnessSnapshotAt,
+  type AiDoctorContextReadiness,
+} from "@/lib/aiDoctorContextRules";
 import AiDoctorContextQuickActions from "@/components/AiDoctorContextQuickActions";
 import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
 import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
@@ -151,12 +154,13 @@ export default function PlantDetailAiDoctorReadinessGate({
     [result.readiness, hasSafeAiDoctorFlow],
   );
 
+  const freshnessSnapshotAt = selectAiDoctorFreshnessSnapshotAt(result);
   const freshness = useMemo(
     () =>
       buildAiDoctorSnapshotFreshnessStatus({
-        latestSnapshotAtIso: result.latest.manualSnapshotAt,
+        latestSnapshotAtIso: freshnessSnapshotAt,
       }),
-    [result.latest.manualSnapshotAt],
+    [freshnessSnapshotAt],
   );
 
   const quickActions = useMemo(

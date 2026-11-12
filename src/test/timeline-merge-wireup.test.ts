@@ -58,7 +58,7 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     expect(TIMELINE_SRC).toMatch(/from\s+["']@\/lib\/manualSensorCorrectionEvents["']/);
     expect(TIMELINE_SRC).toMatch(/\bsubscribeManualSensorCorrections\s*\(\s*ownerId/);
     expect(TIMELINE_SRC).toMatch(
-      /subscribeManualSensorCorrections\s*\(\s*ownerId[\s\S]{0,120}void\s+load\s*\(\s*\)/,
+      /subscribeManualSensorCorrections\s*\(\s*ownerId[\s\S]{0,120}reloadAfterRevision\s*\(\s*\)/,
     );
   });
 
@@ -69,8 +69,14 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
 
   it("refetches when a confirmed manual correction lands for the signed-in owner", () => {
     expect(TIMELINE_SRC).toMatch(/subscribeManualSensorCorrections\s*\(\s*ownerId/);
-    expect(TIMELINE_SRC).toMatch(/subscribeManualSensorCorrections[\s\S]{0,120}void\s+load\(\)/);
-    expect(TIMELINE_SRC).toMatch(/\[\s*ownerId\s*,\s*load\s*\]/);
+    expect(TIMELINE_SRC).toMatch(
+      /subscribeManualSensorCorrections[\s\S]{0,120}reloadAfterRevision\(\)/,
+    );
+    expect(TIMELINE_SRC).toMatch(/\[\s*ownerId\s*,\s*reloadAfterRevision\s*\]/);
+    // The revision reload still refetches: it sets the discard flag, then loads.
+    expect(TIMELINE_SRC).toMatch(
+      /reloadAfterRevision\s*=\s*useCallback\(\(\)\s*=>\s*\{[\s\S]{0,120}void\s+load\(\)/,
+    );
   });
 
   it("counts supplemental manual sensor receipts toward timeline evidence", () => {

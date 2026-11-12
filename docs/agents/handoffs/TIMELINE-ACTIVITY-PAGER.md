@@ -7,10 +7,11 @@ why: Repository audit 2026-11-11. Timeline reads grow_events once with a 100-row
 branch: claude/timeline-activity-pager
 base: STACKED on claude/brave-fermat-u06ig6 at 761be52fc266d3901c1c8d5dfa22e64f9cc3a9ce (PR #2934), which is on verdant-grow-diary at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8. The PR targets verdant-grow-diary, so its diff includes #2934's commits until #2934 merges.
 checkout: git fetch origin claude/timeline-activity-pager && git switch claude/timeline-activity-pager
-pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2951 (draft)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2951 (ready for review since 2026-11-12 07:26 UTC)
 head_sha: code at a7aa915a42c006427f56b638b1deba9fe8fed562 (2026-11-12); a docs-only commit recording this PR link follows it, so read the current head from the PR
-state: implemented, local checks green, pushed draft
-current_step: draft PR open; required CI runs once it is marked ready
+state: implemented, marked ready by owner decision; two Codex findings fixed 2026-11-12
+current_step: ready for review; parent #2934 merged in at a375f06aafcdca094a2da41c67bb83d71e4590a3
+review_fixes: (P1) a correction or retraction on an older loaded page stayed on screen, because a reload refetched only the newest page and the merge kept the rest. Fixed in the parent (#2934, a375f06a: reloadAfterRevision makes the next committed read replace every loaded page) and merged here; the activity merge shares the same scope check, so loaded older activity is dropped too. (P2) a refresh that overtook an in-flight older-activity request left the pager disabled on "Loading older activity…"; load() now clears that flag when it starts.
 next_action: wait for #2934 to merge, then merge verdant-grow-diary into this branch (no rebase) so the diff shrinks to this slice; then mark ready on the owner's word and route one independent exact-head review. If #2934 changes, merge its branch in first.
 post_merge_check: after live /version.json reports the merge SHA, on the disposable fixture grow with more than 100 Quick Log events: open /timeline, confirm the notice names both numbers, press "Load older activity" and confirm the count rises and older watering, feeding or note rows appear in the history panels. Read-only. NOT_MEASURED until then.
 active_writer: Claude session_017UoYKvCNSMryxiQZyBbit8
@@ -18,7 +19,7 @@ decisions: (1) Keyset paging on (occurred_at, id) with the existing filterOlderT
 behavior_change: Timeline shows "Load older activity (N more)" under the activity notice when the server counted more events than are loaded. Pressing it appends up to 100 older events to the history panels. A failed load shows an inline error with "Try again" and leaves the loaded activity as it was.
 not_in_scope: the separate 100-row read of environment sensor events (TIMELINE_SENSOR_GROW_EVENT_SELECT); the supplemental by-id linked-event lookup still receives the refreshed first page only; no schema, RPC or RLS change.
 scorer_lock: no scorer tracked on verdant-grow-diary is modified. src/test/timeline-paged-history-truth.test.tsx is new in #2934 and extended here.
-tests: src/test/timeline-paged-history-truth.test.tsx grew from 15 to 26 tests. RED before the implementation: 13 failed, 13 passed (7 new rule tests, 4 new component tests, 2 notice-copy assertions). After the rules only: 4 failed. After the page wiring: 26 passed. 90 test files that touch the Timeline page: 90 passed, 1014 tests. bun run typecheck:tsgo exit 0; eslint and prettier clean on the three changed source files.
+tests: src/test/timeline-paged-history-truth.test.tsx grew from 15 to 29 tests (16 in the parent after its fix, 13 here). RED before the implementation: 13 failed, 13 passed (7 new rule tests, 4 new component tests, 2 notice-copy assertions). After the rules only: 4 failed. After the page wiring: 26 passed. 90 test files that touch the Timeline page: 90 passed, 1014 tests. bun run typecheck:tsgo exit 0; eslint and prettier clean on the three changed source files.
 not_measured: a real browser (desktop or 375 px) was not driven for this slice; the control reuses the existing "Load older entries" button classes. Production.
 commands: bunx vitest run src/test/timeline-paged-history-truth.test.tsx --reporter=dot ; bun run typecheck:tsgo
 files_touched: src/lib/timelinePagedHistoryRules.ts; src/pages/Timeline.tsx; src/test/timeline-paged-history-truth.test.tsx; this file

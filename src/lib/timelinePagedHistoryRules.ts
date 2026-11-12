@@ -44,7 +44,9 @@ export interface TimelineRefreshMerge<T extends TimelinePagedRow> {
  * refreshed page and the refreshed page reaches a row already loaded, so the
  * two are contiguous. Otherwise the refreshed page replaces everything. Rows inside the refreshed page always come from the refresh,
  * so an entry removed elsewhere disappears. A kept older row that was removed
- * elsewhere stays until the next full reload (scope or date-range change).
+ * on another device stays until the next full reload. A correction, retraction
+ * or removal made on this page is not such a case: the caller passes
+ * `sameScope: false` for the reload that follows it, so nothing stale is kept.
  */
 export function mergeTimelineRefreshedFirstPage<T extends TimelinePagedRow>(
   input: TimelineRefreshMergeInput<T>,

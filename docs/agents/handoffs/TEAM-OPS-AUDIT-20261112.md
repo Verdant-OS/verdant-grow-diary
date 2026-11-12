@@ -7,8 +7,8 @@ why: The founder asked that the findings be known to the whole team. The audit w
 branch: claude/project-thread-3w4icp
 base: verdant-grow-diary
 checkout: git fetch origin claude/project-thread-3w4icp verdant-grow-diary && git switch claude/project-thread-3w4icp && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED (draft PR opened after the first push)
-head_sha: NOT_MEASURED (first push pending at write time)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2959 (draft)
+head_sha: 3fffcca09b08a7de004b81f67695a0a95ff6525b (audit content); the next commit only fills this handoff, so review the PR head SHA at review time
 state: local only, then pushed draft
 current_step: open the draft PR
 next_action: independent docs-only review of the two docs/audits files and this handoff at the PR's exact head

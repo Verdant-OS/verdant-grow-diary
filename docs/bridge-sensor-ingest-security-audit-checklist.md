@@ -376,8 +376,9 @@ accepted-risk entry in `docs/security-exceptions.md`.
   client current-state display to live 15m / manual 24h without touching
   `sensorIngestFreshness`. If #691 merges as-is, readings aged 15–30m are
   stored as `live` but displayed stale — plus a long tail of surfaces on
-  other windows (60m normalization, 6h AI sufficiency, 48h readiness, 5m
-  `ecowitt-real-ingest`, 15m/60m metric badges). The webhook comment ties
+  other windows (60m normalization, 6h AI sufficiency, 24h AI Doctor
+  readiness — 48h when this audit was written, aligned to the 24h manual
+  window by #2940 — 5m `ecowitt-real-ingest`, 15m/60m metric badges). The webhook comment ties
   the 30m window to the dedupe uniqueness key, so server-side alignment is a
   deliberate slice, not a constant edit. This checklist pins the server value
   ([E25]) so any change is forced through review.

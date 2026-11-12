@@ -99,6 +99,7 @@ import {
   AI_DOCTOR_CONTEXT_READINESS_CONFIG,
   type AiDoctorContextReadinessConfig,
 } from "@/constants/aiDoctorContextReadiness";
+import { MANUAL_SNAPSHOT_FUTURE_SKEW_MS } from "@/constants/sensorTiming";
 import { normalizePlantType } from "@/lib/plantTypeRules";
 
 /** Re-exported for back-compat. Source of truth lives in constants/. */
@@ -160,6 +161,10 @@ export function evaluateAiDoctorContext(
   // --- Recent manual snapshots ------------------------------------------
   let latestSnapAt: number | null = null;
   let latestSnapIso: string | null = null;
+  // Newest snapshot no further ahead of the clock than the tolerated skew.
+  // A capture time beyond it is never current (isManualSnapshotCurrent), so
+  // it cannot be fresh evidence, and it must not hide an older fresh one.
+  let latestFreshCandidateAt: number | null = null;
   let recentSnaps = 0;
   let snapWarnings = 0;
   for (const s of snaps) {
@@ -175,7 +180,15 @@ export function evaluateAiDoctorContext(
       latestSnapAt = t;
       latestSnapIso = typeof s.at === "string" ? s.at : new Date(t).toISOString();
     }
+    if (
+      t - now <= MANUAL_SNAPSHOT_FUTURE_SKEW_MS &&
+      (latestFreshCandidateAt == null || t > latestFreshCandidateAt)
+    ) {
+      latestFreshCandidateAt = t;
+    }
   }
+  const freshSnap =
+    latestFreshCandidateAt != null && now - latestFreshCandidateAt <= snapshotFreshMs;
 
   const counts: AiDoctorContextCounts = {
     recentEvents: recent.length,
@@ -221,7 +234,7 @@ export function evaluateAiDoctorContext(
   // --- Sensor snapshots -------------------------------------------------
   if (recentSnaps > 0) {
     evidence.push("recent-manual-sensor-snapshot");
-    if (latestSnapAt != null && now - latestSnapAt <= snapshotFreshMs) {
+    if (freshSnap) {
       evidence.push("fresh-manual-sensor-snapshot");
     }
   } else {
@@ -245,7 +258,6 @@ export function evaluateAiDoctorContext(
   const hasKnownPlantType = !!plant && normalizePlantType(plant.plantType ?? null) !== "unknown";
   const hasRecentActivity = recent.length >= 2;
   const hasRecentSnap = recentSnaps > 0;
-  const freshSnap = latestSnapAt != null && now - latestSnapAt <= snapshotFreshMs;
   const hasPhotoOrWaterFeed = (plant?.hasPlantPhoto ?? false) || recentWaterFeed > 0;
 
   let readiness: AiDoctorContextReadiness;

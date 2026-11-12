@@ -2,7 +2,7 @@
 
 ```text
 TASK CSV-MULTI-FILE-TZ-HINT-SPEC  priority: other  status: CLOSED
-closed: merged. #2957 squash-merged 2026-11-12 12:04:05 UTC as 5b0eca2ebbb0dfb39bc048e80c33cc9ed8e4a277 (final SHA) from head df041b4bafe04f6986d7c829343c8f2f0d999c0c, merged_by cheekhimself through the merge queue. Closed by Claude session_017UoYKw22N6tm7BDDUdYBQv the same day under Matthew's standing instruction of 2026-11-12 to handle work that needs no sign-in, approval or secret.
+closed: merged. #2957 merged 2026-11-12 12:04:05 UTC as 5b0eca2ebbb0dfb39bc048e80c33cc9ed8e4a277 (final SHA) from head df041b4bafe04f6986d7c829343c8f2f0d999c0c, merged_by cheekhimself (a two-parent merge commit; parents e2cd593 and df041b4). Closed by Claude session_017UoYKw22N6tm7BDDUdYBQv the same day under Matthew's standing instruction of 2026-11-12 to handle work that needs no sign-in, approval or secret.
 goal: Land docs/specs/csv-import-multi-file-and-time-zone-hint.md so a builder can pick up multi-file CSV import, a source time zone hint and the stale soil-columns message without guessing.
 why: Matthew, 2026-11-12, asked for a spec only (no code), then chose "Open draft PR" to put it in docs/specs. A real Spider Farmer app export arrives as several CSV files per export, the import takes one file per run, and wall-clock timestamps need the grower to pick a zone; a fixed-offset device clock fits America/Regina better than America/Chicago (inference, recorded in the spec with its evidence).
 branch: claude/project-thread-db0g22

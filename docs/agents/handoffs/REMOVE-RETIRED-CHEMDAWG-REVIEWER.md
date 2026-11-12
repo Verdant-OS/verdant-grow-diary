@@ -1,7 +1,8 @@
 # REMOVE-RETIRED-CHEMDAWG-REVIEWER
 
 ```text
-TASK REMOVE-RETIRED-CHEMDAWG-REVIEWER  priority: P2  status: OPEN
+TASK REMOVE-RETIRED-CHEMDAWG-REVIEWER  priority: P2  status: CLOSED
+closed: merged. #2948 squash-merged into verdant-grow-diary on 2026-11-12 10:41:52 UTC as 9f3ff71226f6af71d9967c23a856ebe653fa1726 (final SHA; GitHub API, read 2026-11-12) from final head 770f2aff921a2ef6693bca92845f7216e920d573. Closed the same day by Claude session_017UoYKvVZYWXWayQWJ9z81a at Matthew's request (source claim: his press of the close button in that session). The open_questions below are not resolved by this close; they stay with Matthew.
 goal: Live agent instruction text stops routing to the retired Chemdawg / Grok 91 name. Each mention that meant a current duty now names the seat (Merge Readiness, the Coordinator or the Merge Steward), and the roster gains stable labels so instruction files never need a bot name.
 why: Matthew, 2026-11-12 (relayed by the coordinator): agents kept waiting on Chemdawg, which has been retired for weeks ("our Achilles heel the past month"). He asked for routing by role, with labels like Reviewer A/B and Writer A/B, because he renames bots (UK Cheese was once named Chemdog).
 branch: claude/remove-retired-chemdawg-reviewer-4u1yxl
@@ -9,10 +10,10 @@ base: verdant-grow-diary @ c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8, stacked on 
 stacking: built on top of #2933 because both touch the eighteen governance files and the sentinel version. Merge #2933 first. If #2933's head moves, merge it into this branch; never rebase or force-push.
 checkout: git fetch origin claude/remove-retired-chemdawg-reviewer-4u1yxl verdant-grow-diary && git switch claude/remove-retired-chemdawg-reviewer-4u1yxl && git ls-remote origin claude/remove-retired-chemdawg-reviewer-4u1yxl  # compare with the PR head before trusting any review
 pr: see the draft PR for this branch (a file cannot hold its own PR link before it exists)
-head_sha: the commit that adds this file; a file cannot hold its own SHA. Verify with git ls-remote.
-state: pushed draft; awaiting independent exact-head review
-next_action: an eligible independent reviewer (see exclusions) reviews the full head; then Matthew's per-item yes and the Merge Steward, after #2933 merges. Builder seats do not mark ready, enqueue or merge.
-post_merge_check: NOT_APPLICABLE for app behavior (docs only). After merge, grep the deploy branch's live instruction files for "Chemdawg" and "Grok 91"; only historical sections, the roster's rename note and the changelog should remain.
+head_sha: 770f2aff921a2ef6693bca92845f7216e920d573 (final head that merged)
+state: merged; closed
+next_action: none; closed. The open_questions below go to Matthew.
+post_merge_check: NOT_APPLICABLE for app behavior (docs only). After merge, grep the deploy branch's live instruction files for "Chemdawg" and "Grok 91"; only historical sections, the roster's rename note and the changelog should remain. Result 2026-11-12 at 9f3ff712: PASS; the remaining mentions sit in sections marked historical or kept word for word, the roster's rename note, the changelog, and the roles/chemdawg.md path.
 active_writer: Claude session_017UoYKvVZYWXWayQWJ9z81a
 decisions:
   - Treated Chemdawg as a renamed seat, not a deleted one (coordinator guidance). Each live mention now names the duty it meant: pre-check and CI verdicts go to Merge Readiness, reviewer assignment to the Coordinator, merging to the Merge Steward.
@@ -39,10 +40,10 @@ open_questions:
 blockers: none for the docs.
 exclusions_for_review: session_017UoYKvVZYWXWayQWJ9z81a (this writer); every author of #2933 for the stacked commit 29c958fc
 reviewer_seat: requested; proposed a non-author Main Reviewer seat (A-D) routed by the Coordinator (Grok Lead (Main)), or Codex if Matthew confirms Codex as a current reviewer. Governance scope: Graft's low-risk allowlist does not cover it.
-reviewer_sha: none yet
-review_verdict: NOT_MEASURED
+reviewer_sha: 770f2aff921a2ef6693bca92845f7216e920d573 (VReviewer APPROVE; Matthew's APPROVE at the same head)
+review_verdict: PASS at 770f2aff (independent); 35/35 required checks green at that head
 session_state: no production access used. No live /version.json read. No messages outside this project.
 claimed_by: Claude session_017UoYKvVZYWXWayQWJ9z81a, 2026-11-12 04:40 UTC
 owner: Claude
-last_updated: 2026-11-12, by Claude session_017UoYKvVZYWXWayQWJ9z81a
+last_updated: 2026-11-12, by Claude session_017UoYKvVZYWXWayQWJ9z81a (close)
 ```

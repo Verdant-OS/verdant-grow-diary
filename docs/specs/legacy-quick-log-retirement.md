@@ -81,9 +81,9 @@ So the split today is by entry path, and by what the entry needs to capture.
 constants; then, separately, files that dispatch an event whose name comes from a
 variable. `AppShell.tsx` is the listener and is not counted.
 
-- **25 modules dispatch it by name.** Listed in appendix A. Three of them use the
-  bare string: `DiaryCalendarSection.tsx` (two call sites) and
-  `PlantDetailWhatsMissing.tsx`. `ActionFollowUpQuickLogHandoffButton.tsx` and
+- **25 modules dispatch it by name.** Listed in appendix A. Two of them use the
+  bare string, at three call sites: `DiaryCalendarSection.tsx` (two) and
+  `PlantDetailWhatsMissing.tsx` (one). `ActionFollowUpQuickLogHandoffButton.tsx` and
   `diaryEntryRemovalFollowUpRules.ts` use the other two constants.
 - **7 modules dispatch an event name supplied by a rules object**
   (`intent.eventName`, `target.eventName`, `cta.eventName`,

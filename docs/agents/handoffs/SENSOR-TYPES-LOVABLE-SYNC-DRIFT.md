@@ -10,7 +10,7 @@ checkout: git fetch origin claude/project-thread-k9mdpl verdant-grow-diary && gi
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2974 (draft; opened 2026-11-12 on Matthew's "Open the draft PR")
 head_sha: the commit carrying this file; verify with git ls-remote once pushed
 state: pushed; draft PR open; CI is the first test run; no reviewer yet
-current_step: waiting on Matthew's yes to push and open the draft PR
+current_step: waiting on CI for PR #2974; fix any failure in the same draft without weakening a test
 next_action: on his yes, push and open a draft PR against verdant-grow-diary, let CI run, report head SHA and check results. Then the Coordinator routes an eligible independent reviewer. This writer does not mark ready, request review, enqueue or merge.
 post_merge_check: on the merged deploy tip, git grep -n unit_unconfirmed src/integrations/supabase/types.ts finds the sensor_readings Row/Insert/Update fields, and the next Lovable session's regenerated types.ts shows no sensor_readings diff.
 active_writer: Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGs1fDtPAm8KhjKuoCRCKkKvQ

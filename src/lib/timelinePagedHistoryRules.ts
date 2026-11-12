@@ -50,7 +50,15 @@ export interface TimelineRefreshMerge<T extends TimelinePagedRow> {
  * that are new on the refreshed page. A count that grew by more means a row
  * landed somewhere the refresh did not read (a save backdated between loaded
  * pages); a count that fell means a row is gone. Either way the kept rows and
- * cursor cannot be trusted. Otherwise the refreshed page replaces everything.
+ * cursor cannot be trusted. The same holds when a row on the refreshed page is
+ * loaded at a different time, or a loaded row that belongs inside the refreshed
+ * page's range is missing from it: its time was corrected elsewhere, which
+ * leaves the count unchanged. Otherwise the refreshed page replaces everything.
+ *
+ * Known limit: changes made on another device that touch only kept older
+ * pages and cancel out in the count (one removal plus one backdated save, or
+ * a time corrected from one older page to another) are not detected. They
+ * show after the next full reload.
  * Rows inside the refreshed page always come from the refresh, so an entry
  * removed elsewhere disappears. A correction, retraction
  * or removal made on this page is not such a case: the caller passes
@@ -88,10 +96,28 @@ export function mergeTimelineRefreshedFirstPage<T extends TimelinePagedRow>(
     input.firstPageServerCount !== null &&
     input.firstPageServerCount - input.previousServerCount === newOnFirstPage;
 
+  // The count is a net figure, so it cannot see a row whose time was
+  // corrected elsewhere: the row count does not change. Check membership too.
+  // A row on the refreshed page must not be loaded at a different time, and a
+  // loaded row inside the refreshed page's range must still be on that page.
+  const loadedRows = [...input.previousRows, ...input.previousHiddenRows];
+  const refreshedRows = [...input.firstPageRows, ...input.firstPageHiddenRows];
+  const loadedTimeById = new Map(loadedRows.map((row) => [row.id, row.entry_at]));
+  const refreshedIds = new Set(refreshedRows.map((row) => row.id));
+  const movedRow = refreshedRows.some((row) => {
+    const loadedAt = loadedTimeById.get(row.id);
+    return loadedAt !== undefined && loadedAt !== row.entry_at;
+  });
+  const missingRow =
+    firstPageCursor !== null &&
+    loadedRows.some((row) => !isOlderThanCursor(row, firstPageCursor) && !refreshedIds.has(row.id));
+
   if (
     !reachedPastFirstPage ||
     !overlapsLoadedRows ||
     !countReconciles ||
+    movedRow ||
+    missingRow ||
     firstPageCursor === null
   ) {
     return {

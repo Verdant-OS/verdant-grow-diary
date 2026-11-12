@@ -349,6 +349,7 @@ describe("mergeTimelineRefreshedFirstPage", () => {
       previousRows: [N2],
       previousHiddenRows: [{ id: "h", entry_at: N0.entry_at }],
       previousCursor: { entryAt: N2.entry_at, id: N2.id },
+      firstPageHiddenRows: [{ id: "h", entry_at: N0.entry_at }],
       // N0 and N1 are both new to this page.
       firstPageServerCount: 4,
     });
@@ -430,6 +431,69 @@ describe("mergeTimelineRefreshedFirstPage", () => {
       firstPageServerCount: 4,
     });
     expect(merged.keptOlderPages).toBe(true);
+  });
+
+  it("replaces when a row on the refreshed page is loaded at a different time", () => {
+    // Another device corrected b from 05:00 to 11:00, then a local save added
+    // n. The count grew by one and n is the one new row, so the count alone
+    // reconciles; keeping the older page would show b twice.
+    const at = (hour: string) => `2026-10-14T${hour}:00:00.000Z`;
+    const [a, b, c, d] = [
+      note("a", at("04")),
+      note("b", at("05")),
+      note("c", at("09")),
+      note("d", at("10")),
+    ];
+    const merged = mergeTimelineRefreshedFirstPage({
+      sameScope: true,
+      previousRows: [d, c, b, a],
+      previousCursor: { entryAt: a.entry_at, id: a.id },
+      previousHiddenRows: [],
+      firstPageRows: [note("n", at("12")), note("b", at("11")), d],
+      firstPageCursor: { entryAt: d.entry_at, id: d.id },
+      firstPageHiddenRows: [],
+      previousServerCount: 4,
+      firstPageServerCount: 5,
+    });
+    expect(merged.keptOlderPages).toBe(false);
+    expect(merged.rows.map((row) => row.id)).toEqual(["n", "b", "d"]);
+    expect(merged.cursor).toEqual({ entryAt: d.entry_at, id: d.id });
+  });
+
+  it("replaces when a loaded row inside the refreshed page's range is missing from it", () => {
+    // Another device corrected d from 10:00 down to 03:00, then a local save
+    // added n. d belongs on the refreshed page by its loaded time but is not
+    // there, so what is on screen for it is stale.
+    const at = (hour: string) => `2026-10-14T${hour}:00:00.000Z`;
+    const [a, b, c, d] = [
+      note("a", at("04")),
+      note("b", at("05")),
+      note("c", at("09")),
+      note("d", at("10")),
+    ];
+    const merged = mergeTimelineRefreshedFirstPage({
+      sameScope: true,
+      previousRows: [d, c, b, a],
+      previousCursor: { entryAt: a.entry_at, id: a.id },
+      previousHiddenRows: [],
+      firstPageRows: [note("n", at("12")), c, b],
+      firstPageCursor: { entryAt: b.entry_at, id: b.id },
+      firstPageHiddenRows: [],
+      previousServerCount: 4,
+      firstPageServerCount: 5,
+    });
+    expect(merged.keptOlderPages).toBe(false);
+    expect(merged.rows.map((row) => row.id)).toEqual(["n", "c", "b"]);
+  });
+
+  it("replaces when a hidden loaded row inside the refreshed range is missing from it", () => {
+    const merged = mergeTimelineRefreshedFirstPage({
+      ...base,
+      previousHiddenRows: [{ id: "h", entry_at: N0.entry_at }],
+      previousServerCount: 3,
+      firstPageServerCount: 4,
+    });
+    expect(merged.keptOlderPages).toBe(false);
   });
 
   it("replaces when either server count is unknown", () => {

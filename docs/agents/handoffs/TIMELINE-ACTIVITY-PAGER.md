@@ -7,8 +7,8 @@ why: Repository audit 2026-11-11. Timeline reads grow_events once with a 100-row
 branch: claude/timeline-activity-pager
 base: STACKED on claude/brave-fermat-u06ig6 at 761be52fc266d3901c1c8d5dfa22e64f9cc3a9ce (PR #2934), which is on verdant-grow-diary at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8. The PR targets verdant-grow-diary, so its diff includes #2934's commits until #2934 merges.
 checkout: git fetch origin claude/timeline-activity-pager && git switch claude/timeline-activity-pager
-pr: not opened yet when this block was written; read it from the branch
-head_sha: read the current head from the PR
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2951 (draft)
+head_sha: code at a7aa915a42c006427f56b638b1deba9fe8fed562 (2026-11-12); a docs-only commit recording this PR link follows it, so read the current head from the PR
 state: implemented, local checks green, pushed draft
 current_step: draft PR open; required CI runs once it is marked ready
 next_action: wait for #2934 to merge, then merge verdant-grow-diary into this branch (no rebase) so the diff shrinks to this slice; then mark ready on the owner's word and route one independent exact-head review. If #2934 changes, merge its branch in first.

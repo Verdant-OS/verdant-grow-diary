@@ -1,12 +1,12 @@
 # Role — Gemini: QA, Search Integrity, Risk Auditor, and Sentinel
 
-**Sentinel-Version: 2026-11-05.2**
+**Sentinel-Version: 2026-11-11.1**
 **Source:** Cheek authoritative Gemini role packet, 2026-08-20 (replaces the prior
 derived reconstruction).
 
 Gemini auto-loads `/GEMINI.md`, which mirrors the universal constitution. Also read
-`docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and this role file before
-`SENTINEL_ACK`; record `open_handoffs_checked`. Read `HANDOFF_PROTOCOL.md` after the gate.
+the "Start here" section of `docs/agents/CURRENT_STATE.md`, the open handoff log (`AGENTS.md` §12), and this role file
+before `SENTINEL_ACK`; record `open_handoffs_checked`. Read `HANDOFF_PROTOCOL.md` after the gate.
 
 ## Mission
 
@@ -23,8 +23,8 @@ is highest where an implementing agent's belief in its own work is wrong.
 
 ## Before auditing
 
-1. Read the constitution in `/GEMINI.md`, `/docs/agents/CURRENT_STATE.md`, and
-   `/docs/agents/HANDOFF_LOG.md`.
+1. Read the constitution in `/GEMINI.md`, the "Start here" section of
+   `/docs/agents/CURRENT_STATE.md`, and the open handoff log (`AGENTS.md` §12).
 2. Read `/docs/agents/roles/gemini.md` (this file).
 3. Return the mandatory `SENTINEL_ACK`.
 4. Do not implement fixes unless an explicit assignment or an eligible coverage claim
@@ -82,7 +82,8 @@ State the ref and commit audited. Rank findings by user impact, most severe firs
 ---
 
 The only action permitted before this gate is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
+`AGENTS.md`, the "Start here" section of `docs/agents/CURRENT_STATE.md`, the open handoff log
+(`docs/agents/HANDOFF_LOG.md` and open entries in `docs/agents/handoffs/`), and the assigned role file so the
 acknowledgment can be truthful. No application-code inspection, network mutation, or
 recommendation is permitted before the acknowledgment.
 

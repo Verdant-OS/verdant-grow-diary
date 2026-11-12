@@ -276,7 +276,8 @@ export default function DailyCheck() {
   const effectiveTentId = activityTarget.tentId ?? "";
   const requestedStep = routeIdentityPending ? routeStep : step;
   const renderedStep = requestedStep === "manual" && !effectiveTentId ? "select" : requestedStep;
-  const requestedQuickLogOpen = routeIdentityPending ? routeStep === "quicklog" : quickLogOpen;
+  // Field notebook AC1: a quicklog deep link never opens Quick Log by itself.
+  const requestedQuickLogOpen = routeIdentityPending ? false : quickLogOpen;
   const renderedQuickLogOpen = requestedQuickLogOpen && !!selectedPlant;
 
   // Reconcile every plant/grow/method route identity. Render-time route values
@@ -288,7 +289,7 @@ export default function DailyCheck() {
     setPlantChoice("route");
     setTentId(routeTentId);
     setStep(routeStep);
-    setQuickLogOpen(routeStep === "quicklog");
+    setQuickLogOpen(false);
     setState(INITIAL_DAILY_GROW_CHECK_STATE);
     setLastSubmittedAt(null);
     setLastSubmittedSource(null);

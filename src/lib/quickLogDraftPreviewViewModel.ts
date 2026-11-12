@@ -14,13 +14,7 @@
  */
 
 export type QuickLogDraftSource =
-  | "hyperlog"
-  | "plant-detail"
-  | "fast-add"
-  | "pheno-evidence-goal"
-  | string
-  | null
-  | undefined;
+  "hyperlog" | "plant-detail" | "fast-add" | "pheno-evidence-goal" | string | null | undefined;
 
 export interface QuickLogDraftPreviewInput {
   /** Mirrors the optional QuickLogPrefill exposed by QuickLog.tsx. */
@@ -241,7 +235,7 @@ export function buildQuickLogDraftPreview(
       (prefill.source === "pheno-evidence-goal" ||
         prefill.eventType === "observation" ||
         (!prefill.eventType && Boolean(prefill.source)))
-        ? "Note field is empty — add what you observed before saving."
+        ? "Add what you observed."
         : null;
 
     const show =

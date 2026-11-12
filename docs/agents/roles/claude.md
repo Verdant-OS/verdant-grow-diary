@@ -2,7 +2,7 @@
 
 **Historical — no current seat.**
 
-**Sentinel-Version: 2026-11-05.2**
+**Sentinel-Version: 2026-11-11.1**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
@@ -44,8 +44,8 @@ See docs/production-only-verification-runbook.md.
 > deliverables and output format were not received and are reconstructed below from the
 > Grok section's structure. Replace this file with the authoritative text when available.
 
-Read `/AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and
-this role file before `SENTINEL_ACK`. Record `open_handoffs_checked` truthfully.
+Read `/AGENTS.md`, the "Start here" section of `docs/agents/CURRENT_STATE.md`, the open handoff log
+(`AGENTS.md` §12), and this role file before `SENTINEL_ACK`. Record `open_handoffs_checked` truthfully.
 
 ## Mission
 
@@ -123,7 +123,8 @@ End with one calibrated verdict. Do not end with vague enthusiasm.
 ---
 
 The only action permitted before this gate is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
+`AGENTS.md`, the "Start here" section of `docs/agents/CURRENT_STATE.md`, the open handoff log
+(`docs/agents/HANDOFF_LOG.md` and open entries in `docs/agents/handoffs/`), and the assigned role file so the
 acknowledgment can be truthful. No application-code inspection, network mutation, or
 recommendation is permitted before the acknowledgment.
 

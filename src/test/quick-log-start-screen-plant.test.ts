@@ -47,14 +47,14 @@ describe("returning Quick Log start screen", () => {
     const target = resolveReturningQuickLogStartTarget({ plants, ...room });
 
     expect(resolveReturningSignInRoute({ savedChoice: "quickLog", plants, ...room })).toBe(
-      `/plants/${PLANT_A}?open=quick-log`,
+      "/dashboard",
     );
     expect(target).toEqual({
-      route: `/plants/${PLANT_A}?open=quick-log`,
+      route: "/dashboard",
       plantId: PLANT_A,
       tentId: TENT_A,
       growId: GROW_A,
-      opensQuickLog: true,
+      opensQuickLog: false,
     });
     expect(resolvePlantQuickLogRouteTarget(`/plants/${PLANT_A}`)).toBe(PLANT_A);
   });
@@ -77,12 +77,12 @@ describe("returning Quick Log start screen", () => {
     const target = resolveReturningQuickLogStartTarget({ plants, ...room });
 
     expect(resolveReturningSignInRoute({ savedChoice: "quickLog", plants, ...room })).toBe(
-      `/plants/${PLANT_B}?open=quick-log`,
+      "/dashboard",
     );
     expect(target.plantId).toBe(PLANT_B);
     expect(target.tentId).toBe(TENT_B);
     expect(target.growId).toBe(GROW_B);
-    expect(target.opensQuickLog).toBe(true);
+    expect(target.opensQuickLog).toBe(false);
   });
 
   it("breaks an undated tie by plant id, independent of input order", () => {

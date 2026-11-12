@@ -66,6 +66,7 @@ const QUICK_LOG_V2_SAVE_CALLERS = [
       /save\(exactManualSubmission\.payload,\s*\{\s*telemetryIntent:\s*submissionAction,\s*verifyPersistedNote:\s*pendingManualSubmission !== null,\s*canContinueNote,?\s*\}\)/,
   },
   { file: "src/components/AiDoctorCheckInPreviewPanel.tsx", telemetryIntent: null },
+  { file: "src/components/FieldNotebookMount.tsx", telemetryIntent: null },
   { file: "src/pages/EcowittIngestAudit.tsx", telemetryIntent: null },
   {
     file: "src/components/PlantQuickLog.tsx",

@@ -7,8 +7,8 @@ why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8 fou
 branch: claude/legacy-quicklog-retirement-spec
 base: verdant-grow-diary at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8
 checkout: git fetch origin claude/legacy-quicklog-retirement-spec verdant-grow-diary && git switch claude/legacy-quicklog-retirement-spec
-pr: not opened yet when this block was written; read it from the branch
-head_sha: read the current head from the PR
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2950 (draft)
+head_sha: spec at c16379e49b43209dc623d843ff6b5570a7f75dd2 (2026-11-12); a docs-only commit recording this PR link follows it, so read the current head from the PR
 state: spec written, pushed draft
 current_step: draft PR open
 next_action: owner answers the five decisions in section 8 of docs/specs/legacy-quick-log-retirement.md; no stage is approved for build until then

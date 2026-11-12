@@ -1,6 +1,6 @@
 # Verdant Grok Role
 
-**Sentinel-Version: 2026-11-05.2**
+**Sentinel-Version: 2026-11-11.1**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
@@ -50,7 +50,8 @@ strength, not a research-only fence.
 
 Before any of those five powers:
 
-1. Read `/AGENTS.md`, `/docs/agents/CURRENT_STATE.md`, and `/docs/agents/HANDOFF_LOG.md`.
+1. Read `/AGENTS.md`, the "Start here" section of `/docs/agents/CURRENT_STATE.md`, and the
+   open handoff log (`AGENTS.md` §12).
 2. Read and follow `/docs/agents/roles/grok.md` — full mission, five powers, research
    rules, claim/reviewer fences, deliverables, and output format.
 3. Return the mandatory `SENTINEL_ACK` block from `AGENTS.md`.
@@ -86,7 +87,8 @@ HOLD — CURRENT EVIDENCE DOES NOT SUPPORT EXPANSION
 ---
 
 The only action permitted before this gate is read-only acquisition of
-`AGENTS.md`, `docs/agents/CURRENT_STATE.md`, `docs/agents/HANDOFF_LOG.md`, and the assigned role file so the
+`AGENTS.md`, the "Start here" section of `docs/agents/CURRENT_STATE.md`, the open handoff log
+(`docs/agents/HANDOFF_LOG.md` and open entries in `docs/agents/handoffs/`), and the assigned role file so the
 acknowledgment can be truthful. No application-code inspection, network mutation, or
 recommendation is permitted before the acknowledgment.
 

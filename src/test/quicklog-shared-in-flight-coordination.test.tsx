@@ -438,7 +438,7 @@ describe("Quick Log shared in-flight coordination", () => {
     });
 
     expect(await screen.findByTestId("quick-log-draft-preview-empty-note")).toHaveTextContent(
-      /note field is empty/i,
+      "Add what you observed.",
     );
     fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-picker-note"));
     const childNote = await screen.findByTestId("quick-log-dialog-all-activities-note");
@@ -482,7 +482,7 @@ describe("Quick Log shared in-flight coordination", () => {
     });
 
     expect(await screen.findByTestId("quick-log-draft-preview-empty-note")).toHaveTextContent(
-      /note field is empty/i,
+      "Add what you observed.",
     );
     prepareMainNote();
     act(() => submitForm(mainForm()));
@@ -513,7 +513,7 @@ describe("Quick Log shared in-flight coordination", () => {
 
     expect(screen.getByTestId("quicklog-note")).toHaveValue("");
     expect(await screen.findByTestId("quick-log-draft-preview-empty-note")).toHaveTextContent(
-      /note field is empty/i,
+      "Add what you observed.",
     );
   });
 

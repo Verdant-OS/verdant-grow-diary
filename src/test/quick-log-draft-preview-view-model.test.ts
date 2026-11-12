@@ -107,7 +107,7 @@ describe("buildQuickLogDraftPreview", () => {
     expect(vm.headline).not.toMatch(/note prefilled/i);
     expect(vm.sourceLabel).toBe(QUICK_LOG_DRAFT_PHENO_SOURCE_LABEL);
     expect(vm.goalLabel).toBe("Goal: Vigor");
-    expect(vm.emptyNoteHint).toMatch(/note field is empty/i);
+    expect(vm.emptyNoteHint).toBe("Add what you observed.");
   });
 
   it("uses activity set headline when only event type is set without a note", () => {

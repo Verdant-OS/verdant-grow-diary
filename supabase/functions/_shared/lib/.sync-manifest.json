@@ -2,7 +2,7 @@
   "generator": "scripts/sync-edge-shared.mjs",
   "sourceCount": 108,
   "sourceHashes": {
-    "src/constants/aiDoctorContextReadiness.ts": "387a0f98abfe7eeaeda0a24cc289b6491b5c017592989e095facf1efb2e671f2",
+    "src/constants/aiDoctorContextReadiness.ts": "81dfe93461a52551335030fbce39402df17009043af8498d95cbb98d2869e55b",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
     "src/constants/sensorTiming.ts": "e91479a71bf50dae3902b920d3c5603fdc4449396a18a5624b7a4c54d3c12056",
     "src/constants/sensorTruthRanges.ts": "5662662912cf250db54d82e2135e913f8791099ebd368f0b334dd0bb1f6239a0",
@@ -10,7 +10,7 @@
     "src/lib/aiCoachLatestSensorSnapshot.ts": "b37f8baccdf66becef9023a2e632383c3a9cb3bd095d3d5faf813051ae6f32f5",
     "src/lib/aiDoctorContextCompiler.ts": "961834597ad69dce6d9b72cb901dbdc24a5bab891e6589713605750cdb439593",
     "src/lib/aiDoctorContextRules.ts": "35b078c974215cae7ec26a79ef7f57d92a066bd12a97df653d8fce8735d121cd",
-    "src/lib/aiDoctorContextViewModel.ts": "7ad91e0c9181ddc86355de503db0c5b205ca7f92ffbe09779b60e6d5c573652e",
+    "src/lib/aiDoctorContextViewModel.ts": "1abaae75f87640476560d62943cb57c099aa1d2e45ac3cfc6aeac99d9de1b23d",
     "src/lib/aiDoctorCreditReplayRules.ts": "55c948e68e1f444b482b8d7e3a772553057dcf76ad1d2b95c737bdfbe463936b",
     "src/lib/aiDoctorCsvHistoryContextRules.ts": "ca2dffde07396178405e75b077d25b28a4b6c6badb8759d30649aac7f414fe87",
     "src/lib/aiDoctorCurrentSensorSnapshotRules.ts": "976048ddf1c908f14e92ac10d1e70bd206ddfae52c898637339ccca6e31a94af",

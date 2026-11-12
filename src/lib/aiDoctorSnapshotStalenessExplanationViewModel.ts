@@ -1,7 +1,7 @@
 /**
  * aiDoctorSnapshotStalenessExplanationViewModel — pure helper that
  * explains, in one deterministic sentence, when the grower's most
- * recent manual sensor snapshot fell outside the 48h freshness cutoff.
+ * recent manual sensor snapshot fell outside the shared freshness cutoff.
  *
  * Hard constraints:
  *  - Pure: no React, no Supabase, no I/O, no globals.
@@ -17,12 +17,12 @@ export interface AiDoctorSnapshotStalenessExplanation {
   /** ISO timestamp of the latest manual snapshot, or null. */
   snapshotAtIso: string | null;
   /**
-   * ISO timestamp of the exact freshness cutoff (now - 48h). Any snapshot
+   * ISO timestamp of the exact freshness cutoff (now - the freshness window). Any snapshot
    * logged strictly before this instant is considered stale.
    */
   cutoffAtIso: string;
   /**
-   * Human-readable sentence naming the 48h cutoff, the snapshot time,
+   * Human-readable sentence naming the cutoff, the snapshot time,
    * and the exact cutoff time — empty string when not stale.
    */
   sentence: string;
@@ -40,7 +40,7 @@ export interface BuildAiDoctorSnapshotStalenessExplanationArgs {
    * without stubbing globals.
    */
   nowFallback?: () => number;
-  /** Override the freshness window (ms). Defaults to the shared 48h. */
+  /** Override the freshness window (ms). Defaults to the shared window. */
   snapshotFreshMs?: number;
   /**
    * Formatter for the two timestamps. Defaults to ISO strings so tests

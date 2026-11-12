@@ -4,7 +4,7 @@
  * Pins the lib's whole contract:
  *  - cutoffAtIso is the exact instant `now - AI_DOCTOR_SNAPSHOT_FRESH_MS`
  *    in EVERY branch (null / unparseable / fresh / stale),
- *  - staleness is STRICT `>` — a snapshot exactly 48h old is NOT stale,
+ *  - staleness is STRICT `>` — a snapshot exactly 24h old is NOT stale,
  *    matching evaluateAiDoctorContext's inclusive `<=` fresh check,
  *  - the stale sentence is a deterministic literal under the default
  *    identity formatter (the reason a grower sees is reproducible),
@@ -22,10 +22,10 @@ const NOW = Date.parse("2026-06-01T12:00:00.000Z");
 const CUTOFF_ISO = new Date(NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS).toISOString();
 
 describe("buildAiDoctorSnapshotStalenessExplanation — cutoff instant", () => {
-  it("computes cutoffAtIso as exactly now - 48h with the shared constant", () => {
-    // The 48h window comes from AI_DOCTOR_CONTEXT_READINESS_CONFIG; this
-    // pins the arithmetic (2026-06-01T12:00Z minus 48h) to the instant.
-    expect(CUTOFF_ISO).toBe("2026-05-30T12:00:00.000Z");
+  it("computes cutoffAtIso as exactly now - 24h with the shared constant", () => {
+    // The 24h window comes from AI_DOCTOR_CONTEXT_READINESS_CONFIG; this
+    // pins the arithmetic (2026-06-01T12:00Z minus 24h) to the instant.
+    expect(CUTOFF_ISO).toBe("2026-05-31T12:00:00.000Z");
     const res = buildAiDoctorSnapshotStalenessExplanation({
       latestSnapshotAtIso: null,
       now: NOW,
@@ -56,7 +56,7 @@ describe("buildAiDoctorSnapshotStalenessExplanation — cutoff instant", () => {
 });
 
 describe("buildAiDoctorSnapshotStalenessExplanation — strict > boundary", () => {
-  it("a snapshot EXACTLY at the 48h cutoff is not stale (agrees with the inclusive fresh rule)", () => {
+  it("a snapshot EXACTLY at the 24h cutoff is not stale (agrees with the inclusive fresh rule)", () => {
     const exactlyAtCutoff = new Date(NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS).toISOString();
     const res = buildAiDoctorSnapshotStalenessExplanation({
       latestSnapshotAtIso: exactlyAtCutoff,
@@ -98,7 +98,7 @@ describe("buildAiDoctorSnapshotStalenessExplanation — deterministic reason", (
     expect(res.isStale).toBe(true);
     expect(res.sentence).toBe(
       `Your most recent manual sensor snapshot (${snapIso}) is older ` +
-        `than the 48h freshness cutoff (${CUTOFF_ISO}). ` +
+        `than the 24h freshness cutoff (${CUTOFF_ISO}). ` +
         `Add a fresh sensor snapshot to unblock a cautious AI Doctor review.`,
     );
   });
@@ -176,7 +176,7 @@ describe("buildAiDoctorSnapshotStalenessExplanation — missing / invalid inputs
     }
   });
 
-  it("non-positive or non-finite snapshotFreshMs falls back to the shared 48h window", () => {
+  it("non-positive or non-finite snapshotFreshMs falls back to the shared 24h window", () => {
     for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
       const res = buildAiDoctorSnapshotStalenessExplanation({
         latestSnapshotAtIso: null,
@@ -189,7 +189,7 @@ describe("buildAiDoctorSnapshotStalenessExplanation — missing / invalid inputs
 });
 
 describe("buildAiDoctorSnapshotStalenessExplanation — near-boundary ms offsets", () => {
-  // Symmetric sweep around the exact 48h cutoff. Every offset <= 0 must be
+  // Symmetric sweep around the exact 24h cutoff. Every offset <= 0 must be
   // fresh (inclusive), every offset > 0 must be stale. No off-by-one, no
   // hidden rounding, no drift as offset magnitude grows.
   const FRESH_OFFSETS_MS = [0, -1, -2, -100, -999, -1_000, -60_000];
@@ -198,7 +198,7 @@ describe("buildAiDoctorSnapshotStalenessExplanation — near-boundary ms offsets
   for (const offset of FRESH_OFFSETS_MS) {
     it(`offset ${offset}ms from cutoff → fresh (inclusive boundary)`, () => {
       const snap = new Date(NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS + Math.abs(offset)).toISOString();
-      // Equivalent: snapshot age = 48h - |offset|, so age <= 48h.
+      // Equivalent: snapshot age = 24h - |offset|, so age <= 24h.
       const res = buildAiDoctorSnapshotStalenessExplanation({
         latestSnapshotAtIso: snap,
         now: NOW,
@@ -220,7 +220,7 @@ describe("buildAiDoctorSnapshotStalenessExplanation — near-boundary ms offsets
       expect(res.isStale).toBe(true);
       expect(res.snapshotAtIso).toBe(snap);
       expect(res.cutoffAtIso).toBe(CUTOFF_ISO);
-      expect(res.sentence).toContain("48h freshness cutoff");
+      expect(res.sentence).toContain("24h freshness cutoff");
     });
   }
 
@@ -233,8 +233,8 @@ describe("buildAiDoctorSnapshotStalenessExplanation — near-boundary ms offsets
         latestSnapshotAtIso: snap,
         now: NOW,
       });
-      // d > 0 → snapshot is (48h + d)ms old → stale.
-      // d <= 0 → snapshot is (48h - |d|)ms old (or exactly 48h) → fresh.
+      // d > 0 → snapshot is (24h + d)ms old → stale.
+      // d <= 0 → snapshot is (24h - |d|)ms old (or exactly 24h) → fresh.
       expect(res.isStale).toBe(d > 0);
     }
   });
@@ -271,7 +271,7 @@ describe("buildAiDoctorSnapshotStalenessExplanation — leap-second-like inputs"
 
   it("a plausible pre-leap-second timestamp one second earlier is classified normally", () => {
     // Sanity: the surrounding real second parses fine and is stale (well
-    // past the 48h window from NOW=2026-06-01).
+    // past the 24h window from NOW=2026-06-01).
     const realIso = "2016-12-31T23:59:59.000Z";
     expect(Number.isFinite(Date.parse(realIso))).toBe(true);
     const res = buildAiDoctorSnapshotStalenessExplanation({

@@ -11,6 +11,7 @@
  *    AI request. Sending is intentionally out of scope for this build.
  */
 
+import { AI_DOCTOR_SNAPSHOT_FRESH_HOURS } from "@/constants/aiDoctorContextReadiness";
 import type { AiDoctorContextResult, AiDoctorContextReadiness } from "@/lib/aiDoctorContextRules";
 import { labelEvidence, labelMissing } from "@/lib/aiDoctorContextViewModel";
 
@@ -79,8 +80,8 @@ function formatSnapshotSummary(result: AiDoctorContextResult): string {
   if (n <= 0) return "No manual sensor snapshot in the last 7 days.";
   const fresh = result.evidence.includes("fresh-manual-sensor-snapshot");
   const freshPart = fresh
-    ? "Most recent snapshot is within 48 hours."
-    : "Most recent snapshot is older than 48 hours.";
+    ? `Most recent snapshot is within ${AI_DOCTOR_SNAPSHOT_FRESH_HOURS} hours.`
+    : `Most recent snapshot is older than ${AI_DOCTOR_SNAPSHOT_FRESH_HOURS} hours.`;
   return `${n} manual sensor snapshot${n === 1 ? "" : "s"} in the last 7 days. ${freshPart}`;
 }
 

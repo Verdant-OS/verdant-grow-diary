@@ -43,6 +43,9 @@ import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { sanitizeCheckoutRecoveryPlanSlug } from "@/lib/checkoutRecoveryPlanSlug";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
+import { useStripeCheckout } from "@/hooks/useStripeCheckout";
+import { shouldUseStripeCheckout } from "@/lib/stripeCheckoutClientRules";
+import { PRO_CHECKOUT_PROVIDER } from "@/config/checkoutProvider";
 import {
   CHECKOUT_PAUSED_MESSAGE,
   CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE,
@@ -221,6 +224,7 @@ export default function Pricing() {
     blockedScope,
     dismissBlocked,
   } = usePaddleCheckout();
+  const { startStripeCheckout } = useStripeCheckout();
   const checkoutRetryGate = resolvePricingCheckoutRetryGate(
     lastCheckoutSkuRef.current ?? interestPlan,
     creditPackGate,
@@ -309,6 +313,11 @@ export default function Pricing() {
     setInterestPlan(planId);
     setRecoveryRequested(true);
     trackPricingEvent(eventName, { source });
+    // Off while PRO_CHECKOUT_PROVIDER is "paddle" (src/config/checkoutProvider.ts).
+    if (shouldUseStripeCheckout(planId, PRO_CHECKOUT_PROVIDER)) {
+      void startStripeCheckout(planId);
+      return;
+    }
     if (isSkuBlocked(planId)) {
       trackPricingEvent("pricing_checkout_blocked", {
         plan: planId,

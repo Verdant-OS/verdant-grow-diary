@@ -1,10 +1,26 @@
-# Re-activate managed auth emails (answer only, nothing changed)
+# Database tune-up plan (nothing applied yet)
 
-1. Is the hook off? Very likely yes, but I can't confirm the hook setting directly. A read-only status check reports: notify.verdantgrowdiary.com is Active, the queue is healthy, 0 emails sent in 7 days, and the auth setup shows "No authentication emails yet". That means the platform no longer counts this project as having managed auth emails set up. I have no read-only tool that shows the Send Email hook value, so "off" is an inference (it fits the 0 hook runs at 14:57).
-2. The single supported action: re-run the auth email setup (the managed scaffold, overwrite confirmed), or ask in chat for the email update again. That is the step that registers the project's auth hook with the platform. Turning on project emails is a separate switch, and the status doesn't show it as off.
-3. What that action touches:
-   - Repo files: yes. It rewrites the auth hook and the six auth templates. Branding would need to be re-applied, and other email files may be re-rendered.
-   - supabase/migrations: none added or edited, as far as I know. The scaffold doesn't run migrations.
-   - Database objects: not expected. I can't fully confirm this for the managed activation step.
-   - Deploys: the auth hook only. The live site is unchanged until publish.
-4. Changing none of these: not with any tool I have. Redeploying alone (done at 14:08) doesn't re-activate the hook. The hook can't be safely switched on by hand. If Cloud > Emails offers a re-activate or "restore update" button, that might work without file changes. I can't verify that button exists.
+## What I measured (read-only, Oct 30 - Nov 12)
+- Database compute: 114 instance-hours, about 19.2 credits. This is the biggest running cost. Functions cost about 3.5 credits, network about 0.9 and storage under 0.1.
+- Health is fine: memory at 44%, disk at 8%, low connections, no overload alerts.
+- The top slow query loads the latest sensor readings for a tent through the "effective readings" view. It ran 87k times at about 66 ms each, about 96 minutes in total, and some runs took up to 8 s. The same query for several tents at once averages 750 ms.
+- Next come the diary list queries: about 320k calls at about 3.7 ms each, and one variant at 82 ms.
+
+## Likely cause (unconfirmed until I check the query plan)
+The view runs a correction lookup for every reading a tent has before it sorts and keeps the newest few. There are about 317k readings. The sort order also doesn't match the existing index, because missing dates are sorted last.
+
+## Proposed fix
+1. Check the query plan, read-only, to confirm the cause.
+2. Add one new, additive migration file that creates indexes only:
+   - one sensor-readings index that matches the newest-first order
+   - one diary index on entry date that skips retracted entries
+3. If the indexes don't help much, change how the app asks for the newest readings. Because this changes code, it would come back to you as a separate plan first.
+4. Re-measure query time afterwards. Compute savings can only be claimed if active hours actually drop.
+
+## What this does NOT touch
+- The email_infra migration file: no edits, rewrite or delete. Existing migration files stay byte-for-byte unchanged.
+- The sign-in email hook (auth-email-hook): no edits and no redeploy.
+- No table, data, queue, cron job or setting changes. Nothing is deployed or published.
+
+## Needs your OK
+Your project rules lock live database writes. Approving this plan is the go-ahead for that one index-only migration.

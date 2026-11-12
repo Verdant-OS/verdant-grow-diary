@@ -4,14 +4,14 @@
 TASK AI-DOCTOR-SNAPSHOT-FRESH-WINDOW  priority: P2  status: OPEN
 goal: AI Doctor readiness uses the same 24-hour rule as the AI Doctor engine and the manual snapshot quality rules for when a manual sensor snapshot stops being fresh. One window, one constant.
 why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8, security/sensor pass finding 1. src/constants/aiDoctorContextReadiness.ts set AI_DOCTOR_SNAPSHOT_FRESH_HOURS = 48 while src/constants/sensorTiming.ts sets MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 24, which the engine (aiDoctorEnginePhase1Foundation) and manualSensorSnapshotQualityRules use. A 30-hour-old manual reading was "fresh" in readiness and "stale" everywhere else. Owner decision (Matthew, audit session, 2026-11-11, pop-up answer "Align to 24 hours"): one 24-hour window; saved badges graded under 48 hours stay readable; the edge mirror under supabase/ is regenerated.
-branch: claude/ai-doctor-snapshot-fresh-window (local at the time of writing; confirm on the PR)
+branch: claude/ai-doctor-snapshot-fresh-window
 base: verdant-grow-diary at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8
 checkout: git fetch origin claude/ai-doctor-snapshot-fresh-window verdant-grow-diary && git switch claude/ai-doctor-snapshot-fresh-window
-pr: NOT_MEASURED until opened
-head_sha: read from the PR; this file is written before the first push
-state: implemented, local checks green
-current_step: awaiting push and draft PR
-next_action: push, open the draft PR, then route one independent exact-head review once required checks are green
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2940 (draft)
+head_sha: code at 9903cba78b734dfb5d92db6454ca29d117a691f0 (2026-11-11); a docs-only commit recording this PR link follows it, so read the current head from the PR
+state: implemented, local checks green, pushed draft
+current_step: draft PR open; required CI runs once it is marked ready
+next_action: mark ready when the owner says so, then route one independent exact-head review once required checks are green
 post_merge_check: after live /version.json reports the merge SHA, on the disposable fixture grow: open the AI Doctor launch dialog for the fixture plant whose newest manual snapshot is between 24 and 48 hours old and confirm the stale explanation shows and the copy says 24 hours. Read-only; no save needed. NOT_MEASURED until then.
 active_writer: Claude session_017UoYKvCNSMryxiQZyBbit8
 decisions: (1) AI_DOCTOR_SNAPSHOT_FRESH_HOURS is now defined as MANUAL_SNAPSHOT_CURRENT_STALE_HOURS, not a second literal, so the two cannot drift. (2) The three hardcoded "48 hours" strings (readiness tooltip, evidence label, safe-review summary) are built from the constant. The "Nh freshness window/cutoff" sentences already were. (3) Saved readiness checks: aiDoctorReadinessTimelineBadge never re-grades history. A row saved as "fresh" at 24-48 hours under the old window is still accepted as coherent via AI_DOCTOR_SNAPSHOT_FRESH_LEGACY_HOURS = 48 and shows its recorded grade with its age ("Snapshot fresh · 30h old at check"). The legacy constant is read-only for old rows and never grades a new check. (4) Readiness is still advisory: a stale snapshot does not disable the review action (unchanged; e2e pins it).
@@ -29,7 +29,7 @@ links: none besides the PR
 artifacts: the test files above
 reviewer_seat: none routed yet
 reviewer_sha: none
-session_state: no routines, no paused workflows; pending human decisions: push target, review routing and the per-item merge yes
+session_state: no routines, no paused workflows; pending human decisions: mark ready, review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-11 23:45 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
 last_updated: 2026-11-11 17:45 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8

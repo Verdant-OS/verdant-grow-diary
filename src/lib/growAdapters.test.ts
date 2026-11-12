@@ -216,6 +216,8 @@ describe("mapSensorReadingRow", () => {
     created_at: "2026-05-01T12:00:00Z",
     device_id: null,
     raw_payload: null,
+    notes: null,
+    unit_unconfirmed: false,
     captured_at: null,
   };
   it("maps each metric onto the correct field", () => {
@@ -319,6 +321,8 @@ describe("groupSensorReadingRows", () => {
     created_at: "x",
     device_id: null,
     raw_payload: null,
+    notes: null,
+    unit_unconfirmed: false,
     captured_at: null,
   };
   const row = (
@@ -491,6 +495,8 @@ describe("mock data immutability", () => {
       value: 1,
       device_id: null,
       raw_payload: null,
+      notes: null,
+      unit_unconfirmed: false,
       captured_at: null,
     });
     expect(JSON.stringify(tents)).toBe(tentsSnap);

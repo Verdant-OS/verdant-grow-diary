@@ -1,0 +1,33 @@
+# TEAM-OPS-AUDIT-20261112
+
+```text
+TASK TEAM-OPS-AUDIT-20261112  priority: other  status: OPEN
+goal: Record the 2026-11-11 team ops audit (token cost, stale branches, five weak spots) in the repo so every seat sees it, and map each weak spot to its owner or open PR.
+why: The founder asked that the findings be known to the whole team. The audit was read-only and lived only outside the repo.
+branch: claude/project-thread-3w4icp
+base: verdant-grow-diary
+checkout: git fetch origin claude/project-thread-3w4icp verdant-grow-diary && git switch claude/project-thread-3w4icp && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
+pr: NOT_MEASURED (draft PR opened after the first push)
+head_sha: NOT_MEASURED (first push pending at write time)
+state: local only, then pushed draft
+current_step: open the draft PR
+next_action: independent docs-only review of the two docs/audits files and this handoff at the PR's exact head
+post_merge_check: NOT_APPLICABLE (docs only; no runtime behavior)
+active_writer: Claude thread session for this task
+decisions: Docs only, outside the eighteen versioned governance files, so it cannot collide with the Sentinel-Version bumps in PR #2933 and PR #2948. No rule is changed here; the remaining rule conflicts need their own amendment PR with founder picks.
+tried_and_rejected: Fixing the rule conflicts in this PR (rejected: governance amendment, collides with #2933 and #2948, and needs founder choices). Deleting stale branches (rejected: destructive; needs the founder's yes to a list).
+commands: git diff --stat origin/verdant-grow-diary...HEAD ; node scripts/assert-docs-safety.mjs
+files_touched: docs/audits/team-ops-audit-2026-11-11.md, docs/audits/stale-branches-2026-11-11.md, docs/agents/handoffs/TEAM-OPS-AUDIT-20261112.md
+files_remaining: none
+blockers: none for the docs; the follow-ups listed in the audit's ownership table need the founder or the named seats
+open_questions: Which seat takes weak spot 1 (yes-per-PR habit) and weak spot 4 (review-event check)? Founder pick on §11 APPROVE vs §13 COMMENT.
+gotchas: Branch counts move daily; the stale list is a 2026-11-11 snapshot. Squash merges make most stale branches look unmerged.
+links: PR #2933, PR #2948, PR #2928
+artifacts: docs/audits/team-ops-audit-2026-11-11.md, docs/audits/stale-branches-2026-11-11.md
+reviewer_seat: an eligible non-contributing reviewer per docs/agents/OWNERSHIP.md §4.3
+reviewer_sha: none yet
+session_state: Slack hand-off note to the Coordinator seat drafted for the founder's yes; not sent
+claimed_by: Claude thread session, 2026-11-12 CT
+owner: Claude thread session for this task
+last_updated: 2026-11-12, by Claude
+```

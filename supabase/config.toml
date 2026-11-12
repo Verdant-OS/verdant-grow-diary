@@ -28,6 +28,10 @@ project_id = "knkwiiywfkbqznbxwqfh"
   # Gateway JWT required, and the handler re-verifies via auth.getUser.
   [functions.stripe-checkout]
     verify_jwt = true
+  # stripe-webhook receives Stripe events, which carry no Supabase JWT. It
+  # reads and writes nothing until the raw-body Stripe-Signature verifies.
+  [functions.stripe-webhook]
+    verify_jwt = false
   # checkout-status re-verifies the caller JWT inside the function via
   # auth.getUser (defence in depth) but keeps platform verify_jwt off so
   # tests / previews can hit it without editing project auth config.

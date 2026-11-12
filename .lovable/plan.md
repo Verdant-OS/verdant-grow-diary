@@ -1,28 +1,10 @@
-# Fix: pheno_crosses.channel missing in production
+# Re-activate managed auth emails (answer only, nothing changed)
 
-## Confirmed diagnosis
-- `src/lib/phenoKeepersService.ts` `listCrossesForHunt` selects `channel, generation, recurrent_parent_id` from `pheno_crosses`.
-- Those columns are added by `supabase/migrations/20260707210000_pheno_crosses_full_taxonomy.sql`, which is present in the repo and pinned by `src/test/required-core-migrations-gate.test.ts` (`PHENO_CROSSES_TAXONOMY_COLUMNS`).
-- Production is throwing Postgres `42703` on `pheno_crosses.channel` (9 hits, 2026-07-28). The migration exists locally but is not recorded in the production ledger — this matches the earlier `BLOCKED_LEDGER_FILENAME_DIVERGENCE` and `BLOCKED_PHENO_ACL_LEAK` audits.
-
-## Why no code change here
-The frontend code and migration file are correct. This is a **production schema-drift issue**, not a code defect. Per project rules the sandbox never applies migrations to production; only Matthew's Windows machine dispatches the pinned production migration workflows.
-
-## Recommended path (operator-run, from Windows)
-The reconciliation migration `supabase/migrations/20260728090000_production_schema_reconciliation.sql` already covers the missing pheno taxonomy columns, but its last apply attempt was halted with `BLOCKED_PHENO_ACL_LEAK` because production `pheno_crosses` / `pheno_reversals` carry a legacy default-ACL leak (anon/authenticated hold 8 privileges each).
-
-Two ordered steps:
-
-1. **Author an additive REVOKE migration** normalizing `pheno_crosses` and `pheno_reversals` ACLs to the canonical set (`GRANT SELECT, INSERT, UPDATE, DELETE ON ... TO authenticated; GRANT ALL ... TO service_role;` after `REVOKE ALL ... FROM anon, authenticated`). No column changes.
-   - New file: `supabase/migrations/<new-ts>_pheno_crosses_acl_normalize.sql`.
-   - Ship via normal PR + `Apply pinned production migrations` workflow.
-
-2. **Re-dispatch** `.github/workflows/apply-pinned-production-migrations.yml` for `20260728090000_production_schema_reconciliation.sql`. With the ACL leak closed, the `DO $reconcile$` guard will pass and `channel`, `generation`, `recurrent_parent_id` will be added to `pheno_crosses`.
-
-## Verification after apply
-- `/operator/schema-audit` should show `pheno_crosses` taxonomy columns present and RLS/ACL audit clean.
-- `select column_name from information_schema.columns where table_name='pheno_crosses' and column_name in ('channel','generation','recurrent_parent_id');` returns 3 rows.
-- Pheno Hunt cross list stops emitting `42703` in edge logs.
-
-## Rollback
-Both migrations are additive; no destructive change. Rollback is only necessary if the REVOKE breaks a policy — mitigate by re-granting the exact prior set from the schema baseline at `/mnt/documents/db-baselines/schema-baseline-20260724T103225Z.txt`.
+1. Is the hook off? Very likely yes, but I can't confirm the hook setting directly. A read-only status check reports: notify.verdantgrowdiary.com is Active, the queue is healthy, 0 emails sent in 7 days, and the auth setup shows "No authentication emails yet". That means the platform no longer counts this project as having managed auth emails set up. I have no read-only tool that shows the Send Email hook value, so "off" is an inference (it fits the 0 hook runs at 14:57).
+2. The single supported action: re-run the auth email setup (the managed scaffold, overwrite confirmed), or ask in chat for the email update again. That is the step that registers the project's auth hook with the platform. Turning on project emails is a separate switch, and the status doesn't show it as off.
+3. What that action touches:
+   - Repo files: yes. It rewrites the auth hook and the six auth templates. Branding would need to be re-applied, and other email files may be re-rendered.
+   - supabase/migrations: none added or edited, as far as I know. The scaffold doesn't run migrations.
+   - Database objects: not expected. I can't fully confirm this for the managed activation step.
+   - Deploys: the auth hook only. The live site is unchanged until publish.
+4. Changing none of these: not with any tool I have. Redeploying alone (done at 14:08) doesn't re-activate the hook. The hook can't be safely switched on by hand. If Cloud > Emails offers a re-activate or "restore update" button, that might work without file changes. I can't verify that button exists.

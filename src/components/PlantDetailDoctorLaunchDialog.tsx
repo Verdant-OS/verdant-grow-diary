@@ -57,6 +57,7 @@ import {
   ADD_CONTEXT_HELPER_COPY,
 } from "@/lib/plantDetailDoctorAddContextRouter";
 import { evaluateAiDoctorContextFromSources } from "@/lib/aiDoctorContextViewModel";
+import { selectAiDoctorFreshnessSnapshotAt } from "@/lib/aiDoctorContextRules";
 import {
   buildAiDoctorReadinessGate,
   buildAiDoctorReadinessBlockedExplanation,
@@ -189,6 +190,9 @@ export default function PlantDetailDoctorLaunchDialog({
       }),
     [plantId, plantName, stage, hasPlantPhoto, evidenceItems, now],
   );
+  // The freshness copy describes the snapshot the grade used, so a
+  // future-dated row cannot contradict a strong readiness.
+  const freshnessSnapshotAt = selectAiDoctorFreshnessSnapshotAt(readinessResult);
 
   const gate = useMemo(
     () =>
@@ -245,11 +249,11 @@ export default function PlantDetailDoctorLaunchDialog({
       }
     };
     return buildAiDoctorSnapshotStalenessExplanation({
-      latestSnapshotAtIso: readinessResult.latest.manualSnapshotAt,
+      latestSnapshotAtIso: freshnessSnapshotAt,
       now: nowMs,
       formatDateTime: fmt,
     });
-  }, [readinessResult.latest.manualSnapshotAt, now]);
+  }, [freshnessSnapshotAt, now]);
 
   const { log: logReadiness, logging } = useLogAiDoctorReadinessToDiary();
   const canLogReadiness = typeof growId === "string" && growId.trim().length > 0;
@@ -258,7 +262,7 @@ export default function PlantDetailDoctorLaunchDialog({
     if (!canLogReadiness || !plantId) return;
     void logReadiness({
       readiness: readinessResult.readiness,
-      latestSnapshotAtIso: readinessResult.latest.manualSnapshotAt,
+      latestSnapshotAtIso: freshnessSnapshotAt,
       blockingCodes: blockedExplanation.blockingCodes,
       growId,
       plantId,
@@ -269,7 +273,7 @@ export default function PlantDetailDoctorLaunchDialog({
     canLogReadiness,
     plantId,
     readinessResult.readiness,
-    readinessResult.latest.manualSnapshotAt,
+    freshnessSnapshotAt,
     blockedExplanation.blockingCodes,
     growId,
     tentId,

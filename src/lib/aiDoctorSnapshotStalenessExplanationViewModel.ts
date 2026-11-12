@@ -9,6 +9,7 @@
  *  - Uses the shared `AI_DOCTOR_SNAPSHOT_FRESH_MS` threshold — never
  *    hardcodes a different freshness window.
  */
+import { MANUAL_SNAPSHOT_FUTURE_SKEW_MS } from "@/constants/sensorTiming";
 import { AI_DOCTOR_SNAPSHOT_FRESH_MS } from "@/lib/aiDoctorContextRules";
 
 export interface AiDoctorSnapshotStalenessExplanation {
@@ -91,12 +92,21 @@ export function buildAiDoctorSnapshotStalenessExplanation(
   if (!Number.isFinite(snapMs)) {
     return { isStale: false, snapshotAtIso: snapIso, cutoffAtIso, sentence: "" };
   }
+  const hours = Math.round(freshMs / 3_600_000);
+  if (snapMs - now > MANUAL_SNAPSHOT_FUTURE_SKEW_MS) {
+    // Dated further ahead than clock skew explains: its age is unknown, so
+    // it is not fresh evidence (same bound as isManualSnapshotCurrent).
+    const sentence =
+      `Your most recent manual sensor snapshot (${format(snapIso)}) is dated ` +
+      `in the future, so its age is unknown. ` +
+      `Add a fresh sensor snapshot to unblock a cautious AI Doctor review.`;
+    return { isStale: true, snapshotAtIso: snapIso, cutoffAtIso, sentence };
+  }
   const isStale = now - snapMs > freshMs;
   if (!isStale) {
     return { isStale: false, snapshotAtIso: snapIso, cutoffAtIso, sentence: "" };
   }
 
-  const hours = Math.round(freshMs / 3_600_000);
   const sentence =
     `Your most recent manual sensor snapshot (${format(snapIso)}) is older ` +
     `than the ${hours}h freshness cutoff (${format(cutoffAtIso)}). ` +

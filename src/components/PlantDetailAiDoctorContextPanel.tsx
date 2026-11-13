@@ -4,7 +4,6 @@
  */
 import { useMemo } from "react";
 import { CheckCircle2, AlertTriangle, Info } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 import { useTimelineMemory, TIMELINE_MEMORY_DEFAULT_LIMIT } from "@/hooks/useTimelineMemory";
 import { useRootZoneObservations } from "@/hooks/useRootZoneObservations";
 import {
@@ -25,6 +24,7 @@ import {
   AI_DOCTOR_NO_WARNING_CONTEXT_COPY,
 } from "@/lib/aiDoctorContextQuickActionsViewModel";
 import AiDoctorContextQuickActions from "@/components/AiDoctorContextQuickActions";
+import { buildAiDoctorLatestSnapshotLine } from "@/lib/aiDoctorLatestSnapshotLineViewModel";
 import AiDoctorVpdDriftSection from "@/components/AiDoctorVpdDriftSection";
 import type { AiDoctorVpdDriftContext } from "@/lib/vpdDriftRules";
 import {
@@ -133,11 +133,7 @@ export default function PlantDetailAiDoctorContextPanel({
   );
 
   const style = READINESS_STYLES[result.readiness];
-  const latestSnap = result.latest.manualSnapshotAt
-    ? formatDistanceToNow(new Date(result.latest.manualSnapshotAt), {
-        addSuffix: true,
-      })
-    : null;
+  const latestSnap = buildAiDoctorLatestSnapshotLine(result.latest, Date.now());
   const quickActions = useMemo(
     () =>
       buildAiDoctorContextQuickActions({

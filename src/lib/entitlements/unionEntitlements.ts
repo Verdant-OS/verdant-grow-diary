@@ -124,8 +124,9 @@ export function resolveUnionEntitlements(input: ResolveUnionInput): ResolvedEnti
 /**
  * Bounded newest-first scan window for public.subscriptions reads.
  *
- * public.subscriptions is unique per paddle_subscription_id, NOT per user,
- * so one account can hold several rows in one environment (e.g. an active
+ * public.subscriptions is unique per provider subscription id (Paddle or
+ * Stripe), NOT per user, so one account can hold several rows in one
+ * environment (e.g. an active
  * Founder Lifetime row plus a newer canceled Pro row). A single-newest-row
  * read lets the non-entitling newer row shadow the entitling older one, so
  * readers scan a bounded window and apply any-entitling-row semantics — the
@@ -176,8 +177,9 @@ export function lovableRowEntitles(
  * (supabase/functions/_shared/unionEntitlementLookup.ts).
  *
  * Rows MUST arrive newest-first with a unique tiebreak (created_at desc,
- * paddle_subscription_id desc — created_at alone is not unique, so without
- * the tiebreak equal timestamps make the pick nondeterministic).
+ * paddle_subscription_id desc nulls last, id desc — created_at alone is not
+ * unique and Stripe rows have no paddle_subscription_id, so without the id
+ * tiebreak equal timestamps make the pick nondeterministic).
  *
  * Selection mirrors pickStrongestBilling's precedence:
  *   1. Newest entitling founder_lifetime row — lifetime beats any recurring

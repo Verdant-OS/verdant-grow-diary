@@ -4,7 +4,8 @@
  * A display preference on this device only: an opaque enum value, no ids,
  * no amounts. It never selects a grow, tent or plant and never changes a
  * saved row. Missing, unknown or unreadable values, or unavailable storage,
- * fall back to ml. Only the unit control writes it.
+ * fall back to the default unit, L (docs/specs/quick-log-water-unit-liters-default.md).
+ * Only the unit control writes it.
  */
 import {
   DEFAULT_WATER_ENTRY_UNIT,

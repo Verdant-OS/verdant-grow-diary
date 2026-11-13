@@ -1,6 +1,9 @@
 import "@testing-library/jest-dom";
 import { beforeEach, afterEach } from "vitest";
-import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import { teardownDomForTest } from "./helpers/domTeardown";
 
 // Production deliberately retains this fence for the complete browser page
@@ -13,6 +16,14 @@ const HIERARCHY_CREATE_OUTCOME_RECOVERY_STORAGE_KEY =
   "verdant:hierarchy-create-outcome-unknown:v1" as const;
 const HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_STATE_SLOT =
   "__verdantHierarchyCreateOutcomeRecoveryRuntimeState" as const;
+
+// The Water volume entry unit now defaults to liters for a new phone (spec
+// docs/specs/quick-log-water-unit-liters-default.md). The older Water suites type
+// milliliter amounts into "Volume (ml)", so every test starts on a phone that
+// chose ml. The default itself is owned by the two volume-units suites and
+// quick-log-water-liters-default.test.tsx, which remove this key first.
+// Same literal as WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY; kept literal like the key above.
+const WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY = "verdant:waterVolumeEntryUnit" as const;
 
 function resetHierarchyCreateOutcomeRecoveryForTest(): void {
   if (typeof window !== "undefined") {
@@ -34,6 +45,11 @@ beforeEach(() => {
   resetHierarchyCreateOutcomeRecoveryForTest();
   try {
     clearLocalStorageForTest();
+  } catch {
+    // ignore (storage genuinely unrecoverable)
+  }
+  try {
+    setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "ml");
   } catch {
     // ignore (storage genuinely unrecoverable)
   }

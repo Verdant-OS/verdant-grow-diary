@@ -3,7 +3,7 @@
  * half of test 14. Typed ml / L / gal text converts once to canonical ml, and
  * the existing ml gates decide what is valid.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getLocalStorageItemForTest,
   removeLocalStorageItemForTest,
@@ -126,27 +126,31 @@ describe("display helpers", () => {
 });
 
 describe("waterVolumeEntryUnitPreference (14, storage)", () => {
+  // The shared setup seeds "ml" for older suites; this suite owns the default.
+  beforeEach(() => {
+    removeLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY);
+  });
   afterEach(() => {
     vi.restoreAllMocks();
     removeLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY);
   });
 
-  it("defaults to ml and remembers a chosen unit", () => {
-    expect(loadWaterVolumeEntryUnit()).toBe("ml");
+  it("defaults to L and remembers a chosen unit", () => {
+    expect(loadWaterVolumeEntryUnit()).toBe("L");
     expect(saveWaterVolumeEntryUnit("gal")).toBe(true);
     expect(loadWaterVolumeEntryUnit()).toBe("gal");
     expect(getLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("gal");
   });
 
-  it("falls back to ml for an unknown stored value", () => {
+  it("falls back to L for an unknown stored value", () => {
     setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "quart");
-    expect(loadWaterVolumeEntryUnit()).toBe("ml");
+    expect(loadWaterVolumeEntryUnit()).toBe("L");
   });
 
-  it("falls back to ml when storage throws", () => {
+  it("falls back to L when storage throws", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("blocked");
     });
-    expect(loadWaterVolumeEntryUnit()).toBe("ml");
+    expect(loadWaterVolumeEntryUnit()).toBe("L");
   });
 });

@@ -58,10 +58,11 @@ must convert by hand today, which invites typos that the 10,000 ml warning will 
 - **R9. Presets (D3 b).** The six presets stay labelled in ml ("500 ml") in every entry unit.
   Selecting one sets the entry unit to `ml` and the text to the preset's ml value, so it saves its
   exact ml. This switch does not change the remembered default unit (R13).
-- **R13. Remembered unit (D1 b).** The default entry unit is `ml`. Choosing a unit with the unit
+- **R13. Remembered unit (D1 b).** The default entry unit is `L` since 2026-11-12
+  (docs/specs/quick-log-water-unit-liters-default.md; it was `ml`). Choosing a unit with the unit
   control stores it on this device under `verdant:waterVolumeEntryUnit` (opaque enum value only,
   no ids, no amounts), and the next Water form opens in that unit. A missing, unreadable or unknown
-  stored value, or unavailable storage, falls back to `ml`. Only the unit control writes it.
+  stored value, or unavailable storage, falls back to the default unit. Only the unit control writes it.
   It is a display preference: it never selects a grow, tent or plant, and never changes a saved row.
 - **R14. Runoff (D2 yes).** The same unit control governs `Runoff`. Runoff text converts with R4,
   the existing 0–1,000,000 ml bound is applied to the converted value, it gets its own
@@ -177,6 +178,10 @@ Each new test must be shown failing before the change (RED count in the PR body)
 
 Recorded 2026-11-03 (Matthew): **D1 (b), D2 yes, D3 (b).** The options are kept below for the record.
 Claude's call inside D3 (b), open to change: selecting a preset does not overwrite the remembered unit.
+
+Revised 2026-11-12 (Matthew): the D1 default is `L`, not `ml`, for every phone with no stored unit
+("Liters for all"). The remembered unit still wins. See docs/specs/quick-log-water-unit-liters-default.md.
+The record below is kept as history.
 
 - **D1. Default unit.** (a) Always `ml`, the grower switches each time. (b) `ml` by default, and the
   last unit chosen is remembered on this device (localStorage, like the temperature preference).

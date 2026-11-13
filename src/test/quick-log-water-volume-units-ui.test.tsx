@@ -76,10 +76,10 @@ afterEach(() => {
 });
 
 describe("Quick Log Water volume units", () => {
-  it("defaults to ml with today's label", () => {
+  it("defaults to L for a new phone", () => {
     render(<Harness />);
-    expect(screen.getByLabelText("Volume (ml)")).toBeInTheDocument();
-    expect(screen.getByTestId("qlv2-volume-unit-ml")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Volume (L)")).toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-volume-unit-L")).toHaveAttribute("aria-pressed", "true");
     expect(isWateringFormPristine(latest)).toBe(true);
   });
 
@@ -93,6 +93,7 @@ describe("Quick Log Water volume units", () => {
 
   it("9: shows the saved ml only for valid L/gal text", () => {
     render(<Harness />);
+    chooseUnit("ml");
     fireEvent.change(volumeInput(), { target: { value: "500" } });
     expect(screen.queryByTestId("qlv2-volume-saves-as")).toBeNull();
     chooseUnit("gal");
@@ -191,10 +192,10 @@ describe("Quick Log Water volume units", () => {
     expect(getLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("gal");
   });
 
-  it("14: an unknown stored unit opens in ml", () => {
+  it("14: an unknown stored unit opens in L", () => {
     setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "quart");
     render(<Harness />);
-    expect(screen.getByLabelText("Volume (ml)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Volume (L)")).toBeInTheDocument();
   });
 
   it("15: runoff shares the unit and converts before its bound", () => {

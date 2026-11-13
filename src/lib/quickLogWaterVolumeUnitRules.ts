@@ -14,7 +14,8 @@ import {
 
 export type WaterEntryUnit = "ml" | "L" | "gal";
 export const WATER_ENTRY_UNITS: readonly WaterEntryUnit[] = Object.freeze(["ml", "L", "gal"]);
-export const DEFAULT_WATER_ENTRY_UNIT: WaterEntryUnit = "ml";
+/** Liters for every phone with no stored choice (docs/specs/quick-log-water-unit-liters-default.md, D-L1). */
+export const DEFAULT_WATER_ENTRY_UNIT: WaterEntryUnit = "L";
 
 /** 1 US liquid gallon = 3,785.411784 ml exactly; held as a ratio of integers. */
 const ML_PER_GAL_NUMERATOR = 3_785_411_784n;

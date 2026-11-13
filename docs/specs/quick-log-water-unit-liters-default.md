@@ -1,6 +1,6 @@
 # Quick Log Water: liters by default (step 1 of the one-tap Watered plan)
 
-Status: build in progress on `claude/water-unit-liters-default` (draft PR), Claude (Taproot thread). Not reviewed, not merged.
+Status: built on `claude/water-unit-liters-default` (PR #2966, ready for review), Claude (Taproot thread). In independent review, not merged.
 Build base: `verdant-grow-diary` at `c2884348875b3dd39f2059ecc323ac10c33cfde5` (2026-11-12). The draft was read at
 `a6be0915`; none of the files in §4 changed between the two.
 Amends: `docs/specs/quick-log-water-volume-units.md` R13 (first sentence only) and the D1 record in §8.
@@ -18,8 +18,8 @@ Grower impact: a tired grower pouring from a jug or a 1 L measuring cup types `2
 form tells them it saves as 2,000 ml. Steps 2 and 3 (reuse the last amount, one-tap Watered) read and
 show amounts in this unit, so this lands first.
 
-Code size: one constant. Test size: five locked files and one new test file (§6), which is the real
-cost of this step.
+Code size: one constant. Test size: eleven locked files (five planned in §6.2, six more found by the
+first CI run, §6.2.1) and one new test file (§6), which is the real cost of this step.
 
 ## 2. Requirements and assumptions
 
@@ -71,11 +71,11 @@ existing growers would be silent; L5 and L8 are why it is not silent here.
 
 | File | Change |
 | --- | --- |
-| `src/lib/quickLogWaterVolumeUnitRules.ts` line 17 | `DEFAULT_WATER_ENTRY_UNIT` from `"ml"` to `"L"` |
+| `src/lib/quickLogWaterVolumeUnitRules.ts` line 18 | `DEFAULT_WATER_ENTRY_UNIT` from `"ml"` to `"L"` |
 | `src/lib/waterVolumeEntryUnitPreference.ts` | Header comment only: "fall back to ml" becomes "fall back to the default unit (L)" |
 | `docs/specs/quick-log-water-volume-units.md` | R13 first sentence points here; §8 gains a dated D1 revision line. History stays. |
 | `src/test/quick-log-water-liters-default.test.tsx` (new) | §6.1 |
-| Five locked scorer files | §6.2, each needs Matthew's approval before it is edited |
+| Eleven locked scorer files | §6.2 and §6.2.1, each edited only after Matthew's approval |
 | `docs/agents/handoffs/WATER-UNIT-LITERS-DEFAULT.md` | The handoff block, written before the first push |
 
 Untouched: `QuickLogWateringForm.tsx` (it already reads `loadWaterVolumeEntryUnit`),
@@ -90,7 +90,7 @@ Functions, auth, Timeline readback, the Feed form (its nutrient unit is `mL/L` a
 - The form already seeds its remembered-unit state from `loadWaterVolumeEntryUnit()`, so the label,
   the pressed button, the `Saves as` line and the too-large copy all follow the constant with no
   component edit.
-- **Why five locked files.** Twenty test files (nineteen Vitest suites and the Playwright smoke) find
+- **Why five planned locked files.** Twenty test files (nineteen Vitest suites and the Playwright smoke) find
   the Water field by the label `Volume (ml)` and type milliliter numbers. Each Vitest run starts with
   empty localStorage (`src/test/setup.ts` clears it), so after the flip every one of them would see
   `Volume (L)`. Two ways to keep them honest:
@@ -126,10 +126,11 @@ Writable (new scorer). Each `beforeEach` removes `verdant:waterVolumeEntryUnit`.
 9. A 1,893 ml prefill shows `1.893` and saves `volume_ml: 1893` unedited (L7).
 10. An untouched form opened in liters is pristine (no draft from the default alone).
 
-**Negative gate:** set the one-line constant change aside, run this suite, expect 1, 2, 5 and 7 to
-fail; restore. A suite that passes either way pins nothing.
+**Negative gate:** set the one-line constant change aside, run this suite, expect 1, 2, 5, 6, 7, 8 and 9
+to fail and 3, 4 and 10 to pass (they do not depend on the default); restore. Seat A's mutation at
+`0463d0e5f` measured exactly that. A suite that passes either way pins nothing.
 
-### 6.2 Locked files that must change (approval needed before each edit)
+### 6.2 Locked files planned (Matthew, "Edit them", 2026-11-12T14:28:59Z)
 
 | Locked file | What changes |
 | --- | --- |
@@ -143,16 +144,32 @@ Each unlock goes through `node scripts/scorer-lock.mjs --unlock <path> --reason 
 branch and is declared in the PR body with Matthew's approval time. If the RED run shows any other
 locked file failing, the build stops and asks before touching it.
 
+#### 6.2.1 Locked files found by the first CI run (approved before each edit)
+
+The shared seed did not reach suites that wipe storage themselves, and two tent checks counted every
+stored key. Each fix keeps the suite's own assertions; none was deleted or narrowed.
+
+| Locked file | What changes | Approval |
+| --- | --- | --- |
+| `src/test/tent-plant-roster-preferences.test.ts` | The no-write check compares `localStorage.length` to the length before the write, not to `0` | "Edit both", 2026-11-12T15:25:57Z |
+| `src/test/tent-plant-tabs-preferences.test.ts` | Same | "Edit both", 2026-11-12T15:25:57Z |
+| `src/test/quick-log-v2-sheet-watering.test.tsx` | Re-seed `ml` after `clearLocalStorageForTest()` | "Edit all four", 2026-11-12T16:57:04Z |
+| `src/test/quick-log-v2-refresh-sheet.test.tsx` | Same | "Edit all four", 2026-11-12T16:57:04Z |
+| `src/test/quick-log-starter-water-typed-handoff.test.tsx` | Same | "Edit all four", 2026-11-12T16:57:04Z |
+| `e2e-local/native-watering-recovery.spec.ts` | Seed `ml` with `context.addInitScript` before sign-in (e2e-local has no shared seed) | "Edit all four", 2026-11-12T16:57:04Z |
+
 ### 6.3 Older suites that must stay green with no edit (recommended path)
 
-`quick-log-v2-sheet-watering`, `quick-log-watering-form`, `quick-log-water-confirm-amount-edit`,
+The three Quick Log suites in §6.2.1 were on this list in the plan; the build had to edit them.
+
+`quick-log-watering-form`, `quick-log-water-confirm-amount-edit`,
 `quick-log-feeding-review-view-model`, `quick-log-water-save-gate-ec`,
-`quick-log-watering-review-view-model`, `quick-log-v2-refresh-sheet`,
+`quick-log-watering-review-view-model`,
 `quick-log-water-volume-confirm-reset`, `quick-log-v2-sheet-feeding`,
 `quick-log-v2-sheet-watering-volume-defaults`, `quick-log-water-volume-save-helper`,
 `quick-log-water-save-gate`, `quick-log-water-temperature-a11y`,
 `quick-log-water-volume-warning-ui`, `quick-log-water-volume-confirm-early-return`,
-`quick-log-starter-water-typed-handoff`, `quick-log-water-temperature-inline-gate`,
+`quick-log-water-temperature-inline-gate`,
 `quick-log-v2-sheet-feeding-defaults`, plus the R13 suites `quick-log-water-volume-text-bound`,
 `-save-parser-parity`, `-warning`, `-warning-boundaries`.
 
@@ -174,8 +191,8 @@ the entry is there. Then tap `ml`, close, reopen: it stays in ml.
 
 ## 8. Safety verdict
 
-SAFE to build. D-L1 is decided. The five locked files in §6.2 wait for Matthew's recorded approval;
-the build commits nothing in them before that.
+SAFE to build. D-L1 is decided. Each of the eleven locked files in §6.2 and §6.2.1 was edited only
+after Matthew's recorded approval for that file.
 
 - No schema, migration, RLS, RPC, Edge Function or auth change.
 - No sensor, AI, Action Queue or device-control path is touched.

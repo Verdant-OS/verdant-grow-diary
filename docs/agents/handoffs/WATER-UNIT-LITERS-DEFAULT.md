@@ -6,10 +6,10 @@ branch: claude/water-unit-liters-default
 base: verdant-grow-diary @ c2884348875b3dd39f2059ecc323ac10c33cfde5 (2026-11-12; draft was read at a6be0915, target files unchanged)
 checkout: git fetch origin claude/water-unit-liters-default verdant-grow-diary && git switch claude/water-unit-liters-default
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2966
-head_sha: see the PR; the commit that adds the four 16:57Z edits and this update is the head
-state: Step 1 built, with eleven approved locked test edits. CI at 546f12e5b failed shards 24, 28, 29 (49 tests) and native save/retrieve (2 tests) because those suites clear storage and lose the ml seed; the four fixes are in the head commit. Copilot check failure is that bot's monthly quota, not this code. Tests at the new head: pending CI.
-current_step: Waiting on CI at the new head, then an independent exact-head review.
-next_action: An eligible reviewer seat reviews the exact head; the test jobs run once the PR leaves draft. Merge only through the Merge Steward with Matthew's per-item yes.
+head_sha: see the PR. Reviewed head 0463d0e5f0356a9d9998bd211417b45310578215 (Seat A, PASS-with-P2 0/2/3); the head is the docs-only commit on top of it that fixes Seat A's P2s.
+state: Step 1 built, with eleven approved locked test edits. Required CI at 0463d0e5f was all green (35 of 35 traditional required contexts). Seat A found two P2s (stale PR title and body; spec still said five locked files) and three P3s; the docs fixes are in the head commit. No code or test file changed after 0463d0e5f.
+current_step: Waiting on a clean exact-head review from Seats A, C and D at the new head.
+next_action: Reviewer seats review the exact head. Merge only through the Merge Steward with Matthew's per-item yes.
 post_merge_check: On a phone that never chose a unit, Quick Log, Water shows `Volume (L)`; `2` shows `Saves as 2,000 ml.`; save, reload, the entry is there. Tap `ml`, reopen, it stays ml. NOT_MEASURED until done.
 active_writer: Claude (Taproot thread)
 decisions:
@@ -31,7 +31,7 @@ files_remaining:
 - none
 blockers:
 - Independent exact-head review (unassigned seat).
-- Local vitest BLOCKED (install refused by proxy, partial node_modules missing `pathe`); CI is the only test run.
+- Local vitest BLOCKED in the Taproot thread (install refused by proxy, partial node_modules missing `pathe`); CI is the builder's only test run. Seat A ran the new suite locally, 10/10.
 open_questions:
 - none
 gotchas:
@@ -48,11 +48,11 @@ links:
 - Parent spec: docs/specs/quick-log-water-volume-units.md (R4, R6, R8, R9, R10, R13, R14; §8 D1 to D3)
 - Concept page (v11): https://claude.ai/artifact/H49v4xXxz8zqKYxx9F2Z8o
 artifacts: spec and this handoff, drafted outside the repo in the project folder verdant-step1-liters-default/
-reviewer_seat: unassigned; must be a seat that did not author the build
-reviewer_sha: none
-session_state: Fix for the 51 CI failures pushed; waiting on CI, then independent review.
+reviewer_seat: Seat A reviewed 0463d0e5f (PASS-with-P2); Seats C and D not yet posted. Each must be a seat that did not author the build.
+reviewer_sha: 0463d0e5f0356a9d9998bd211417b45310578215 (Seat A, historical once the head moves)
+session_state: Seat A P2 fixes pushed (docs only); waiting on CI and reviews.
 claimed_by: Claude (Taproot thread)
 owner: Claude
-last_updated: 2026-11-12
+last_updated: 2026-11-13
 
 resume here: read the spec, confirm the locked-file approval is recorded in Matthew's own words, re-run the open-handoff overlap check if the base moved, then do next_action.

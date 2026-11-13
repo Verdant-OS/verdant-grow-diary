@@ -8,6 +8,9 @@
  * 3. Activity history reads the newest 100 grow_events; nothing said so when
  *    more existed.
  *
+ * 4. Follow-up: older activity can be loaded a page at a time, and a refresh
+ *    keeps the activity pages already loaded.
+ *
  * Component tests render <Timeline /> against a mocked Supabase client.
  */
 import { act, createElement } from "react";
@@ -15,9 +18,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import {
+  appendTimelineOlderActivity,
+  mergeTimelineRefreshedActivity,
   mergeTimelineRefreshedFirstPage,
+  timelineActivityCursor,
+  timelineActivityTotalAfterOlderPage,
   timelineActivityTruncationNotice,
   timelineHiddenFetchedRows,
+  timelineLoadOlderActivityLabel,
 } from "@/lib/timelinePagedHistoryRules";
 
 const harness = vi.hoisted(() => ({
@@ -247,6 +255,26 @@ function note(id: string, entryAt: string): DiaryRow {
   };
 }
 
+function activity(id: string, occurredAt: string) {
+  return {
+    id,
+    grow_id: GROW_A.id,
+    plant_id: "plant-1",
+    tent_id: "tent-1",
+    event_type: "note",
+    occurred_at: occurredAt,
+    source: "manual",
+    notes: null,
+    payload: {},
+    is_deleted: false,
+  };
+}
+
+const E0 = activity("e0", "2026-10-15T09:00:00.000Z");
+const E1 = activity("e1", "2026-10-14T09:00:00.000Z");
+const E2 = activity("e2", "2026-10-13T09:00:00.000Z");
+const E3 = activity("e3", "2026-10-12T09:00:00.000Z");
+
 const N0 = note("n0", "2026-10-15T09:00:00.000Z");
 const N1 = note("n1", "2026-10-14T09:00:00.000Z");
 const N1B = note("n1b", "2026-10-14T08:00:00.000Z");
@@ -257,14 +285,39 @@ interface Server {
   firstPage: DiaryRow[];
   total: number;
   olderPages: Record<string, DiaryRow[]>;
-  growEvents: { rows: unknown[]; total: number };
+  growEvents: {
+    rows: unknown[];
+    total: number;
+    olderPages?: Record<string, unknown[]>;
+    failOlder?: boolean;
+    /** The older-activity request never settles. */
+    pendingOlder?: boolean;
+  };
   cursors: string[];
+  activityCursors: string[];
 }
 
-function serve(initial: Omit<Server, "cursors" | "growEvents"> & Partial<Server>): Server {
-  const server: Server = { growEvents: { rows: [], total: 0 }, cursors: [], ...initial };
+function serve(
+  initial: Omit<Server, "cursors" | "activityCursors" | "growEvents"> & Partial<Server>,
+): Server {
+  const server: Server = {
+    growEvents: { rows: [], total: 0 },
+    cursors: [],
+    activityCursors: [],
+    ...initial,
+  };
   harness.executeQuery.mockImplementation((spec: QuerySpec) => {
     if (spec.table === "grow_events") {
+      const activityKeyset = spec.filters.find((filter) => filter.op === "or");
+      const activityMatch = activityKeyset
+        ? /^occurred_at\.lt\."([^"]+)"/.exec(String(activityKeyset.value))
+        : null;
+      if (activityMatch) {
+        server.activityCursors.push(activityMatch[1]);
+        if (server.growEvents.pendingOlder) return new Promise(() => {});
+        if (server.growEvents.failOlder) return { data: null, error: { message: "read failed" } };
+        return { data: server.growEvents.olderPages?.[activityMatch[1]] ?? [], error: null };
+      }
       // Only the counted core read; sensor and by-id lookups stay empty.
       return spec.count === "exact"
         ? { data: server.growEvents.rows, error: null, count: server.growEvents.total }
@@ -524,8 +577,99 @@ describe("timelineActivityTruncationNotice", () => {
 
   it("names both numbers when older activity is not loaded", () => {
     expect(timelineActivityTruncationNotice(100, 250)).toBe(
-      "Activity history below shows the newest 100 of 250 Quick Log events. Set a date range to see older activity.",
+      "Activity history below shows the newest 100 of 250 Quick Log events. Load older activity, or set a date range.",
     );
+  });
+});
+
+describe("activity paging rules", () => {
+  it("takes the oldest row as the cursor, breaking ties by id", () => {
+    expect(timelineActivityCursor([])).toBeNull();
+    expect(timelineActivityCursor([E1, E3, E2])).toEqual({ entryAt: E3.occurred_at, id: "e3" });
+    const tiedA = activity("a", E2.occurred_at);
+    const tiedB = activity("b", E2.occurred_at);
+    expect(timelineActivityCursor([tiedB, tiedA])).toEqual({ entryAt: E2.occurred_at, id: "a" });
+  });
+
+  it("appends an older page without duplicating a row", () => {
+    expect(appendTimelineOlderActivity([E1, E2], [E2, E3]).map((row) => row.id)).toEqual([
+      "e1",
+      "e2",
+      "e3",
+    ]);
+  });
+
+  it("keeps older activity when the refreshed page overlaps it", () => {
+    const merged = mergeTimelineRefreshedActivity({
+      sameScope: true,
+      previousRows: [E1, E2, E3],
+      firstPageRows: [E0, E1],
+      previousServerCount: 3,
+      firstPageServerCount: 4,
+    });
+    expect(merged.keptOlderPages).toBe(true);
+    expect(merged.rows.map((row) => row.id)).toEqual(["e0", "e1", "e2", "e3"]);
+  });
+
+  it("replaces the activity for another scope or when the pages do not meet", () => {
+    expect(
+      mergeTimelineRefreshedActivity({
+        sameScope: false,
+        previousRows: [E1, E2, E3],
+        firstPageRows: [E0, E1],
+        previousServerCount: 3,
+        firstPageServerCount: 4,
+      }).rows.map((row) => row.id),
+    ).toEqual(["e0", "e1"]);
+    // Everything loaded is older than the refreshed page: rows in between
+    // were never fetched, so the older rows must not be kept.
+    expect(
+      mergeTimelineRefreshedActivity({
+        sameScope: true,
+        previousRows: [E2, E3],
+        firstPageRows: [E0],
+        previousServerCount: 2,
+        firstPageServerCount: 3,
+      }).rows.map((row) => row.id),
+    ).toEqual(["e0"]);
+  });
+
+  it("drops a row the refreshed page no longer returns", () => {
+    const merged = mergeTimelineRefreshedActivity({
+      sameScope: true,
+      previousRows: [E0, E1, E2, E3],
+      firstPageRows: [E0, E2],
+      previousServerCount: 4,
+      firstPageServerCount: 3,
+    });
+    // The count fell, so no older row is kept: any of them may be the one gone.
+    expect(merged.rows.map((row) => row.id)).toEqual(["e0", "e2"]);
+    expect(merged.keptOlderPages).toBe(false);
+  });
+
+  it("replaces the activity when the server counts an event the refreshed page does not hold", () => {
+    // An event backdated between two loaded activity pages.
+    const merged = mergeTimelineRefreshedActivity({
+      sameScope: true,
+      previousRows: [E1, E2, E3],
+      firstPageRows: [E1],
+      previousServerCount: 3,
+      firstPageServerCount: 4,
+    });
+    expect(merged.rows.map((row) => row.id)).toEqual(["e1"]);
+    expect(merged.keptOlderPages).toBe(false);
+  });
+
+  it("stops offering more when an older page comes back empty", () => {
+    expect(timelineActivityTotalAfterOlderPage(250, 100, 0)).toBe(100);
+    expect(timelineActivityTotalAfterOlderPage(250, 200, 100)).toBe(250);
+    expect(timelineActivityTotalAfterOlderPage(150, 200, 100)).toBe(200);
+    expect(timelineActivityTotalAfterOlderPage(null, 200, 100)).toBeNull();
+  });
+
+  it("labels the button with what is left", () => {
+    expect(timelineLoadOlderActivityLabel(100, 250, false)).toBe("Load older activity (150 more)");
+    expect(timelineLoadOlderActivityLabel(100, 250, true)).toBe("Loading older activity…");
   });
 });
 
@@ -642,7 +786,7 @@ describe("Timeline paged history", () => {
     renderTimeline();
 
     expect(await screen.findByTestId("timeline-activity-truncation-notice")).toHaveTextContent(
-      "Activity history below shows the newest 1 of 250 Quick Log events. Set a date range to see older activity.",
+      "Activity history below shows the newest 1 of 250 Quick Log events. Load older activity, or set a date range.",
     );
   });
 
@@ -654,6 +798,121 @@ describe("Timeline paged history", () => {
     expect(await screen.findByText("Note n1.")).toBeInTheDocument();
     expect(screen.queryByTestId("timeline-activity-truncation-notice")).not.toBeInTheDocument();
   });
+  it("loads older activity a page at a time", async () => {
+    const server = serve({
+      firstPage: [N1],
+      total: 1,
+      olderPages: {},
+      growEvents: {
+        rows: [E0, E1],
+        total: 4,
+        olderPages: { [E1.occurred_at]: [E2], [E2.occurred_at]: [E3] },
+      },
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByTestId("timeline-load-older-activity")).toHaveTextContent(
+      "Load older activity (2 more)",
+    );
+    fireEvent.click(screen.getByTestId("timeline-load-older-activity"));
+    expect(await screen.findByTestId("timeline-activity-truncation-notice")).toHaveTextContent(
+      "newest 3 of 4 Quick Log events",
+    );
+
+    fireEvent.click(screen.getByTestId("timeline-load-older-activity"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("timeline-load-older-activity")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("timeline-activity-truncation-notice")).not.toBeInTheDocument();
+    expect(server.activityCursors).toEqual([E1.occurred_at, E2.occurred_at]);
+  });
+
+  it("keeps loaded older activity when a save refreshes the newest page", async () => {
+    const server = serve({
+      firstPage: [N1],
+      total: 1,
+      olderPages: {},
+      growEvents: {
+        rows: [E1],
+        total: 3,
+        olderPages: { [E1.occurred_at]: [E2], [E2.occurred_at]: [E3] },
+      },
+    });
+
+    renderTimeline();
+    fireEvent.click(await screen.findByTestId("timeline-load-older-activity"));
+    expect(await screen.findByTestId("timeline-activity-truncation-notice")).toHaveTextContent(
+      "newest 2 of 3 Quick Log events",
+    );
+
+    // A Quick Log save lands: the newest activity page now leads with it.
+    server.growEvents.rows = [E0, E1];
+    server.growEvents.total = 4;
+    act(() => {
+      window.dispatchEvent(new Event("verdant:entry-created"));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("timeline-activity-truncation-notice")).toHaveTextContent(
+        "newest 3 of 4 Quick Log events",
+      ),
+    );
+
+    // Paging resumes from the oldest activity still loaded, not from page one.
+    fireEvent.click(screen.getByTestId("timeline-load-older-activity"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("timeline-load-older-activity")).not.toBeInTheDocument(),
+    );
+    expect(server.activityCursors).toEqual([E1.occurred_at, E2.occurred_at]);
+  });
+
+  it("says so and keeps what is shown when older activity fails to load", async () => {
+    const server = serve({
+      firstPage: [N1],
+      total: 1,
+      olderPages: {},
+      growEvents: { rows: [E1], total: 3, failOlder: true },
+    });
+
+    renderTimeline();
+    fireEvent.click(await screen.findByTestId("timeline-load-older-activity"));
+
+    expect(await screen.findByTestId("timeline-load-older-activity-error")).toHaveTextContent(
+      "Older activity could not be loaded. The activity already shown is unchanged.",
+    );
+    expect(screen.getByTestId("timeline-activity-truncation-notice")).toHaveTextContent(
+      "newest 1 of 3 Quick Log events",
+    );
+
+    server.growEvents.failOlder = false;
+    server.growEvents.olderPages = { [E1.occurred_at]: [E2, E3] };
+    fireEvent.click(screen.getByTestId("timeline-load-older-activity-retry"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("timeline-load-older-activity-error")).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.queryByTestId("timeline-load-older-activity")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("stops offering more when the server has no older activity left", async () => {
+    serve({
+      firstPage: [N1],
+      total: 1,
+      olderPages: {},
+      growEvents: { rows: [E1], total: 3, olderPages: {} },
+    });
+
+    renderTimeline();
+    fireEvent.click(await screen.findByTestId("timeline-load-older-activity"));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("timeline-load-older-activity")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("timeline-activity-truncation-notice")).not.toBeInTheDocument();
+  });
+
   it("drops loaded older pages after a correction or retraction, so no stale row stays", async () => {
     const server = serve({
       firstPage: [N1],
@@ -684,6 +943,63 @@ describe("Timeline paged history", () => {
     fireEvent.click(screen.getByTestId("timeline-load-older"));
     expect(await screen.findByText("Note n3.")).toBeInTheDocument();
     expect(screen.queryByText("Note n2.")).not.toBeInTheDocument();
+  });
+  it("drops loaded older activity after a correction or retraction", async () => {
+    const server = serve({
+      firstPage: [N1],
+      total: 1,
+      olderPages: {},
+      growEvents: { rows: [E1], total: 3, olderPages: { [E1.occurred_at]: [E2] } },
+    });
+
+    renderTimeline();
+    fireEvent.click(await screen.findByTestId("timeline-load-older-activity"));
+    expect(await screen.findByTestId("timeline-activity-truncation-notice")).toHaveTextContent(
+      "newest 2 of 3 Quick Log events",
+    );
+
+    // e2 is retracted from a history panel: the server now counts two.
+    server.growEvents.total = 2;
+    act(() => {
+      harness.activityPanelOnEntryChanged?.();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("timeline-activity-truncation-notice")).toHaveTextContent(
+        "newest 1 of 2 Quick Log events",
+      ),
+    );
+  });
+
+  it("does not leave the activity pager stuck when a refresh overtakes its request", async () => {
+    const server = serve({
+      firstPage: [N1],
+      total: 1,
+      olderPages: {},
+      growEvents: { rows: [E1], total: 3, pendingOlder: true },
+    });
+
+    renderTimeline();
+    fireEvent.click(await screen.findByTestId("timeline-load-older-activity"));
+    await waitFor(() =>
+      expect(screen.getByTestId("timeline-load-older-activity")).toHaveTextContent(
+        "Loading older activity…",
+      ),
+    );
+
+    // A save lands while the older-activity request is still in flight.
+    server.growEvents.rows = [E0, E1];
+    server.growEvents.total = 4;
+    act(() => {
+      window.dispatchEvent(new Event("verdant:entry-created"));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("timeline-load-older-activity")).toHaveTextContent(
+        "Load older activity (2 more)",
+      ),
+    );
+    expect(screen.getByTestId("timeline-load-older-activity")).not.toBeDisabled();
   });
 
   it("shows a save backdated between loaded pages and never strands the pager", async () => {

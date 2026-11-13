@@ -116,6 +116,16 @@ describe("PlantDetailAiDoctorContextPanel — future-dated latest snapshot", () 
       /Latest manual sensor snapshot: about 2 hours ago/,
     );
   });
+
+  it("keeps the relative time for a snapshot within the 5-minute clock-skew allowance", () => {
+    // +2 min is not flagged future-dated (MANUAL_SNAPSHOT_FUTURE_SKEW_MS), so
+    // the line keeps date-fns relative time, unchanged from before this fix.
+    sources.timelineItems = [manualSnapshotItem(new Date(Date.now() + 2 * 60_000).toISOString())];
+    renderPanel();
+    const line = screen.getByTestId("plant-ai-doctor-context-latest-snapshot");
+    expect(line).toHaveTextContent(/Latest manual sensor snapshot: in \d+ minutes?/);
+    expect(line).not.toHaveTextContent(/age is unknown/);
+  });
 });
 
 describe("buildAiDoctorLatestSnapshotLine", () => {
@@ -135,9 +145,15 @@ describe("buildAiDoctorLatestSnapshotLine", () => {
     ).toBe("dated in the future, so its age is unknown");
   });
 
-  it("keeps a relative time within the clock-skew allowance (flag unset)", () => {
+  it("keeps the relative age for a past snapshot (flag unset)", () => {
     expect(buildAiDoctorLatestSnapshotLine({ manualSnapshotAt: iso(NOW - 3 * HOUR) }, NOW)).toBe(
       "about 3 hours ago",
+    );
+  });
+
+  it("keeps a relative time within the clock-skew allowance (flag unset, +2 min)", () => {
+    expect(buildAiDoctorLatestSnapshotLine({ manualSnapshotAt: iso(NOW + 2 * 60_000) }, NOW)).toBe(
+      "in 2 minutes",
     );
   });
 

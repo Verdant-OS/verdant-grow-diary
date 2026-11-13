@@ -41,18 +41,11 @@ vi.mock("@/components/QuickLogV2Fab", () => ({ default: () => null }));
 // only rendering bounded loading/error chrome.
 const aiDoctorSpies = {
   liveReview: vi.fn(),
-  safeReviewStart: vi.fn(),
   contextPanel: vi.fn(),
 };
 vi.mock("@/components/PlantDetailAiDoctorLiveReview", () => ({
   default: (...args: unknown[]) => {
     aiDoctorSpies.liveReview(...args);
-    return null;
-  },
-}));
-vi.mock("@/components/PlantDetailAiDoctorSafeReviewStart", () => ({
-  default: (...args: unknown[]) => {
-    aiDoctorSpies.safeReviewStart(...args);
     return null;
   },
 }));
@@ -149,7 +142,6 @@ describe("PlantDetail bounded loading", () => {
     vi.useFakeTimers();
     refetch.mockClear();
     aiDoctorSpies.liveReview.mockClear();
-    aiDoctorSpies.safeReviewStart.mockClear();
     aiDoctorSpies.contextPanel.mockClear();
   });
   afterEach(() => {
@@ -185,14 +177,12 @@ describe("PlantDetail bounded loading", () => {
     mockState = { data: null, isLoading: true, isError: false };
     renderAt();
     expect(aiDoctorSpies.liveReview).not.toHaveBeenCalled();
-    expect(aiDoctorSpies.safeReviewStart).not.toHaveBeenCalled();
     expect(aiDoctorSpies.contextPanel).not.toHaveBeenCalled();
     act(() => {
       vi.advanceTimersByTime(PLANT_DETAIL_LOAD_TIMEOUT_MS + 50);
     });
     expect(screen.getByTestId("plant-detail-loading-slow")).toBeInTheDocument();
     expect(aiDoctorSpies.liveReview).not.toHaveBeenCalled();
-    expect(aiDoctorSpies.safeReviewStart).not.toHaveBeenCalled();
     expect(aiDoctorSpies.contextPanel).not.toHaveBeenCalled();
   });
 });

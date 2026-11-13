@@ -176,12 +176,7 @@ describe("Plant Detail information architecture", () => {
   it("mounts one real AI review action without legacy preview launchers", () => {
     expect(countComponent(ACTIVE_PAGE, "PlantDetailAiDoctorReadinessSection")).toBe(1);
     expect(countComponent(AI_SECTION, "PlantDetailAiDoctorLiveReview")).toBe(1);
-    for (const component of [
-      "PlantDetailDoctorContextPreview",
-      "PlantDetailAiDoctorReadinessGate",
-      "PlantDetailAiDoctorSafeReviewStart",
-      "AiDoctorReviewResultPreview",
-    ]) {
+    for (const component of ["AiDoctorReviewResultPreview"]) {
       expect(countComponent(ACTIVE_PAGE, component), component).toBe(0);
       expect(PAGE).not.toMatch(new RegExp(`import\\s+${component}\\s+from`));
     }

@@ -56,21 +56,6 @@ VPD_MAX_KPA = 15.0
 DEFAULT_STALE_SECONDS = 30.0
 
 _MAC_RE = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
-_DROPPED_KEYS = frozenset(
-    {
-        "pid",
-        "uid",
-        "mac",
-        "wifi",
-        "ssid",
-        "bssid",
-        "password",
-        "passwd",
-        "productcode",
-        "product_code",
-        "label",
-    }
-)
 
 WARN_UNMAPPED = "unmapped controller skipped"
 WARN_EMPTY = "empty sensor payload; no row written"
@@ -335,6 +320,7 @@ def _row(event: _Event, mapping: ControllerMap, *, stale: bool) -> dict[str, str
     flags.sort()
     observed_text = _format_instant(observed, mapping.timezone_name)
     ingested_text = _format_instant(event.received_at, mapping.timezone_name)
+    # Built from known fields. The notification object is not copied, so identifier fields stay out.
     redacted = {
         "method": "getDevSta",
         "zone": ZONE,

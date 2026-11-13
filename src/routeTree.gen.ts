@@ -160,6 +160,8 @@ import { Route as AppGrowsGrowIdLearningRouteImport } from './routes/_app/grows_
 import { Route as AppPhenoHuntsIdKeepersRouteImport } from './routes/_app/pheno-hunts_.$id.keepers'
 import { Route as AppPhenoHuntsIdWorkspaceRouteImport } from './routes/_app/pheno-hunts_.$id.workspace'
 import { Route as AppReportsPostGrowGrowIdRouteImport } from './routes/_app/reports_.post-grow.$growId'
+import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
+import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/email/auth/webhook'
 import { Route as AppGeneticsHealthKindIdRouteImport } from './routes/_app/genetics.health.$kind.$id'
 import { Route as AppGeneticsTraceKindIdRouteImport } from './routes/_app/genetics.trace.$kind.$id'
 
@@ -965,6 +967,16 @@ const AppReportsPostGrowGrowIdRoute =
     path: '/reports/post-grow/$growId',
     getParentRoute: () => AppRoute,
   } as any)
+const LovableEmailAuthPreviewRoute = LovableEmailAuthPreviewRouteImport.update({
+  id: '/lovable/email/auth/preview',
+  path: '/lovable/email/auth/preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LovableEmailAuthWebhookRoute = LovableEmailAuthWebhookRouteImport.update({
+  id: '/lovable/email/auth/webhook',
+  path: '/lovable/email/auth/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppGeneticsHealthKindIdRoute = AppGeneticsHealthKindIdRouteImport.update({
   id: '/health/$kind/$id',
   path: '/health/$kind/$id',
@@ -1126,6 +1138,8 @@ export interface FileRoutesByFullPath {
   '/pheno-hunts/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
   '/pheno-hunts/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
   '/reports/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
+  '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
+  '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
   '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1278,6 +1292,8 @@ export interface FileRoutesByTo {
   '/pheno-hunts/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
   '/pheno-hunts/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
   '/reports/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
+  '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
+  '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
   '/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1434,6 +1450,8 @@ export interface FileRoutesById {
   '/_app/pheno-hunts_/$id/keepers': typeof AppPhenoHuntsIdKeepersRoute
   '/_app/pheno-hunts_/$id/workspace': typeof AppPhenoHuntsIdWorkspaceRoute
   '/_app/reports_/post-grow/$growId': typeof AppReportsPostGrowGrowIdRoute
+  '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
+  '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
   '/_app/genetics/health/$kind/$id': typeof AppGeneticsHealthKindIdRoute
   '/_app/genetics/trace/$kind/$id': typeof AppGeneticsTraceKindIdRoute
 }
@@ -1589,6 +1607,8 @@ export interface FileRouteTypes {
     | '/pheno-hunts/$id/keepers'
     | '/pheno-hunts/$id/workspace'
     | '/reports/post-grow/$growId'
+    | '/lovable/email/auth/preview'
+    | '/lovable/email/auth/webhook'
     | '/genetics/health/$kind/$id'
     | '/genetics/trace/$kind/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -1741,6 +1761,8 @@ export interface FileRouteTypes {
     | '/pheno-hunts/$id/keepers'
     | '/pheno-hunts/$id/workspace'
     | '/reports/post-grow/$growId'
+    | '/lovable/email/auth/preview'
+    | '/lovable/email/auth/webhook'
     | '/genetics/health/$kind/$id'
     | '/genetics/trace/$kind/$id'
   id:
@@ -1896,6 +1918,8 @@ export interface FileRouteTypes {
     | '/_app/pheno-hunts_/$id/keepers'
     | '/_app/pheno-hunts_/$id/workspace'
     | '/_app/reports_/post-grow/$growId'
+    | '/lovable/email/auth/preview'
+    | '/lovable/email/auth/webhook'
     | '/_app/genetics/health/$kind/$id'
     | '/_app/genetics/trace/$kind/$id'
   fileRoutesById: FileRoutesById
@@ -1963,6 +1987,8 @@ export interface RootRouteChildren {
   CustomerGuideOreozVsGelonadeComparisonRoute: typeof CustomerGuideOreozVsGelonadeComparisonRoute
   PhenoHuntsIdCompareRoute: typeof PhenoHuntsIdCompareRoute
   PhenoHuntsIdShowcaseRoute: typeof PhenoHuntsIdShowcaseRoute
+  LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
+  LovableEmailAuthWebhookRoute: typeof LovableEmailAuthWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -3024,6 +3050,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReportsPostGrowGrowIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/lovable/email/auth/preview': {
+      id: '/lovable/email/auth/preview'
+      path: '/lovable/email/auth/preview'
+      fullPath: '/lovable/email/auth/preview'
+      preLoaderRoute: typeof LovableEmailAuthPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lovable/email/auth/webhook': {
+      id: '/lovable/email/auth/webhook'
+      path: '/lovable/email/auth/webhook'
+      fullPath: '/lovable/email/auth/webhook'
+      preLoaderRoute: typeof LovableEmailAuthWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/genetics/health/$kind/$id': {
       id: '/_app/genetics/health/$kind/$id'
       path: '/health/$kind/$id'
@@ -3339,6 +3379,8 @@ const rootRouteChildren: RootRouteChildren = {
     CustomerGuideOreozVsGelonadeComparisonRoute,
   PhenoHuntsIdCompareRoute: PhenoHuntsIdCompareRoute,
   PhenoHuntsIdShowcaseRoute: PhenoHuntsIdShowcaseRoute,
+  LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,
+  LovableEmailAuthWebhookRoute: LovableEmailAuthWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,0 +1,2 @@
+timestamp,temp_c,humidity,vpd,source,tent_id,timezone,observed_at,ingested_at,device_alias,time_basis,source_app,transport,reading_flags,raw_payload
+2026-11-13T11:39:19-06:00,21.5,55,1.25,csv,synthetic-tent-alpha,America/Chicago,2026-11-13T11:39:19-06:00,2026-11-13T11:39:19-06:00,synthetic-alias-a,receive,spider_farmer_ggs,ble,,"{""method"":""getDevSta"",""sensor_id"":""avg1"",""source_app"":""spider_farmer_ggs"",""time_basis"":""receive"",""transport"":""ble"",""zone"":""zone1""}"

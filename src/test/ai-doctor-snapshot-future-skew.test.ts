@@ -7,9 +7,7 @@
  * negative age always passes, so a snapshot dated a day ahead read as fresh.
  * These tests pin the same skew bound on every AI Doctor freshness path:
  *  - evaluateAiDoctorContext (readiness evidence + strong grade)
- *  - buildAiDoctorSnapshotFreshnessStatus (readiness gate chip)
- *  - buildAiDoctorSnapshotStalenessExplanation (launch dialog), which a
- *    fuzz test requires to agree with the chip.
+ *  - buildAiDoctorSnapshotFreshnessStatus (freshness chip view model)
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -17,9 +15,7 @@ import {
   selectAiDoctorFreshnessSnapshotAt,
 } from "@/lib/aiDoctorContextRules";
 import { buildAiDoctorReadinessDiaryEntry } from "@/lib/aiDoctorReadinessDiaryEntryRules";
-import { buildAiDoctorSafeReviewStart } from "@/lib/aiDoctorSafeReviewStartViewModel";
 import { buildAiDoctorSnapshotFreshnessStatus } from "@/lib/aiDoctorSnapshotFreshnessStatusViewModel";
-import { buildAiDoctorSnapshotStalenessExplanation } from "@/lib/aiDoctorSnapshotStalenessExplanationViewModel";
 import {
   MANUAL_SNAPSHOT_FUTURE_SKEW_MS,
   isManualSnapshotCurrent,
@@ -117,52 +113,7 @@ describe("buildAiDoctorSnapshotFreshnessStatus — future-dated snapshot", () =>
   });
 });
 
-describe("buildAiDoctorSnapshotStalenessExplanation — future-dated snapshot", () => {
-  it("+1 hour is stale, with a sentence that says it is dated in the future", () => {
-    const r = buildAiDoctorSnapshotStalenessExplanation({
-      latestSnapshotAtIso: iso(NOW + HOUR),
-      now: NOW,
-    });
-    expect(r.isStale).toBe(true);
-    expect(r.sentence).toMatch(/dated in the future/);
-    expect(r.sentence).not.toMatch(/older than/);
-  });
-
-  it("within the skew (+4 min) is not stale", () => {
-    const r = buildAiDoctorSnapshotStalenessExplanation({
-      latestSnapshotAtIso: iso(NOW + 4 * 60_000),
-      now: NOW,
-    });
-    expect(r.isStale).toBe(false);
-    expect(r.sentence).toBe("");
-  });
-
-  it("agrees with the freshness chip across the skew boundary", () => {
-    for (const d of [-1, 0, 1, HOUR]) {
-      const snap = iso(NOW + MANUAL_SNAPSHOT_FUTURE_SKEW_MS + d);
-      const chip = buildAiDoctorSnapshotFreshnessStatus({ latestSnapshotAtIso: snap, now: NOW });
-      const expl = buildAiDoctorSnapshotStalenessExplanation({
-        latestSnapshotAtIso: snap,
-        now: NOW,
-      });
-      expect(chip.state === "stale").toBe(expl.isStale);
-    }
-  });
-});
-
-describe("buildAiDoctorSafeReviewStart — future-dated snapshot summary", () => {
-  it("does not claim a future-dated snapshot is older than the window", () => {
-    const view = buildAiDoctorSafeReviewStart(contextWithSnapshots([NOW + HOUR]));
-    const summary = view.preparation?.snapshotSummary ?? "";
-    expect(summary).toMatch(/dated in the future, so its age is unknown/);
-    expect(summary).not.toMatch(/older than/);
-  });
-
-  it("still says older than the window for a genuinely stale snapshot", () => {
-    const view = buildAiDoctorSafeReviewStart(contextWithSnapshots([NOW - 30 * HOUR]));
-    expect(view.preparation?.snapshotSummary ?? "").toMatch(/older than 24 hours/);
-  });
-
+describe("evaluateAiDoctorContext — manualSnapshotFutureDated flag", () => {
   it("flags the newest snapshot as future-dated only beyond the skew", () => {
     expect(
       contextWithSnapshots([NOW + MANUAL_SNAPSHOT_FUTURE_SKEW_MS]).latest.manualSnapshotFutureDated,
@@ -184,11 +135,6 @@ describe("presenter input — a future-dated row beside a fresh one", () => {
       now: NOW,
     });
     expect(chip.state).toBe("fresh");
-    const expl = buildAiDoctorSnapshotStalenessExplanation({
-      latestSnapshotAtIso: selectAiDoctorFreshnessSnapshotAt(r),
-      now: NOW,
-    });
-    expect(expl.isStale).toBe(false);
   });
 
   it("the saved readiness note agrees with a strong grade", () => {

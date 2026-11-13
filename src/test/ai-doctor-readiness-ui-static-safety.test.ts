@@ -10,7 +10,6 @@
  *   - src/components/PlantDetailAiDoctorContextReadinessMount.tsx
  *   - src/components/AiDoctorContextQuickActions.tsx
  *   - src/lib/aiDoctorReadinessViewModel.ts
- *   - src/lib/aiDoctorReadinessGateViewModel.ts
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
@@ -23,7 +22,6 @@ const SCANNED_FILES = [
   "src/components/PlantDetailAiDoctorContextReadinessMount.tsx",
   "src/components/AiDoctorContextQuickActions.tsx",
   "src/lib/aiDoctorReadinessViewModel.ts",
-  "src/lib/aiDoctorReadinessGateViewModel.ts",
 ] as const;
 
 // At least these readiness path files MUST exist and be scanned.

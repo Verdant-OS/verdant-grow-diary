@@ -2,8 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import PlantDetailAiDoctorContextPanel from "@/components/PlantDetailAiDoctorContextPanel";
-import PlantDetailAiDoctorReadinessGate from "@/components/PlantDetailAiDoctorReadinessGate";
-import PlantDetailAiDoctorSafeReviewStart from "@/components/PlantDetailAiDoctorSafeReviewStart";
 import {
   buildAiDoctorRootZoneReadinessScope,
   selectSettledAiDoctorRootZoneObservations,
@@ -85,8 +83,6 @@ function observation(
 function renderAdjacentSurfaces() {
   return render(
     <MemoryRouter>
-      <PlantDetailAiDoctorReadinessGate plantId={PLANT_ID} plant={plant} hasSafeAiDoctorFlow />
-      <PlantDetailAiDoctorSafeReviewStart plantId={PLANT_ID} plant={plant} />
       <PlantDetailAiDoctorContextPanel plantId={PLANT_ID} plant={plant} />
     </MemoryRouter>,
   );
@@ -102,23 +98,15 @@ beforeEach(() => {
 });
 
 describe("Plant Detail AI Doctor root-zone readiness consistency", () => {
-  it("uses the same context scope and makes every adjacent surface partial", () => {
+  it("uses the plant-context root-zone scope and reads partial", () => {
     renderAdjacentSurfaces();
 
-    expect(screen.getByTestId("plant-ai-doctor-readiness-gate")).toHaveAttribute(
-      "data-readiness",
-      "partial",
-    );
-    expect(screen.getByTestId("plant-ai-doctor-safe-review-start")).toHaveAttribute(
-      "data-variant",
-      "partial",
-    );
     const panel = screen.getByTestId("plant-ai-doctor-context-panel");
     expect(panel).toHaveAttribute("data-readiness", "partial");
     expect(within(panel).getByText("Recent watering/feeding").parentElement).toHaveTextContent("2");
     expect(screen.queryByTestId("plant-ai-doctor-context-latest-snapshot")).toBeNull();
 
-    expect(mocks.rootZoneCalls).toHaveLength(3);
+    expect(mocks.rootZoneCalls).toHaveLength(1);
     for (const call of mocks.rootZoneCalls) {
       expect(call.scope).toEqual({
         kind: "plant_context",
@@ -138,11 +126,6 @@ describe("Plant Detail AI Doctor root-zone readiness consistency", () => {
 
     renderAdjacentSurfaces();
 
-    expect(screen.getByTestId("plant-ai-doctor-readiness-gate")).toHaveAttribute(
-      "data-readiness",
-      "insufficient",
-    );
-    expect(screen.queryByTestId("plant-ai-doctor-safe-review-start")).toBeNull();
     expect(screen.getByTestId("plant-ai-doctor-context-panel")).toHaveAttribute(
       "data-readiness",
       mocks.rootZone.isError ? "unavailable" : "loading",

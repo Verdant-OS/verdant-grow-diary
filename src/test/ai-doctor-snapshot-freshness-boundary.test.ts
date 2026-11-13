@@ -1,10 +1,9 @@
 /**
  * Boundary tests: 48h manual-snapshot freshness cutoff.
  *
- * Chains `evaluateAiDoctorContext` → `buildAiDoctorReadinessGate` to lock
- * in that transitions across the 48h freshness boundary stay consistent
- * for both `showQuickActions` and `primary.kind` in every safe-flow
- * combination.
+ * Locks `evaluateAiDoctorContext` readiness on both sides of the
+ * freshness boundary. (Readiness-gate view-model checks were removed with
+ * that module on 2026-11-13: no route mounted it.)
  *
  * Cutoff semantics (source: aiDoctorContextRules):
  *   now - latestSnapAt <= snapshotFreshMs  → fresh (inclusive)
@@ -19,11 +18,6 @@ import {
   AI_DOCTOR_SNAPSHOT_FRESH_MS,
   type AiDoctorContextInput,
 } from "@/lib/aiDoctorContextRules";
-import {
-  buildAiDoctorReadinessGate,
-  AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
-  AI_DOCTOR_READINESS_GATE_REVIEW_LABEL,
-} from "@/lib/aiDoctorReadinessGateViewModel";
 
 const NOW = Date.parse("2026-07-15T12:00:00Z");
 const ONE_MS = 1;
@@ -72,105 +66,6 @@ describe("AI Doctor 48h snapshot freshness — boundary transitions", () => {
     const r = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS));
     expect(r.readiness).toBe("strong");
     expect(r.evidence).toContain("fresh-manual-sensor-snapshot");
-  });
-
-  it("gate: at-cutoff (strong) + safe flow → hides quick actions, primary=open_ai_doctor", () => {
-    const r = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS));
-    const gate = buildAiDoctorReadinessGate({
-      readiness: r.readiness,
-      hasSafeAiDoctorFlow: true,
-    });
-    expect(gate.showQuickActions).toBe(false);
-    expect(gate.primary.kind).toBe("open_ai_doctor");
-    expect(gate.primary.label).toBe(AI_DOCTOR_READINESS_GATE_REVIEW_LABEL);
-  });
-
-  it("gate: 1ms-past-cutoff (partial) + safe flow → keeps quick actions, primary=open_ai_doctor", () => {
-    const r = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
-    const gate = buildAiDoctorReadinessGate({
-      readiness: r.readiness,
-      hasSafeAiDoctorFlow: true,
-    });
-    expect(gate.showQuickActions).toBe(true);
-    expect(gate.primary.kind).toBe("open_ai_doctor");
-    expect(gate.primary.label).toBe(AI_DOCTOR_READINESS_GATE_REVIEW_LABEL);
-  });
-
-  it("gate: 1ms-past-cutoff (partial) + no safe flow → quick actions, primary=focus_anchor (add-context)", () => {
-    const r = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
-    const gate = buildAiDoctorReadinessGate({
-      readiness: r.readiness,
-      hasSafeAiDoctorFlow: false,
-    });
-    expect(gate.showQuickActions).toBe(true);
-    expect(gate.primary.kind).toBe("focus_anchor");
-    expect(gate.primary.label).toBe(AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL);
-  });
-
-  it("gate: at-cutoff (strong) + no safe flow → hides quick actions, primary=focus_anchor", () => {
-    const r = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS));
-    const gate = buildAiDoctorReadinessGate({
-      readiness: r.readiness,
-      hasSafeAiDoctorFlow: false,
-    });
-    expect(gate.showQuickActions).toBe(false);
-    expect(gate.primary.kind).toBe("focus_anchor");
-    expect(gate.primary.label).toBe(AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL);
-  });
-
-  it("stale → fresh transition flips readiness partial → strong and hides quick actions (safe flow on)", () => {
-    const stale = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
-    const fresh = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS));
-    expect(stale.readiness).toBe("partial");
-    expect(fresh.readiness).toBe("strong");
-
-    const gStale = buildAiDoctorReadinessGate({
-      readiness: stale.readiness,
-      hasSafeAiDoctorFlow: true,
-    });
-    const gFresh = buildAiDoctorReadinessGate({
-      readiness: fresh.readiness,
-      hasSafeAiDoctorFlow: true,
-    });
-    expect(gStale.showQuickActions).toBe(true);
-    expect(gFresh.showQuickActions).toBe(false);
-    // Primary action kind stays consistent across the transition under safe flow.
-    expect(gStale.primary.kind).toBe("open_ai_doctor");
-    expect(gFresh.primary.kind).toBe("open_ai_doctor");
-  });
-
-  it("fresh → stale transition flips readiness strong → partial and re-shows quick actions (safe flow on)", () => {
-    const fresh = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS));
-    const stale = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
-    const gFresh = buildAiDoctorReadinessGate({
-      readiness: fresh.readiness,
-      hasSafeAiDoctorFlow: true,
-    });
-    const gStale = buildAiDoctorReadinessGate({
-      readiness: stale.readiness,
-      hasSafeAiDoctorFlow: true,
-    });
-    expect(gFresh.showQuickActions).toBe(false);
-    expect(gStale.showQuickActions).toBe(true);
-    expect(gStale.primary.kind).toBe("open_ai_doctor");
-  });
-
-  it("no-safe-flow transition: primary stays focus_anchor on both sides of the cutoff", () => {
-    const stale = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS + ONE_MS));
-    const fresh = evaluateAiDoctorContext(baseInput(AI_DOCTOR_SNAPSHOT_FRESH_MS - ONE_MS));
-    const gStale = buildAiDoctorReadinessGate({
-      readiness: stale.readiness,
-      hasSafeAiDoctorFlow: false,
-    });
-    const gFresh = buildAiDoctorReadinessGate({
-      readiness: fresh.readiness,
-      hasSafeAiDoctorFlow: false,
-    });
-    expect(gStale.primary.kind).toBe("focus_anchor");
-    expect(gFresh.primary.kind).toBe("focus_anchor");
-    // Quick actions still track readiness even without safe flow.
-    expect(gStale.showQuickActions).toBe(true);
-    expect(gFresh.showQuickActions).toBe(false);
   });
 
   it("boundary is deterministic across repeated evaluations at the same instant", () => {

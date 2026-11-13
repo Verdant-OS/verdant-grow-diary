@@ -56,7 +56,6 @@ vi.mock("@/components/PlantDetailAiDoctorContextReadinessMount", () => ({
   default: () => null,
 }));
 vi.mock("@/components/PlantDetailAiDoctorLiveReview", () => ({ default: () => null }));
-vi.mock("@/components/PlantDetailAiDoctorSafeReviewStart", () => ({ default: () => null }));
 vi.mock("@/components/PlantAssignedTentActionsPanel", () => ({ default: () => null }));
 vi.mock("@/components/PlantDetailQuickActions", () => ({ default: () => null }));
 

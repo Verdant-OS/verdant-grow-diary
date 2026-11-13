@@ -83,6 +83,12 @@ vi.mock("@/lib/pricingAnalytics", () => ({ trackPricingEvent: vi.fn() }));
 import { CREDIT_PACKS } from "@/constants/pricing";
 import Pricing from "@/pages/Pricing";
 
+// This file covers the Paddle Pro checkout path. Pin it, so these assertions
+// hold even in a build with VITE_PRO_CHECKOUT_PROVIDER=stripe
+// (src/config/checkoutProvider.ts); pricing-stripe-pro-checkout.test.tsx
+// covers the Stripe path.
+vi.mock("@/config/checkoutProvider", () => ({ PRO_CHECKOUT_PROVIDER: "paddle" }));
+
 /** Every CTA that can open a paid checkout, and the SKU it opens. */
 const PAID_CTAS: ReadonlyArray<{ testId: string; sku: string }> = [
   { testId: "pricing-cta-pro-annual", sku: "pro_annual" },

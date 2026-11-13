@@ -125,15 +125,21 @@ export function pickExpectedBillingEnvironment(raw: unknown): LovableBillingEnvi
   return raw === "live" ? "live" : "sandbox";
 }
 
-const SUBSCRIPTION_COLUMNS =
-  "user_id,paddle_subscription_id,paddle_customer_id,product_id,price_id,status,current_period_end,current_period_start,cancel_at_period_end,environment,created_at,updated_at";
+// "*" on purpose: the mapper reads billing_provider and
+// stripe_subscription_id when they exist (migration 20261104184500) and
+// treats a row without them as Paddle. Naming those columns here would turn
+// a database that lacks them into a failed read, which fails every paid
+// user closed. Nothing selected here leaves the server: the mapper exposes
+// no provider ids.
+const SUBSCRIPTION_COLUMNS = "*";
 
 // Bounded newest-first window + any-entitling-row selection semantics are
 // shared with the client hook via pickEntitlingLovableRow /
 // SUBSCRIPTION_ROW_SCAN_LIMIT in src/lib/entitlements/unionEntitlements.ts
-// (window rationale documented there). created_at is not unique;
-// paddle_subscription_id is — without the tiebreak, equal timestamps make
-// the window order (and therefore the picked row) nondeterministic.
+// (window rationale documented there). created_at is not unique, and
+// paddle_subscription_id is null on Stripe rows, so the final tiebreak is
+// the primary key id — without a unique tiebreak, equal timestamps make the
+// window order (and therefore the picked row) nondeterministic.
 function newestSubscriptionRows(
   supabase: any,
   environment: LovableBillingEnvironment,
@@ -148,7 +154,8 @@ function newestSubscriptionRows(
   }
   return query
     .order("created_at", { ascending: false })
-    .order("paddle_subscription_id", { ascending: false })
+    .order("paddle_subscription_id", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: false })
     .limit(SUBSCRIPTION_ROW_SCAN_LIMIT);
 }
 

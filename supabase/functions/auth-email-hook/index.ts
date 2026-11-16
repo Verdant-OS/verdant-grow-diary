@@ -297,10 +297,12 @@ type AuthDelivery = {
   response: "lovable" | "native";
 };
 
-// GoTrue puts the new-address hash in token_hash and, when secure email
-// change is on, the current-address hash in token_hash_new. Each hash is
-// delivered only to the mailbox it proves. The two sends use different
-// idempotency keys so a retry does not collapse them into one message.
+// GoTrue names the fields backwards from the mailboxes. token_hash confirms
+// the new address. token_hash_new confirms the current address. With secure
+// email change on, token is the current address OTP and token_new is the new
+// address OTP. With it off, only token is set and it belongs to the new address.
+// The two sends use different idempotency keys so a retry with the same
+// webhook-id does not collapse them.
 function nativeEmailChangeDeliveries(
   currentEmail: string,
   newEmail: unknown,
@@ -325,19 +327,22 @@ function nativeEmailChangeDeliveries(
     emailData.redirect_to,
   );
   if (!newUrl) return null;
+  const secure =
+    typeof emailData.token_hash_new === "string" && emailData.token_hash_new.length > 0;
+  const newOtp = secure ? emailData.token_new : emailData.token;
   const deliveries: AuthDelivery[] = [
     {
       emailType: "email_change",
       recipient: newEmail,
       confirmationUrl: newUrl,
-      token: typeof emailData.token === "string" ? emailData.token : "",
+      token: typeof newOtp === "string" ? newOtp : "",
       oldEmail: currentEmail,
       newEmail,
       run_id: `${webhookId}:new`,
       response: "native",
     },
   ];
-  if (typeof emailData.token_hash_new === "string" && emailData.token_hash_new.length > 0) {
+  if (secure) {
     const currentUrl = nativeConfirmationUrl(
       emailData.site_url,
       emailData.token_hash_new,
@@ -349,7 +354,7 @@ function nativeEmailChangeDeliveries(
       emailType: "email_change",
       recipient: currentEmail,
       confirmationUrl: currentUrl,
-      token: typeof emailData.token_new === "string" ? emailData.token_new : "",
+      token: typeof emailData.token === "string" ? emailData.token : "",
       oldEmail: currentEmail,
       newEmail,
       run_id: `${webhookId}:current`,

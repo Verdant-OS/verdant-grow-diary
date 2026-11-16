@@ -7,14 +7,14 @@ why: Production Send Email is on and pointed at auth-email-hook, but the functio
 branch: cursor/auth-email-hook-native-send-4adb
 base: verdant-grow-diary
 checkout: git fetch origin cursor/auth-email-hook-native-send-4adb verdant-grow-diary && git switch cursor/auth-email-hook-native-send-4adb
-pr: see the draft PR for this branch
-head_sha: read from the PR after push
-state: implemented locally, targeted tests and typecheck green, not deployed
-current_step: open the draft PR
-next_action: independent exact-head review by Reviewer A, Reviewer D and Reviewer C. Do not enqueue or merge. Do not set secrets or deploy.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2979
+head_sha: the remote head after the OTP fix is pushed; Seat A reviewed e046307c5d15f0623e97fa8d7147dce7074b8df0
+state: implemented, CI was green at e046307c5, OTP fix not yet on that head, not deployed
+current_step: Seat A PASS-with-P2 fixed in the working tree; push and wait for a new exact-head review
+next_action: independent exact-head review by Reviewer D and Reviewer C, and a new Seat A review of the OTP fix. Do not enqueue or merge. Do not set secrets or deploy.
 post_merge_check: after a founder-approved deploy of this function to production project knkwiiywfkbqznbxwqfh, with SEND_EMAIL_HOOK_SECRET and LOVABLE_API_KEY set by name only, one disposable-account recovery mail arrives From noreply@verdantgrowdiary.com and writes one email_send_log row with template_name recovery and status sent. Until that deploy, NOT_MEASURED.
 active_writer: cursor cloud agent on cursor/auth-email-hook-native-send-4adb
-decisions: (1) Keep the Lovable webhook path. It is the existing preview and managed-sender contract, and a request is native only when it carries webhook-id, webhook-timestamp or webhook-signature. (2) Native success is HTTP 200 with {}. Native failure is { error: { http_code, message } }. The Lovable responses stay { success: true } and { error: string }. (3) Confirmation links are site origin plus /auth/v1/verify with token, type and redirect_to. (4) Idempotency key for a native call is the webhook-id, except email change, which uses webhook-id:new and webhook-id:current. (5) email_change sends token_hash only to user.new_email. token_hash_new, when present, is a second send to user.email. (6) No migration, no secret values, no deploy.
+decisions: (1) Keep the Lovable webhook path. It is the existing preview and managed-sender contract, and a request is native only when it carries webhook-id, webhook-timestamp or webhook-signature. (2) Native success is HTTP 200 with {}. Native failure is { error: { http_code, message } }. The Lovable responses stay { success: true } and { error: string }. (3) Confirmation links are site origin plus /auth/v1/verify with token, type and redirect_to. (4) Idempotency key for a native call is the webhook-id, except email change, which uses webhook-id:new and webhook-id:current. (5) email_change sends token_hash only to user.new_email. token_hash_new, when present, is a second send to user.email. With secure email change, the new address gets token_new and the current address gets token. With it off, the new address gets token. (6) A second-send failure still returns 500. GoTrue retries with a new webhook-id, so the first link can be orphaned. Returning 200 after a partial send would mark the change complete without the current-address mail. (7) No migration, no secret values, no deploy.
 tried_and_rejected: editing src/test/helpers/authEmailHookHarness.ts. The scorer lock refused the edit. Native coverage lives in a new test file with its own vm loader. The locked harness and its tests were left unchanged and re-run.
 commands: bunx vitest run src/test/auth-email-hook-native-send.test.ts src/test/auth-email-hook-runtime.test.ts src/test/auth-email-hook-direct-send-guard.test.ts src/test/timing-safe-compare-call-sites-static.test.ts --reporter=dot ; bun run typecheck
 files_touched: supabase/functions/auth-email-hook/index.ts; src/test/auth-email-hook-native-send.test.ts; docs/agents/handoffs/AUTH-EMAIL-NATIVE-HOOK.md
@@ -24,8 +24,8 @@ open_questions: whether auth-email-hook is already deployed on production, and w
 gotchas: verify_jwt must stay false. Timestamp window is 5 minutes. Signature is checked before the timestamp so a bad signature is 401 even when the timestamp is also stale. Never log the secret, token, token_hash or rendered body.
 links: diagnosis uploads FOLLOWUP-2026-11-16 and REPORT; docs/agents/handoffs/AUTH-EMAIL-DIRECT-SEND.md
 artifacts: src/test/auth-email-hook-native-send.test.ts
-reviewer_seat: Reviewer A, Reviewer D, Reviewer C required. Not requested yet.
-reviewer_sha:
+reviewer_seat: Seat A (Sour Diesel) PASS-with-P2 on e046307c5d15f0623e97fa8d7147dce7074b8df0, review 5926978269. That verdict does not cover the OTP fix. Reviewer D and Reviewer C still required.
+reviewer_sha: e046307c5d15f0623e97fa8d7147dce7074b8df0 (superseded by the OTP fix)
 session_state: no production calls, no secret writes, no deploy
 claimed_by: cursor cloud agent, 2026-11-16
 owner: cursor cloud agent for this branch

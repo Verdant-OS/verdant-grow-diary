@@ -181,7 +181,15 @@ function nativeHook() {
     });
   }
 
-  return { post, signed, sends, auditRows, renders, logs };
+  return {
+    post,
+    signed,
+    sends,
+    auditRows,
+    renders,
+    logs,
+    clearHookSecret: () => env.delete("SEND_EMAIL_HOOK_SECRET"),
+  };
 }
 
 describe("auth-email-hook native Send Email hook", () => {
@@ -250,6 +258,36 @@ describe("auth-email-hook native Send Email hook", () => {
     expect(hook.auditRows).toEqual([]);
   });
 
+  it("rejects a future timestamp, a non-numeric timestamp, and a missing hook secret", async () => {
+    const hook = nativeHook();
+    const raw = JSON.stringify(nativeBody("recovery"));
+    const future = String(Math.floor(Date.now() / 1000) + 10 * 60);
+    const futureResult = await hook.signed(raw, future, "msg_future");
+    expect(futureResult).toEqual({
+      code: 401,
+      body: { error: { http_code: 401, message: "Stale timestamp" } },
+    });
+
+    const nonNumeric = await hook.signed(raw, "not-a-timestamp", "msg_nan");
+    expect(nonNumeric).toEqual({
+      code: 401,
+      body: { error: { http_code: 401, message: "Invalid signature" } },
+    });
+
+    hook.clearHookSecret();
+    const missingSecret = await hook.signed(
+      raw,
+      String(Math.floor(Date.now() / 1000)),
+      "msg_nosecret",
+    );
+    expect(missingSecret).toEqual({
+      code: 401,
+      body: { error: { http_code: 401, message: "Invalid signature" } },
+    });
+    expect(hook.sends).toEqual([]);
+    expect(hook.logs.join("\n")).not.toContain(FIXTURE_SECRET);
+  });
+
   it("rejects a stale timestamp", async () => {
     const hook = nativeHook();
     const raw = JSON.stringify(nativeBody("recovery"));
@@ -287,8 +325,8 @@ describe("auth-email-hook native Send Email hook", () => {
       },
       email_data: {
         email_action_type: "email_change",
-        token: "otp-new-do-not-log",
-        token_new: "otp-current-do-not-log",
+        token: "otp-current-do-not-log",
+        token_new: "otp-new-do-not-log",
         token_hash: "hash-for-new-address",
         token_hash_new: "hash-for-current-address",
         redirect_to: "https://verdantgrowdiary.com/reset",
@@ -305,6 +343,12 @@ describe("auth-email-hook native Send Email hook", () => {
     expect(hook.sends.map((send) => [send.message.to, send.message.idempotency_key])).toEqual([
       ["next@example.invalid", "msg_change:new"],
       ["current@example.invalid", "msg_change:current"],
+    ]);
+    expect(hook.renders.map((render) => [render.props.recipient, render.props.token])).toEqual([
+      ["next@example.invalid", "otp-new-do-not-log"],
+      ["next@example.invalid", "otp-new-do-not-log"],
+      ["current@example.invalid", "otp-current-do-not-log"],
+      ["current@example.invalid", "otp-current-do-not-log"],
     ]);
     expect(hook.renders.map((render) => render.props.confirmationUrl)).toEqual([
       confirmationUrl("email_change", "hash-for-new-address"),
@@ -348,6 +392,7 @@ describe("auth-email-hook native Send Email hook", () => {
 
     expect(insecureResult.code).toBe(200);
     expect(insecureHook.sends.map((send) => send.message.to)).toEqual(["next@example.invalid"]);
+    expect(insecureHook.renders[0].props.token).toBe("otp-new-do-not-log");
     expect(String(insecureHook.renders[0].props.confirmationUrl)).toContain("hash-for-new-address");
     expect(String(insecureHook.renders[0].props.confirmationUrl)).not.toContain(
       "hash-for-current-address",

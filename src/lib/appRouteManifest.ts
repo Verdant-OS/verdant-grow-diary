@@ -312,6 +312,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Authenticated PII-free grower referral surface.",
   },
   { path: "/leads", access: "internal" },
+  {
+    path: "/lovable/email/auth/webhook",
+    access: "public",
+    description:
+      "Server-only POST endpoint for Lovable's signed sign-in email webhook; no page. The signature check is the gate.",
+  },
   { path: "/login", access: "redirect", description: "→ /auth" },
   { path: "/logs", access: "redirect", description: "→ /timeline" },
   {

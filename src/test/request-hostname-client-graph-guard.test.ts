@@ -24,7 +24,11 @@ const SRC = join(process.cwd(), "src");
 // server-only and never imported by client code.
 const SERVER_ONLY_IMPORTERS = [
   "src/integrations/supabase/auth-middleware.ts",
+  "src/lib/authEmailWebhookRuntime.server.ts",
   "src/lib/requestHostname.server.ts",
+  // Lazily imports the email webhook runtime inside its POST server handler,
+  // the pattern client.server.ts prescribes for route files.
+  "src/routes/lovable/email/auth/webhook.tsx",
   "src/server.ts",
 ];
 

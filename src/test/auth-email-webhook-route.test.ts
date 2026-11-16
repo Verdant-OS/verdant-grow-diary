@@ -184,7 +184,8 @@ describe("managed sign-in email webhook handler", () => {
     const { render } = await import("@react-email/render");
     for (const action of AUTH_EMAIL_ACTION_TYPES) {
       const deps = makeDeps(payloadFor(action), {
-        render: (element, options) => render(element, options),
+        render: (element, options) =>
+          options?.plainText ? render(element, { plainText: true }) : render(element),
       });
       const res = await handleAuthEmailWebhook(request(), deps);
       expect(res.status).toBe(200);

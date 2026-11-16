@@ -25,7 +25,8 @@ export const Route = createFileRoute("/lovable/email/auth/webhook")({
           verify: ({ req, secret, parser }) => verifyWebhookRequest({ req, secret, parser }),
           parse: parseEmailWebhookPayload,
           verificationErrorCode: (error) => (error instanceof WebhookError ? error.code : null),
-          render: (element, options) => render(element, options),
+          render: (element, options) =>
+            options?.plainText ? render(element, { plainText: true }) : render(element),
           send: (sendRequest, options) => sendLovableEmail(sendRequest, options),
           sendErrorCode: (error) => (error instanceof EmailAPIError ? (error.code ?? null) : null),
           writeLog: async (row) => {

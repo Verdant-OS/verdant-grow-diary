@@ -28,7 +28,7 @@ const SERVER_ONLY_IMPORTERS = [
   "src/lib/requestHostname.server.ts",
   // Lazily imports the email webhook runtime inside its POST server handler,
   // the pattern client.server.ts prescribes for route files.
-  "src/routes/lovable/email/auth/webhook.tsx",
+  "src/routes/lovable/email/auth/webhook.ts",
   "src/server.ts",
 ];
 

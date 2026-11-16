@@ -127,9 +127,6 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/pheno-hunts/:id/showcase",
   "/internal/pheno-hunt-demo",
   "/.lovable/oauth/consent",
-  // Signed POST-only webhook for sign-in emails (no page): a signed-out GET
-  // must stay on origin and make zero private-table fetches.
-  "/lovable/email/auth/webhook",
   "/breeder-beta",
   "/creator-beta",
   "/glossary",

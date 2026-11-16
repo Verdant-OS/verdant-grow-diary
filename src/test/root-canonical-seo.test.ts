@@ -91,10 +91,6 @@ const ROOT_CANONICAL_TOLERATED: ReadonlyMap<string, string> = new Map([
   ["/internal/demo-proof-walkthrough", "fixture demo, deliberately unlinked"],
   ["/internal/pheno-hunt-demo", "fixture demo, deliberately unlinked"],
   [
-    "/lovable/email/auth/webhook",
-    "signed POST webhook for sign-in emails; no page, never an acquisition page",
-  ],
-  [
     "/partners/csv-preview",
     "browser-local tool, not in sitemap; promote to a prerendered doc if it becomes an acquisition page",
   ],

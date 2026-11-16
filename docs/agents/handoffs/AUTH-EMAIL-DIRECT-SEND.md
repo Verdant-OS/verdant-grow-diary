@@ -9,8 +9,8 @@ branch: claude/project-thread-do02zz
 base: verdant-grow-diary at d4b2ac066 (2026-11-12)
 checkout: git fetch origin claude/project-thread-do02zz verdant-grow-diary && git switch claude/project-thread-do02zz
 pr: see the draft PR for this branch
-head_sha: read from the PR
-state: implemented, targeted checks green locally, draft PR
+head_sha: final a6be091539a3a8613ad78192e2ba6c84a71405fa (merge on verdant-grow-diary)
+state: CLOSED 2026-11-16. Merged as a6be09153 (#2961, squash, 2026-11-12 12:37 UTC). Superseded for live delivery by AUTH-EMAIL-MANAGED-ROUTE: production Supabase Auth never called this edge function after the merge, and Lovable's managed setup on this stack now targets an app server route.
 current_step: draft PR open; required CI runs once it is marked ready
 next_action: route one independent exact-head review once required checks are green; merge and any Lovable deploy wait on Cheek's per-item yes
 post_merge_check: after a deploy that Cheek approves, request a sign-in email for the disposable test account on https://verdantgrowdiary.com, confirm it arrives From noreply@verdantgrowdiary.com with SPF, DKIM and DMARC PASS, and confirm one new email_send_log row with status sent. Until then NOT_MEASURED (no deploy authorized).
@@ -30,5 +30,5 @@ reviewer_sha: 7bd0158cc0ab6cb60d6f9b8163b80cb08a2987ce (superseded)
 session_state: no routines, no paused workflows; pending human decisions: review routing, the per-item merge yes, and any Lovable deploy or Publish
 claimed_by: Claude thread session, 2026-11-12 09:25 UTC
 owner: Claude thread session for this task
-last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (bulk close; previous 2026-11-12 04:55 CT)
+last_updated: 2026-11-16, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsDb2mPjWBxVLtwJZkM4i1Cw (closed; follow-on work in AUTH-EMAIL-MANAGED-ROUTE)
 ```

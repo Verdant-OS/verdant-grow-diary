@@ -17,7 +17,7 @@ describe("deleted plant labels", () => {
     ).toBe(DeletedPlantDisplayRules.LABEL);
   });
 
-  it("keeps a stored diary name and otherwise labels the leftover plant id", () => {
+  it("keeps a stored diary name and labels a leftover plant id the loaded directory lacks", () => {
     const kept = buildDiaryCalendarViewModel([
       {
         id: "e1",
@@ -29,15 +29,21 @@ describe("deleted plant labels", () => {
     ]);
     expect(kept[0].events[0].plantName).toBe("Blue Dream");
 
-    const deleted = buildDiaryCalendarViewModel([
-      {
-        id: "e2",
-        entry_at: "2026-06-10T12:00:00Z",
-        event_type: "watering",
-        plant_id: "gone",
-        details: { event_type: "watering" },
-      },
-    ]);
+    // "Deleted plant" needs a loaded plant directory that lacks the id; a
+    // missing stored name alone no longer implies the plant was removed.
+    const deleted = buildDiaryCalendarViewModel(
+      [
+        {
+          id: "e2",
+          entry_at: "2026-06-10T12:00:00Z",
+          event_type: "watering",
+          plant_id: "gone",
+          details: { event_type: "watering" },
+        },
+      ],
+      undefined,
+      { plantNamesById: new Map() },
+    );
     expect(deleted[0].events[0].plantName).toBe("Deleted plant");
 
     const unnamed = buildDiaryCalendarViewModel([

@@ -241,13 +241,37 @@ function safeNote(value: unknown): string | null {
   return trimmed.length > NOTE_MAX ? `${trimmed.slice(0, NOTE_MAX - 1)}…` : trimmed;
 }
 
-function safePlantName(details: unknown): string | null {
-  if (!details || typeof details !== "object") return null;
-  const name = (details as Record<string, unknown>).plant_name;
+function safeName(name: unknown): string | null {
   if (typeof name !== "string") return null;
   const trimmed = name.trim();
   if (!trimmed || trimmed.length > 80) return trimmed ? trimmed.slice(0, 80) : null;
   return trimmed;
+}
+
+function safePlantName(details: unknown): string | null {
+  if (!details || typeof details !== "object") return null;
+  return safeName((details as Record<string, unknown>).plant_name);
+}
+
+/**
+ * Plant label for one calendar event. A name stored on the diary details
+ * wins. Otherwise the owner's loaded plant directory supplies the name for
+ * the row's plant_id. "Deleted plant" is shown only when that directory has
+ * loaded and has no row for the id. While the directory is unavailable
+ * (loading or failed) the label stays blank: a missing stored name alone
+ * says nothing about whether the plant still exists.
+ */
+function resolveCalendarPlantName(
+  plantId: string | null | undefined,
+  details: unknown,
+  plantNamesById: ReadonlyMap<string, string> | null | undefined,
+): string | null {
+  const stored = safePlantName(details);
+  if (stored) return stored;
+  const id = typeof plantId === "string" ? plantId.trim() : "";
+  if (!id || !plantNamesById) return null;
+  if (plantNamesById.has(id)) return safeName(plantNamesById.get(id));
+  return DeletedPlantDisplayRules.nameOrDeleted(id, null);
 }
 
 function safeCalendarStage(value: unknown): "seedling" | "veg" | "flower" | "drying" | null {
@@ -531,6 +555,15 @@ function dateKeyUtc(iso: string): string {
   return iso.slice(0, 10);
 }
 
+export interface DiaryCalendarViewModelOptions {
+  /**
+   * id → name over the owner's plants, including archived and merged rows.
+   * Null or omitted while unavailable; then rows without a stored plant
+   * name keep a blank plant label instead of "Deleted plant".
+   */
+  plantNamesById?: ReadonlyMap<string, string> | null;
+}
+
 /**
  * Build the read-only calendar view-model. Pure & deterministic.
  *
@@ -546,7 +579,9 @@ function dateKeyUtc(iso: string): string {
 export function buildDiaryCalendarViewModel(
   rawEntries: readonly DiaryCalendarRawEntry[] | null | undefined,
   tempUnit: TemperatureUnitPreference = loadTemperatureUnitPreference(),
+  options: DiaryCalendarViewModelOptions = {},
 ): DiaryCalendarDayGroup[] {
+  const plantNamesById = options.plantNamesById ?? null;
   const list = Array.isArray(rawEntries) ? rawEntries : [];
   const events: DiaryCalendarEvent[] = [];
 
@@ -564,7 +599,7 @@ export function buildDiaryCalendarViewModel(
       label: DIARY_CALENDAR_KIND_LABEL[kind],
       occurredAt: iso,
       dateKey: dateKeyUtc(iso),
-      plantName: DeletedPlantDisplayRules.nameOrDeleted(raw.plant_id, safePlantName(raw.details)),
+      plantName: resolveCalendarPlantName(raw.plant_id, raw.details, plantNamesById),
       stage: safeCalendarStage(raw.stage),
       noteSnippet,
       details: buildEventDetails(kind, raw, noteSnippet, tempUnit),

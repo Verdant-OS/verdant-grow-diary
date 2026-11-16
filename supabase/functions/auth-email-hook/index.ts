@@ -261,28 +261,27 @@ async function verifyNativeSendEmailHook(
   return "ok";
 }
 
-function nativeConfirmationUrl(emailData: {
-  site_url?: unknown;
-  token_hash?: unknown;
-  email_action_type?: unknown;
-  redirect_to?: unknown;
-}): string | null {
-  if (typeof emailData.site_url !== "string" || typeof emailData.token_hash !== "string") {
+function nativeConfirmationUrl(
+  siteUrl: unknown,
+  tokenHash: unknown,
+  actionType: string,
+  redirectTo: unknown,
+): string | null {
+  if (typeof siteUrl !== "string" || typeof tokenHash !== "string" || tokenHash.length === 0) {
     return null;
   }
-  if (typeof emailData.email_action_type !== "string") return null;
   let site: URL;
   try {
-    site = new URL(emailData.site_url);
+    site = new URL(siteUrl);
   } catch {
     return null;
   }
   if (site.protocol !== "https:" && site.protocol !== "http:") return null;
-  const redirectTo = typeof emailData.redirect_to === "string" ? emailData.redirect_to : "";
+  const redirect = typeof redirectTo === "string" ? redirectTo : "";
   const params = new URLSearchParams({
-    token: emailData.token_hash,
-    type: emailData.email_action_type,
-    redirect_to: redirectTo,
+    token: tokenHash,
+    type: actionType,
+    redirect_to: redirect,
   });
   return `${site.origin}${site.pathname.replace(/\/$/, "")}/auth/v1/verify?${params.toString()}`;
 }
@@ -297,6 +296,68 @@ type AuthDelivery = {
   run_id: string;
   response: "lovable" | "native";
 };
+
+// GoTrue puts the new-address hash in token_hash and, when secure email
+// change is on, the current-address hash in token_hash_new. Each hash is
+// delivered only to the mailbox it proves. The two sends use different
+// idempotency keys so a retry does not collapse them into one message.
+function nativeEmailChangeDeliveries(
+  currentEmail: string,
+  newEmail: unknown,
+  emailData: {
+    token?: unknown;
+    token_new?: unknown;
+    token_hash?: unknown;
+    token_hash_new?: unknown;
+    redirect_to?: unknown;
+    site_url?: unknown;
+    email_action_type?: unknown;
+  },
+  webhookId: string,
+): AuthDelivery[] | null {
+  if (typeof newEmail !== "string" || newEmail.length === 0) return null;
+  const actionType =
+    typeof emailData.email_action_type === "string" ? emailData.email_action_type : "email_change";
+  const newUrl = nativeConfirmationUrl(
+    emailData.site_url,
+    emailData.token_hash,
+    actionType,
+    emailData.redirect_to,
+  );
+  if (!newUrl) return null;
+  const deliveries: AuthDelivery[] = [
+    {
+      emailType: "email_change",
+      recipient: newEmail,
+      confirmationUrl: newUrl,
+      token: typeof emailData.token === "string" ? emailData.token : "",
+      oldEmail: currentEmail,
+      newEmail,
+      run_id: `${webhookId}:new`,
+      response: "native",
+    },
+  ];
+  if (typeof emailData.token_hash_new === "string" && emailData.token_hash_new.length > 0) {
+    const currentUrl = nativeConfirmationUrl(
+      emailData.site_url,
+      emailData.token_hash_new,
+      actionType,
+      emailData.redirect_to,
+    );
+    if (!currentUrl) return null;
+    deliveries.push({
+      emailType: "email_change",
+      recipient: currentEmail,
+      confirmationUrl: currentUrl,
+      token: typeof emailData.token_new === "string" ? emailData.token_new : "",
+      oldEmail: currentEmail,
+      newEmail,
+      run_id: `${webhookId}:current`,
+      response: "native",
+    });
+  }
+  return deliveries;
+}
 
 async function deliverAuthEmail(delivery: AuthDelivery, apiKey: string): Promise<Response> {
   const EmailTemplate = EMAIL_TEMPLATES[delivery.emailType];
@@ -407,7 +468,9 @@ async function handleNativeSendEmailHook(req: Request): Promise<Response> {
     email_data?: {
       email_action_type?: unknown;
       token?: unknown;
+      token_new?: unknown;
       token_hash?: unknown;
+      token_hash_new?: unknown;
       redirect_to?: unknown;
       site_url?: unknown;
     };
@@ -430,12 +493,6 @@ async function handleNativeSendEmailHook(req: Request): Promise<Response> {
     return nativeHookError(400, `Unknown email type: ${emailData.email_action_type}`);
   }
 
-  const confirmationUrl = emailType === "reauthentication" ? "" : nativeConfirmationUrl(emailData);
-  if (emailType !== "reauthentication" && !confirmationUrl) {
-    console.error("Invalid webhook payload", { reason: "confirmation_url" });
-    return nativeHookError(400, "Invalid webhook payload");
-  }
-
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey) {
     console.error("LOVABLE_API_KEY not configured");
@@ -443,8 +500,34 @@ async function handleNativeSendEmailHook(req: Request): Promise<Response> {
   }
 
   const webhookId = req.headers.get("webhook-id") ?? "";
-  return deliverAuthEmail(
-    {
+  const deliveries: AuthDelivery[] = [];
+  if (emailType === "email_change") {
+    const changeDeliveries = nativeEmailChangeDeliveries(
+      recipient,
+      body.user?.new_email,
+      emailData,
+      webhookId,
+    );
+    if (!changeDeliveries) {
+      console.error("Invalid webhook payload", { reason: "email_change" });
+      return nativeHookError(400, "Invalid webhook payload");
+    }
+    deliveries.push(...changeDeliveries);
+  } else {
+    const confirmationUrl =
+      emailType === "reauthentication"
+        ? ""
+        : nativeConfirmationUrl(
+            emailData.site_url,
+            emailData.token_hash,
+            emailData.email_action_type,
+            emailData.redirect_to,
+          );
+    if (emailType !== "reauthentication" && !confirmationUrl) {
+      console.error("Invalid webhook payload", { reason: "confirmation_url" });
+      return nativeHookError(400, "Invalid webhook payload");
+    }
+    deliveries.push({
       emailType,
       recipient,
       confirmationUrl: confirmationUrl ?? "",
@@ -453,9 +536,15 @@ async function handleNativeSendEmailHook(req: Request): Promise<Response> {
       newEmail: typeof body.user?.new_email === "string" ? body.user.new_email : recipient,
       run_id: webhookId,
       response: "native",
-    },
-    apiKey,
-  );
+    });
+  }
+
+  let last: Response = jsonResponse({}, 200);
+  for (const delivery of deliveries) {
+    last = await deliverAuthEmail(delivery, apiKey);
+    if (last.status !== 200) return last;
+  }
+  return last;
 }
 
 // Webhook handler - verifies signature and sends email

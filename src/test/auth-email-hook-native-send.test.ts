@@ -45,9 +45,9 @@ function nativeBody(action: string): Row {
   };
 }
 
-function confirmationUrl(action: string): string {
+function confirmationUrl(action: string, tokenHash = TOKEN_HASH): string {
   const params = new URLSearchParams({
-    token: TOKEN_HASH,
+    token: tokenHash,
     type: action,
     redirect_to: "https://verdantgrowdiary.com/reset",
   });
@@ -275,6 +275,83 @@ describe("auth-email-hook native Send Email hook", () => {
     });
     expect(hook.sends).toEqual([]);
     expect(hook.auditRows).toEqual([]);
+  });
+
+  it("sends an email-change link for the new address, and the current address only when token_hash_new is set", async () => {
+    const hook = nativeHook();
+    const secure = JSON.stringify({
+      user: {
+        id: "user_fixture",
+        email: "current@example.invalid",
+        new_email: "next@example.invalid",
+      },
+      email_data: {
+        email_action_type: "email_change",
+        token: "otp-new-do-not-log",
+        token_new: "otp-current-do-not-log",
+        token_hash: "hash-for-new-address",
+        token_hash_new: "hash-for-current-address",
+        redirect_to: "https://verdantgrowdiary.com/reset",
+        site_url: "https://fixture.supabase.co",
+      },
+    });
+    const secureResult = await hook.signed(
+      secure,
+      String(Math.floor(Date.now() / 1000)),
+      "msg_change",
+    );
+
+    expect(secureResult).toEqual({ code: 200, body: {} });
+    expect(hook.sends.map((send) => [send.message.to, send.message.idempotency_key])).toEqual([
+      ["next@example.invalid", "msg_change:new"],
+      ["current@example.invalid", "msg_change:current"],
+    ]);
+    expect(hook.renders.map((render) => render.props.confirmationUrl)).toEqual([
+      confirmationUrl("email_change", "hash-for-new-address"),
+      confirmationUrl("email_change", "hash-for-new-address"),
+      confirmationUrl("email_change", "hash-for-current-address"),
+      confirmationUrl("email_change", "hash-for-current-address"),
+    ]);
+    expect(
+      hook.auditRows.map((row) => [row.row.recipient_email, row.row.template_name, row.row.status]),
+    ).toEqual([
+      ["next@example.invalid", "email_change", "sent"],
+      ["current@example.invalid", "email_change", "sent"],
+    ]);
+    const logged = hook.logs.join("\n");
+    expect(logged).not.toContain("hash-for-new-address");
+    expect(logged).not.toContain("hash-for-current-address");
+    expect(logged).not.toContain("otp-new-do-not-log");
+    expect(logged).not.toContain("otp-current-do-not-log");
+
+    const insecureHook = nativeHook();
+    const insecure = JSON.stringify({
+      user: {
+        id: "user_fixture",
+        email: "current@example.invalid",
+        new_email: "next@example.invalid",
+      },
+      email_data: {
+        email_action_type: "email_change",
+        token: "otp-new-do-not-log",
+        token_hash: "hash-for-new-address",
+        token_hash_new: "",
+        redirect_to: "https://verdantgrowdiary.com/reset",
+        site_url: "https://fixture.supabase.co",
+      },
+    });
+    const insecureResult = await insecureHook.signed(
+      insecure,
+      String(Math.floor(Date.now() / 1000)),
+      "msg_change_one",
+    );
+
+    expect(insecureResult.code).toBe(200);
+    expect(insecureHook.sends.map((send) => send.message.to)).toEqual(["next@example.invalid"]);
+    expect(String(insecureHook.renders[0].props.confirmationUrl)).toContain("hash-for-new-address");
+    expect(String(insecureHook.renders[0].props.confirmationUrl)).not.toContain(
+      "hash-for-current-address",
+    );
   });
 
   it("does not write the secret, token, token hash, or rendered body to logs", async () => {

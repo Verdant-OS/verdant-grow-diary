@@ -248,6 +248,7 @@ beforeEach(() => {
   authState.ownerId = "11111111-1111-4111-8111-111111111111";
   window.sessionStorage.clear();
   clearLocalStorageForTest();
+  setLocalStorageItemForTest("verdant:waterVolumeEntryUnit", "ml");
   let tail: Promise<unknown> = Promise.resolve();
   Object.defineProperty(window.navigator, "locks", {
     configurable: true,

@@ -361,7 +361,7 @@ test.describe("Quick Log smoke checklist", () => {
         await dialog.getByRole("button", { name: /^watering$/i, exact: true }).click();
 
         await expect(page.getByTestId("qlv2-watering-form")).toBeVisible();
-        await expect(page.getByLabel("Volume (ml)")).toBeVisible();
+        await expect(page.getByLabel("Volume (L)")).toBeVisible();
         await expect(page.getByLabel("Choose plant or tent for this Quick Log")).toContainText(
           TARGET_NAME,
         );

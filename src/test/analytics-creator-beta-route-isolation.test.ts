@@ -2,8 +2,9 @@
 // @vitest-environment-options {"url":"https://verdantgrowdiary.com/"}
 // GA only collects on the production host (#2693), so these run there.
 /**
- * #2714: the creator beta page tells visitors "No analytics." No provider may
- * load or send there, even when the visitor accepted analytics elsewhere.
+ * #2714: the creator and breeder beta pages tell visitors "No analytics." No
+ * provider may load or send there, even when the visitor accepted analytics
+ * elsewhere.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -110,6 +111,24 @@ describe("creator beta page analytics isolation", () => {
 
     expect(providerNodes()).toEqual({ google: 1, ahrefs: 0 });
     expect(gaOptedOut()).toBe(false);
+  });
+
+  it("gives the breeder beta page the same isolation", () => {
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+
+    for (const pathname of ["/breeder-beta", "/breeder-beta/", "/Breeder-Beta", "//breeder-beta"]) {
+      expect(applyAnalyticsConsentDecision("granted", at(pathname)), pathname).toBe(false);
+      expect(providerNodes(), pathname).toEqual({ google: 0, ahrefs: 0 });
+      expect(gaOptedOut(), pathname).toBe(true);
+    }
+
+    applyAnalyticsConsentDecision("granted", LANDING);
+    expect(providerNodes()).toEqual({ google: 1, ahrefs: 1 });
+    expect(tearDownAnalyticsForExcludedRoute(readAnalyticsConsent(), at("/breeder-beta"))).toBe(
+      true,
+    );
+    expect(providerNodes()).toEqual({ google: 1, ahrefs: 0 });
+    expect(gaOptedOut()).toBe(true);
   });
 
   it("keeps a declined visitor declined", () => {

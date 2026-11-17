@@ -243,9 +243,16 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
     );
   });
 
-  // #2714: the creator beta page says "No analytics." Consent does not change that.
-  it("neither loads the tag nor sends a view on the creator beta page", () => {
-    for (const pathname of ["/creator-beta", "/Creator-Beta/", "//creator-beta"]) {
+  // #2714: the beta landing pages say "No analytics." Consent does not change that.
+  it("neither loads the tag nor sends a view on a beta landing page", () => {
+    const betaPaths = [
+      "/creator-beta",
+      "/Creator-Beta/",
+      "//creator-beta",
+      "/breeder-beta",
+      "/Breeder-Beta/",
+    ];
+    for (const pathname of betaPaths) {
       locationState.pathname = pathname;
       const { unmount } = renderHook(() => useGoogleAnalyticsPageViews());
       unmount();

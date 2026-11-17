@@ -172,9 +172,16 @@ describe("PostHog consent client", () => {
     expect(loadSdk).not.toHaveBeenCalled();
   });
 
-  it("does not load on the creator beta page, in any spelling the router serves (#2714)", async () => {
+  it("does not load on a beta landing page, in any spelling the router serves (#2714)", async () => {
     const loadSdk = vi.fn(async () => sdk);
-    for (const pathname of ["/creator-beta", "/Creator-Beta/", "//creator-beta"]) {
+    const betaPaths = [
+      "/creator-beta",
+      "/Creator-Beta/",
+      "//creator-beta",
+      "/breeder-beta",
+      "/Breeder-Beta/",
+    ];
+    for (const pathname of betaPaths) {
       setLocation("verdantgrowdiary.com", pathname);
       syncPostHogWithConsent(
         "granted",

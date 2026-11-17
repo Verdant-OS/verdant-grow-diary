@@ -61,9 +61,9 @@ describe("no-analytics public pages (#2714)", () => {
     hostname: PROD,
   };
 
-  // Each spelling rendered the creator beta page, with its "No analytics."
+  // Each spelling rendered a beta landing page, with its "No analytics."
   // line, on production on 2026-11-16.
-  const CREATOR_BETA_SPELLINGS = [
+  const NO_ANALYTICS_SPELLINGS = [
     "/creator-beta",
     "/creator-beta/",
     "/creator-beta//",
@@ -71,16 +71,21 @@ describe("no-analytics public pages (#2714)", () => {
     "/CREATOR-BETA/",
     "//creator-beta",
     "/creator%2Dbeta",
+    "/breeder-beta",
+    "/breeder-beta/",
+    "/Breeder-Beta",
+    "//breeder-beta",
+    "/breeder%2Dbeta",
   ];
 
-  it("excludes every spelling of the creator beta path the router serves", () => {
-    for (const pathname of CREATOR_BETA_SPELLINGS) {
+  it("excludes every spelling of the beta landing paths the router serves", () => {
+    for (const pathname of NO_ANALYTICS_SPELLINGS) {
       expect(isExcludedAnalyticsPath(pathname), pathname).toBe(true);
     }
   });
 
   it("keeps PostHog off there with consent, a key, and the production host", () => {
-    for (const pathname of CREATOR_BETA_SPELLINGS) {
+    for (const pathname of NO_ANALYTICS_SPELLINGS) {
       expect(decidePostHogStartup({ ...granted, pathname }), pathname).toEqual({
         enabled: false,
         reason: "excluded-route",
@@ -98,6 +103,9 @@ describe("no-analytics public pages (#2714)", () => {
       "/creator-beta/apply",
       "/x/creator-beta",
       "/guides/creator-beta",
+      "/breeder",
+      "/breeder-beta-x",
+      "/breeder-beta/apply",
     ];
     for (const pathname of others) {
       expect(isExcludedAnalyticsPath(pathname), pathname).toBe(false);

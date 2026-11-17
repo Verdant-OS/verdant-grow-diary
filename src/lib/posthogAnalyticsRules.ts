@@ -44,10 +44,11 @@ export function isAnalyticsCollectionHost(hostname: string | null | undefined): 
 }
 
 /**
- * Public pages whose own copy tells the visitor "No analytics." (#2714).
+ * Public pages whose own copy tells the visitor "No analytics." (#2714): the
+ * two beta landing pages, which render the same BetaLanding component.
  * No provider may load or send on them, even with consent granted.
  */
-const NO_ANALYTICS_PUBLIC_PATHS: readonly string[] = ["/creator-beta"];
+const NO_ANALYTICS_PUBLIC_PATHS: readonly string[] = ["/creator-beta", "/breeder-beta"];
 
 export function isExcludedAnalyticsPath(pathname: string): boolean {
   if (pathname === GROW_HELP_TOOLKIT_PATH || pathname === `${GROW_HELP_TOOLKIT_PATH}/`) return true;

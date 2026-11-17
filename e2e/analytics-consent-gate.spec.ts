@@ -95,43 +95,48 @@ test.describe("analytics consent gate", () => {
     await secondTab.close();
   });
 
-  // #2714: the creator beta page tells visitors "No analytics." Consent does not change that.
-  test("the creator beta page loads no analytics, even after accepting", async ({ page }) => {
-    const analyticsRequests: string[] = [];
-    // Nothing from this run may reach a real analytics property.
-    await page.route(ANALYTICS_REQUEST, (route) => route.abort());
-    page.on("request", (request) => {
-      if (ANALYTICS_REQUEST.test(request.url())) analyticsRequests.push(request.url());
+  // #2714: both beta landing pages tell visitors "No analytics." Consent does not change that.
+  for (const betaPath of ["/creator-beta", "/breeder-beta"]) {
+    test(`${betaPath} loads no analytics, even after accepting`, async ({ page }) => {
+      const analyticsRequests: string[] = [];
+      // Nothing from this run may reach a real analytics property.
+      await page.route(ANALYTICS_REQUEST, (route) => route.abort());
+      page.on("request", (request) => {
+        if (ANALYTICS_REQUEST.test(request.url())) analyticsRequests.push(request.url());
+      });
+      const googleOptOut = () =>
+        page.evaluate(
+          (id) => (window as unknown as Record<string, unknown>)[`ga-disable-${id}`],
+          MEASUREMENT_ID,
+        );
+
+      await page.goto(betaPath, { waitUntil: "domcontentloaded" });
+      await page.getByTestId("analytics-consent-accept").click();
+      await expect(page.getByTestId("analytics-consent-banner")).toHaveCount(0);
+      expect(
+        await page.evaluate(
+          (key) => window.localStorage.getItem(key),
+          ANALYTICS_CONSENT_STORAGE_KEY,
+        ),
+      ).toBe("granted");
+      // The opt-out flag is set by the same pass that would have loaded the tag.
+      await expect.poll(googleOptOut).toBe(true);
+      expect(await page.locator(TAG_SELECTOR).count()).toBe(0);
+
+      // A second load starts from the saved "granted" decision.
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await expect.poll(googleOptOut).toBe(true);
+      expect(await page.locator(TAG_SELECTOR).count()).toBe(0);
+      expect(
+        await page.evaluate(
+          () => typeof (window as unknown as { gtag?: unknown }).gtag === "function",
+        ),
+      ).toBe(false);
+      expect(analyticsRequests).toEqual([]);
+
+      // The saved decision still turns measurement on for a normal page.
+      await page.goto("/pricing", { waitUntil: "domcontentloaded" });
+      await expect(page.locator(TAG_SELECTOR)).toHaveCount(1);
     });
-    const googleOptOut = () =>
-      page.evaluate(
-        (id) => (window as unknown as Record<string, unknown>)[`ga-disable-${id}`],
-        MEASUREMENT_ID,
-      );
-
-    await page.goto("/creator-beta", { waitUntil: "domcontentloaded" });
-    await page.getByTestId("analytics-consent-accept").click();
-    await expect(page.getByTestId("analytics-consent-banner")).toHaveCount(0);
-    expect(
-      await page.evaluate((key) => window.localStorage.getItem(key), ANALYTICS_CONSENT_STORAGE_KEY),
-    ).toBe("granted");
-    // The opt-out flag is set by the same pass that would have loaded the tag.
-    await expect.poll(googleOptOut).toBe(true);
-    expect(await page.locator(TAG_SELECTOR).count()).toBe(0);
-
-    // A second load starts from the saved "granted" decision.
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await expect.poll(googleOptOut).toBe(true);
-    expect(await page.locator(TAG_SELECTOR).count()).toBe(0);
-    expect(
-      await page.evaluate(
-        () => typeof (window as unknown as { gtag?: unknown }).gtag === "function",
-      ),
-    ).toBe(false);
-    expect(analyticsRequests).toEqual([]);
-
-    // The saved decision still turns measurement on for a normal page.
-    await page.goto("/pricing", { waitUntil: "domcontentloaded" });
-    await expect(page.locator(TAG_SELECTOR)).toHaveCount(1);
-  });
+  }
 });

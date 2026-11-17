@@ -8,10 +8,10 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 
 | Seat            | Side  | Holder                                   | GitHub account          |
 | --------------- | ----- | ---------------------------------------- | ----------------------- |
-| Ultra Builder 1 | Ultra | Node                                     | `verdant-ultra-bot`     |
-| Ultra Builder 2 | Ultra | Wedding Cake                             | `verdant-ultra-bot`     |
-| Ultra Fixer     | Ultra | Brachs (Blueberry)                       | `verdant-ultra-bot`     |
-| Ultra Relay     | Ultra | Roots                                    | `verdant-ultra-bot`     |
+| Ultra Builder 1 | Ultra | Node                                     | `cheekhimself` (shared) |
+| Ultra Builder 2 | Ultra | Wedding Cake                             | `cheekhimself` (shared) |
+| Ultra Fixer     | Ultra | Brachs (Blueberry)                       | `cheekhimself` (shared) |
+| Ultra Relay     | Ultra | Roots                                    | `cheekhimself` (shared) |
 | Coordinator     | Main  | UK Cheese                                | `cheekhimself` (shared) |
 | Merge Steward   | Ultra | Matthew (direct)                         | `cheekhimself` (shared) |
 | Merge Readiness | Main  | Green Crack                              | `cheekhimself` (shared) |
@@ -39,7 +39,7 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 - Whoever holds Steward Backup and acts as it on a PR cannot also be the reviewer of record for that PR.
 - OG Kush is retired (Matthew, 2026-11-12). UK Cheese holds the Coordinator seat. Steward Backup, the engineering lead and the default inheritor have no named holder until Matthew names one; record `BLOCKED` rather than infer one.
 - PR #1971: the records below and in `docs/agents/OWNERSHIP.md` name OG Kush as its merge actor. That founder assignment is not moved to another seat by inference. Matthew names the new #1971 merge actor; the hold stays with the Coordinator.
-- `verdant-ultra-bot` is retired (Matthew, 2026-11-17). Ultra Builder 1, Ultra Builder 2, Ultra Fixer and Ultra Relay still list it in the table and have no active holder until Matthew names one; record `BLOCKED` rather than infer one.
+- `verdant-ultra-bot` is retired (Matthew, 2026-11-17). Ultra seats open and push pull requests as `cheekhimself` (shared). GitHub does not let an account approve its own pull request, so a `cheekhimself` (shared) seat cannot post the GitHub approval on them.
 - Ultra's open pull-request cap is 10.
 - Reviewer C, Reviewer D, Reviewer E, Reviewer F, and QA are active. Matthew set Reviewer E and Reviewer F on 2026-11-17: they are non-author Main Reviewer seats, never write product code, and never merge.
 

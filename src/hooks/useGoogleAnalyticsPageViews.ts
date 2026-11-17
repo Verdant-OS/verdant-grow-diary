@@ -5,6 +5,7 @@ import { buildSafeAnalyticsPageLocation, sanitizePagePath } from "@/lib/analytic
 import { readAnalyticsConsent, subscribeToAnalyticsConsent } from "@/lib/analyticsConsent";
 import { isGoogleAnalyticsCollectionHost } from "@/lib/googleAnalyticsHost";
 import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
+import { isExcludedAnalyticsPath } from "@/lib/posthogAnalyticsRules";
 
 export { sanitizePagePath } from "@/lib/analyticsPageViewRules";
 
@@ -22,6 +23,8 @@ function trackPageView(path: string, title: string) {
   if (typeof window === "undefined") return;
   // Consent gate: no analytics call may run before an explicit "granted".
   if (readAnalyticsConsent() !== "granted") return;
+  // Pages that promise "No analytics." (#2714) get no tag and no view, even with consent.
+  if (isExcludedAnalyticsPath(path)) return;
   // Install the gtag stub if needed so cold loads are not dropped before AnalyticsShell hydrates.
   loadGoogleAnalytics();
   if (!isGoogleAnalyticsCollectionHost(window.location.hostname)) return;

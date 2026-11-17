@@ -10,6 +10,7 @@ import {
   buildPostHogInitOptions,
   decidePostHogStartup,
   isAnalyticsCollectionHost,
+  isExcludedAnalyticsPath,
   mapFunnelEventToPostHog,
   planPostHogPersistenceRemoval,
   posthogCookieExpiryAssignments,
@@ -49,6 +50,75 @@ describe("PostHog collection host", () => {
   it("rejects a missing hostname", () => {
     expect(isAnalyticsCollectionHost(null)).toBe(false);
     expect(isAnalyticsCollectionHost(undefined)).toBe(false);
+  });
+});
+
+describe("no-analytics public pages (#2714)", () => {
+  const granted = {
+    decision: "granted" as const,
+    key: FIXTURE_KEY,
+    host: "",
+    hostname: PROD,
+  };
+
+  // Each spelling rendered the creator beta page, with its "No analytics."
+  // line, on production on 2026-11-16.
+  const CREATOR_BETA_SPELLINGS = [
+    "/creator-beta",
+    "/creator-beta/",
+    "/creator-beta//",
+    "/Creator-Beta",
+    "/CREATOR-BETA/",
+    "//creator-beta",
+    "/creator%2Dbeta",
+  ];
+
+  it("excludes every spelling of the creator beta path the router serves", () => {
+    for (const pathname of CREATOR_BETA_SPELLINGS) {
+      expect(isExcludedAnalyticsPath(pathname), pathname).toBe(true);
+    }
+  });
+
+  it("keeps PostHog off there with consent, a key, and the production host", () => {
+    for (const pathname of CREATOR_BETA_SPELLINGS) {
+      expect(decidePostHogStartup({ ...granted, pathname }), pathname).toEqual({
+        enabled: false,
+        reason: "excluded-route",
+      });
+    }
+  });
+
+  it("does not exclude neighbouring or unrelated paths", () => {
+    const others = [
+      "",
+      "/",
+      "/pricing",
+      "/creator",
+      "/creator-beta-x",
+      "/creator-beta/apply",
+      "/x/creator-beta",
+      "/guides/creator-beta",
+    ];
+    for (const pathname of others) {
+      expect(isExcludedAnalyticsPath(pathname), pathname).toBe(false);
+    }
+    expect(decidePostHogStartup({ ...granted, pathname: "/pricing" })).toEqual({
+      enabled: true,
+      key: FIXTURE_KEY,
+      apiHost: POSTHOG_DEFAULT_API_HOST,
+    });
+  });
+
+  it("returns false, without throwing, for a malformed or missing path", () => {
+    expect(isExcludedAnalyticsPath("/%E0%A4%A")).toBe(false);
+    expect(isExcludedAnalyticsPath(undefined as unknown as string)).toBe(false);
+    expect(isExcludedAnalyticsPath(null as unknown as string)).toBe(false);
+  });
+
+  it("leaves the toolkit rule as it was", () => {
+    expect(isExcludedAnalyticsPath(GROW_HELP_TOOLKIT_PATH)).toBe(true);
+    expect(isExcludedAnalyticsPath(`${GROW_HELP_TOOLKIT_PATH}/`)).toBe(true);
+    expect(isExcludedAnalyticsPath(`${GROW_HELP_TOOLKIT_PATH}/x`)).toBe(false);
   });
 });
 

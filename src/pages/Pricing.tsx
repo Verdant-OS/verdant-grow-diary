@@ -68,7 +68,11 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { creditPackBlockedCopy, resolveCreditPackPurchaseGate } from "@/lib/creditPackEligibility";
 import { buildCreditPackSuccessUrl } from "@/lib/checkoutReturnTo";
 import { isReducedMotionPreferred } from "@/lib/useTimelineHighlightAutoScroll";
-import { buildCheckoutPlanReturnPath, savePlanIntent } from "@/lib/checkoutPlanIntent";
+import {
+  buildCheckoutPlanReturnPath,
+  isKnownPlanIntent,
+  savePlanIntent,
+} from "@/lib/checkoutPlanIntent";
 import { resolvePricingCheckoutRetryGate } from "@/lib/pricingCheckoutRetryRules";
 import { isFounderLifetimeCheckoutSku } from "@/lib/founderLifetimeCheckoutGuard";
 
@@ -322,6 +326,23 @@ export default function Pricing() {
     // (src/config/checkoutProvider.ts). If the server says Stripe is not set
     // up yet, the same click falls back to Paddle.
     if (shouldUseStripeCheckout(planId, PRO_CHECKOUT_PROVIDER)) {
+      // A signed-out Pro click must reach /auth and resume into Stripe.
+      // Starting checkout here returns auth_required and only toasts.
+      if (!authLoading && user == null) {
+        if (isKnownPlanIntent(planId)) savePlanIntent(planId);
+        const back = buildCheckoutPlanReturnPath({
+          pathname: location.pathname,
+          search: location.search,
+          plan: planId,
+        });
+        navigate(
+          buildAttributedSignupPath({
+            source: resolvePaidAcquisitionSource(window.location.search) ?? "pricing_page",
+            redirectTo: back,
+          }),
+        );
+        return;
+      }
       void startStripeCheckout(planId).then((outcome) => {
         if (outcome === "fallback") openPaddlePaidIntent(planId, source);
       });

@@ -1,7 +1,10 @@
 # Plan — live Stripe checkout, smallest safe path
 
-**Status:** `PROPOSED — NOT APPROVED`. Plan only. No code, schema, RLS, Edge, secret,
-Lovable or production change was made to write it.
+**Status:** `MERGED — NOT DEPLOYED`. Plan accepted and the code it describes merged
+on `verdant-grow-diary` as `253b49a702f09b56e73752ce6315c46c79728f3f` (#2973,
+which contains #2969) on 2026-11-17 06:47 UTC. Nothing here is a deploy, a
+secret, or a production apply. Live checkout stays `NOT_MEASURED` until Cheek
+deploys.
 **Requested by:** Cheek, 2026-11-12 14:39 UTC ("What's the easiest way to get live checkouts?").
 **Measured at:** deploy branch `verdant-grow-diary` at
 `c2884348875b3dd39f2059ecc323ac10c33cfde5`, 2026-11-12.

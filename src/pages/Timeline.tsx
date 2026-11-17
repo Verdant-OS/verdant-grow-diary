@@ -3144,6 +3144,7 @@ export default function Timeline() {
           rawEntries={scopedRecentLaneRawEntries}
           activeStage={activeGrow?.stage ?? null}
           plantStartedAt={activeGrow?.started_at ?? null}
+          plantNamesById={plantNamesById}
         />
       </div>
 

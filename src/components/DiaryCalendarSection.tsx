@@ -112,6 +112,12 @@ export interface DiaryCalendarSectionProps {
   /** Grower SET flowering duration, or a labeled suggested duration. */
   flowerDurationDays?: number | null;
   flowerDurationKind?: "grower_set" | "suggested" | null;
+  /**
+   * id → name over the owner's plants (useTimelineNameDirectory). Null while
+   * loading or on failure: rows without a stored plant name then show no
+   * plant label, never "Deleted plant".
+   */
+  plantNamesById?: ReadonlyMap<string, string> | null;
 }
 
 export default function DiaryCalendarSection({
@@ -123,6 +129,7 @@ export default function DiaryCalendarSection({
   flowerFlipAt = null,
   flowerDurationDays = null,
   flowerDurationKind = null,
+  plantNamesById = null,
 }: DiaryCalendarSectionProps) {
   // Preserve one stable clock for normal app renders, while allowing tests to
   // inject a precise instant. The history projector never reads ambient time.
@@ -130,8 +137,8 @@ export default function DiaryCalendarSection({
   const calendarNow = now ?? internalNowRef.current;
   const temperatureUnit = useTemperatureUnitPreference();
   const allGroups = useMemo(
-    () => buildDiaryCalendarViewModel(rawEntries ?? [], temperatureUnit),
-    [rawEntries, temperatureUnit],
+    () => buildDiaryCalendarViewModel(rawEntries ?? [], temperatureUnit, { plantNamesById }),
+    [rawEntries, temperatureUnit, plantNamesById],
   );
   const historyFacts = useMemo<CultivationCalendarHistoryFact[]>(() => {
     const facts: CultivationCalendarHistoryFact[] = [];

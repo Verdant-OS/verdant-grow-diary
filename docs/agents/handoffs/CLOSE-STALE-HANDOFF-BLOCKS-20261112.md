@@ -7,34 +7,35 @@ why: AGENTS.md section 12 requires a merged task to be CLOSED the same day with 
 branch: claude/project-thread-sgovxq
 base: verdant-grow-diary @ c2884348875b3dd39f2059ecc323ac10c33cfde5
 checkout: git fetch origin claude/project-thread-sgovxq verdant-grow-diary && git switch claude/project-thread-sgovxq && git ls-remote origin claude/project-thread-sgovxq  # compare with the PR head before trusting any review
-pr: the draft PR for branch claude/project-thread-sgovxq (number recorded in the PR body and the thread report)
-head_sha: the commit carrying this file; read the current head from the PR and verify with git ls-remote
-state: pushed draft; no review requested
-current_step: review routing
-next_action: the Coordinator routes one eligible independent reviewer (not this session) for the exact head; then Matthew's per-item yes and the Merge Steward. This writer does not mark ready, request review, enqueue or merge. After merge, the carried-forward items below need owners.
-post_merge_check: on the merged deploy tip, (a) git grep -lE '^TASK .*status: OPEN' -- docs/agents/handoffs/ lists none of the 15 task ids below; (b) each of their TASK lines reads status: CLOSED; (c) git diff <base>..<tip> -- docs/agents/HANDOFF_LOG.md is empty. Docs only; nothing ships to the app, so there is no production check.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/2967 (the close-out, merged 2026-11-12 15:49 UTC as b7e05214ddb0c552d1c6d04a3101045a9f771ab8); the 2026-11-17 ownership update rides a new draft PR from the same branch, recreated from origin/verdant-grow-diary at f1b8a6a920ba7f8bf3b16b6fd49599116e1f7bf1
+head_sha: the close-out landed as b7e05214ddb0c552d1c6d04a3101045a9f771ab8; for the ownership update, read the current head from its PR and verify with git ls-remote
+state: the close-out is merged and its post_merge_check passed on 2026-11-17; this entry stays OPEN as the owner record for the carried-forward items below
+current_step: owning the carried-forward items (2026-11-17)
+next_action: re-run the POSTHOG-USER-AGENT-AUTOMATION check below once consented growers produce pageviews on a live build that includes 9c2d542; work the other carried-forward items as their gates allow. The ownership-update PR needs one eligible independent reviewer (not this session), Matthew's per-item yes and the Merge Steward. This writer does not mark ready, request review, enqueue or merge.
+post_merge_check: on the merged deploy tip, (a) git grep -lE '^TASK .*status: OPEN' -- docs/agents/handoffs/ lists none of the 15 task ids below; (b) each of their TASK lines reads status: CLOSED; (c) git diff <base>..<tip> -- docs/agents/HANDOFF_LOG.md is empty. Docs only; nothing ships to the app, so there is no production check. Result 2026-11-17 on deploy tip f1b8a6a920ba7f8bf3b16b6fd49599116e1f7bf1: PASS. (a) and (b) all 15 TASK lines read status: CLOSED; (c) the HANDOFF_LOG.md diff from the base is empty.
 active_writer: Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f
 decisions:
   - Follows the CLOSE-STALE-HANDOFF-BLOCKS-20261111 (#2928) convention. Three things change in each file: the TASK line reads status: CLOSED, one closed: line is added under it, and last_updated is replaced with the old value kept in parentheses. Nothing else in the 15 files changes. HANDOFF_LOG.md is not edited.
   - Merged state and merged_at come from GitHub (PR reads, 2026-11-12). Each landing SHA is the first-parent commit on origin/verdant-grow-diary whose subject ends with the PR number (read 2026-11-12). All 15 are first-parent commits on the deploy branch.
   - CLOSE-STALE-HANDOFF-BLOCKS-20261111 (#2928) is itself one of the 15. Its own carried-forward list stays in its file and is not repeated here.
   - Closing does not mean the items are done. Each entry's post_merge_check, open_questions and blockers are copied verbatim below unless the whole value is an empty marker (none, N/A, NOT_APPLICABLE, optionally "(docs only)"). None is claimed as measured.
+  - 2026-11-17: Matthew said "Take ownership." (message cmsg_01P7pGxx3V5wxVuLXvJUxaGs9HLvNaTHBLEq9FDDucfmvf). This session now owns this entry and every carried-forward item below, including POSTHOG-USER-AGENT-AUTOMATION, which had no owner after OG Kush retired. Owning an item does not move any gate: Publish, production APPLY, the per-item merge yes and naming roster seat holders stay with Matthew. The roster is not edited here.
   - Claim check before writing (2026-11-12): the four open PRs (#2960, #2956, #2951, #2936) touch none of the 15 files; no other branch edits them; Slack showed no claim on the close-out.
 tried_and_rejected: none
 commands: re-check a landing SHA: git log origin/verdant-grow-diary --first-parent --format='%H %s' | grep '(#<N>)$'. Per file, git diff <base> -- docs/agents/handoffs/<TASK-ID>.md shows exactly the TASK line, the added closed: line and last_updated. The edit script was scratch-only (not committed).
 files_touched: edited: docs/agents/handoffs/{AI-DOCTOR-SNAPSHOT-FRESH-WINDOW,AUTH-EMAIL-DIRECT-SEND,CLOSE-STALE-HANDOFF-BLOCKS-20261111,DEAD-MODULE-CLEANUP-ZERO-REFERENCE,FIELD-NOTEBOOK-SLICE-1,LEAN-STARTUP-READS-20261111,LEGACY-QUICKLOG-RETIREMENT-SPEC,OPERATOR-PLANTS-READ-ONLY,POSTHOG-USER-AGENT-AUTOMATION,SENTINEL-PARITY-MERGE-GROUP,TEAM-OPS-AUDIT-20261112,TIMELINE-PAGED-HISTORY-TRUTH,TYPECHECK-GATE-HEAP,VERDANT-AUTO-HANDOFF-20261112,WORKFLOWS-TYPECHECK-GATE}.md; this file (new)
 files_remaining: none
 blockers: none for the docs. Independent exact-head review and Matthew's per-item yes are the standing gates.
-open_questions: who owns each carried-forward item below (Matthew). POSTHOG-USER-AGENT-AUTOMATION names OG Kush as owner, and the roster records OG Kush as retired with no named inheritor; that owner gap is BLOCKED until Matthew names one.
+open_questions: none on ownership; Matthew assigned all carried-forward items to this session on 2026-11-17, which resolves the POSTHOG-USER-AGENT-AUTOMATION owner gap. Roster rows that still name OG Kush are Matthew's to update.
 gotchas: check the TASK line only; the words status: CLOSED can appear elsewhere in a file. FIELD-NOTEBOOK-SLICE-1.md had no code fence, and on the deploy branch it already failed prettier --check: with the repo config, prettier --write (which lint-staged runs on commit) would pair the two __root.tsx mentions as bold and rewrite them as **root.tsx. This change wraps that entry in a text fence, as the other handoff files have, so no existing line changes; its TASK line is now line 2. Some carried-forward blockers name pre-merge gates for PRs that have since merged; they are historical and kept verbatim. Whether any carried-forward post-merge check was already measured elsewhere was not checked.
 links: https://github.com/Verdant-OS/verdant-grow-diary/pull/2928 (convention)
 exclusions_for_review: Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (this writer)
-reviewer_seat: none requested yet
+reviewer_seat: none requested for the ownership update; the close-out (#2967) merged with no independent review record in this file
 reviewer_sha: none
 session_state: no production access used; no paused workflows; no scheduled routines.
-claimed_by: Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f, 2026-11-12 (Matthew's request)
+claimed_by: Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f, 2026-11-12 (Matthew's request); renewed 2026-11-17 (Matthew: "Take ownership.")
 owner: Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f
-last_updated: 2026-11-12, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f
+last_updated: 2026-11-17, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsEpwdKHZggkJ6ogkMmA8G6f (previously 2026-11-12)
 ```
 
 ## Closed entries (15)
@@ -120,6 +121,7 @@ Copied verbatim from each closed entry (`source claim` from that block, not re-v
 
 - **post_merge_check:** after Publish and live /version.json reports the merge SHA, run in PostHog SQL: count web $pageview events in the last 24 hours grouped by $virt_traffic_type. Expect Regular for consented growers and no rise in Automation / no_user_agent. NOT_MEASURED until the SHA is live.
 - **blockers:** independent exact-head review; Matthew's per-item yes; Publish is Matthew's only
+- **status 2026-11-17 (this owner, not copied):** live /version.json reports f1b8a6a920ba7f8bf3b16b6fd49599116e1f7bf1 (built 2026-11-17 07:13:36 UTC), which includes 9c2d542. The check as written (last 24 hours) is NO_DATA: PostHog has 0 web $pageview events since that build. Supporting evidence, read-only PostHog SQL over 21 days: the last Automation pageview was 2026-11-11 16:28 UTC, the first Regular one 2026-11-12 12:51 UTC (55 minutes after the merge), and all 21 pageviews since are Regular with a user agent. `inference`: the fix reached production on 2026-11-12; which build served those pageviews was not measured. Verdict NOT_MEASURED until the 24-hour query returns pageviews; re-run it then.
 
 ### `SENTINEL-PARITY-MERGE-GROUP` (#2958)
 

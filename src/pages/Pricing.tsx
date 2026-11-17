@@ -43,6 +43,9 @@ import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { sanitizeCheckoutRecoveryPlanSlug } from "@/lib/checkoutRecoveryPlanSlug";
 import { VERDANT_PRICING_FAQ_ADDITIONS } from "@/constants/verdantSeoCopy";
 import { usePaddleCheckout } from "@/hooks/usePaddleCheckout";
+import { useStripeCheckout } from "@/hooks/useStripeCheckout";
+import { shouldUseStripeCheckout } from "@/lib/stripeCheckoutClientRules";
+import { PRO_CHECKOUT_PROVIDER } from "@/config/checkoutProvider";
 import {
   CHECKOUT_PAUSED_MESSAGE,
   CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE,
@@ -221,6 +224,7 @@ export default function Pricing() {
     blockedScope,
     dismissBlocked,
   } = usePaddleCheckout();
+  const { startStripeCheckout, loading: stripeCheckoutLoading } = useStripeCheckout();
   const checkoutRetryGate = resolvePricingCheckoutRetryGate(
     lastCheckoutSkuRef.current ?? interestPlan,
     creditPackGate,
@@ -272,6 +276,12 @@ export default function Pricing() {
    * panel's Dismiss button.
    */
   function isSkuBlocked(sku: string): boolean {
+    // A Stripe Pro checkout is not blocked by Paddle's state.
+    if (shouldUseStripeCheckout(sku, PRO_CHECKOUT_PROVIDER)) return false;
+    return isPaddleSkuBlocked(sku);
+  }
+
+  function isPaddleSkuBlocked(sku: string): boolean {
     if (unavailableMessage) return true;
     if (!blockedReason) return false;
     // Unattributed failure — blocked, but we don't know which SKU it belongs
@@ -307,9 +317,22 @@ export default function Pricing() {
     }
     lastCheckoutSkuRef.current = planId;
     setInterestPlan(planId);
-    setRecoveryRequested(true);
     trackPricingEvent(eventName, { source });
-    if (isSkuBlocked(planId)) {
+    // Pro goes to Stripe when PRO_CHECKOUT_PROVIDER is "stripe"
+    // (src/config/checkoutProvider.ts). If the server says Stripe is not set
+    // up yet, the same click falls back to Paddle.
+    if (shouldUseStripeCheckout(planId, PRO_CHECKOUT_PROVIDER)) {
+      void startStripeCheckout(planId).then((outcome) => {
+        if (outcome === "fallback") openPaddlePaidIntent(planId, source);
+      });
+      return;
+    }
+    openPaddlePaidIntent(planId, source);
+  }
+
+  function openPaddlePaidIntent(planId: SubscriberInterestPlanId, source: string) {
+    setRecoveryRequested(true);
+    if (isPaddleSkuBlocked(planId)) {
       trackPricingEvent("pricing_checkout_blocked", {
         plan: planId,
         source,
@@ -772,7 +795,7 @@ export default function Pricing() {
               // Pro — $99/ year") must wrap instead of forcing the card
               // wider than a ≤390px viewport (Button defaults to nowrap).
               className="w-full h-auto min-h-11 whitespace-normal"
-              disabled={checkoutLoading}
+              disabled={checkoutLoading || stripeCheckoutLoading}
               data-testid={
                 billing === "annual" ? "pricing-cta-pro-annual" : "pricing-cta-pro-monthly"
               }
@@ -1340,7 +1363,7 @@ export default function Pricing() {
           </Link>
           <Button
             size="lg"
-            disabled={checkoutLoading}
+            disabled={checkoutLoading || stripeCheckoutLoading}
             data-testid="pricing-cta-pro-footer"
             onClick={() => {
               handlePaidIntent("pro_monthly", "pricing_cta_pro_monthly_clicked", "footer");

@@ -1,4 +1,6 @@
-TASK WATER-UNIT-LITERS-DEFAULT priority: P2 status: OPEN
+```text
+TASK WATER-UNIT-LITERS-DEFAULT priority: P2 status: CLOSED
+closed: 2026-11-17, merged. Landed on verdant-grow-diary as 2a6ed81cf2073e7bd89606d31ee507a4733bc578 (#2966, 2026-11-17 06:43 UTC). Closed by Claude session_017UoYKxxpw2guRq48NBdZRB at Matthew's request. The post_merge_check, blockers and open questions below carry forward unchanged; none is claimed as measured by this close.
 
 goal: A phone that never picked a Water unit opens Quick Log Water in liters. A stored choice wins. Saved rows stay whole ml.
 why: Step 1 of the one-tap Watered plan. Matthew, 2026-11-12: "Let's go with one unit per phone in liters, if that is the path of least resistance." Then "Draft step 1". Then "Liters for all" (D-L1).
@@ -53,6 +55,7 @@ reviewer_sha: 0463d0e5f0356a9d9998bd211417b45310578215 (Seat A, historical once 
 session_state: Seat A P2 fixes pushed (docs only); waiting on CI and reviews.
 claimed_by: Claude (Taproot thread)
 owner: Claude
-last_updated: 2026-11-13
+last_updated: 2026-11-17, by Claude session_017UoYKxxpw2guRq48NBdZRB (previously 2026-11-13)
 
 resume here: read the spec, confirm the locked-file approval is recorded in Matthew's own words, re-run the open-handoff overlap check if the base moved, then do next_action.
+```

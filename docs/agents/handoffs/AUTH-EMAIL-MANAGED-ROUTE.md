@@ -1,7 +1,8 @@
 # AUTH-EMAIL-MANAGED-ROUTE
 
 ```text
-TASK AUTH-EMAIL-MANAGED-ROUTE  priority: P2  status: OPEN
+TASK AUTH-EMAIL-MANAGED-ROUTE  priority: P2  status: CLOSED
+closed: 2026-11-17, merged. Landed on verdant-grow-diary as c96bcb8225d760c11c2945bd4c87cab5d56e14e2 (#2981, 2026-11-17 18:29 UTC). Closed by Claude session_017UoYKxxpw2guRq48NBdZRB at Matthew's request. The post_merge_check, blockers and open questions below carry forward unchanged; none is claimed as measured by this close.
 goal: Verdant's sign-in emails (signup, invite, magic link, recovery, email change, reauthentication) reach growers from noreply@verdantgrowdiary.com through Lovable's managed sender (notify.verdantgrowdiary.com), via the app server route that Lovable's managed setup registers on this stack.
 why: After #2961 merged (a6be09153), production Supabase Auth still never called the auth-email-hook edge function (0 invocations on a test reset, 2026-11-12). Lovable's managed setup on this TanStack Start stack registers a server route, /lovable/email/auth/webhook, not the edge function. Lovable's own scaffold of that route (Lovable side-branch commit 44c7a1bd, 2026-11-13) did not build, and added a preview route, a pnpm override and an MCP manifest change nobody asked for. Cheek chose "Build the PR" (2026-11-13 05:39 UTC) and approved adding the four email packages to the lockfile (2026-11-16 17:01 UTC, "Add the packages").
 branch: claude/project-thread-do02zz
@@ -29,5 +30,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows; pending human decisions: per-item merge yes, Lovable publish, one test reset
 claimed_by: Claude thread session, 2026-11-16 17:05 UTC
 owner: Claude thread session for this task
-last_updated: 2026-11-16, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsDb2mPjWBxVLtwJZkM4i1Cw
+last_updated: 2026-11-17, by Claude session_017UoYKxxpw2guRq48NBdZRB (previously 2026-11-16, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsDb2mPjWBxVLtwJZkM4i1Cw)
 ```

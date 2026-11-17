@@ -1,7 +1,8 @@
 # QUICKLOG-DRAFT-WATER-FEED-DETAILS
 
 ```text
-TASK QUICKLOG-DRAFT-WATER-FEED-DETAILS  priority: P2  status: OPEN
+TASK QUICKLOG-DRAFT-WATER-FEED-DETAILS  priority: P2  status: CLOSED
+closed: 2026-11-17, merged. Landed on verdant-grow-diary as 054e7dbabb1c03f1874abd1c5cbceb1ca50d085d (#2936, 2026-11-12 14:56 UTC). Closed by Claude session_017UoYKxxpw2guRq48NBdZRB at Matthew's request. The post_merge_check, blockers and open questions below carry forward unchanged; none is claimed as measured by this close.
 goal: The Quick Log sheet keeps typed Water details (volume, pH, EC, runoff, water temperature, pot feel) and Feed details (recipe, volume, pH, EC, runoff) when the sheet is closed or remounted and reopened for the same target.
 why: Repository audit 2026-11-11 at c03ea6fd46707dde04eac0d0ef3e7c46db8b6bc8, finding 3; Matthew asked for this slice in the audit session. The session draft (src/lib/quickLogObservationDraftRules.ts) stored the note and basic readings only, and the open effect in src/components/QuickLogV2Sheet.tsx reset wateringForm and feedingForm, so a grower who typed volume, pH and runoff and brushed the sheet closed found blank fields with no notice.
 branch: claude/quicklog-draft-water-feed
@@ -30,5 +31,5 @@ reviewer_sha: none
 session_state: PR activity subscription held by the authoring session; no routines, no paused workflows; pending human decisions: review routing and the per-item merge yes
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-11 20:40 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
-last_updated: 2026-11-11 14:55 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
+last_updated: 2026-11-17, by Claude session_017UoYKxxpw2guRq48NBdZRB (previously 2026-11-11 14:55 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8)
 ```

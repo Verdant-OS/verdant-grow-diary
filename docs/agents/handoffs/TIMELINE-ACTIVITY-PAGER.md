@@ -1,7 +1,8 @@
 # TIMELINE-ACTIVITY-PAGER
 
 ```text
-TASK TIMELINE-ACTIVITY-PAGER  priority: P2  status: OPEN
+TASK TIMELINE-ACTIVITY-PAGER  priority: P2  status: CLOSED
+closed: 2026-11-17, merged. Landed on verdant-grow-diary as 1f138a548756babf610d1260be6906f4f3653a6a (#2951, 2026-11-13 01:46 UTC). Closed by Claude session_017UoYKxxpw2guRq48NBdZRB at Matthew's request. The post_merge_check, blockers and open questions below carry forward unchanged; none is claimed as measured by this close.
 goal: A grower can load Quick Log activity older than the newest 100 events on the Timeline, a page at a time, and a save does not throw the loaded activity away.
 why: Repository audit 2026-11-11. Timeline reads grow_events once with a 100-row limit. #2934 (TIMELINE-PAGED-HISTORY-TRUTH) made the page say so; it did not let the grower reach the rest except by setting a date range. Matthew asked for the pager next (2026-11-12) and chose "Stack on #2934".
 branch: claude/timeline-activity-pager
@@ -34,5 +35,5 @@ reviewer_sha: none current (last reviewed head a2a5560e8196cc63e19e19f4b21b106e1
 session_state: no routines, no paused workflows; pending human decisions: #2934's review and merge, then mark ready, review routing and the per-item merge yes for this PR
 claimed_by: Claude session_017UoYKvCNSMryxiQZyBbit8, 2026-11-12 07:40 UTC
 owner: Claude session_017UoYKvCNSMryxiQZyBbit8
-last_updated: 2026-11-12 05:55 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8
+last_updated: 2026-11-17, by Claude session_017UoYKxxpw2guRq48NBdZRB (previously 2026-11-12 05:55 CT, by Claude session_017UoYKvCNSMryxiQZyBbit8)
 ```

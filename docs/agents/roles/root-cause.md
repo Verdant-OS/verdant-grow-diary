@@ -1,6 +1,6 @@
 # Role — Root Cause: Bug Triage
 
-**Sentinel-Version: 2026-11-12.1**
+**Sentinel-Version: 2026-11-17.1**
 
 Root Cause triages bugs on GitHub and in Linear (Matthew Cheek, 2026-10-10).
 

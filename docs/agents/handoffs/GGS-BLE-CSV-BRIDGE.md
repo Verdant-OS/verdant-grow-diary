@@ -1,7 +1,8 @@
 # GGS-BLE-CSV-BRIDGE
 
 ```text
-TASK GGS-BLE-CSV-BRIDGE  priority: other  status: OPEN
+TASK GGS-BLE-CSV-BRIDGE  priority: other  status: CLOSED
+closed: merged. Verdant-OS/verdant-grow-diary#2978 merged into verdant-grow-diary on 2026-11-17 at 09:10 UTC as 6a0540b0bea169c7d7cda0eb9514ee8a726616a0 (final SHA; merge commit from GitHub, confirmed an ancestor of origin/verdant-grow-diary at c468bc90e83f4a7d2c1e15937d88e0e14a0da741). The merged PR head was 3f57d3e57c65b6e7b34b4b18d9220263135d84c3, with a GitHub APPROVE from matt816cheek-bit at that commit. The required-check count at that head and the founder's per-item yes were not re-read for this close (NOT_MEASURED). post_merge_check result: PASS. bunx vitest run src/test/ggs-ble-csv-bridge-import.test.ts --reporter=dot on c468bc90e83f4a7d2c1e15937d88e0e14a0da741, 2026-11-17: Test Files 1 passed (1), Tests 2 passed (2). The tool's pytest suite was not run for this close (pytest is not installed on the closing machine). Closed on 2026-11-17 by a Claude Code session that did not author or review #2978, at Matthew's request ("close the GGS-BLE-CSV-BRIDGE handoff"). This close does not resolve the open questions below, and the tool has still not been run on a controller. The receive-only proof this entry cites as a task attachment is filed in draft Verdant-OS/verdant-grow-diary#2991.
 goal: Draft a receive-only bridge that turns measured GGS status notifications into one CSV row per snapshot for the existing environment CSV import.
 why: The owner asked for the smallest draft that reuses the current CSV path. Source stays csv. No schema, UI, or radio write.
 branch: cursor/ggs-ble-csv-bridge-163b
@@ -29,5 +30,5 @@ reviewer_sha: none
 session_state: no hardware listen was run; no production write
 claimed_by: Grok, 2026-11-12 21:05 CT
 owner: Grok implementation session
-last_updated: 2026-11-12 21:15 CT, by Grok
+last_updated: 2026-11-17, by Claude Code (close; previous 2026-11-12 21:15 CT, by Grok)
 ```

@@ -228,7 +228,10 @@ export default function Pricing() {
     blockedScope,
     dismissBlocked,
   } = usePaddleCheckout();
-  const { startStripeCheckout, loading: stripeCheckoutLoading } = useStripeCheckout();
+  const stripeFallbackRef = useRef<(plan: "pro_monthly" | "pro_annual") => void>(() => {});
+  const { startStripeCheckout, loading: stripeCheckoutLoading } = useStripeCheckout({
+    onFallback: (plan) => stripeFallbackRef.current(plan),
+  });
   const checkoutRetryGate = resolvePricingCheckoutRetryGate(
     lastCheckoutSkuRef.current ?? interestPlan,
     creditPackGate,
@@ -363,6 +366,7 @@ export default function Pricing() {
     }
     void openCheckout({ priceId: planId });
   }
+  stripeFallbackRef.current = (plan) => openPaddlePaidIntent(plan, "stripe_resume");
 
   /**
    * Success URL for a pack SKU, or undefined for a plan.

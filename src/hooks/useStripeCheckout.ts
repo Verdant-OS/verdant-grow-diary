@@ -29,13 +29,15 @@ export type StripeCheckoutOutcome = "redirecting" | "fallback" | "failed" | "bus
  *   with `loading` still true, so a `pageshow` from that cache resets it and
  *   the Pro button works again.
  */
-export function useStripeCheckout(): {
+export function useStripeCheckout(options?: { onFallback?: (plan: StripeProPlanKey) => void }): {
   startStripeCheckout: (plan: StripeProPlanKey) => Promise<StripeCheckoutOutcome>;
   loading: boolean;
 } {
   const [loading, setLoading] = useState(false);
   const inFlight = useRef(false);
   const { user, loading: authLoading } = useAuth();
+  const onFallbackRef = useRef(options?.onFallback);
+  onFallbackRef.current = options?.onFallback;
 
   useEffect(() => {
     const onPageShow = (event: PageTransitionEvent) => {
@@ -81,11 +83,16 @@ export function useStripeCheckout(): {
     if (authLoading || user == null) return;
     if (PRO_CHECKOUT_PROVIDER !== "stripe") return;
     if (resumeAttemptedRef.current) return;
-    const pending = peekPlanIntent();
-    if (!shouldUseStripeCheckout(pending, PRO_CHECKOUT_PROVIDER)) return;
+    const peeked = peekPlanIntent();
+    if (!shouldUseStripeCheckout(peeked, PRO_CHECKOUT_PROVIDER)) return;
     resumeAttemptedRef.current = true;
-    consumePlanIntent();
-    void startStripeCheckout(pending);
+    // consumePlanIntent drops expired and tampered records. Peek does not,
+    // so the checkout start must use the consumed value.
+    const pending = consumePlanIntent();
+    if (!shouldUseStripeCheckout(pending, PRO_CHECKOUT_PROVIDER)) return;
+    void startStripeCheckout(pending).then((outcome) => {
+      if (outcome === "fallback") onFallbackRef.current?.(pending);
+    });
   }, [authLoading, user, startStripeCheckout]);
 
   return { startStripeCheckout, loading };

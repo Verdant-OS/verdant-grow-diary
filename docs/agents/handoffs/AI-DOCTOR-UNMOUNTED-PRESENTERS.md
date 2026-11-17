@@ -1,7 +1,8 @@
 # AI-DOCTOR-UNMOUNTED-PRESENTERS
 
 ```text
-TASK AI-DOCTOR-UNMOUNTED-PRESENTERS  priority: other  status: OPEN
+TASK AI-DOCTOR-UNMOUNTED-PRESENTERS  priority: other  status: CLOSED
+closed: merged. Verdant-OS/verdant-grow-diary#2976 merged into verdant-grow-diary through the merge queue on 2026-11-17 at 06:55 UTC as 0d70f0c0ce25ce98865ff56b8ec2bd00a86a6451 (final SHA). The reviewed and approved PR head was 7cf44a7f471e978c1375ccc0bcc354118e01ec71: an independent PASS (0 P1 / 0 P2) by session_017UoYKxjqLTdRmjWEVpZyYQ, 35/35 required checks green, and Matthew's per-item yes plus a GitHub APPROVE. The queue was started by matt816cheek-bit. Live https://verdantgrowdiary.com/version.json reported commit 0d70f0c0ce25ce98865ff56b8ec2bd00a86a6451 (buildTime 2026-11-17T06:56:19Z), read 2026-11-17. post_merge_check result: NOT_MEASURED. The signed-in fixture-grow read of the "How this was decided" panel needs a disposable test session, which the author session did not have. The future-dated case remains tests-only. Closed by the author session on 2026-11-17 at Matthew's request.
 goal: Make AI Doctor freshness code match what growers see live. Remove the Plant Detail AI Doctor presenters no route mounts, and fix the one live freshness line that could describe a future-dated snapshot with an age.
 why: #2956 (d725622) updated PlantDetailAiDoctorReadinessGate, PlantDetailDoctorLaunchDialog and the safe-review summary, but nothing mounts them; their new copy is absent from the live JS (measured 2026-11-12 on b7e0521). Meanwhile the live context panel (Plant Detail → AI review → "How this was decided") printed "Latest manual sensor snapshot: in 1 day" for a future-dated timeline snapshot.
 branch: claude/optimistic-faraday-18filv

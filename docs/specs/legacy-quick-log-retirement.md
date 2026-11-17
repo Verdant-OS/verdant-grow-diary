@@ -91,7 +91,8 @@ variable. `AppShell.tsx` is the listener and is not counted.
   in the first list. Whether each sends the legacy string or a V2 event depends on the
   rule that built the intent, and was not traced per call site for this spec
   (`uncertainty`). `plantDetailDoctorAddContextRouter.ts` sets the legacy constant, so
-  `PlantDetailDoctorLaunchDialog.tsx` does open legacy.
+  `PlantDetailDoctorLaunchDialog.tsx` does open legacy. (Both removed 2026-11-13: unmounted,
+  no route.)
 - 29 production files mention `PLANT_QUICKLOG_PREFILL_EVENT`. That number mixes
   dispatchers with rules modules that only build a payload, and it misses the bare
   string and the two other constants. It is not the producer count.
@@ -399,6 +400,6 @@ Dispatch an event name supplied by a rules object (7):
 - `src/components/GlobalFastAddButton.tsx`
 - `src/components/GlobalSearchDialog.tsx`
 - `src/components/PlantDetailAiDoctorContextReadinessMount.tsx`
-- `src/components/PlantDetailDoctorLaunchDialog.tsx`
+- `src/components/PlantDetailDoctorLaunchDialog.tsx` (removed 2026-11-13: unmounted, no route)
 - `src/components/PlantRelativeTimelineSection.tsx`
 - `src/components/TimelineEmptyState.tsx`

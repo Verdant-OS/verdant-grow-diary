@@ -1,5 +1,5 @@
 /**
- * Targeted: AI Doctor readiness gate categorization.
+ * Targeted: AI Doctor readiness categorization.
  *
  * Verifies:
  *  - Available evidence lands in `evidence[]`, missing evidence in `missing[]`,
@@ -7,11 +7,9 @@
  *  - Stale snapshots never earn the `fresh-manual-sensor-snapshot` flag.
  *  - Invalid/warning snapshots are flagged, not treated as healthy evidence.
  *  - Malformed timestamps are ignored entirely (not categorized as available).
- *  - The gate BLOCKS diagnosis (`primary = add-context`) only when readiness
- *    is `insufficient` — i.e. no plant profile, or no recent activity and no
- *    recent snapshot at all.
- *  - Partial-but-meaningful context does NOT block: when a safe AI Doctor
- *    flow is wired, primary is `open_ai_doctor`.
+ *  - Readiness is `insufficient` only when there is no plant profile, or no
+ *    recent activity and no recent snapshot at all.
+ *  - Partial-but-meaningful context is `partial`, not `insufficient`.
  *
  * Pure: no React, no I/O.
  */
@@ -21,11 +19,6 @@ import {
   AI_DOCTOR_RECENT_WINDOW_MS,
   AI_DOCTOR_SNAPSHOT_FRESH_MS,
 } from "@/lib/aiDoctorContextRules";
-import {
-  buildAiDoctorReadinessGate,
-  AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL,
-  AI_DOCTOR_READINESS_GATE_REVIEW_LABEL,
-} from "@/lib/aiDoctorReadinessGateViewModel";
 
 const NOW = Date.UTC(2026, 6, 15, 12, 0, 0);
 const HOUR = 60 * 60 * 1000;
@@ -136,19 +129,10 @@ describe("readiness categorization: available vs missing", () => {
   });
 });
 
-describe("gate blocks diagnosis only when context is effectively unusable", () => {
-  const wireGate = (
-    readiness: ReturnType<typeof evaluateAiDoctorContext>["readiness"],
-    hasSafeAiDoctorFlow: boolean,
-  ) => buildAiDoctorReadinessGate({ readiness, hasSafeAiDoctorFlow });
-
+describe("readiness is insufficient only when context is effectively unusable", () => {
   it("blocks when there is no plant profile (insufficient)", () => {
     const r = evaluateAiDoctorContext({ plant: null, now: NOW });
     expect(r.readiness).toBe("insufficient");
-    const gate = wireGate(r.readiness, true);
-    expect(gate.primary.kind).toBe("focus_anchor");
-    expect(gate.primary.label).toBe(AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL);
-    expect(gate.showQuickActions).toBe(true);
   });
 
   it("blocks when there is no recent activity AND no recent snapshot", () => {
@@ -159,8 +143,6 @@ describe("gate blocks diagnosis only when context is effectively unusable", () =
       now: NOW,
     });
     expect(r.readiness).toBe("insufficient");
-    const gate = wireGate(r.readiness, true);
-    expect(gate.primary.kind).toBe("focus_anchor");
   });
 
   it("does NOT block when partial but meaningful (activity present, snapshot missing)", () => {
@@ -174,11 +156,6 @@ describe("gate blocks diagnosis only when context is effectively unusable", () =
       now: NOW,
     });
     expect(r.readiness).toBe("partial");
-    const gate = wireGate(r.readiness, true);
-    expect(gate.primary.kind).toBe("open_ai_doctor");
-    expect(gate.primary.label).toBe(AI_DOCTOR_READINESS_GATE_REVIEW_LABEL);
-    // Quick actions remain visible so the grower can improve context.
-    expect(gate.showQuickActions).toBe(true);
   });
 
   it("does NOT block when only a recent snapshot exists (no timeline activity)", () => {
@@ -190,24 +167,6 @@ describe("gate blocks diagnosis only when context is effectively unusable", () =
     });
     // A single snapshot with no activity is not "effectively unusable".
     expect(r.readiness).toBe("partial");
-    const gate = wireGate(r.readiness, true);
-    expect(gate.primary.kind).toBe("open_ai_doctor");
-  });
-
-  it("falls back to add-context when partial and no safe AI Doctor flow is wired", () => {
-    const r = evaluateAiDoctorContext({
-      plant: fullPlant,
-      recentEvents: [
-        { at: iso(-HOUR), category: "watering" },
-        { at: iso(-2 * HOUR), category: "notes" },
-      ],
-      recentManualSnapshots: [],
-      now: NOW,
-    });
-    expect(r.readiness).toBe("partial");
-    const gate = wireGate(r.readiness, false);
-    expect(gate.primary.kind).toBe("focus_anchor");
-    expect(gate.primary.label).toBe(AI_DOCTOR_READINESS_GATE_ADD_CONTEXT_LABEL);
   });
 
   it("stale-only snapshot with activity is partial (not blocked, not strong)", () => {
@@ -221,8 +180,6 @@ describe("gate blocks diagnosis only when context is effectively unusable", () =
       now: NOW,
     });
     expect(r.readiness).toBe("partial");
-    const gate = wireGate(r.readiness, true);
-    expect(gate.primary.kind).toBe("open_ai_doctor");
   });
 
   it("readiness result never claims a diagnosis", () => {

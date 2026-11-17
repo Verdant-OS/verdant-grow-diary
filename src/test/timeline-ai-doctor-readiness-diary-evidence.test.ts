@@ -244,7 +244,6 @@ describe("AI Doctor readiness view — leak safety", () => {
 const READINESS_SURFACE = [
   "src/lib/aiDoctorContextCompiler.ts",
   "src/lib/aiDoctorReadinessViewModel.ts",
-  "src/lib/aiDoctorReadinessGateViewModel.ts",
   "src/lib/quickLogV2RefreshRules.ts",
 ];
 

@@ -192,6 +192,8 @@ function toSensorReadingRow(row: ManualSensorTimelineMetricRow): SensorReadingRo
     captured_at: row.captured_at ?? null,
     quality: row.quality ?? "ok",
     raw_payload: null,
+    notes: null,
+    unit_unconfirmed: false,
     user_id: "",
     created_at: row.ts,
     device_id: null,

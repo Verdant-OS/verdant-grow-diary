@@ -66,6 +66,8 @@ describe("future capture time cannot become healthy sensor evidence", () => {
         created_at: NOW.toISOString(),
         device_id: null,
         raw_payload: null,
+        notes: null,
+        unit_unconfirmed: false,
       };
       const input = structuredClone(row);
       const readings = groupSensorReadingRows([row], NOW);

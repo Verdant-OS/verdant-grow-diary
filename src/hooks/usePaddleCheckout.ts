@@ -21,8 +21,11 @@ import {
   buildCheckoutPlanReturnPath,
   consumePlanIntent,
   isKnownPlanIntent,
+  peekPlanIntent,
   savePlanIntent,
 } from "@/lib/checkoutPlanIntent";
+import { PRO_CHECKOUT_PROVIDER } from "@/config/checkoutProvider";
+import { shouldUseStripeCheckout } from "@/lib/stripeCheckoutClientRules";
 import { beginCheckoutSession } from "@/lib/checkoutOverlaySession";
 import { resolvePaidAcquisitionSource } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
@@ -328,6 +331,12 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
     if (resumeAttemptedRef.current) return;
     if (!user) return;
     if (unavailable) return;
+    // Stripe Pro resumes in useStripeCheckout. Leave that intent unread so
+    // this effect cannot open Paddle for it. Paddle stays the resume path
+    // for every other saved plan, and for every plan when the provider is
+    // the default "paddle".
+    const peeked = peekPlanIntent();
+    if (shouldUseStripeCheckout(peeked, PRO_CHECKOUT_PROVIDER)) return;
     const pending = consumePlanIntent();
     if (!pending) return;
     resumeAttemptedRef.current = true;

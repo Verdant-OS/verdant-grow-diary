@@ -172,6 +172,53 @@ describe("PostHog consent client", () => {
     expect(loadSdk).not.toHaveBeenCalled();
   });
 
+  it("does not load on a beta landing page, in any spelling the router serves (#2714)", async () => {
+    const loadSdk = vi.fn(async () => sdk);
+    const betaPaths = [
+      "/creator-beta",
+      "/Creator-Beta/",
+      "//creator-beta",
+      "/breeder-beta",
+      "/Breeder-Beta/",
+    ];
+    for (const pathname of betaPaths) {
+      setLocation("verdantgrowdiary.com", pathname);
+      syncPostHogWithConsent(
+        "granted",
+        { pathname, search: "", hash: "" },
+        { loadSdk, readEnv: prodEnv },
+      );
+      await flush();
+    }
+    expect(loadSdk).not.toHaveBeenCalled();
+    expect(sdk.init).not.toHaveBeenCalled();
+    expectNoPostHogNetwork();
+  });
+
+  it("stops a running client on the creator beta page and resumes after leaving (#2714)", async () => {
+    const loadSdk = vi.fn(async () => sdk);
+    setLocation("verdantgrowdiary.com", "/pricing");
+    const pricing = { pathname: "/pricing", search: "", hash: "" };
+    const beta = { pathname: "/creator-beta", search: "", hash: "" };
+    syncPostHogWithConsent("granted", pricing, { loadSdk, readEnv: prodEnv });
+    await vi.waitFor(() => expect(sdk.init).toHaveBeenCalledTimes(1));
+    expect(sdk.capture).toHaveBeenCalledTimes(1);
+
+    sdk.capture.mockClear();
+    syncPostHogWithConsent("granted", beta, { loadSdk, readEnv: prodEnv });
+    expect(sdk.opt_out_capturing).toHaveBeenCalledTimes(1);
+    expect(sdk.capture).not.toHaveBeenCalled();
+
+    syncPostHogWithConsent("granted", pricing, { loadSdk, readEnv: prodEnv });
+    expect(loadSdk).toHaveBeenCalledTimes(1);
+    expect(sdk.opt_in_capturing).toHaveBeenCalledTimes(2);
+    expect(sdk.capture).toHaveBeenCalledTimes(1);
+    expect(sdk.capture).toHaveBeenCalledWith("$pageview", {
+      $pathname: "/pricing",
+      $current_url: "https://verdantgrowdiary.com/pricing",
+    });
+  });
+
   it("initializes once after consent and sends one sanitized pageview per route", async () => {
     const loadSdk = vi.fn(async () => sdk);
     setLocation("www.verdantgrowdiary.com");

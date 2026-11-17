@@ -43,8 +43,34 @@ export function isAnalyticsCollectionHost(hostname: string | null | undefined): 
   return (PRODUCTION_HOSTNAMES as readonly string[]).includes(normalized);
 }
 
+/**
+ * Public pages whose own copy tells the visitor "No analytics." (#2714): the
+ * two beta landing pages, which render the same BetaLanding component.
+ * No provider may load or send on them, even with consent granted.
+ */
+const NO_ANALYTICS_PUBLIC_PATHS: readonly string[] = ["/creator-beta", "/breeder-beta"];
+
 export function isExcludedAnalyticsPath(pathname: string): boolean {
-  return pathname === GROW_HELP_TOOLKIT_PATH || pathname === `${GROW_HELP_TOOLKIT_PATH}/`;
+  if (pathname === GROW_HELP_TOOLKIT_PATH || pathname === `${GROW_HELP_TOOLKIT_PATH}/`) return true;
+  return isNoAnalyticsPublicPath(pathname);
+}
+
+/**
+ * The router serves these pages in any letter case, with repeated or trailing
+ * slashes, and with percent-escapes, so the match ignores all of them.
+ */
+function isNoAnalyticsPublicPath(pathname: unknown): boolean {
+  if (typeof pathname !== "string" || pathname === "") return false;
+  let decoded = pathname;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    // A malformed escape is compared as written.
+  }
+  const collapsed = decoded.toLowerCase().replace(/\/{2,}/g, "/");
+  const canonical =
+    collapsed.length > 1 && collapsed.endsWith("/") ? collapsed.slice(0, -1) : collapsed;
+  return NO_ANALYTICS_PUBLIC_PATHS.includes(canonical);
 }
 
 /** Empty means the US cloud default. Any other value must be an https origin. */

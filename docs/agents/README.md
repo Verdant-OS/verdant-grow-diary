@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-11-12.1**
+**Sentinel-Version: 2026-11-17.1**
 
 Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
 **Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.
@@ -66,8 +66,8 @@ HISTORICAL — never active instructions
 
 ## Which files each agent loads
 
-| Agent                    | Auto-loads                                  | Must also read                                                                                                                                         |
-| ------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Agent                    | Auto-loads                                  | Must also read                                                                                                                                                      |
+| ------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Codex                    | `AGENTS.md`                                 | `docs/agents/roles/codex.md`, `CURRENT_STATE.md` "Start here", open handoff log                                                                                     |
 | Claude                   | `CLAUDE.md` (imports constitution + role)   | `CURRENT_STATE.md` "Start here", open handoff log — read before `SENTINEL_ACK`                                                                                      |
 | Grok                     | `AGENTS.md`, `.grok/rules/*`                | `docs/agents/roles/grok.md`, `CURRENT_STATE.md` "Start here", open handoff log                                                                                      |

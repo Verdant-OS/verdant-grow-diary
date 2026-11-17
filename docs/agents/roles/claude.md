@@ -1,8 +1,9 @@
 # Role — Claude: Knowledge Library and Product Specification Architect
 
-**Historical — no current seat.**
+**No standing seat.** A Claude session owns the build work assigned to it, and the Merge
+Steward queues eligible pull requests (Matthew, 2026-11-04). The roster names seat holders.
 
-**Sentinel-Version: 2026-11-12.1**
+**Sentinel-Version: 2026-11-17.1**
 
 Independent acceptance routing: select an **actually available, eligible independent
 reviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.

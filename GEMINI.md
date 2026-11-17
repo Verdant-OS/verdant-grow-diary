@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-11-12.1**
+**Sentinel-Version: 2026-11-17.1**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-11-12.1**
+**Sentinel-Version: 2026-11-17.1**
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -410,7 +410,8 @@ An existing block moves to its own file at its next update, and that file wins.
   review at that commit. An adverse verdict (any P1 or P2) is `REQUEST_CHANGES`.
   A clean verdict on a non-gated pull request is `APPROVE` at that commit by the
   reviewer seat. A clean verdict on a gated pull request is `COMMENT` until
-  Matthew's own yes names the pull request and SHA. Only the Merge Steward may
+  Matthew's own yes names the pull request and SHA. After that yes, the reviewer
+  seat posts `APPROVE` at that commit; that is the approval §11 waits for. Only the Merge Steward may
   dismiss `REQUEST_CHANGES`, and only with Matthew's written exception naming
   the pull request, SHA, and finding. Detail is in `docs/agents/OWNERSHIP.md`.
 - Role files say each seat's default strength. Strength is not rank. Before
@@ -573,6 +574,7 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-11-17.1** — Two lines that disagreed now agree. §13 states the step `docs/agents/OWNERSHIP.md` already had: on a gated pull request a clean review is `COMMENT`, and after Matthew's yes naming the pull request and SHA the reviewer seat posts `APPROVE` at that commit, which is the approval §11 waits for. `docs/agents/roles/claude.md` no longer opens with "Historical — no current seat" while `CLAUDE.md` loads it as the role: it now says Claude has no standing seat and a Claude session owns the build work assigned to it (Matthew, 2026-11-04). No seat, gate or holder changes.
 - **2026-11-12.1** — Live instruction text no longer routes to the retired Chemdawg / Grok 91 name. Mentions that meant a current duty now name the seat (Merge Readiness, the Coordinator or the Merge Steward). The roster gains stable labels (Writer A/B, Reviewer A–D, Grok Lead (Main), Grok Lead (Ultra)) and a rename-history note: Chemdawg was an earlier name, and the bot now holding Grok Lead (Main) once carried it. Roster only: UK Cheese holds the Coordinator seat, and OG Kush is retired. Historical sections stay word for word. No rule changes.
 - **2026-11-11.1** — Startup reads shrink. Agents read only the "Start here" section of `docs/agents/CURRENT_STATE.md` at startup, and the rest when that section says to. The handoff log read is `HANDOFF_LOG.md` plus the open entries in `docs/agents/handoffs/`; closed `HANDOFF_LOG.md` blocks moved byte for byte to `docs/agents/archive/HANDOFF_LOG_ARCHIVE.md`. No other rule changes.
 - **2026-11-05.2** — `CLAUDE.md` again says no root-level `*Rules.ts` imports the Supabase client: #2883 moved the cultivar slug route's read into a service, so the 2026-11-05.1 exception no longer exists. No rule changes.

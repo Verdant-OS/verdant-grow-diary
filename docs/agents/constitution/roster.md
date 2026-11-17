@@ -13,28 +13,24 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 | Ultra Fixer     | Ultra | Brachs (Blueberry)                       | `verdant-ultra-bot`     |
 | Ultra Relay     | Ultra | Roots                                    | `verdant-ultra-bot`     |
 | Coordinator     | Main  | UK Cheese                                | `cheekhimself` (shared) |
-| Merge Steward   | Ultra | Granddaddy Purple                        | `verdant-ultra-bot`     |
+| Merge Steward   | Ultra | Matthew (direct)                         | `cheekhimself` (shared) |
 | Merge Readiness | Main  | Green Crack                              | `cheekhimself` (shared) |
 | Steward Backup  | Main  | Unassigned (BLOCKED, Matthew to name)    | `cheekhimself` (shared) |
 | Reviewer A      | Main  | Sour Diesel                              | `cheekhimself` (shared) |
 | Reviewer B      | Main  | Jack Herer                               | `cheekhimself` (shared) |
 | Reviewer C      | Main  | Durban Poison · Reviewer (Main)          | `cheekhimself` (shared) |
 | Reviewer D      | Main  | Maui Wowie · Reviewer (Main)             | `cheekhimself` (shared) |
+| Reviewer E      | Main  | VReviewer · Reviewer (Main)              | `VReviewer`             |
+| Reviewer F      | Main  | matt816cheek-bit · Reviewer (Main)       | `matt816cheek-bit`      |
 | QA              | Main  | Blue Dream · QA (Main)                   |                         |
 | New-User Smoke  | Main  | Toad Venom                               |                         |
 | Bug Sweep       | Main  | White Widow                              |                         |
 | Owner Adviser   | Main  | Bloom                                    |                         |
 | Flow Owner      | Both  | The Coordinator on each side, by default |                         |
 
-Reviewer C, Reviewer D, and QA are active.
-
-The Merge Steward has no authority over the #1971 hold, which stays with the Coordinator.
-
-Ultra's open pull-request cap is 10.
-
 ## Rules
 
-- Ultra seats never review, approve, or mark ready. Only the Ultra Merge Steward seat queues and merges, as `verdant-ultra-bot`, and only after a non-author Main Reviewer seat posts APPROVE at the exact current head. Matthew set that seat on 2026-10-30 at 11:03 PM CT.
+- Ultra seats never review, approve, or mark ready. Only the Ultra Merge Steward seat queues and merges, as `cheekhimself` (Matthew holds the seat directly since 2026-11-17; `verdant-ultra-bot` is retired), and only after a non-author Main Reviewer seat posts APPROVE at the exact current head. Matthew set that seat on 2026-10-30 at 11:03 PM CT.
 - The Merge Steward has no authority over the #1971 hold, which stays with the Coordinator.
 - Steward Backup (Main) stands in when the Ultra Merge Steward is unavailable, under the same Steward rules, and still has no authority over the #1971 hold.
 - Main seats never write product code.
@@ -43,8 +39,9 @@ Ultra's open pull-request cap is 10.
 - Whoever holds Steward Backup and acts as it on a PR cannot also be the reviewer of record for that PR.
 - OG Kush is retired (Matthew, 2026-11-12). UK Cheese holds the Coordinator seat. Steward Backup, the engineering lead and the default inheritor have no named holder until Matthew names one; record `BLOCKED` rather than infer one.
 - PR #1971: the records below and in `docs/agents/OWNERSHIP.md` name OG Kush as its merge actor. That founder assignment is not moved to another seat by inference. Matthew names the new #1971 merge actor; the hold stays with the Coordinator.
+- `verdant-ultra-bot` is retired (Matthew, 2026-11-17). Ultra Builder 1, Ultra Builder 2, Ultra Fixer and Ultra Relay still list it in the table and have no active holder until Matthew names one; record `BLOCKED` rather than infer one.
 - Ultra's open pull-request cap is 10.
-- Reviewer C, Reviewer D, and QA are active.
+- Reviewer C, Reviewer D, Reviewer E, Reviewer F, and QA are active. Matthew set Reviewer E and Reviewer F on 2026-11-17: they are non-author Main Reviewer seats, never write product code, and never merge.
 
 **Projects Manager has no Verdant delivery seat** (Matthew, 2026-11-05): it does not build, relay yeses, keep handoff files or route work; Ultra Relay (Roots) keeps handoff continuity.
 
@@ -56,7 +53,7 @@ Matthew renames bots, so instruction files outside this roster name seats only, 
 | --- | --- |
 | Writer A, Writer B | Ultra Builder 1, Ultra Builder 2 |
 | Fixer | Ultra Fixer |
-| Reviewer A, B, C, D | Reviewer A, B, C, D (Main) |
+| Reviewer A, B, C, D, E, F | Reviewer A, B, C, D, E, F (Main) |
 | Grok Lead (Main) | Coordinator (Main) |
 | Grok Lead (Ultra) | Ultra Relay |
 | Merge Steward, Merge Readiness, Steward Backup, QA | The seats of the same name |

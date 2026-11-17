@@ -1,7 +1,8 @@
 # AUTH-EMAIL-NATIVE-HOOK
 
 ```text
-TASK AUTH-EMAIL-NATIVE-HOOK  priority: P2  status: OPEN
+TASK AUTH-EMAIL-NATIVE-HOOK  priority: P2  status: CLOSED
+closed: 2026-11-17, merged. Landed on verdant-grow-diary as f1b8a6a920ba7f8bf3b16b6fd49599116e1f7bf1 (#2979, 2026-11-17 06:48 UTC). Closed by Claude session_017UoYKxxpw2guRq48NBdZRB at Matthew's request. The post_merge_check, blockers and open questions below carry forward unchanged; none is claimed as measured by this close.
 goal: auth-email-hook accepts Supabase Auth's native Send Email hook, verifies the Standard Webhooks signature, and still delivers through sendLovableEmail.
 why: Production Send Email is on and pointed at auth-email-hook, but the function only accepted a Lovable webhook. GoTrue calls were rejected before email_send_log, so recovery, signup, magic link and email-change mail were not sent.
 branch: cursor/auth-email-hook-native-send-4adb
@@ -29,5 +30,5 @@ reviewer_sha: e046307c5d15f0623e97fa8d7147dce7074b8df0 (superseded by the OTP fi
 session_state: no production calls, no secret writes, no deploy
 claimed_by: cursor cloud agent, 2026-11-16
 owner: cursor cloud agent for this branch
-last_updated: 2026-11-16, by cursor cloud agent
+last_updated: 2026-11-17, by Claude session_017UoYKxxpw2guRq48NBdZRB (previously 2026-11-16, by cursor cloud agent)
 ```

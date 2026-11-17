@@ -1,4 +1,5 @@
-TASK FIELD-NOTEBOOK-RELOAD-DRAFT-2968 priority: P2 status: OPEN
+TASK FIELD-NOTEBOOK-RELOAD-DRAFT-2968 priority: P2 status: CLOSED
+closed: 2026-11-17, merged. Landed on verdant-grow-diary as c468bc90e83f4a7d2c1e15937d88e0e14a0da741 (#2975, 2026-11-17 08:43 UTC). Closed by Claude session_017UoYKxxpw2guRq48NBdZRB at Matthew's request. The post_merge_check, blockers and open questions below carry forward unchanged; none is claimed as measured by this close.
 goal: Keep an unsaved Field Notebook observation through a full page reload for the signed-in owner, and clear it on sign-out and successful save.
 why: #2968. The #2922 draft lived only in memory, so a typed URL to /pricing and back emptied Observation.
 branch: cursor/notebook-draft-reload-33b8
@@ -25,4 +26,4 @@ reviewer_sha:
 session_state: cursor cloud agent
 claimed_by: cursor cloud agent 2026-11-12
 owner: cursor cloud agent
-last_updated: 2026-11-12 18:45 CT, by cursor cloud agent
+last_updated: 2026-11-17, by Claude session_017UoYKxxpw2guRq48NBdZRB (previously 2026-11-12 18:45 CT, by cursor cloud agent)

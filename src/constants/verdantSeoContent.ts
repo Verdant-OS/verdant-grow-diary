@@ -492,6 +492,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
     ],
     author: { name: "Matthew Cheek" },
+    publishedOn: "2026-07-03",
     modifiedOn: "2026-11-18",
   },
   {

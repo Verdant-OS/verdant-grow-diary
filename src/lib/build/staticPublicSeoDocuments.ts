@@ -463,24 +463,13 @@ function buildStaticWebPageJsonLd(metadata: {
 
 function buildStaticGuideJsonLd(guide: (typeof VERDANT_SEO_GUIDES)[number]) {
   const url = `${VERDANT_SITE_ORIGIN}/guides/${guide.slug}`;
-  const article = guide.publishedOn
-    ? buildArticleJsonLd({
-        headline: guide.h1,
-        description: guide.description,
-        url,
-        datePublished: guide.publishedOn,
-        dateModified: guide.modifiedOn,
-        image: DEFAULT_OG_IMAGE,
-        authorName: "Verdant Grow Diary",
-        publisherName: "Verdant Grow Diary",
-        siteUrl: VERDANT_SITE_ORIGIN,
-      })
-    : guide.author && guide.modifiedOn
+  const article =
+    guide.author && guide.modifiedOn
       ? buildArticleJsonLd({
           headline: guide.h1,
           description: guide.description,
           url,
-          datePublished: guide.modifiedOn,
+          datePublished: guide.publishedOn ?? guide.modifiedOn,
           dateModified: guide.modifiedOn,
           image: DEFAULT_OG_IMAGE,
           authorName: guide.author.name,
@@ -488,7 +477,19 @@ function buildStaticGuideJsonLd(guide: (typeof VERDANT_SEO_GUIDES)[number]) {
           publisherName: "Verdant Grow Diary",
           siteUrl: VERDANT_SITE_ORIGIN,
         })
-      : null;
+      : guide.publishedOn
+        ? buildArticleJsonLd({
+            headline: guide.h1,
+            description: guide.description,
+            url,
+            datePublished: guide.publishedOn,
+            dateModified: guide.modifiedOn,
+            image: DEFAULT_OG_IMAGE,
+            authorName: "Verdant Grow Diary",
+            publisherName: "Verdant Grow Diary",
+            siteUrl: VERDANT_SITE_ORIGIN,
+          })
+        : null;
   const howTo = guide.howTo
     ? buildHowToJsonLd({ url, name: guide.howTo.name, steps: guide.howTo.steps })
     : null;
@@ -497,7 +498,11 @@ function buildStaticGuideJsonLd(guide: (typeof VERDANT_SEO_GUIDES)[number]) {
       title: guide.title,
       description: guide.description,
       url,
-      dateModified: guide.publishedOn ? undefined : guide.modifiedOn,
+      dateModified: guide.author
+        ? guide.modifiedOn
+        : guide.publishedOn
+          ? undefined
+          : guide.modifiedOn,
     }),
     buildFaqPageJsonLd({ pageUrl: url, questions: guide.faq }),
     buildBreadcrumbListJsonLd({

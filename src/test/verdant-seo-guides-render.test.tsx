@@ -294,7 +294,7 @@ describe("/guides/:slug detail — public render", () => {
       } | null;
       expect(article?.author).toEqual({ "@type": "Person", name: "Matthew Cheek" });
       expect(article?.dateModified).toBe("2026-11-18");
-      expect(article?.datePublished).toBe("2026-11-18");
+      expect(article?.datePublished).toBe(slug === "grow-diary-app" ? "2026-07-03" : "2026-11-18");
     }
 
     cleanup();

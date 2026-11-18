@@ -1,7 +1,8 @@
 # TIMELINE-MEASUREMENT-TEMPERATURE-UNIT
 
 ```text
-TASK TIMELINE-MEASUREMENT-TEMPERATURE-UNIT  priority: P2  status: OPEN
+TASK TIMELINE-MEASUREMENT-TEMPERATURE-UNIT  priority: P2  status: CLOSED
+closed: 2026-11-18, merged. Landed on verdant-grow-diary as 460529f9d5922035ed65e724518ee8af0d8475b6 (#2998, 2026-11-18 03:34 UTC) through the merge queue after Matthew's approval and enqueue. Closed by the Claude thread session for the core-loop walk task. The post_merge_check below carries forward unchanged; it is not measured by this close.
 goal: The Quick Log history headline for a measurement or sensor snapshot shows the temperature in the grower's unit with its symbol ("76.0°F" or "24.4°C"), never a bare raw Celsius number ("24.44°").
 why: Found in the 2026-11-18 core-loop walk on production (b7e0521, UX Audit Test Tent, signed-in test entries tagged [smoke]). The row headline read "Measurement · 24.44° · 56% RH" while the row body showed "76.0°F", so a grower who thinks in Fahrenheit saw a number that looked wrong by 50 degrees. Matthew asked (2026-11-18 01:13 UTC, via coordinator relay) for each rough spot found in the walk to get its own focused branch and draft PR with tests, ready for independent review, no merges.
 root_cause: buildSummarySuffix in quickLogEventIdentityRules.ts pushed `${snap.temp}°` straight from the stored canonical Celsius value, with no unit symbol and no conversion to the grower's preference.
@@ -26,5 +27,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows. Pending human decisions: Matthew's merge yes after review; whether to thread the grower's unit into the Plant Detail recent panel, recap and harvest-watch evidence as a follow-up.
 claimed_by: Claude cse_017UoYKywjU6h8V7ndDq9JPe, 2026-11-18 01:28 UTC
 owner: Claude cse_017UoYKywjU6h8V7ndDq9JPe
-last_updated: 2026-11-18 01:28 UTC, by Claude cse_017UoYKywjU6h8V7ndDq9JPe
+last_updated: 2026-11-18 03:45 UTC, by the Claude thread session for the core-loop walk task (previously 2026-11-18 01:28 UTC, by Claude cse_017UoYKywjU6h8V7ndDq9JPe)
 ```

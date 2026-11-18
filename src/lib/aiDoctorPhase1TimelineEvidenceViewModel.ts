@@ -71,22 +71,57 @@ function asStringArray(value: unknown): string[] {
   return out;
 }
 
-export function formatAiDoctorPhase1TimelineSavedAt(iso: string | null | undefined): string | null {
+export interface AiDoctorPhase1TimelineTimeOptions {
+  /**
+   * IANA zone to show the saved time in, normally the viewer's own zone.
+   * Omitted, empty or invalid, the time is shown in UTC with a "UTC"
+   * suffix, as before.
+   */
+  timeZone?: string | null;
+}
+
+function formatSavedAtInUtc(ms: number): string {
+  return (
+    new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "UTC",
+    }).format(new Date(ms)) + " UTC"
+  );
+}
+
+export function formatAiDoctorPhase1TimelineSavedAt(
+  iso: string | null | undefined,
+  options?: AiDoctorPhase1TimelineTimeOptions,
+): string | null {
   if (typeof iso !== "string" || iso.length === 0) return null;
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
-  try {
-    return (
-      new Intl.DateTimeFormat("en-US", {
+  const zone = typeof options?.timeZone === "string" ? options.timeZone.trim() : "";
+  if (zone.length > 0 && zone.toUpperCase() !== "UTC") {
+    try {
+      // The zone's short name ("CST", "GMT-6") goes with the time, so a
+      // grower never reads a local-looking time that is really UTC.
+      return new Intl.DateTimeFormat("en-US", {
         year: "numeric",
         month: "short",
         day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
-        timeZone: "UTC",
-      }).format(new Date(ms)) + " UTC"
-    );
+        timeZone: zone,
+        timeZoneName: "short",
+      }).format(new Date(ms));
+    } catch {
+      // Unknown zone: fall through to the labelled UTC time.
+    }
+  }
+  try {
+    return formatSavedAtInUtc(ms);
   } catch {
     return iso;
   }
@@ -127,6 +162,7 @@ export function buildAiDoctorPhase1TimelineReviewHref(input: {
 
 export function buildAiDoctorPhase1TimelineEvidenceViewModel(
   event: AiDoctorPhase1TimelineEvidenceEventInput | null | undefined,
+  options?: AiDoctorPhase1TimelineTimeOptions,
 ): AiDoctorPhase1TimelineEvidenceViewModel | null {
   if (!isAiDoctorPhase1EvidenceEvent(event)) return null;
   const details = asRecord(event!.details) ?? {};
@@ -141,7 +177,7 @@ export function buildAiDoctorPhase1TimelineEvidenceViewModel(
   const growId = asString(event!.grow_id);
   const tentId = asString(event!.tent_id);
   const occurredAt = asString(event!.occurred_at) ?? asString(event!.entry_at) ?? null;
-  const savedAtLabel = formatAiDoctorPhase1TimelineSavedAt(occurredAt);
+  const savedAtLabel = formatAiDoctorPhase1TimelineSavedAt(occurredAt, options);
 
   return {
     id: asString(event!.id),

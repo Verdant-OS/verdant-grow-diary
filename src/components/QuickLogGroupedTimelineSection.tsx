@@ -83,6 +83,9 @@ type Props =
       demoEntries?: ReadonlyArray<DemoQuickLogTimelineEntry>;
     };
 
+/** The viewer's zone, so AI Doctor evidence times read as local time (same idiom as Timeline.tsx). */
+const VIEWER_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 function actionIcon(a: QuickLogActionEvent) {
   return a.kind === "water" ? (
     <Droplets className="h-4 w-4" aria-hidden />
@@ -179,15 +182,18 @@ function EntryItem({ entry, demoVariant, correctionCount }: EntryItemProps) {
       ? (entry.action.aiDoctorPhase1Evidence ?? null)
       : null;
   const evidenceViewModel = evidence
-    ? buildAiDoctorPhase1TimelineEvidenceViewModel({
-        id: evidence.diaryEntryId,
-        plant_id: evidence.plantId,
-        tent_id: evidence.tentId,
-        grow_id: evidence.growId,
-        entry_at: evidence.entryAt,
-        occurred_at: evidence.entryAt,
-        details: evidence.details,
-      })
+    ? buildAiDoctorPhase1TimelineEvidenceViewModel(
+        {
+          id: evidence.diaryEntryId,
+          plant_id: evidence.plantId,
+          tent_id: evidence.tentId,
+          grow_id: evidence.growId,
+          entry_at: evidence.entryAt,
+          occurred_at: evidence.entryAt,
+          details: evidence.details,
+        },
+        { timeZone: VIEWER_TIME_ZONE },
+      )
     : null;
 
   const phenoReceipt =

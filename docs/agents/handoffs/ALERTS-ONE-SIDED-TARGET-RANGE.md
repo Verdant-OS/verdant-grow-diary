@@ -1,7 +1,8 @@
 # ALERTS-ONE-SIDED-TARGET-RANGE
 
 ```text
-TASK ALERTS-ONE-SIDED-TARGET-RANGE  priority: P2  status: OPEN
+TASK ALERTS-ONE-SIDED-TARGET-RANGE  priority: P2  status: CLOSED
+closed: 2026-11-18, merged. Landed on verdant-grow-diary as 975099c8eae28ecd356d827e88d9b440d54e4bb0 (#2999, 2026-11-18 03:12 UTC) through the merge queue after Matthew's approval and enqueue. Closed by the Claude thread session for the core-loop walk task. The post_merge_check below carries forward unchanged; it is not measured by this close.
 goal: The Alerts page context header reads a target with only one bound as "up to 85°F" or "at least 70°F", never "—–85°F". Two-sided ranges are unchanged ("70–85°F").
 why: Found in the 2026-11-18 core-loop walk on production (UX Audit Test Tent, test entries tagged [smoke]). The header read "Temp —–85°F." for a temperature target with a maximum and no minimum, which looks like broken data to a grower. Matthew asked (2026-11-18, via coordinator relay) for each rough spot found in the walk to get its own focused branch and draft PR with tests, ready for independent review, no merges.
 root_cause: formatRange in src/components/AlertsContextHeader.tsx printed "—" for each missing bound and always joined them with an en dash.
@@ -24,5 +25,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows. Pending human decisions: Matthew's merge yes after review.
 claimed_by: Claude thread session for the core-loop walk task, 2026-11-18 01:45 UTC
 owner: Claude thread session for the core-loop walk task
-last_updated: 2026-11-18 01:45 UTC, by Claude thread session for the core-loop walk task
+last_updated: 2026-11-18 03:45 UTC, by the Claude thread session for the core-loop walk task (previously 2026-11-18 01:45 UTC, by Claude thread session for the core-loop walk task)
 ```

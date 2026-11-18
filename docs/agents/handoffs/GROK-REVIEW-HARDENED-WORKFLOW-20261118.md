@@ -9,7 +9,7 @@ base: verdant-grow-diary @ 0d9e9c081973ea3e4ff86f5cd8822d5cfab3f1be
 pr: see the PR opened from this branch
 head_sha: read the current head from the PR and verify with git ls-remote
 state: pushed draft; no review requested
-next_action: Matthew decides (1) whether sending non-docs PR diffs and readable repo files to xAI is acceptable, (2) creates the XAI_API_KEY repository secret if he wants it to run. Then one eligible outside reviewer (not this session) at the exact head for this protected .github scope, Matthew's per-item yes and the merge queue.
+next_action: Matthew creates the XAI_API_KEY repository secret if he wants it to run (the xAI data-destination question is decided: yes). Then one eligible outside reviewer (not this session) at the exact head for this protected .github scope, Matthew's per-item yes and the merge queue.
 post_merge_check: on the first non-draft, non-docs PR after merge, the "Grok peer review" run shows the review job with a read-only token and the post job leaving one comment that starts "Grok peer observation". If XAI_API_KEY is absent the comment says the review was skipped. NOT_MEASURED until then.
 decisions:
   - Two jobs: review (contents: read, xAI key, no GitHub token, checkout with persist-credentials: false) and post (pull-requests: write, no checkout, no xAI key).
@@ -28,7 +28,7 @@ commands: |
 files_touched: .github/workflows/grok-review.yml (new); src/test/grok-review-workflow-safety.test.ts (new); this file (new)
 files_remaining: none
 blockers: XAI_API_KEY secret existence is unknown (no access to repository secrets). The workflow runs but posts a skipped note without it. The agent run itself is NOT_MEASURED: no key in this session, and the exact tool names accepted by --tools/--allow are taken from docs, not observed.
-open_questions: is sending PR diffs to xAI acceptable (new data destination)? Matthew's decision.
+open_questions: none. Data destination decided: Matthew answered "Yes, xAI is OK" on 2026-11-18 09:44 UTC in session session_017UoYKwo4mYcULag9FoN2QE to sending non-draft, non-docs PR diffs and repo files the agent reads to xAI.
 gotchas: a Grok comment is a peer observation, never independent acceptance (OWNERSHIP.md section 4.3). If grok rejects a flag, the review step fails closed and no comment is posted.
 exclusions_for_review: Claude session_017UoYKwo4mYcULag9FoN2QE (this writer)
 reviewer_seat: none requested yet
@@ -36,5 +36,5 @@ reviewer_sha: none
 session_state: no production access used; no secrets read or set; no paused workflows.
 claimed_by: Claude session_017UoYKwo4mYcULag9FoN2QE, 2026-11-18 09:41 UTC (Matthew's request)
 owner: Claude session_017UoYKwo4mYcULag9FoN2QE
-last_updated: 2026-11-18 09:41 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE
+last_updated: 2026-11-18 09:44 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE (recorded Matthew's xAI OK)
 ```

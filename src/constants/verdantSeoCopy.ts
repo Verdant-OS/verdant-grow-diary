@@ -188,7 +188,7 @@ export const VERDANT_PRICING_FAQ_ADDITIONS: ReadonlyArray<FaqEntry> = [
   {
     question: "Does Verdant charge extra for AI Doctor?",
     answer:
-      "No à-la-carte AI charges. Free includes 3 AI Doctor credits per grow. Pro Monthly and Pro Annual each include 100 AI Doctor credits per UTC calendar month. Craft includes 300. Credits are capped, never unlimited.",
+      "Free includes 3 AI Doctor credits per grow. Pro Monthly and Pro Annual each include 100 AI Doctor credits per UTC calendar month, and Craft includes 300. Credits are capped, never unlimited. Pro and Craft members can also buy one-time credit packs when they run out: 50 credits for $9 or 150 credits for $19. Packs never expire.",
   },
   {
     question: "Can I use Verdant without live sensors?",

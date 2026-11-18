@@ -9,11 +9,7 @@ import {
   removeAhrefsAnalyticsScript,
 } from "@/lib/ahrefsAnalyticsLoader";
 import { loadGoogleAnalytics, setGoogleAnalyticsOptOut } from "@/lib/googleAnalyticsLoader";
-import {
-  denyGoogleTagManagerConsent,
-  isGoogleTagManagerLoaded,
-  loadGoogleTagManager,
-} from "@/lib/googleTagManagerLoader";
+import { denyGoogleTagManagerConsent, loadGoogleTagManager } from "@/lib/googleTagManagerLoader";
 import { isExcludedAnalyticsPath } from "@/lib/posthogAnalyticsRules";
 import { syncPostHogWithConsent } from "@/lib/posthogClient";
 

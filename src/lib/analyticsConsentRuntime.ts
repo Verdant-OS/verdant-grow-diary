@@ -1,5 +1,6 @@
 import {
   persistedGrantWouldSurviveReload,
+  revocationSurvivesReload,
   type AnalyticsConsentDecision,
 } from "@/lib/analyticsConsent";
 import {
@@ -8,7 +9,11 @@ import {
   removeAhrefsAnalyticsScript,
 } from "@/lib/ahrefsAnalyticsLoader";
 import { loadGoogleAnalytics, setGoogleAnalyticsOptOut } from "@/lib/googleAnalyticsLoader";
-import { isGoogleTagManagerLoaded, loadGoogleTagManager } from "@/lib/googleTagManagerLoader";
+import {
+  denyGoogleTagManagerConsent,
+  isGoogleTagManagerLoaded,
+  loadGoogleTagManager,
+} from "@/lib/googleTagManagerLoader";
 import { isExcludedAnalyticsPath } from "@/lib/posthogAnalyticsRules";
 import { syncPostHogWithConsent } from "@/lib/posthogClient";
 
@@ -16,9 +21,11 @@ import { syncPostHogWithConsent } from "@/lib/posthogClient";
  * Apply the browser-local consent decision to every site analytics provider.
  * Provider loaders remain idempotent and receive no grower-content payloads.
  *
- * Google Tag Manager cannot be unloaded and has no kill switch, so a container
- * that already ran forces a reload when consent is withdrawn or an excluded
- * route opens, exactly like an already-running Ahrefs tag.
+ * Google Tag Manager cannot be unloaded and has no kill switch. A container that
+ * already ran gets Google consent-mode denial at once, and the document reloads
+ * whenever the reload keeps the denial: after a failed revoke that left the old
+ * grant in localStorage, the session-scoped denial is enough. Only when neither
+ * store can hold the denial does the container stay, under consent denial.
  */
 export function applyAnalyticsConsentDecision(
   decision: AnalyticsConsentDecision,
@@ -27,9 +34,10 @@ export function applyAnalyticsConsentDecision(
   if (isExcludedAnalyticsPath(location.pathname)) {
     syncPostHogWithConsent("denied", location);
     setGoogleAnalyticsOptOut(true);
-    const tagWasPresent = isAhrefsAnalyticsLoaded() || isGoogleTagManagerLoaded();
+    const containerRan = denyGoogleTagManagerConsent();
+    const tagWasPresent = isAhrefsAnalyticsLoaded() || containerRan;
     removeAhrefsAnalyticsScript();
-    if (persistedGrantWouldSurviveReload()) return false;
+    if (persistedGrantWouldSurviveReload()) return containerRan && revocationSurvivesReload();
     return tagWasPresent;
   }
 
@@ -46,9 +54,10 @@ export function applyAnalyticsConsentDecision(
     }
   }
 
-  const mustReload = isAhrefsAnalyticsLoaded() || (!granted && isGoogleTagManagerLoaded());
+  const containerRan = !granted && denyGoogleTagManagerConsent();
+  const mustReload = isAhrefsAnalyticsLoaded() || containerRan;
   removeAhrefsAnalyticsScript();
-  if (persistedGrantWouldSurviveReload()) return false;
+  if (persistedGrantWouldSurviveReload()) return containerRan && revocationSurvivesReload();
   return mustReload;
 }
 

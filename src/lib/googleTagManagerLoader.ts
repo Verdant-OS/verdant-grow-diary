@@ -66,3 +66,33 @@ export function isGoogleTagManagerLoaded(
   const src = buildGoogleTagManagerScriptSrc(containerId);
   return src !== null && findContainerScript(src) !== null;
 }
+
+/**
+ * Google consent-mode denial for a container that already ran in this document.
+ *
+ * Google tags fired by the container honour `consent update`; custom HTML and
+ * non-Google tags may not. This is the fallback when a reload cannot be used,
+ * not a replacement for it.
+ */
+export const GOOGLE_TAG_MANAGER_DENIED_CONSENT = Object.freeze({
+  ad_storage: "denied",
+  ad_user_data: "denied",
+  ad_personalization: "denied",
+  analytics_storage: "denied",
+});
+
+/** Pushes `gtag('consent', 'update', <all denied>)` when the container ran. */
+export function denyGoogleTagManagerConsent(
+  containerId: string = GOOGLE_TAG_MANAGER_CONTAINER_ID,
+): boolean {
+  if (typeof window === "undefined" || !isGoogleTagManagerLoaded(containerId)) return false;
+  const w = window as DataLayerWindow;
+  w.dataLayer = w.dataLayer || [];
+  const dataLayer = w.dataLayer;
+  const gtag = function gtag(..._args: unknown[]) {
+    // eslint-disable-next-line prefer-rest-params -- Arguments object required by Google's tag
+    dataLayer.push(arguments);
+  };
+  gtag("consent", "update", { ...GOOGLE_TAG_MANAGER_DENIED_CONSENT });
+  return true;
+}

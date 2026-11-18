@@ -110,7 +110,7 @@ jobs:
 
       - name: Upload offline SARIF to Code Scanning
         if: hashFiles(env.SARIF_PATH) != ''
-        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: ${{ env.SARIF_PATH }}
           category: prefix-diff-expected
@@ -206,7 +206,7 @@ jobs:
 
       - name: Upload live SARIF to Code Scanning
         if: hashFiles(env.SARIF_PATH) != ''
-        uses: github/codeql-action/upload-sarif@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: ${{ env.SARIF_PATH }}
           category: prefix-diff-live

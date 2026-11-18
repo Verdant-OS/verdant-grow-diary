@@ -1,7 +1,8 @@
 # CREATOR-BETA-NO-ANALYTICS
 
 ```text
-TASK CREATOR-BETA-NO-ANALYTICS  priority: P2  status: OPEN
+TASK CREATOR-BETA-NO-ANALYTICS  priority: P2  status: CLOSED
+closed: 2026-11-18, merged. Landed on verdant-grow-diary as e1b1109ce203a1294dd492278456be65eab35318 (#2985, 2026-11-17 23:36 UTC). Closed by Claude session_017UoYKxxpw2guRq48NBdZRB at Matthew's request. The post_merge_check, blockers and open questions below carry forward unchanged; none is claimed as measured by this close.
 goal: A visitor to /creator-beta or /breeder-beta is not measured by any analytics provider, whatever they chose on the consent banner, so the "No analytics." line on both pages is true.
 why: #2714 asks that /creator-beta never load analytics, even with consent. Measured on production on 2026-11-16 at cbb708bce190 (live /version.json): with analytics accepted, /creator-beta loaded Google Analytics and PostHog. Matthew told this session to fix it (2026-11-16, his word: "fix"). /breeder-beta renders the same component and the same sentence; asked on 2026-11-16, Matthew chose "Turn analytics off too".
 branch: claude/project-thread-66zbbk on GitHub (the integrating session's permitted push branch). The authoring session named it claude/creator-beta-no-analytics; that name was never pushed. The four commits keep their SHAs (fetched from the v2 bundle).
@@ -33,5 +34,5 @@ reviewer_sha: none
 session_state: cse_017UoYKzUZNQJm1Lq1SHx6Qv is subscribed to #2985 activity. No routines, no paused workflows. Pending human decision: Matthew's merge yes after review.
 claimed_by: Claude cse_017UoYKzUZNQJm1Lq1SHx6Qv, 2026-11-17 06:47 UTC, transferred at the push as next_action required (earlier claim: session_017UoYKwswU3ZkQjov4uiTgE, 2026-11-17 03:15 UTC). Issue #2714's assignee is verdant-ultra-bot; no branch, PR or handoff entry from that seat was found on 2026-11-17.
 owner: Claude cse_017UoYKzUZNQJm1Lq1SHx6Qv
-last_updated: 2026-11-17 06:47 UTC, by Claude cse_017UoYKzUZNQJm1Lq1SHx6Qv
+last_updated: 2026-11-18, by Claude session_017UoYKxxpw2guRq48NBdZRB (previously 2026-11-17 06:47 UTC, by Claude cse_017UoYKzUZNQJm1Lq1SHx6Qv)
 ```

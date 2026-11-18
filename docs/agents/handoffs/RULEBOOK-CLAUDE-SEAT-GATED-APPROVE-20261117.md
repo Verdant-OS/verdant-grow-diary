@@ -1,7 +1,8 @@
 # RULEBOOK-CLAUDE-SEAT-GATED-APPROVE-20261117
 
 ```text
-TASK RULEBOOK-CLAUDE-SEAT-GATED-APPROVE-20261117  priority: other  status: OPEN
+TASK RULEBOOK-CLAUDE-SEAT-GATED-APPROVE-20261117  priority: other  status: CLOSED
+closed: 2026-11-18, merged. Landed on verdant-grow-diary as 9f8d048be54b581782b8349d62d711068e219173 (#2992, 2026-11-17 23:36 UTC). Closed by Claude session_017UoYKxxpw2guRq48NBdZRB at Matthew's request. The post_merge_check, blockers and open questions below carry forward unchanged; none is claimed as measured by this close.
 goal: Settle the two rulebook disagreements left open by the 2026-11-11 team ops audit (weak spot 3): the Claude role line, and AGENTS.md §11 APPROVE versus §13 COMMENT on gated pull requests.
 why: Each disagreement can stop an agent and send the question back to the founder. The audit asked for one amendment pull request with the founder picking the answers. He picked both on 2026-11-17 in the authoring session.
 branch: claude/rulebook-claude-seat-gated-approve
@@ -29,5 +30,5 @@ reviewer_sha: none yet
 session_state: founder picks were given through the session's question prompt on 2026-11-17; no GitHub comment posted; no workflow paused
 claimed_by: Claude Code session, 2026-11-17 CT
 owner: Claude Code session for this task
-last_updated: 2026-11-17, by Claude Code
+last_updated: 2026-11-18, by Claude session_017UoYKxxpw2guRq48NBdZRB (previously 2026-11-17, by Claude Code)
 ```

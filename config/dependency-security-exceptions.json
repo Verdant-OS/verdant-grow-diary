@@ -84,7 +84,7 @@
         {
           "package": "@lovable.dev/mcp-js",
           "group": "dependencies",
-          "spec": "0.24.0"
+          "spec": "3.5.0"
         },
         {
           "package": "@tailwindcss/vite",
@@ -161,7 +161,7 @@
         {
           "package": "@lovable.dev/mcp-js",
           "group": "dependencies",
-          "spec": "0.24.0"
+          "spec": "3.5.0"
         },
         {
           "package": "@tailwindcss/vite",

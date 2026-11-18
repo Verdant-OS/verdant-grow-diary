@@ -2324,11 +2324,19 @@ var get_grow_walk_context_default = defineTool5({
 
 // src/lib/mcp/index.ts
 var projectRef = "knkwiiywfkbqznbxwqfh";
+var MCP_ALLOWED_ORIGINS = [
+  "https://verdantgrowdiary.com",
+  "https://www.verdantgrowdiary.com",
+  "https://verdantgrowdiary-com.lovable.app",
+  "https://id-preview--66255e7b-892c-4be5-8686-ab1cfc3666db.lovable.app",
+  "https://66255e7b-892c-4be5-8686-ab1cfc3666db.lovableproject.com"
+];
 var mcp_default = defineMcp({
   name: "verdant-grow-os-mcp",
   title: "Verdant Grow OS",
   version: "0.1.0",
   instructions: "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Use `list_grow_walk_targets` to rank owned tents and plants for physical inspection, then `get_grow_walk_context` to retrieve bounded, source-labeled evidence for one exact owned target. Grow Walk priority is scouting guidance, not diagnosis. Photo rows are metadata only unless an image is separately supplied and inspected. Sensor readings always include their `source` and `quality` labels verbatim. Trust is deny-by-default: a reading is current live telemetry ONLY when its quality is `ok` AND its source is `live` (fresh validated connected telemetry). Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. This server never writes, never starts AI Doctor, never spends AI credits, never approves Action Queue items, and never controls devices.",
+  allowedOrigins: MCP_ALLOWED_ORIGINS,
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"

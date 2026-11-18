@@ -35,6 +35,7 @@ const DISALLOW_RULES = ROBOTS.split(/\r?\n/)
 const REQUIRED_GUIDE_URLS = [
   "https://verdantgrowdiary.com/guides",
   "https://verdantgrowdiary.com/guides/grow-diary-app",
+  "https://verdantgrowdiary.com/guides/grow-log-without-spreadsheets",
   "https://verdantgrowdiary.com/guides/grow-log-app-vs-grow-journal",
   "https://verdantgrowdiary.com/guides/grow-room-vpd-tracker",
   "https://verdantgrowdiary.com/guides/ac-infinity-data-logging",

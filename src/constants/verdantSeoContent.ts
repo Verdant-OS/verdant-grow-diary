@@ -264,44 +264,228 @@ const IMPORT_GROW_SENSOR_CSV_LINK: GuideAnchor = {
 export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   {
     slug: "grow-diary-app",
-    title: "Best grow diary app for serious growers | Verdant Grow Diary",
-    h1: "Best grow diary app for serious growers who track more than notes",
+    title: "Best grow diary app for cannabis growers with controllers | Verdant",
+    h1: "Best grow diary app for cannabis: Verdant, Grow with Jane, GrowDiaries, or a spreadsheet?",
     description:
-      "What a serious grow diary app should track — logs, photos, source-labeled sensor snapshots, and one plant timeline so you build real plant memory across runs.",
+      "Verdant is a browser-based cannabis grow diary for home growers who run AC Infinity, Spider Farmer or EcoWitt gear. An honest comparison with Grow with Jane, GrowDiaries and spreadsheets.",
     targetKeyword: "grow diary app",
+    introHeading: "What's the best grow diary app for cannabis?",
     intro:
-      "A serious grow diary app has to do more than store text notes. It has to hold the moment a grower actually cares about: what changed, when it changed, and what the plant looked like at the time — with the sensor context around it. Verdant is a grow diary app built for growers who want to make decisions from their own history, not memory.",
+      "If you grow cannabis at home and already run a controller or sensors (AC Infinity, Spider Farmer, EcoWitt), Verdant Grow Diary is built for you: it puts your logs, photos, and sensor readings on one plant timeline, and it never touches your equipment. If you want a native phone app with care reminders and a big community, Grow with Jane is the better fit. If you mainly want to read and share public grow diaries, use GrowDiaries. There's no single best app for every grower, so here is an honest comparison, including where Verdant is not the right pick. To be upfront: Verdant is new and still in early build.",
     sections: [
       {
-        heading: "One plant timeline, not scattered notebooks",
-        body: "Verdant organizes every entry against a specific plant. Waterings, feedings, training, symptoms, photos, alerts, and sensor snapshots land on the same timeline so you can see what changed and what the plant did next. That is plant memory — the core value of a real grow diary app.",
+        heading: "The short version: which grow diary fits you",
+        body: "Each option is built for a different grower. Competitor details come from their own public pages and app store listings as of November 2026, so check them for current details.",
+        columnTable: {
+          ariaLabel: "Grow diary options compared",
+          headers: ["Option", "Best for, and what to know"],
+          rows: [
+            [
+              "Verdant Grow Diary",
+              "Growers with controllers or sensors who want logs and conditions on one timeline. Runs in the browser; no native iOS or Android app yet. AC Infinity and Spider Farmer CSV import on Free, EcoWitt read-only on Pro. No reminder notifications or public diaries yet. Free; Pro $99/year or $12/month; Craft $249/year or $29/month.",
+            ],
+            [
+              "Grow with Jane",
+              "Growers who want a native iPhone, iPad, and Android journal with care reminders and a large community. Measurements are typed in by hand. Free; Pro in-app purchases listed at $4.99 and $35.99 on the App Store.",
+            ],
+            [
+              "GrowDiaries",
+              "Growers who want to share and browse public grow diaries, forums, and contests. Website plus iOS and Android apps launched in September 2026. Free on the App Store.",
+            ],
+            [
+              "Google Sheets or Excel",
+              "Growers who want full control of their own columns and formulas and will maintain the sheet. Free. No reminders, photos, or controller data unless you build them in yourself.",
+            ],
+          ],
+        },
       },
       {
-        heading: "30-second Quick Log so entries actually happen",
-        body: "The best grow diary is the one you actually fill in. Quick Log is designed to capture a watering, feeding, or observation in about 30 seconds, with an optional photo and sensor snapshot. If logging takes five minutes, it stops happening after week two.",
+        heading: "Verdant Grow Diary: for growers who already own the hardware",
+        body: "Verdant is a grow diary for serious home growers who already run a controller and don't want another one. It doesn't replace your AC Infinity, Spider Farmer, or EcoWitt app. It turns what that gear records into plant history. It runs in your browser, so there's nothing to install.",
+        bullets: [
+          {
+            text: "One plant timeline: waterings, feedings, training, symptoms, photos, sensor snapshots, alerts, AI Doctor results, and outcomes all land on the same plant, so you can see what changed and what the plant did next.",
+          },
+          {
+            text: "Quick Log: it's designed to capture a watering, feeding, or observation in about 30 seconds, with an optional photo and sensor snapshot. You can try it without an account, and the draft stays in your browser until you choose to keep it.",
+            link: {
+              label: "try it without an account",
+              href: "/quick-log",
+            },
+          },
+          {
+            text: "Controller data, imported honestly: export a CSV from the AC Infinity or Spider Farmer app and import it from Sensors with Import historical data. Each reading stays labeled as CSV, so it's never passed off as live. This is included on Free. See the AC Infinity data logging guide.",
+            link: {
+              label: "AC Infinity data logging guide",
+              href: "/guides/ac-infinity-data-logging",
+            },
+          },
+          {
+            text: "EcoWitt, read-only: on Pro, EcoWitt readings can come in through a read-only integration, and Verdant never sends commands back. ESP32, MQTT, webhook, and Raspberry Pi bridge paths are read-only too, and any reading can still be logged by hand, including from a TrolMaster. See hardware integrations.",
+            link: {
+              label: "hardware integrations",
+              href: "/hardware-integrations",
+            },
+          },
+          {
+            text: "Source-labeled sensor data: every reading is labeled live, manual, csv, demo, stale, or invalid. Old or sample readings are never shown as current tent conditions.",
+          },
+          {
+            text: "AI Doctor that shows its work: it reviews plant history, recent logs, photos, and labeled sensor context, then returns the evidence it used, a confidence level, what information is missing, possible causes, and what not to do. When context is thin, it says so instead of guessing. See how AI Doctor works.",
+            link: {
+              label: "how AI Doctor works",
+              href: "/how-ai-doctor-works",
+            },
+          },
+          {
+            text: "Approval-required Action Queue: AI Doctor can suggest a next step. It only goes into the Action Queue if you add it, and approving an item sends no command to any device.",
+          },
+          {
+            text: "Reports you can keep: on Pro, the Post-Grow Learning Report and a date-range diary report print or save as PDF from your browser.",
+          },
+        ],
+        continuations: [
+          {
+            heading: "Who it's for",
+            headingLevel: 3,
+            bullets: [
+              {
+                text: "Home cannabis growers running one or more tents with AC Infinity, Spider Farmer, EcoWitt, or similar gear",
+              },
+              {
+                text: "Growers who want to read a diary note against the conditions that led up to it",
+              },
+              {
+                text: "Growers who want AI help that admits what it doesn't know, and who want to make the final call themselves",
+              },
+              {
+                text: "Growers who want to compare runs and remember what to repeat or avoid next time (Pro includes a Post-Grow Learning Report)",
+              },
+            ],
+          },
+          {
+            heading: "Who it's not for",
+            headingLevel: 3,
+            bullets: [
+              {
+                text: "Growers who want Verdant to run their tent. It doesn't automate lights, fans, irrigation, or humidifiers. That's on purpose. Keep using your controller.",
+              },
+              {
+                text: "Growers who want a native app from the App Store or Google Play. Verdant runs in the browser for now. There's no native iOS or Android app yet.",
+              },
+              {
+                text: "Growers who rely on reminder notifications. Verdant doesn't send reminder notifications yet.",
+              },
+              {
+                text: "Growers whose main goal is a big public community. If browsing thousands of other people's grows and getting comments is the point, GrowDiaries or Grow with Jane will serve you better.",
+              },
+              {
+                text: "Growers who want a long-established product. Verdant is still in early build. If you'd rather use an app with years of history behind it, Jane or GrowDiaries is the safer pick today.",
+              },
+            ],
+          },
+        ],
       },
       {
-        heading: "Source-labeled sensor snapshots",
-        body: "Verdant preserves the source of every reading — live, manual, csv, demo, stale, or invalid — so a snapshot you attach to a diary entry always carries its own provenance. Demo or stale values never masquerade as current tent truth.",
+        heading: "Grow with Jane: for a native phone journal and a big community",
+        body: "Grow with Jane is a cannabis grow journal app for iPhone, iPad, and Android. According to its App Store listing, you can track plants and environments, log watering, feeding, transplanting, notes, and photos, set reminders for plant care and recurring tasks, review charts, use calculators, share Growlogs on a grower profile, and ask Jane AI about plant issues. It's free to use, and Pro (in-app purchases listed at $4.99 and $35.99) unlocks unlimited plants and environments, expert Grower Support, high-quality photo backups, and more Jane AI use. Grow with Jane's site says more than 650,000 growers use it.",
+        closing:
+          "Pick Jane if you want a polished native phone app, care reminders, and a large community, and you're happy to type in measurements yourself. Pick Verdant instead if you want your controller's history next to your notes without retyping numbers.",
       },
       {
-        heading: "Grower-approved decisions, never hands-off",
-        body: "Verdant suggests; the grower decides. AI Doctor can point at likely causes and cite the evidence, but a recommendation reaches the approval-required Action Queue only when the grower chooses to add it. Verdant cannot touch your equipment.",
+        heading: "GrowDiaries: for public diaries and learning from other growers",
+        body: "GrowDiaries is a cannabis growers' community built around public grow diaries. Its App Store listing says you can document grow cycles, browse a library of more than 90,000 grow diaries, and take part in forums and contests alongside a community of more than 350,000 growers. Official iOS and Android apps launched in September 2026.",
+        closing:
+          "Pick GrowDiaries if you want to share your grow publicly, get feedback, and research how a strain or nutrient line ran for other people. Looking for a GrowDiaries alternative? If what you want is a private working record tied to your own sensor data, with AI that cites its evidence, Verdant fits. Many growers can use both: GrowDiaries to share with the community, Verdant as the full working record.",
+      },
+      {
+        heading: "Google Sheets or Excel: for full control, if you'll maintain it",
+        body: "A spreadsheet is a real option. It's free, you choose every column, and formulas let you compare runs side by side. The cost is upkeep: you maintain it yourself, photos and controller readings live somewhere else, and nothing reminds you when a plant is due. See how to log your grow without spreadsheets for what to log per plant and when a sheet is still the right tool.",
+        bodyLink: {
+          label: "how to log your grow without spreadsheets",
+          href: "/guides/grow-log-without-spreadsheets",
+        },
       },
     ],
     faq: [
       {
-        question: "What should a serious grow diary app track?",
+        question: "Is Verdant free?",
         answer:
-          "At minimum: waterings and feedings (with pH/EC), training and defoliation, symptoms, photos, and sensor snapshots — all against a specific plant with a captured_at timestamp. Verdant adds source-labeled sensor context and grower-approved actions so the diary drives decisions, not just memories.",
+          "Yes. The Free plan is $0 with no time limit: 1 active grow, 1 tent, diary and timeline history kept forever, CSV sensor import, manual sensor entries, 90 days of sensor snapshot history, and 3 AI Doctor credits per grow. Pro is $99/year or $12/month and adds unlimited grows, multi-tent memory, full sensor history, read-only sensor integrations where available, advanced exports, and 100 AI Doctor credits per month. Craft is $249/year or $29/month and adds live per-stage SOP scoring and 300 AI Doctor credits per month.",
       },
       {
-        question: "Do I need sensors to use a grow diary app?",
+        question: "Is there a Verdant phone app?",
         answer:
-          "No. You can start with manual entries and photos, then add CSV imports from AC Infinity, Spider Farmer, or similar environment exports later. Verdant treats manual and CSV as first-class sources with their own labels.",
+          "Not yet. Verdant runs in your browser, on a phone, tablet, or computer. There is no native iOS or Android app yet.",
+      },
+      {
+        question: "Does Verdant work with AC Infinity and Spider Farmer?",
+        answer:
+          "Yes, through CSV. Export from the AC Infinity or Spider Farmer app and import it into Verdant from Sensors, using Import historical data. CSV import is included on Free. Readings stay labeled as CSV, not live.",
+      },
+      {
+        question: "Does Verdant work with TrolMaster or EcoWitt?",
+        answer:
+          "EcoWitt, yes: a read-only EcoWitt integration is available on Pro. Verdant reads the data and never sends commands back. TrolMaster import isn't available yet, so for now you can log TrolMaster readings by hand as manual snapshots.",
+      },
+      {
+        question: "Will Verdant control my lights, fans, or humidifier?",
+        answer:
+          "No. Verdant is read-only and can't change your equipment. AI Doctor suggests, and you decide. Approving an Action Queue item sends no command to any device.",
+      },
+      {
+        question: "Do I need sensors to use Verdant?",
+        answer:
+          "No. A plant nickname and one note are enough to start. Sensor data, photos, and AI review are optional and can be added later.",
+      },
+      {
+        question: "How is AI Doctor different from asking a chatbot?",
+        answer:
+          "It works from your plant's own history and labeled sensor data. It lists the evidence it used, how confident it is, and what's missing. When the context is thin, \"I need more information\" is a valid answer.",
+      },
+      {
+        question: "Is Verdant better than Grow with Jane?",
+        answer:
+          "It's different. Jane is a native phone app with care reminders, a large community, a forum, and Jane AI. Verdant is a browser-based diary for growers who want controller and sensor history on the same timeline as their notes, with AI that cites its evidence. If you don't run a controller, or you want a native phone app with care reminders and a community, Jane may suit you better.",
+      },
+      {
+        question: "Who owns my data?",
+        answer:
+          "You do. Verdant doesn't sell your data, and Pro includes advanced exports so you can take your full history with you.",
       },
     ],
-    related: ["grow-log-app-vs-grow-journal", "sensor-truth-grow-room"],
+    related: [
+      "grow-log-without-spreadsheets",
+      "grow-log-app-vs-grow-journal",
+      "sensor-truth-grow-room",
+    ],
+    sources: [
+      {
+        label: "Grow with Jane on the App Store",
+        href: "https://apps.apple.com/us/app/grow-with-jane-grow-journal/id1467850558",
+        note: "Features and Pro in-app purchase prices as listed on 2026-11-18. The listing doesn't say which Pro price is monthly or yearly.",
+      },
+      {
+        label: "Grow with Jane on Google Play",
+        href: "https://play.google.com/store/apps/details?id=com.unlogical.jane",
+        note: "Confirms the Android app. Read 2026-11-18.",
+      },
+      {
+        label: "Grow with Jane homepage",
+        href: "https://growithjane.com/",
+        note: "Source of the 650,000+ growers figure, the forum, and the Discord channel, as stated by Grow with Jane. Read 2026-11-18.",
+      },
+      {
+        label: "GrowDiaries on the App Store",
+        href: "https://apps.apple.com/us/app/growdiary/id6739211123",
+        note: "Source of the 90,000+ diaries and 350,000+ community figures, as stated by GrowDiaries. Read 2026-11-18.",
+      },
+      {
+        label: "GrowDiaries: apps are officially here",
+        href: "https://growdiaries.com/journal/apps-are-officially-here",
+        note: "GrowDiaries' own announcement of its iOS and Android apps, dated 1 September 2026.",
+      },
+    ],
   },
   {
     slug: "grow-log-app-vs-grow-journal",
@@ -390,6 +574,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "grow-journal-app-without-account",
       "what-to-log-in-a-grow-journal",
       "grow-diary-app",
+      "grow-log-without-spreadsheets",
     ],
   },
   {
@@ -886,7 +1071,12 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       ],
       cta: { label: "Import your first CSV free →", href: IMPORT_GROW_SENSOR_CSV_CTA_HREF },
     },
-    related: ["ac-infinity-data-logging", "spider-farmer-data-logging", "grow-room-vpd-tracker"],
+    related: [
+      "ac-infinity-data-logging",
+      "spider-farmer-data-logging",
+      "grow-room-vpd-tracker",
+      "grow-log-without-spreadsheets",
+    ],
   },
   {
     slug: "sensor-truth-grow-room",
@@ -1316,6 +1506,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "how-to-start-a-grow-journal",
       "what-to-log-in-a-grow-journal",
       "grow-log-app-vs-grow-journal",
+      "grow-log-without-spreadsheets",
     ],
   },
   {
@@ -2459,6 +2650,243 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     ],
     publishedOn: "2026-08-01",
     modifiedOn: "2026-08-01",
+  },
+  {
+    slug: "grow-log-without-spreadsheets",
+    title: "How to log your grow without spreadsheets | Verdant",
+    h1: "How to log your grow without spreadsheets",
+    description:
+      "Stop fighting a Google Sheets or Excel grow log. What to log per plant, what to do with your old sheet, when a spreadsheet is still fine, and offline grow journal alternatives.",
+    targetKeyword: "log grow without spreadsheets",
+    introHeading: "How do I log my grow without a spreadsheet?",
+    intro:
+      "Log each plant in a grow diary built for it. In Verdant, that means a 30-second Quick Log entry per watering, feed, or observation, on one plant timeline with photos and sensor readings attached. Keep your old Google Sheets or Excel grow log as the archive for past runs, and start your current run in the diary. A spreadsheet can work, and many good growers use one. But if your sheet has turned into twenty columns you fill in on Sundays from memory, here's how to replace it for your next entries without losing what you've already recorded. To be upfront: Verdant is new and still in early build, and it doesn't import spreadsheet diaries yet.",
+    sections: [
+      {
+        heading: "Why grow spreadsheets stop working",
+        body: "Most grow sheets don't fail because spreadsheets are bad. They fail because of where and when the logging happens.",
+        bullets: [
+          {
+            text: "The grow room isn't a desk. Typing into cells on a phone with wet hands is slow, so entries get saved for later, and later is from memory.",
+          },
+          {
+            text: 'Photos live somewhere else. The sheet says "leaf spots, plant B." The photo is in your camera roll with 400 others.',
+          },
+          {
+            text: 'Controller data lives somewhere else too. Your AC Infinity or TrolMaster app has the temperature and humidity history, but it isn\'t next to the row where you wrote "drooping."',
+          },
+          {
+            text: "Nothing reminds you. A sheet doesn't tell you a feed is due.",
+          },
+          {
+            text: "The columns grow until nobody fills them in. Every problem adds a column, and you stop filling in most of them by week three.",
+          },
+        ],
+        closing:
+          "If none of that sounds like your grow, a spreadsheet may still be the right tool. The section on when a spreadsheet is fine covers that.",
+      },
+      {
+        heading: "What to log for each plant",
+        body: 'Whether you use Verdant, another app, or a sheet, these are the fields that earn their place. Log them against a specific plant, not "the tent."',
+        columnTable: {
+          ariaLabel: "What to log for each plant",
+          headers: ["Field", "What to write, and why it matters later"],
+          rows: [
+            [
+              "Date and time",
+              "When it happened, not when you typed it. It lets you line up the plant's response with what you did.",
+            ],
+            [
+              "Stage",
+              'Seedling, veg, flower, flush, harvest, or drying. "Not sure yet" is an honest answer. The same symptom means different things in week 2 of veg and week 6 of flower.',
+            ],
+            [
+              "Water volume",
+              'A number in ml or L, not "light" or "heavy." 300 ml and 800 ml tell a story. "Watered" doesn\'t.',
+            ],
+            [
+              "Feed, EC, pH",
+              "What you fed, plus the EC and pH you measured. Most nutrient questions come down to these numbers.",
+            ],
+            [
+              "Observation",
+              "One plain line about what changed: color, posture, new growth, pests. It records what you saw at the time, not what you remember later.",
+            ],
+            [
+              "Photo",
+              "Same angle each time, once or twice a week, plus whenever something looks off. A photo turns a note into evidence.",
+            ],
+            [
+              "Sensor snapshot",
+              "Temperature, humidity, and VPD at that moment, labeled with where the reading came from. It tells you what the room was doing when the plant changed.",
+            ],
+          ],
+        },
+        closing:
+          "Skip whatever you can't keep up. A short log kept daily beats a complete one kept twice. What to log in a grow journal goes deeper.",
+        closingLink: {
+          label: "What to log in a grow journal",
+          href: "/guides/what-to-log-in-a-grow-journal",
+        },
+        continuations: [
+          {
+            heading: "How this looks in Verdant",
+            headingLevel: 3,
+            bullets: [
+              {
+                text: "Quick Log captures a watering, feeding, or observation in about 30 seconds: pick the plant and the entry type, then add the number and a note.",
+              },
+              {
+                text: "Photos attach to the entry, so they land on the plant's timeline at the right date.",
+              },
+              {
+                text: "Sensor snapshots come from the gear you already own. AC Infinity and Spider Farmer exports import as CSV history on Free, and EcoWitt connects through a read-only integration on Pro. Any reading, including from a TrolMaster, can be typed in by hand. Every reading is labeled live, manual, csv, demo, stale, or invalid, so old numbers never pass as current.",
+              },
+              {
+                text: "Reminder entries let you put a date and time on the plant's timeline for the next feed or check. Verdant doesn't send reminder notifications yet.",
+              },
+              {
+                text: 'One plant timeline puts waterings, feeds, photos, readings, and observations in order, so "what changed before this?" is one scroll, not three tabs.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        heading: "What to do with the spreadsheet you already have",
+        body: "Verdant doesn't import spreadsheet grow diaries yet. You don't need to move every old row to stop using the sheet for new entries.",
+        steps: [
+          "Make a copy of your sheet and keep it. It stays the record of your past runs.",
+          "Set up the current run. Create a free account, then add the grow, tent, and plants you're running now.",
+          "Carry over what you'll actually look back at. Add one note per plant with the strain, start date, and the last feed, EC, and pH you used. A link to the old sheet in that note keeps the history one tap away.",
+          "Bring in your controller history. Sensor readings from AC Infinity or Spider Farmer go in from Sensors with Import historical data, free on every plan. EcoWitt connects read-only on Pro.",
+          "Log new entries in Verdant from today. Stop adding rows to the sheet so there's one place to look.",
+        ],
+        closing:
+          "Your diary and your controller's data are two different things. A spreadsheet diary holds your entries: waterings, feeds, notes. A controller CSV holds the room's readings. Verdant imports the controller CSV and keeps those readings labeled as CSV history so they never pass as live. The import grow sensor CSV guide walks through it step by step.",
+        closingLink: {
+          label: "import grow sensor CSV guide",
+          href: "/guides/import-grow-sensor-csv",
+        },
+      },
+      {
+        heading: "When a spreadsheet is still the right tool",
+        body: "A spreadsheet is a fine grow log if most of these are true.",
+        bullets: [
+          {
+            text: "You log at a desk or laptop, not in the grow room.",
+          },
+          {
+            text: "You mostly track numbers (volumes, EC, pH, yields) and rarely need photos next to them.",
+          },
+          {
+            text: "You like building your own formulas and charts, and you enjoy maintaining the sheet.",
+          },
+          {
+            text: "You run one tent and don't need controller history next to your notes.",
+          },
+          {
+            text: "You want a file that's completely yours, in a format any tool can open.",
+          },
+        ],
+        closing:
+          "If that's you, keep the sheet and make it consistent: one row per event, one column per field, the same units every time, and a photo file name in its own column. Grow log app vs paper journal vs spreadsheet covers the trade-offs. Switch when entries stop happening, when photos and readings end up in three places, or when you can't answer \"what changed in the two days before this showed up?\"",
+        closingLink: {
+          label: "Grow log app vs paper journal vs spreadsheet",
+          href: "/guides/grow-log-app-vs-grow-journal",
+        },
+      },
+      {
+        heading: "Other ways to leave a spreadsheet: offline and local-first options",
+        body: "Verdant isn't the only choice, and it isn't the right one for everyone. If keeping data only on your own device matters most, these grow journals are built for that. Their own pages are listed in the sources below.",
+        bullets: [
+          {
+            text: "OG Grow Journal is a free, open-source grow diary that runs in your browser, works offline, and keeps data on your device with no account. Sync between devices is optional and end-to-end encrypted. It has watering and feeding reminders, DLI planning, a tent planner, and a post-to-Overgrow export.",
+          },
+          {
+            text: "Verdiario is a free browser journal with no account and no cloud. It logs watering with pH and EC, training, treatments, and photos, and exports to JSON or CSV.",
+          },
+          {
+            text: "PlantManager is a free, open-source, single-file web app for tracking mothers, clones, feeding, environments, and harvests. Its README describes it as local-first and offline, with no accounts.",
+          },
+          {
+            text: "MyGrowLog is an account-based web app for indoor grows. According to its FAQ, it handles daily logs, climate readings with AC Infinity CSV upload, photos, tasks, costs, an optional AI photo assessment, and opt-in public sharing.",
+          },
+        ],
+        closing:
+          "Where Verdant is different: Verdant is an account-based diary. Your entries are saved to your account, not only to one browser, and it runs in the browser on any device. What it adds is the sensor side: controller CSV import, a read-only EcoWitt integration, source-labeled readings, and an AI Doctor that cites the evidence it used, shows its confidence, names what's missing, and never touches your equipment. If you don't run a controller and want everything kept offline on one device, OG Grow Journal or Verdiario may suit you better.",
+      },
+    ],
+    faq: [
+      {
+        question: "Can I import my Google Sheets or Excel grow diary into Verdant?",
+        answer:
+          "Not yet. Verdant doesn't import spreadsheet grow diaries today. Keep your sheet as the archive for past runs and start your current run in Verdant. Controller sensor CSVs from AC Infinity and Spider Farmer can be imported.",
+      },
+      {
+        question: "Is importing AC Infinity or Spider Farmer CSVs the same thing?",
+        answer:
+          "No. Controller CSV import brings in the room's sensor readings, such as temperature, humidity, and VPD, and labels them as CSV history. It's included on Free, from Sensors, using Import historical data. It doesn't bring in your own diary entries.",
+      },
+      {
+        question: "Do I need an account?",
+        answer:
+          "To keep a diary, yes. You can try one Quick Log entry without an account, and the draft stays in your browser. Saving entries to your diary and importing controller CSVs need a free account.",
+      },
+      {
+        question: "Is there a phone app?",
+        answer:
+          "Not a native one yet. Verdant runs in the browser on your phone, tablet, or computer, so you can log from the grow room without installing anything.",
+      },
+      {
+        question: "Does Verdant work with my sensors?",
+        answer:
+          "AC Infinity and Spider Farmer come in as CSV imports on Free. EcoWitt connects through a read-only integration on Pro. Verdant reads data and never sends commands to your equipment. You can also type readings in by hand, including from a TrolMaster.",
+      },
+      {
+        question: "Is Verdant free?",
+        answer:
+          "The Free plan is $0 with no time limit: 1 active grow, 1 tent, diary and timeline history kept forever, manual sensor entries, CSV sensor import, and 3 AI Doctor credits per grow. Pro is $99/year or $12/month, and Craft is $249/year or $29/month.",
+      },
+      {
+        question: "When should I keep using a spreadsheet?",
+        answer:
+          "If you log at a desk, mostly track numbers, like building your own formulas, and are happy maintaining the sheet, a spreadsheet is a fine grow log. Switch when entries stop happening, photos and readings end up in other places, or you can't answer what changed before a problem.",
+      },
+    ],
+    related: [
+      "grow-diary-app",
+      "grow-log-app-vs-grow-journal",
+      "what-to-log-in-a-grow-journal",
+      "import-grow-sensor-csv",
+    ],
+    sources: [
+      {
+        label: "OG Grow Journal",
+        href: "https://grow.rafime.de/",
+        note: "The project's own page: free, open source, offline-first, no account, optional end-to-end encrypted sync, reminders, DLI planning, tent planner, and Overgrow posting. Read 2026-11-18.",
+      },
+      {
+        label: "OG Grow Journal thread on Overgrow",
+        href: "https://overgrow.com/t/og-grow-journal-a-free-offline-grow-diary-from-seed-to-harvest/258491",
+        note: "The developer's announcement thread on the Overgrow forum.",
+      },
+      {
+        label: "Verdiario",
+        href: "https://verdiario.com/en/",
+        note: "The journal's own page: free, no account, no cloud, pH and EC logging, and JSON or CSV export. Read 2026-11-18.",
+      },
+      {
+        label: "PlantManager on GitHub",
+        href: "https://github.com/magikh0e/PlantManager",
+        note: "The project's README: GPL-3.0, a single-file local-first web app that works offline with no accounts. Read 2026-11-18.",
+      },
+      {
+        label: "MyGrowLog FAQ",
+        href: "https://mygrowlog.com/faq",
+        note: "MyGrowLog's own FAQ, the source of each feature listed above. Read 2026-11-18.",
+      },
+    ],
   },
 ];
 

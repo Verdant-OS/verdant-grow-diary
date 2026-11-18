@@ -82,6 +82,8 @@ const EXPECTED_SLUGS: ReadonlyArray<string> = [
   "cannabis-leaves-turning-yellow",
   "cannabis-leaf-spots-lesions",
   "cannabis-burnt-crispy-leaf-tips",
+  // Spreadsheet-exit guide; pairs with grow-diary-app without competing with it.
+  "grow-log-without-spreadsheets",
 ];
 
 describe("Verdant grower guide FAQ (/guides)", () => {

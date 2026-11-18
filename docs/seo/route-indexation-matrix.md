@@ -49,6 +49,7 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 - `/docs/mcp-api` — robots `index, follow`; sitemap yes; canonical `/docs/mcp-api`
 - `/guides` — robots `index, follow`; sitemap yes; canonical `/guides`
 - `/guides/grow-diary-app` — robots `index, follow`; sitemap yes; canonical `/guides/grow-diary-app`
+- `/guides/grow-log-without-spreadsheets` — robots `index, follow`; sitemap yes; canonical `/guides/grow-log-without-spreadsheets`
 - `/guides/grow-log-app-vs-grow-journal` — robots `index, follow`; sitemap yes; canonical `/guides/grow-log-app-vs-grow-journal`
 - `/guides/grow-room-vpd-tracker` — robots `index, follow`; sitemap yes; canonical `/guides/grow-room-vpd-tracker`
 - `/guides/ac-infinity-data-logging` — robots `index, follow`; sitemap yes; canonical `/guides/ac-infinity-data-logging`

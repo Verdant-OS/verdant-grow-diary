@@ -35,3 +35,11 @@ export const GOOGLE_ANALYTICS_MEASUREMENT_ID = resolveGoogleAnalyticsMeasurement
  */
 export const AHREFS_WEB_ANALYTICS_KEY = "KZfnjSoVSRYkyDJq+SUsow";
 export const AHREFS_WEB_ANALYTICS_SCRIPT_SRC = "https://analytics.ahrefs.com/analytics.js";
+
+/**
+ * Google Tag Manager web container supplied by the site owner (Matthew, 2026-11-18).
+ * A public container id, shipped to browsers by design; not a credential.
+ * The container loads only after the grower accepts analytics, on the production
+ * diary hosts, through src/lib/googleTagManagerLoader.ts.
+ */
+export const GOOGLE_TAG_MANAGER_CONTAINER_ID = "GTM-5SRRPGZT";

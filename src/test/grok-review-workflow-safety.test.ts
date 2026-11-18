@@ -1,4 +1,7 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resolve } from "node:path";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
@@ -170,6 +173,44 @@ describe("grok-review workflow safety contract", () => {
     // Any bracketed review-protocol tag, in any case, is defanged.
     expect(header).toMatch(/\/gI'/);
     expect(header).toContain("YES-RECORDED");
+  });
+
+  it("defangs every review-protocol marker in any case, and leaves ordinary brackets alone", () => {
+    const script = runOf(post, "Build comment body").run!;
+    const dir = mkdtempSync(join(tmpdir(), "grok-post-"));
+    try {
+      const markers = [
+        "VERDICT",
+        "ROUTE",
+        "ACK",
+        "CLAIM",
+        "FIX REQUEST",
+        "YES-RECORDED",
+        "APPROVE",
+        "APPROVED",
+        "APPROVES",
+        "PASS",
+        "FAIL",
+      ];
+      const lines = markers.flatMap((m) => [`[${m}] x`, `[${m.toLowerCase()} abc] y`]);
+      lines.push("array[0] and [link](https://example.com) stay", "ping @someone");
+      mkdirSync(join(dir, "grok"));
+      writeFileSync(join(dir, "grok", "review.md"), lines.join("\n") + "\n");
+      execFileSync("bash", ["-e", "-c", script], {
+        cwd: dir,
+        env: { ...process.env, HEAD_SHA: "abc" },
+      });
+      const out = readFileSync(join(dir, "comment.md"), "utf8");
+      for (const m of markers) {
+        expect(out).not.toContain(`[${m}]`);
+        expect(out).not.toContain(`[${m.toLowerCase()} abc]`);
+        expect(out).toContain(`(model note: ${m})`);
+      }
+      expect(out).toContain("array[0] and [link](https://example.com) stay");
+      expect(out).not.toMatch(/@someone/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("never interpolates PR-controlled text into a shell script", () => {

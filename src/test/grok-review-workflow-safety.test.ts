@@ -12,6 +12,7 @@ type Step = {
 };
 type Job = {
   if?: string;
+  outputs?: Record<string, string>;
   needs?: string | string[];
   permissions?: Record<string, string>;
   env?: Record<string, string>;
@@ -83,7 +84,7 @@ describe("grok-review workflow safety contract", () => {
     expect(step.run).toContain("--disallowed-tools");
     expect(step.run).toContain("run_terminal_cmd");
     expect(step.run).toContain("--no-auto-update");
-    expect(Object.keys(step.env ?? {})).toEqual(["XAI_API_KEY", "GROK_DISABLE_AUTOUPDATER"]);
+    expect(Object.keys(step.env ?? {})).toEqual(["XAI_API_KEY"]);
     for (const s of review.steps) {
       expect(JSON.stringify(s.env ?? {})).not.toMatch(/GH_TOKEN|GITHUB_TOKEN|github\.token/);
     }
@@ -119,6 +120,40 @@ describe("grok-review workflow safety contract", () => {
     expect(scan.run).toMatch(/gh\[pousr\]_/);
   });
 
+  it("removes PR-supplied agent config before the agent starts", () => {
+    const names = review.steps.map((s) => s.name);
+    const stripAt = names.indexOf("Remove PR-supplied agent config");
+    expect(stripAt).toBeGreaterThan(names.indexOf("Write the PR diff"));
+    expect(stripAt).toBeLessThan(names.indexOf("Review the diff (read-only)"));
+    const strip = review.steps[stripAt].run!;
+    for (const path of [
+      ".grok",
+      ".claude",
+      ".mcp.json",
+      ".agents",
+      ".cursor",
+      ".codex",
+      ".gemini",
+    ]) {
+      expect(strip).toContain(`"$GITHUB_WORKSPACE/${path}"`);
+    }
+    expect(review.env?.GROK_HOME).toBe("${{ runner.temp }}/grok-home");
+  });
+
+  it("disables subagents, writes and web fetch through documented env switches", () => {
+    const env = review.env ?? {};
+    expect(env.GROK_SUBAGENTS).toBe("0");
+    expect(env.GROK_WRITE_FILE).toBe("0");
+    expect(env.GROK_WEB_FETCH).toBe("0");
+    expect(env.GROK_MEMORY).toBe("0");
+    const run = runOf(review, "Review the diff (read-only)").run!;
+    expect(run).toContain('--tools "read_file,grep,list_dir"');
+  });
+
+  it("posts only when the agent actually ran", () => {
+    expect(post.if).toBe("needs.review.outputs.ran == 'true'");
+  });
+
   it("keeps the xAI key out of the posting job", () => {
     expect(JSON.stringify(post)).not.toContain("XAI_API_KEY");
   });
@@ -129,6 +164,9 @@ describe("grok-review workflow safety contract", () => {
     expect(step.run).not.toMatch(/gh pr review|--approve|pr merge/);
     const header = runOf(post, "Build comment body").run!;
     expect(header).toContain("not an independent review");
+    for (const marker of ["VERDICT", "ROUTE", "ACK", "CLAIM", "FIX REQUEST"]) {
+      expect(header).toContain(marker);
+    }
   });
 
   it("never interpolates PR-controlled text into a shell script", () => {

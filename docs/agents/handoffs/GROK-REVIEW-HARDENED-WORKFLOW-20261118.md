@@ -10,7 +10,7 @@ pr: see the PR opened from this branch
 head_sha: read the current head from the PR and verify with git ls-remote
 state: pushed draft; no review requested
 next_action: Matthew creates the XAI_API_KEY repository secret if he wants it to run (the xAI data-destination question is decided: yes). Then one eligible outside reviewer (not this session) at the exact head for this protected .github scope, Matthew's per-item yes and the merge queue.
-post_merge_check: on the first non-draft, non-docs PR after merge, the "Grok peer review" run shows the review job with a read-only token and the post job leaving one comment that starts "Grok peer observation". If XAI_API_KEY is absent the comment says the review was skipped. NOT_MEASURED until then.
+post_merge_check: on the first non-draft, non-docs PR after merge, the "Grok peer review" run shows the review job with a read-only token and the post job leaving one comment that starts "Grok peer observation". If XAI_API_KEY is absent the review job logs a notice and no comment is posted. NOT_MEASURED until then.
 decisions:
   - Two jobs: review (contents: read, xAI key, no GitHub token, checkout with persist-credentials: false) and post (pull-requests: write, no checkout, no xAI key).
   - Agent runs with --permission-mode dontAsk, read-only tools, shell/edit/web/subagents disallowed, --sandbox strict, --max-turns 30, --no-auto-update. Flags taken from docs.x.ai/build/cli/reference and docs.x.ai/build/enterprise (read 2026-11-18).
@@ -19,6 +19,7 @@ decisions:
   - Skips drafts, fork PRs and docs-only changes (paths-ignore **/*.md, docs/**).
   - Output posted as a comment with a not-an-independent-review header; @-mentions and [VERDICT] markers neutralized; capped at 60000 bytes.
   - 2026-11-18 10:00 UTC, after Codex security finding r4612036993 (P2: the model process holds XAI_API_KEY and an unscoped Read plus the strict profile could reach /proc/self/environ): Read/Grep now scoped to $GITHUB_WORKSPACE/** with /proc and /sys denied; a review-locked sandbox profile (extends strict) denies /proc, /sys and ~/.grok/config.toml; a scan step withholds output containing the key, its base64 form, or xai-/gh*_/github_pat_ shaped strings before upload. The diff moved into the workspace (.grok-review/pr.diff) so the scoped Read covers it. Two new contract tests were RED (2 failed, 9 passed) before the fix and pass after (11/11); the scan script was exercised locally against 6 fake outputs (clean passes, exact key, base64 key, gh token and xai-shaped string withheld).
+  - 2026-11-18 10:05 UTC, after independent review FAIL at dac724c2 (session_017UoYKwSx4SszGYZisFpeKv, review 5954360561: P2 plus 6 P3): PR-supplied agent config (.grok, .claude, .mcp.json, .agents, .cursor, .codex, .gemini) is removed from the workspace before Grok starts, because a project .grok/config.toml can add [mcp_servers], [plugins] and [permission] (docs.x.ai/build/settings/reference); GROK_HOME points to a fresh temp dir; GROK_SUBAGENTS/WRITE_FILE/WEB_FETCH/MEMORY=0; the post job runs only when Grok actually ran (no skip comment on every PR); [VERDICT]/[ROUTE]/[ACK]/[CLAIM]/[FIX REQUEST] markers are neutralized; the checkout step is renamed. Five contract tests were RED (5 failed, 9 passed) before the change and pass after (14/14).
   - Contract test src/test/grok-review-workflow-safety.test.ts asserts resolved YAML values; it failed before the workflow existed (Test Files 1 failed, no tests) and passes after (9/9).
 tried_and_rejected:
   - Workflow as pasted: rejected for the P1 findings above.
@@ -37,5 +38,5 @@ reviewer_sha: none
 session_state: no production access used; no secrets read or set; no paused workflows.
 claimed_by: Claude session_017UoYKwo4mYcULag9FoN2QE, 2026-11-18 09:41 UTC (Matthew's request)
 owner: Claude session_017UoYKwo4mYcULag9FoN2QE
-last_updated: 2026-11-18 10:00 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE (Codex P2 fix)
+last_updated: 2026-11-18 10:05 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE (review P2/P3 fixes)
 ```

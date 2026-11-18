@@ -105,6 +105,7 @@ export type PhenoScoringTemplateIssueCode =
   | "template_id_missing"
   | "template_version_invalid"
   | "sections_missing"
+  | "section_invalid"
   | "scale_range_invalid"
   | "scale_step_invalid"
   | "field_id_missing"
@@ -240,10 +241,16 @@ export function validatePhenoScoringTemplate(template: unknown): PhenoScoringTem
   }
 
   const seenFieldIds = new Set<string>();
-  for (const section of template.sections) {
-    const sectionId = isRecord(section) && isNonBlankString(section.id) ? section.id : "?";
-    const fields = isRecord(section) && Array.isArray(section.fields) ? section.fields : [];
-    for (const field of fields) {
+  template.sections.forEach((section: unknown, index: number) => {
+    const sectionId =
+      isRecord(section) && isNonBlankString(section.id) ? section.id : `sections[${index}]`;
+    // A section that is not an object, or has no fields array, cannot be walked
+    // by evaluation, so it is an issue rather than an empty section.
+    if (!isRecord(section) || !Array.isArray(section.fields)) {
+      issues.push({ code: "section_invalid", path: sectionId });
+      return;
+    }
+    for (const field of section.fields as unknown[]) {
       if (!isRecord(field) || !isNonBlankString(field.id)) {
         issues.push({ code: "field_id_missing", path: sectionId });
         continue;
@@ -254,7 +261,7 @@ export function validatePhenoScoringTemplate(template: unknown): PhenoScoringTem
       seenFieldIds.add(field.id);
       issues.push(...fieldIssues(field, field.id));
     }
-  }
+  });
 
   return { ok: issues.length === 0, issues };
 }

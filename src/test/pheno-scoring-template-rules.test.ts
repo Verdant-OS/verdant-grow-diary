@@ -141,6 +141,43 @@ describe("validatePhenoScoringTemplate", () => {
     expect(codes).toEqual(expect.arrayContaining(["options_missing", "option_id_duplicate"]));
   });
 
+  it("rejects a section that is not an object or has no fields array", () => {
+    const base = makeTemplate();
+    const malformed: unknown[] = [
+      null,
+      "main",
+      { id: "s", title: "S" },
+      { id: "s", title: "S", fields: "vigor" },
+    ];
+    for (const section of malformed) {
+      const t = { ...base, sections: [...base.sections, section] };
+      const r = validatePhenoScoringTemplate(t);
+      expect(r.ok).toBe(false);
+      expect(r.issues.map((i) => i.code)).toEqual(["section_invalid"]);
+    }
+  });
+
+  it("never accepts a template that evaluation cannot walk", () => {
+    const base = makeTemplate();
+    const candidates: unknown[] = [
+      { ...base, sections: [null] },
+      { ...base, sections: [{ id: "s", title: "S" }] },
+      { ...base, sections: [{ id: "s", title: "S", fields: {} }] },
+    ];
+    for (const candidate of candidates) {
+      if (validatePhenoScoringTemplate(candidate).ok) {
+        expect(() =>
+          evaluatePhenoScoringResponse(candidate as PhenoScoringTemplate, {
+            templateId: base.id,
+            templateVersion: base.version,
+            values: {},
+          }),
+        ).not.toThrow();
+      }
+      expect(validatePhenoScoringTemplate(candidate).ok).toBe(false);
+    }
+  });
+
   it("is null-safe on garbage input", () => {
     expect(validatePhenoScoringTemplate(null).ok).toBe(false);
     expect(validatePhenoScoringTemplate(undefined).ok).toBe(false);

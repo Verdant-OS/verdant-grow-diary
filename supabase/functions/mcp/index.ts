@@ -3,10 +3,10 @@
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
 // src/lib/mcp/index.ts
-import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@3.5.0";
 
 // src/lib/mcp/tools/list-grows.ts
-import { defineTool } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { defineTool } from "npm:@lovable.dev/mcp-js@3.5.0";
 import { z } from "npm:zod@^4.6.6";
 
 // src/lib/mcp/tools/_supabase.ts
@@ -66,7 +66,7 @@ ${JSON.stringify(rows, null, 2)}`
 });
 
 // src/lib/mcp/tools/list-recent-diary-entries.ts
-import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@3.5.0";
 import { z as z2 } from "npm:zod@^4.6.6";
 
 // src/lib/liveSourceTruthGateRules.ts
@@ -790,6 +790,11 @@ async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {})
   }
 }
 
+// src/lib/mcp/tools/_json.ts
+function asStructuredJson(value) {
+  return value;
+}
+
 // src/lib/mcp/tools/list-recent-diary-entries.ts
 var list_recent_diary_entries_default = defineTool2({
   name: "list_recent_diary_entries",
@@ -824,13 +829,13 @@ var list_recent_diary_entries_default = defineTool2({
 ${JSON.stringify(rows, null, 2)}`
         }
       ],
-      structuredContent: { entries: rows }
+      structuredContent: asStructuredJson({ entries: rows })
     };
   }
 });
 
 // src/lib/mcp/tools/get-latest-sensor-snapshot.ts
-import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@3.5.0";
 import { z as z3 } from "npm:zod@^4.6.6";
 var get_latest_sensor_snapshot_default = defineTool3({
   name: "get_latest_sensor_snapshot",
@@ -873,13 +878,13 @@ var get_latest_sensor_snapshot_default = defineTool3({
 ${summary}`
         }
       ],
-      structuredContent: { snapshot: result.data.snapshot }
+      structuredContent: asStructuredJson({ snapshot: result.data.snapshot })
     };
   }
 });
 
 // src/lib/mcp/tools/list-grow-walk-targets.ts
-import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@3.5.0";
 import { z as z4 } from "npm:zod@^4.6.6";
 
 // src/lib/growAttributionRules.ts
@@ -1647,13 +1652,13 @@ var list_grow_walk_targets_default = defineTool4({
           text: targets.length === 0 ? `No Grow Walk targets found in "${grow.name}".` : `Found ${targets.length} Grow Walk target(s) in "${grow.name}", ordered for physical inspection${summaryIsPartial ? " with explicit bounded-summary limits" : ""}.`
         }
       ],
-      structuredContent: { grow, targets, generatedAt, receipt }
+      structuredContent: asStructuredJson({ grow, targets, generatedAt, receipt })
     };
   }
 });
 
 // src/lib/mcp/tools/get-grow-walk-context.ts
-import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@3.5.0";
 import { z as z5 } from "npm:zod@^4.6.6";
 
 // src/lib/actionQueueProvenanceRules.ts
@@ -2312,7 +2317,7 @@ var get_grow_walk_context_default = defineTool5({
           text: partial === 0 ? `Grow Walk context ready for ${archived}"${scope}".` : `Grow Walk context ready for ${archived}"${scope}" with ${partial} explicit partial evidence lane(s).`
         }
       ],
-      structuredContent: { context }
+      structuredContent: asStructuredJson({ context })
     };
   }
 });
@@ -2338,5 +2343,5 @@ var mcp_default = defineMcp({
 });
 
 // lovable-mcp-supabase-entry.ts
-import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.24.0/stacks/supabase";
+import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@3.5.0/stacks/supabase";
 Deno.serve(createSupabaseHandler(mcp_default, { functionName: "mcp" }));

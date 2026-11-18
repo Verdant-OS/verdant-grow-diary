@@ -143,7 +143,21 @@ describe("grok-review workflow safety contract", () => {
     ]) {
       expect(strip).toContain(`"$GITHUB_WORKSPACE/${path}"`);
     }
-    expect(review.env?.GROK_HOME).toBe("${{ runner.temp }}/grok-home");
+    // GROK_HOME is set by the first step, before any step that reads it.
+    const first = review.steps[0];
+    expect(first.name).toBe("Set a fresh Grok home");
+    expect(first.run).toContain('echo "GROK_HOME=$RUNNER_TEMP/grok-home" >> "$GITHUB_ENV"');
+  });
+
+  it("uses only contexts GitHub allows in job-level env (no runner context)", () => {
+    // jobs.<id>.env may use github, needs, strategy, matrix, vars, secrets and inputs only.
+    // A runner.* expression there makes GitHub reject the whole workflow file: every push
+    // then shows a failed run with no jobs, and the merge queue drops the PR (#3016).
+    for (const job of Object.values(wf.jobs)) {
+      for (const value of Object.values(job.env ?? {})) {
+        expect(value).not.toMatch(/\$\{\{[^}]*\b(runner|steps|job|env)\./);
+      }
+    }
   });
 
   it("disables subagents, writes and web fetch through documented env switches", () => {

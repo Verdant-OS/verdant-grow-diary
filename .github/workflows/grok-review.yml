@@ -40,8 +40,6 @@ jobs:
     outputs:
       ran: ${{ steps.grok.outputs.ran }}
     env:
-      # Fresh Grok home: no user config, auth, plugins or skills from anywhere else.
-      GROK_HOME: ${{ runner.temp }}/grok-home
       GROK_DISABLE_AUTOUPDATER: "1"
       # Documented feature switches, as a second layer behind the CLI flags.
       GROK_SUBAGENTS: "0"
@@ -49,6 +47,11 @@ jobs:
       GROK_WEB_FETCH: "0"
       GROK_MEMORY: "0"
     steps:
+      - name: Set a fresh Grok home
+        # No user config, auth, plugins or skills from anywhere else. Set here, not in
+        # job-level env: GitHub rejects the whole workflow if job env uses the runner context.
+        run: echo "GROK_HOME=$RUNNER_TEMP/grok-home" >> "$GITHUB_ENV"
+
       - name: Check out PR merge commit
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:

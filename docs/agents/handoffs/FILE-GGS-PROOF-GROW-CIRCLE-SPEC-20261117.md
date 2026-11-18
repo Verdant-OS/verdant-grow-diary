@@ -1,7 +1,8 @@
 # FILE-GGS-PROOF-GROW-CIRCLE-SPEC-20261117
 
 ```text
-TASK FILE-GGS-PROOF-GROW-CIRCLE-SPEC-20261117  priority: other  status: OPEN
+TASK FILE-GGS-PROOF-GROW-CIRCLE-SPEC-20261117  priority: other  status: CLOSED
+closed: 2026-11-18, merged. Landed on verdant-grow-diary as 1b3f5ae0053340cd30b89090d91a1198b64a6164 (#2991, 2026-11-17 23:34 UTC). Closed by Claude session_017UoYKxxpw2guRq48NBdZRB at Matthew's request. The post_merge_check, blockers and open questions below carry forward unchanged; none is claimed as measured by this close.
 goal: Put three documents that lived only on the founder's computer into the repo: the GGS Pro receive-only proof, the GGS BLE literature review, and the Grow Circle build spec.
 why: The founder asked on 2026-11-12 whether these were taken care of. A read-only check found no copy on the deploy branch. PR #2978's handoff cites the proof as "the task attachment", which no other seat can open. On 2026-11-17 the founder picked "File the 3 docs".
 branch: claude/file-ggs-proof-grow-circle-spec
@@ -29,5 +30,5 @@ reviewer_sha: none yet
 session_state: no hardware listen, no production write, no GitHub comment; the same session also deleted stale branches and drafted a governance amendment under separate founder picks, each recorded on its own pull request or in the session report
 claimed_by: Claude Code session, 2026-11-17 CT
 owner: Claude Code session for this task
-last_updated: 2026-11-17, by Claude Code
+last_updated: 2026-11-18, by Claude session_017UoYKxxpw2guRq48NBdZRB (previously 2026-11-17, by Claude Code)
 ```

@@ -1,15 +1,15 @@
 # TENTS-LIST-STORED-AND-CALCULATED-VPD
 
 ```text
-TASK TENTS-LIST-STORED-AND-CALCULATED-VPD  priority: P2  status: OPEN
+TASK TENTS-LIST-STORED-AND-CALCULATED-VPD  priority: P2  status: CLOSED
 goal: The /tents list shows a stored VPD reading and the VPD calculated from the card's own temperature and RH side by side, each labelled with where it came from ("Stored reading" / "Calculated from temperature and RH").
 why: Core-loop walk L5 (2026-11-18): one tent at 77°F / 55% RH read 1.10 kPa on /tents (stored vpd_kpa) and 1.43 kPa on the Dashboard (calculated). Matthew picked "Both, labeled" on 2026-11-18 05:31 UTC in the project chat (reply to the coordinator's three-option question).
 branch: claude/project-thread-nggu4s
 base: verdant-grow-diary @ 898f4853842fdc70915ec03525565c2ec86117e4
-pr: the PR for this branch (number in the PR body)
-head_sha: read the current head from the PR and verify with git ls-remote
-state: Matthew marked the PR ready and matt816cheek-bit approved it at ddea75b; that approval does not carry to the head that fixes the two Codex P2s below and must be given again at the new head. No independent review yet.
-next_action: required checks at the new head; one eligible independent reviewer (not this session) at the exact head; then Matthew's approval and per-item yes at that head and the merge queue. This writer does not approve, enqueue or merge.
+pr: #3006 (merged)
+head_sha: 6ff5c1cebefc82725af198640767ddb9a6c0c077 (final reviewed head); merge commit 5c42629aca70d31036c931a6e59eeab213ce43c0
+state: merged as #3006 at 5c42629aca70d31036c931a6e59eeab213ce43c0 (2026-11-18 05:56 UTC) through the merge queue, after matt816cheek-bit approved head 6ff5c1cebefc82725af198640767ddb9a6c0c077 and Matthew enqueued it.
+next_action: none on this entry; the post_merge_check below runs once live /version.json reports 5c42629a (NOT_MEASURED until then).
 post_merge_check: after live /version.json reports the merge SHA, signed in on the disposable test account, open /tents and expect the walk's tent card (77°F / 55% RH, stored 1.10 kPa) to show "1.10 kPa · Stored reading" and "1.43 kPa · Calculated from temperature and RH". No write needed.
 decisions:
   - Show, do not choose: Tonight's canonical selection and every existing withholding rule stay unchanged. The view model only tags the shown VPD number with origin stored/calculated (MetricView.origin) and passes Tonight's own `calculated` flag through CanonicalTentVpd.
@@ -27,10 +27,11 @@ blockers: local vitest and tsc are BLOCKED in this environment (no node_modules;
 open_questions: none
 gotchas: many strip tests pin behaviour with review history (Codex/Copilot on #2303, #2412, #2422, #2437, #2442, #2451). The change is additive; if a required shard fails, read the failing test's pinned case before touching canonical selection.
 exclusions_for_review: the Claude thread session for the core-loop walk task (author)
-reviewer_seat: none requested yet
-reviewer_sha: none
+reviewer_seat: matt816cheek-bit approval at 6ff5c1ce; no separate independent review was routed before Matthew enqueued it
+reviewer_sha: 6ff5c1cebefc82725af198640767ddb9a6c0c077
 session_state: no production access used; no paused workflows; no scheduled routines.
+closed: 2026-11-18, merged as #3006; final SHA 5c42629aca70d31036c931a6e59eeab213ce43c0
 claimed_by: the Claude thread session for the core-loop walk task, 2026-11-18 05:50 UTC
 owner: the Claude thread session for the core-loop walk task
-last_updated: 2026-11-18 06:05 UTC, by the Claude thread session for the core-loop walk task
+last_updated: 2026-11-18 06:00 UTC, by the Claude thread session for the core-loop walk task
 ```

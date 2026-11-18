@@ -7,7 +7,7 @@ review and approval.
 
 **Source:** Matthew's message in Claude session `session_017UoYKwo4mYcULag9FoN2QE`, 2026-11-18,
 headed "Decided (recommendations, not production authorization)". The decisions below are recorded
-as he wrote them. Labels in brackets are this file's evidence labels, not part of his wording.
+as he wrote them. Decisions 8 to 10 answer the three questions his first message left open. Labels in brackets are this file's evidence labels, not part of his wording.
 
 **Revision note (from the source):** revised 2026-10-25 per Cheeko. Unlocks were replaced by optional
 spotlight guidance, reliability comes first, and counts were relabeled as estimates.
@@ -30,13 +30,15 @@ spotlight guidance, reliability comes first, and counts were relabeled as estima
    explains that it uses the grower's one active grow. Skipping the guide creates no records and
    consumes no allowance.
 
-## Still open
+## Decided later the same day
 
-These need Matthew's decision. Nothing here answers them.
+Matthew answered the three questions left open, in the same session on 2026-11-18. His answers are
+recorded as given, and they carry the same status as the decisions above: recommendations, not
+production authorization.
 
-- **Restart guide:** where it lives: Help, Settings, or both.
-- **Existing accounts:** whether accounts that never saw the guide are offered it.
-- **Retained drafts:** whether they stay on the device or sync across devices.
+8. **Restart guide:** it lives in both Help and Settings.
+9. **Existing accounts:** accounts that never saw the guide are offered it.
+10. **Retained drafts:** they stay on the device. They do not sync across devices.
 
 ## What this file does not do
 

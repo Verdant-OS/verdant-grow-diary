@@ -275,6 +275,20 @@ function buildVpdRange(targets: GrowTargets | null): AlertsHeaderRange | null {
   return { metricLabel: METRIC_LABELS.vpd, min: t.min, max: t.max, unit: VPD_UNIT };
 }
 
+/**
+ * Bounds text for one Alerts header target range. A target with only one
+ * bound reads "up to 85" or "at least 70", never "—–85". Zero is a real
+ * bound, not a missing one. Both bounds missing reads "—".
+ */
+export function formatAlertsHeaderRangeBounds(min: number | null, max: number | null): string {
+  const lo = min !== null && Number.isFinite(min) ? min : null;
+  const hi = max !== null && Number.isFinite(max) ? max : null;
+  if (lo !== null && hi !== null) return `${lo}–${hi}`;
+  if (hi !== null) return `up to ${hi}`;
+  if (lo !== null) return `at least ${lo}`;
+  return "—";
+}
+
 export interface BuildAlertsHeaderContextArgs {
   growName: string | null;
   stage: string | null;

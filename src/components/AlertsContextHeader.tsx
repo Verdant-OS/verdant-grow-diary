@@ -17,6 +17,7 @@ import {
   buildSourceChip,
   describeLatestSnapshotForAlerts,
   duplicateReassuranceCopy,
+  formatAlertsHeaderRangeBounds,
   type AlertsHeaderContextViewModel,
   type SourceChipTone,
 } from "@/lib/alertFreshnessContext";
@@ -37,12 +38,6 @@ interface Props {
    * Drives the duplicate-prevention reassurance banner. */
   hasOpenAlerts?: boolean;
   testId?: string;
-}
-
-function formatRange(min: number | null, max: number | null): string {
-  const lo = min === null ? "—" : String(min);
-  const hi = max === null ? "—" : String(max);
-  return `${lo}–${hi}`;
 }
 
 const CHIP_TONE_CLASS: Record<SourceChipTone, string> = {
@@ -98,19 +93,19 @@ export default function AlertsContextHeader({
           )}
           {vm.ranges.rh ? (
             <span data-testid={`${testId}-range-rh`}>
-              RH {formatRange(vm.ranges.rh.min, vm.ranges.rh.max)}
+              RH {formatAlertsHeaderRangeBounds(vm.ranges.rh.min, vm.ranges.rh.max)}
               {vm.ranges.rh.unit}.{" "}
             </span>
           ) : null}
           {vm.ranges.temp ? (
             <span data-testid={`${testId}-range-temp`}>
-              Temp {formatRange(vm.ranges.temp.min, vm.ranges.temp.max)}
+              Temp {formatAlertsHeaderRangeBounds(vm.ranges.temp.min, vm.ranges.temp.max)}
               {vm.ranges.temp.unit}.{" "}
             </span>
           ) : null}
           {vm.ranges.vpd ? (
             <span data-testid={`${testId}-range-vpd`}>
-              VPD {formatRange(vm.ranges.vpd.min, vm.ranges.vpd.max)} {vm.ranges.vpd.unit}.{" "}
+              VPD {formatAlertsHeaderRangeBounds(vm.ranges.vpd.min, vm.ranges.vpd.max)} {vm.ranges.vpd.unit}.{" "}
             </span>
           ) : null}
         </p>

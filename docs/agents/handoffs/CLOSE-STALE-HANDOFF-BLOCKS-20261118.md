@@ -1,7 +1,8 @@
 # CLOSE-STALE-HANDOFF-BLOCKS-20261118
 
 ```text
-TASK CLOSE-STALE-HANDOFF-BLOCKS-20261118  priority: other  status: OPEN
+TASK CLOSE-STALE-HANDOFF-BLOCKS-20261118  priority: other  status: CLOSED
+closed: 2026-11-18, merged. Landed on verdant-grow-diary as bb2f517bd73ce69b6728625b6fa2ac46d4afda75 (#3001, 2026-11-18 03:06 UTC), as a merge commit (parents 9e7e51ee and PR head 1a0058ac), not a squash. Closed by Claude session_017UoYKwo4mYcULag9FoN2QE at Matthew's request. Post-merge check run 2026-11-18 on that tip: PASS (the three TASK lines read status: CLOSED and the OPEN grep lists none of them). The four entries this task left OPEN stay OPEN.
 goal: Close three handoff entries that still read OPEN on verdant-grow-diary although their PRs merged on 2026-11-17, without losing their unfinished items.
 why: AGENTS.md section 12 closes a merged task the same day with the final SHA. Matthew asked for this on 2026-11-18 ("Close the 3 stale entries").
 branch: claude/optimistic-faraday-18filv
@@ -30,5 +31,5 @@ reviewer_sha: none
 session_state: no production access used; no paused workflows; no scheduled routines.
 claimed_by: Claude session_017UoYKxxpw2guRq48NBdZRB, 2026-11-18 (Matthew's request)
 owner: Claude session_017UoYKxxpw2guRq48NBdZRB
-last_updated: 2026-11-18, by Claude session_017UoYKxxpw2guRq48NBdZRB
+last_updated: 2026-11-18 05:49 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE (previously 2026-11-18, by Claude session_017UoYKxxpw2guRq48NBdZRB)
 ```

@@ -11,7 +11,7 @@ name: Grok peer review
 # - PR text is untrusted. No PR-controlled field is interpolated into a script.
 # - Output is a plain PR comment labeled as a peer observation. It is not an
 #   independent review, never approves, and does not count toward any merge gate.
-# - Drafts, fork PRs and docs-only changes are skipped.
+# - Off unless vars.GROK_REVIEW_ENABLED == 'true'. Drafts, fork PRs and docs-only changes are skipped.
 on:
   pull_request:
     branches: [verdant-grow-diary]
@@ -30,7 +30,11 @@ concurrency:
 jobs:
   review:
     name: Grok review (read-only)
+    # Off unless the GROK_REVIEW_ENABLED repository variable is 'true'. Held off 2026-11-18:
+    # on GitHub runners the Grok CLI refuses to start because its sandbox cannot enforce the
+    # /proc read-deny. Do not enable until a sandbox that protects the key is verified.
     if: >-
+      vars.GROK_REVIEW_ENABLED == 'true' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest

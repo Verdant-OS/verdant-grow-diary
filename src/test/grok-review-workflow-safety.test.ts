@@ -55,6 +55,12 @@ describe("grok-review workflow safety contract", () => {
     );
   });
 
+  it("stays off unless the GROK_REVIEW_ENABLED repository variable is 'true'", () => {
+    // Held off (Matthew, 2026-11-18): the Grok CLI refuses to start on GitHub runners because
+    // its sandbox cannot enforce the /proc read-deny. Enabling needs a safe sandbox first.
+    expect(review.if).toContain("vars.GROK_REVIEW_ENABLED == 'true'");
+  });
+
   it("pins every action to a full commit SHA", () => {
     for (const s of allSteps.filter((x) => x.uses)) {
       expect(s.uses).toMatch(/@[0-9a-f]{40}$/);

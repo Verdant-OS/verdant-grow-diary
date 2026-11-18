@@ -1,15 +1,16 @@
 # CLOSE-STALE-HANDOFF-BLOCKS-20261118
 
 ```text
-TASK CLOSE-STALE-HANDOFF-BLOCKS-20261118  priority: other  status: OPEN
+TASK CLOSE-STALE-HANDOFF-BLOCKS-20261118  priority: other  status: CLOSED
+closed: 2026-11-18, merged. PR https://github.com/Verdant-OS/verdant-grow-diary/pull/3001 landed on verdant-grow-diary as bb2f517bd73ce69b6728625b6fa2ac46d4afda75 (merge queue; merged_at 03:12 UTC) from reviewed head 1a0058ac3c4b58c77a20115162967b70b18378ff. post_merge_check PASS on that tip: the three TASK lines read status: CLOSED and git grep lists none of them as OPEN.
 goal: Close three handoff entries that still read OPEN on verdant-grow-diary although their PRs merged on 2026-11-17, without losing their unfinished items.
 why: AGENTS.md section 12 closes a merged task the same day with the final SHA. Matthew asked for this on 2026-11-18 ("Close the 3 stale entries").
 branch: claude/optimistic-faraday-18filv
 base: verdant-grow-diary @ 9e7e51eeee595c7c941613b5dca0116da1777cc8
-pr: the PR for this branch (number in the PR body)
-head_sha: read the current head from the PR and verify with git ls-remote
-state: pushed draft; no review requested
-next_action: one eligible independent reviewer (not this session) at the exact head; then Matthew's per-item yes and the merge queue. This writer does not approve, enqueue or merge.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3001 (merged)
+head_sha: 1a0058ac3c4b58c77a20115162967b70b18378ff (reviewed and merged head)
+state: merged; closed
+next_action: none for this task. The three closed entries' own post-merge checks and holds stay with their owners and Matthew.
 post_merge_check: on the merged deploy tip, the three TASK lines below read status: CLOSED and git grep -lE '^TASK .*status: OPEN' -- docs/agents/handoffs/ lists none of them. Docs only; no production check.
 decisions:
   - Same convention as #2928, #2967 and #2995: per closed file, the TASK line reads status: CLOSED, one closed: line is added under it, and last_updated is replaced with the old value kept in parentheses. No other line changes.
@@ -25,10 +26,10 @@ blockers: none for the docs. Independent exact-head review and Matthew's per-ite
 open_questions: none
 gotchas: these entries belong to other writers. This change only marks them closed. Closing does not mean their post-merge checks are done (for example, CREATOR-BETA-NO-ANALYTICS still has a live check, and the Grow Circle build stays on HOLD).
 exclusions_for_review: Claude session_017UoYKxxpw2guRq48NBdZRB (this writer)
-reviewer_seat: none requested yet
-reviewer_sha: none
+reviewer_seat: independent Claude review session session_017UoYKwo4mYcULag9FoN2QE, PASS 0 P1 / 0 P2 / 2 P3 (review 5950032561). That session also marked the PR ready and armed auto-merge on Matthew's yes given there (PR comment 6967419442).
+reviewer_sha: 1a0058ac3c4b58c77a20115162967b70b18378ff
 session_state: no production access used; no paused workflows; no scheduled routines.
 claimed_by: Claude session_017UoYKxxpw2guRq48NBdZRB, 2026-11-18 (Matthew's request)
 owner: Claude session_017UoYKxxpw2guRq48NBdZRB
-last_updated: 2026-11-18, by Claude session_017UoYKxxpw2guRq48NBdZRB
+last_updated: 2026-11-18 05:55 UTC, by Claude session_017UoYKxxpw2guRq48NBdZRB (closed after merge; previously 2026-11-18)
 ```

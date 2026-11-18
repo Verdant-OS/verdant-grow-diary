@@ -2327,7 +2327,6 @@ var projectRef = "knkwiiywfkbqznbxwqfh";
 var MCP_ALLOWED_ORIGINS = [
   "https://verdantgrowdiary.com",
   "https://www.verdantgrowdiary.com",
-  "https://verdantgrowdiary-com.lovable.app",
   "https://id-preview--66255e7b-892c-4be5-8686-ab1cfc3666db.lovable.app",
   "https://66255e7b-892c-4be5-8686-ab1cfc3666db.lovableproject.com"
 ];

@@ -89,6 +89,36 @@ describe("grok-review workflow safety contract", () => {
     }
   });
 
+  it("scopes file reads to the workspace and denies /proc and /sys", () => {
+    const run = runOf(review, "Review the diff (read-only)").run!;
+    expect(run).not.toMatch(/--allow ['"]Read['"]/);
+    expect(run).not.toMatch(/--allow ['"]Grep['"]/);
+    expect(run).toContain('--allow "Read(${GITHUB_WORKSPACE}/**)"');
+    expect(run).toContain('--allow "Grep(${GITHUB_WORKSPACE}/**)"');
+    for (const path of ["/proc/**", "/sys/**"]) {
+      expect(run).toContain(`--deny "Read(${path})"`);
+      expect(run).toContain(`--deny "Grep(${path})"`);
+    }
+    expect(run).toContain("--sandbox review-locked");
+    const profile = runOf(review, "Write locked sandbox profile").run!;
+    expect(profile).toContain('extends = "strict"');
+    for (const path of ['"/proc"', '"/sys"']) expect(profile).toContain(path);
+  });
+
+  it("withholds credential-like output before it leaves the review job", () => {
+    const names = review.steps.map((s) => s.name);
+    const scanAt = names.indexOf("Withhold credential-like output");
+    const uploadAt = names.indexOf("Upload review text");
+    expect(scanAt).toBeGreaterThan(names.indexOf("Review the diff (read-only)"));
+    expect(scanAt).toBeLessThan(uploadAt);
+    const scan = review.steps[scanAt];
+    expect(Object.keys(scan.env ?? {})).toEqual(["XAI_API_KEY"]);
+    expect(scan.run).toContain('grep -qF -- "$XAI_API_KEY"');
+    expect(scan.run).toContain("base64");
+    expect(scan.run).toMatch(/xai-/);
+    expect(scan.run).toMatch(/gh\[pousr\]_/);
+  });
+
   it("keeps the xAI key out of the posting job", () => {
     expect(JSON.stringify(post)).not.toContain("XAI_API_KEY");
   });

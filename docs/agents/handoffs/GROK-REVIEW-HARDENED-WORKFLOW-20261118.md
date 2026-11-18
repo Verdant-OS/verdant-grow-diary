@@ -18,6 +18,7 @@ decisions:
   - Every action pinned to the full SHA already used in this repo. Concurrency follows ci-pr-concurrency.test.ts conventions.
   - Skips drafts, fork PRs and docs-only changes (paths-ignore **/*.md, docs/**).
   - Output posted as a comment with a not-an-independent-review header; @-mentions and [VERDICT] markers neutralized; capped at 60000 bytes.
+  - 2026-11-18 10:00 UTC, after Codex security finding r4612036993 (P2: the model process holds XAI_API_KEY and an unscoped Read plus the strict profile could reach /proc/self/environ): Read/Grep now scoped to $GITHUB_WORKSPACE/** with /proc and /sys denied; a review-locked sandbox profile (extends strict) denies /proc, /sys and ~/.grok/config.toml; a scan step withholds output containing the key, its base64 form, or xai-/gh*_/github_pat_ shaped strings before upload. The diff moved into the workspace (.grok-review/pr.diff) so the scoped Read covers it. Two new contract tests were RED (2 failed, 9 passed) before the fix and pass after (11/11); the scan script was exercised locally against 6 fake outputs (clean passes, exact key, base64 key, gh token and xai-shaped string withheld).
   - Contract test src/test/grok-review-workflow-safety.test.ts asserts resolved YAML values; it failed before the workflow existed (Test Files 1 failed, no tests) and passes after (9/9).
 tried_and_rejected:
   - Workflow as pasted: rejected for the P1 findings above.
@@ -27,7 +28,7 @@ commands: |
   bun run typecheck -> pass; bunx eslint src/test/grok-review-workflow-safety.test.ts -> clean
 files_touched: .github/workflows/grok-review.yml (new); src/test/grok-review-workflow-safety.test.ts (new); this file (new)
 files_remaining: none
-blockers: XAI_API_KEY secret existence is unknown (no access to repository secrets). The workflow runs but posts a skipped note without it. The agent run itself is NOT_MEASURED: no key in this session, and the exact tool names accepted by --tools/--allow are taken from docs, not observed.
+blockers: XAI_API_KEY is not set: the workflow's own run on this PR posted the skip note (comment 6975026545). Recommend a dedicated, spend-capped xAI key for this workflow. The agent run itself is NOT_MEASURED: no key in this session, and the exact tool names accepted by --tools/--allow are taken from docs, not observed.
 open_questions: none. Data destination decided: Matthew answered "Yes, xAI is OK" on 2026-11-18 09:44 UTC in session session_017UoYKwo4mYcULag9FoN2QE to sending non-draft, non-docs PR diffs and repo files the agent reads to xAI.
 gotchas: a Grok comment is a peer observation, never independent acceptance (OWNERSHIP.md section 4.3). If grok rejects a flag, the review step fails closed and no comment is posted.
 exclusions_for_review: Claude session_017UoYKwo4mYcULag9FoN2QE (this writer)
@@ -36,5 +37,5 @@ reviewer_sha: none
 session_state: no production access used; no secrets read or set; no paused workflows.
 claimed_by: Claude session_017UoYKwo4mYcULag9FoN2QE, 2026-11-18 09:41 UTC (Matthew's request)
 owner: Claude session_017UoYKwo4mYcULag9FoN2QE
-last_updated: 2026-11-18 09:44 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE (recorded Matthew's xAI OK)
+last_updated: 2026-11-18 10:00 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE (Codex P2 fix)
 ```

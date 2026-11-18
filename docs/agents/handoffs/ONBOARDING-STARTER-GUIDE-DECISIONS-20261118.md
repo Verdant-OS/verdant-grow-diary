@@ -28,5 +28,5 @@ reviewer_sha: none
 session_state: no production access used; no paused workflows; no scheduled routines.
 claimed_by: Claude session_017UoYKwo4mYcULag9FoN2QE, 2026-11-18 09:15 UTC (Matthew's request)
 owner: Claude session_017UoYKwo4mYcULag9FoN2QE
-last_updated: 2026-11-18 09:29 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE (previously 2026-11-18 09:15 UTC)
+last_updated: 2026-11-18 10:08 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE (decision 10 wording narrowed to Matthew's words, per review P3-2)
 ```

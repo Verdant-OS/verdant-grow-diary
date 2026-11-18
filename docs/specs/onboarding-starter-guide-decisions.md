@@ -38,7 +38,7 @@ production authorization.
 
 8. **Restart guide:** it lives in both Help and Settings.
 9. **Existing accounts:** accounts that never saw the guide are offered it.
-10. **Retained drafts:** they stay on the device. They do not sync across devices.
+10. **Retained drafts:** they stay on the device.
 
 ## What this file does not do
 

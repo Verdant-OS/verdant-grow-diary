@@ -18,6 +18,14 @@
  * never a Date round-trip) so no boundary row is dropped at equal timestamps.
  */
 
+/**
+ * React Query key prefix for the one-tent irrigation ledger. The hook keys
+ * its query under this prefix, and the Quick Log post-save refresh
+ * invalidates it, so a saved Water/Feed entry reaches the tent and plant
+ * irrigation panels without a page reload.
+ */
+export const IRRIGATION_LEDGER_QUERY_KEY_PREFIX = ["irrigation", "ledger"] as const;
+
 // PostgREST projection: parent scope + note/source + both typed children.
 export const IRRIGATION_LEDGER_SELECT =
   "id,grow_id,plant_id,tent_id,event_type,occurred_at,note,source,is_deleted," +

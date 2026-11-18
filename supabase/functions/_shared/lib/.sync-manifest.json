@@ -81,7 +81,7 @@
     "src/lib/ppfdRules.ts": "8ac7ead78f3ae9cfe682d37d36c6594cac3ece2c2862fa6edc7ed853dce14261",
     "src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts": "3985ab4ff100d3f10fdbe4b7ad019ee28aab78b4e5c58c17ad58ae46c5afaad7",
     "src/lib/quick-log/quickLogSnapshotMetricNormalizer.ts": "c458e70f476d3d1bb70c5d22b425865eeeb8cce3c4ab1baa9921208b988fe0ce",
-    "src/lib/quickLogEventIdentityRules.ts": "55e2dce13eb1752d85c34b0975d7efdbaee7ba5a4289aab3bc263758423da0c7",
+    "src/lib/quickLogEventIdentityRules.ts": "cc6c5e98ed097101d3b3ebfb1c7c960d512d3261123235d6c4fdb8cf75750262",
     "src/lib/quickLogHardwareReadingsDisplayRules.ts": "57b3a026337bbc98f6dd1eac3b217a61a0cd4595fe1db1c810b05662dd6ef9fe",
     "src/lib/quickLogHardwareReadingsRules.ts": "8b42d620e5acf4c7bfb38c0a7cbb29b5967dd067d63fd4457ce96965af9ce80d",
     "src/lib/quickLogNoteMarkerRules.ts": "32f5b989d27d84b5f425909a38c5fc2423143c42e81449d2a569dda1bdefadce",

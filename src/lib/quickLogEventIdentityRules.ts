@@ -28,6 +28,11 @@ import {
   hasQuickLogNoteMarker,
   isQuickLogIssueSubtype,
 } from "./quickLogNoteMarkerRules";
+import {
+  DEFAULT_TEMPERATURE_UNIT,
+  formatTemperatureDisplay,
+  type TemperatureUnitPreference,
+} from "./temperatureUnitPreference";
 
 /**
  * Envelope event-type strings that indicate a Quick Log wrapper row
@@ -137,6 +142,7 @@ export interface QuickLogEventIdentity {
 function buildSummarySuffix(
   effectiveType: string,
   details: NormalizedDiaryDetails | null | undefined,
+  temperatureUnit: TemperatureUnitPreference,
 ): string {
   if (!details) return "";
   const parts: string[] = [];
@@ -164,7 +170,17 @@ function buildSummarySuffix(
     case "sensor_snapshot": {
       const snap = details.sensorSnapshot;
       if (snap) {
-        if (typeof snap.temp === "number") parts.push(`${snap.temp}°`);
+        // Stored sensor temperatures are canonical Celsius. Render them in
+        // the grower's unit with the unit symbol, never as a bare "24.44°".
+        if (typeof snap.temp === "number") {
+          parts.push(
+            formatTemperatureDisplay(snap.temp, {
+              valueUnit: "C",
+              unit: temperatureUnit,
+              digits: 1,
+            }),
+          );
+        }
         if (typeof snap.rh === "number") parts.push(`${snap.rh}% RH`);
         if (typeof snap.vpd === "number") parts.push(`VPD ${snap.vpd}`);
       }
@@ -238,11 +254,15 @@ function noteOrIssueLabel(
  *  4. The display label is the canonical label for known types, else a
  *     title-cased fallback ("Note" when unresolvable).
  *  5. `summarySuffix` is filled only from already-normalized detail
- *     fields; missing values stay empty — never invented.
+ *     fields; missing values stay empty — never invented. A sensor
+ *     temperature (stored in Celsius) is rendered with its unit in
+ *     `options.temperatureUnit`, defaulting to the app default (°F).
  */
 export function resolveQuickLogEventIdentity(
   entry: Pick<NormalizedDiaryEntry, "eventType" | "details"> | null | undefined,
+  options?: { temperatureUnit?: TemperatureUnitPreference },
 ): QuickLogEventIdentity {
+  const temperatureUnit = options?.temperatureUnit ?? DEFAULT_TEMPERATURE_UNIT;
   const envelope = normalizeType(entry?.eventType);
   const declared = normalizeType(entry?.details?.declaredEventType ?? null);
   const wrapper = QUICK_LOG_WRAPPER_ENVELOPES.has(envelope);
@@ -268,6 +288,6 @@ export function resolveQuickLogEventIdentity(
     effectiveEventType: effective,
     displayLabel: label,
     fromQuickLog,
-    summarySuffix: buildSummarySuffix(effective, entry?.details),
+    summarySuffix: buildSummarySuffix(effective, entry?.details, temperatureUnit),
   };
 }

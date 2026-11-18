@@ -153,6 +153,11 @@ export interface SeoGuidePage {
   /** Repository-backed publication/review provenance for Article JSON-LD. */
   readonly publishedOn?: string;
   readonly modifiedOn?: string;
+  /**
+   * Opt-in byline. Absent on every guide except the two that name a person.
+   * Builders keep the organization author when this is omitted.
+   */
+  readonly author?: { readonly name: string };
   /** Optional shared comparison table rendered accessibly below the introduction. */
   readonly referenceTable?: SymptomReferenceTableData;
   /** Ordered steps mirrored into HowTo JSON-LD. Text must match the visible list. */
@@ -486,6 +491,8 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         note: "GrowDiaries' own announcement of its iOS and Android apps, dated 1 September 2026.",
       },
     ],
+    author: { name: "Matthew Cheek" },
+    modifiedOn: "2026-11-18",
   },
   {
     slug: "grow-log-app-vs-grow-journal",
@@ -2887,6 +2894,8 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         note: "MyGrowLog's own FAQ, the source of each feature listed above. Read 2026-11-18.",
       },
     ],
+    author: { name: "Matthew Cheek" },
+    modifiedOn: "2026-11-18",
   },
 ];
 

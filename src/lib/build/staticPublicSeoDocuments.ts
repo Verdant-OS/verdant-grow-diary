@@ -475,7 +475,20 @@ function buildStaticGuideJsonLd(guide: (typeof VERDANT_SEO_GUIDES)[number]) {
         publisherName: "Verdant Grow Diary",
         siteUrl: VERDANT_SITE_ORIGIN,
       })
-    : null;
+    : guide.author && guide.modifiedOn
+      ? buildArticleJsonLd({
+          headline: guide.h1,
+          description: guide.description,
+          url,
+          datePublished: guide.modifiedOn,
+          dateModified: guide.modifiedOn,
+          image: DEFAULT_OG_IMAGE,
+          authorName: guide.author.name,
+          authorType: "Person",
+          publisherName: "Verdant Grow Diary",
+          siteUrl: VERDANT_SITE_ORIGIN,
+        })
+      : null;
   const howTo = guide.howTo
     ? buildHowToJsonLd({ url, name: guide.howTo.name, steps: guide.howTo.steps })
     : null;

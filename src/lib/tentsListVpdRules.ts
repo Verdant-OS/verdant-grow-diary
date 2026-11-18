@@ -15,7 +15,14 @@
 import type {
   BuildTentSnapshotInput,
   CanonicalTentVpd,
+  MetricStatus,
+  MetricView,
+  TentSnapshotView,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
+import { calculateVPD } from "@/lib/sensors/calculateVPD";
+import { snapshotFromReadings } from "@/lib/sensorSnapshot";
+import { formatSensorChartDisplayNumber } from "@/lib/sensorChartAxisRules";
+import { classifyVpdAgainstStage, vpdMetricChipStatus } from "@/lib/stageAwareVpdTargets";
 import { sensorCaptureRef, snapshotCaptureRef } from "@/lib/sensorCaptureRefRules";
 import { normalizeSensorSource, type SensorSource } from "@/lib/sensor/sensorSourceRules";
 
@@ -167,6 +174,7 @@ export function tentsListCanonicalVpd(
     sourceLabel: vpd.historical ? DIARY_SOURCE_LABEL : vpd.sourceLabel,
     captureRefs: vpd.captureRefs,
     ageText: vpd.ageText,
+    ...(vpd.calculated ? { calculated: true } : {}),
     // An explicit rejection, not null: the strip must also withhold its own
     // stored VPD when the rejected capture is its latest cohort
     // (Codex P1 on #2303 at 108e3eab).
@@ -259,4 +267,88 @@ export function tentsListDiarySnapshotRows(
     });
   }
   return rows;
+}
+
+/**
+ * Labels for where a Tents list VPD came from. A stored reading and the VPD
+ * calculated from the card's own temperature and RH can disagree (1.10 stored
+ * beside 77°F / 55% RH, which works out to 1.43, in the 2026-11-18 core-loop
+ * walk). Matthew chose to show both, each labelled, rather than pick one.
+ */
+export const TENTS_LIST_VPD_ORIGIN_COPY = {
+  stored: "Stored reading",
+  calculated: "Calculated from temperature and RH",
+} as const;
+
+/** The VPD calculated from the temperature and RH the card shows. */
+export interface TentsListCalculatedVpd {
+  kpa: number;
+  display: string;
+  unit: " kPa";
+  /** Worst of the temperature and RH statuses it was calculated from. */
+  status: "ok" | "degraded" | "stale";
+  /** The inputs' own status word ("Stale", "Degraded", …), or null when both are ok. */
+  statusLabel: string | null;
+  chipStatus: "ok" | "warn" | "bad";
+  label: typeof TENTS_LIST_VPD_ORIGIN_COPY.calculated;
+}
+
+type CalculableStatus = TentsListCalculatedVpd["status"];
+
+const CALCULATED_STATUS_RANK: Record<CalculableStatus, number> = {
+  ok: 0,
+  degraded: 1,
+  stale: 2,
+};
+
+function isCalculableStatus(status: MetricStatus): status is CalculableStatus {
+  return status in CALCULATED_STATUS_RANK;
+}
+
+/**
+ * The calculated VPD to show beside a stored one, or null.
+ *
+ * Shown only when the card's VPD is a stored reading. It is calculated from
+ * the same temperature and RH the card shows (one capture, the latest cohort
+ * of `rows`), so it never borrows another capture's values. A missing,
+ * unknown or invalid temperature or RH yields nothing: a calculation from
+ * flagged inputs must not read as a measurement. Zero is a real value. The
+ * result keeps the worse of its inputs' Stale/Degraded status, so stale data
+ * never reads as healthy.
+ */
+export function tentsListCalculatedVpd(
+  view: Pick<TentSnapshotView, "metrics">,
+  rows: readonly BuildTentSnapshotInput[],
+  stage: string | null | undefined,
+): TentsListCalculatedVpd | null {
+  const byKey = (key: MetricView["key"]) => view.metrics.find((metric) => metric.key === key);
+  const vpd = byKey("vpd");
+  if (!vpd || vpd.origin !== "stored") return null;
+  const temp = byKey("temp");
+  const rh = byKey("rh");
+  if (!temp || !rh || !isCalculableStatus(temp.status) || !isCalculableStatus(rh.status)) {
+    return null;
+  }
+  const cohort = snapshotFromReadings([...rows]);
+  const tempC = cohort?.temp;
+  const rhPct = cohort?.rh;
+  if (typeof tempC !== "number" || typeof rhPct !== "number") return null;
+  const kpa = calculateVPD(tempC, rhPct);
+  if (kpa === null || !Number.isFinite(kpa)) return null;
+  const worst =
+    CALCULATED_STATUS_RANK[rh.status as CalculableStatus] >
+    CALCULATED_STATUS_RANK[temp.status as CalculableStatus]
+      ? rh
+      : temp;
+  const status = worst.status as CalculableStatus;
+  const stageChip = vpdMetricChipStatus(classifyVpdAgainstStage({ value: kpa, stage }));
+  return {
+    kpa,
+    display: formatSensorChartDisplayNumber(kpa, "vpd"),
+    unit: " kPa",
+    status,
+    statusLabel: status === "ok" ? null : worst.statusLabel,
+    chipStatus: status !== "ok" && stageChip === "ok" ? "warn" : stageChip,
+    label: TENTS_LIST_VPD_ORIGIN_COPY.calculated,
+  };
 }

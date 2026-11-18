@@ -7,7 +7,7 @@ why: Found in the 2026-11-18 core-loop walk on production (b7e0521, UX Audit Tes
 root_cause: useTentIrrigationLedger keys its query ["irrigation","ledger",owner,tent,plant,pageSize]; applyQuickLogV2Refresh never invalidated that prefix, so React Query kept the pre-save ledger.
 branch: claude/irrigation-ledger-refresh-on-save
 base: verdant-grow-diary at 9e7e51ee
-pr: draft, number in the PR list for this branch
+pr: #2997 (draft) https://github.com/Verdant-OS/verdant-grow-diary/pull/2997
 state: pushed; draft PR open; required checks running; no independent review yet
 next_action: (1) 35/35 required checks at the PR head; (2) one independent exact-head review by a session that did not write this (exclude cse_017UoYKywjU6h8V7ndDq9JPe); (3) Matthew's per-item yes naming the PR and SHA, then the Merge Steward queues it.
 post_merge_check: after live /version.json reports the merge SHA, signed in on the disposable test account, open the UX Audit Test Tent, save a Water entry tagged [smoke <timestamp>] from Quick Log, and expect it in the tent irrigation history without reloading.
@@ -26,5 +26,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows. Pending human decision: Matthew's merge yes after review.
 claimed_by: Claude cse_017UoYKywjU6h8V7ndDq9JPe, 2026-11-18 01:21 UTC
 owner: Claude cse_017UoYKywjU6h8V7ndDq9JPe
-last_updated: 2026-11-18 01:21 UTC, by Claude cse_017UoYKywjU6h8V7ndDq9JPe
+last_updated: 2026-11-18 01:40 UTC, by Claude cse_017UoYKywjU6h8V7ndDq9JPe
 ```

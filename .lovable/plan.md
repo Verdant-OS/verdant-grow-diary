@@ -1,28 +1,14 @@
-# Fix: pheno_crosses.channel missing in production
+# Read-only answers: sign-in email hook (no changes proposed)
 
-## Confirmed diagnosis
-- `src/lib/phenoKeepersService.ts` `listCrossesForHunt` selects `channel, generation, recurrent_parent_id` from `pheno_crosses`.
-- Those columns are added by `supabase/migrations/20260707210000_pheno_crosses_full_taxonomy.sql`, which is present in the repo and pinned by `src/test/required-core-migrations-gate.test.ts` (`PHENO_CROSSES_TAXONOMY_COLUMNS`).
-- Production is throwing Postgres `42703` on `pheno_crosses.channel` (9 hits, 2026-07-28). The migration exists locally but is not recorded in the production ledger — this matches the earlier `BLOCKED_LEDGER_FILENAME_DIVERGENCE` and `BLOCKED_PHENO_ACL_LEAK` audits.
+Nothing will be changed. This holds only the answers to your four questions.
 
-## Why no code change here
-The frontend code and migration file are correct. This is a **production schema-drift issue**, not a code defect. Per project rules the sandbox never applies migrations to production; only Matthew's Windows machine dispatches the pinned production migration workflows.
+1. **Send Email hook on Auth:** UNKNOWN / BLOCKED. None of my tools can read the Auth hook configuration (whether it is enabled or what URL it points at). Indirect evidence (from earlier, not re-measured): Cloud > Emails shows "No authentication emails yet". The hook ran 0 times during the 14:57 UTC password reset on Nov 12. That suggests no active hook points at `auth-email-hook`, but it does not prove it. Whether a managed Emails hook targets `/lovable/email/auth/webhook` is also NOT_MEASURED. That route is in the code but has not been published.
 
-## Recommended path (operator-run, from Windows)
-The reconciliation migration `supabase/migrations/20260728090000_production_schema_reconciliation.sql` already covers the missing pheno taxonomy columns, but its last apply attempt was halted with `BLOCKED_PHENO_ACL_LEAK` because production `pheno_crosses` / `pheno_reversals` carry a legacy default-ACL leak (anon/authenticated hold 8 privileges each).
+2. **Secret names:**
+   - SEND_EMAIL_HOOK_SECRET: missing
+   - LOVABLE_API_KEY: present (managed)
+   - LOVABLE_SEND_URL: missing. The code reads it as optional and falls back when it is empty.
 
-Two ordered steps:
+3. **Setting SEND_EMAIL_HOOK_SECRET safely:** You can't see this project's Auth hooks, so you have no "v1,whsec_..." value to copy. On Lovable Cloud the hook's secret is created by the platform and is not shown to me or to you. I have no tool that shows it or creates a matching hook. A secure secret form would only store a value you already have. It can't make that value match a hook secret nobody can read. The managed route for sign-in emails is the platform's own Emails setup, not this native-hook path. If you want the native path anyway, staff would need to configure the hook and give you its secret for Project Settings → Secrets.
 
-1. **Author an additive REVOKE migration** normalizing `pheno_crosses` and `pheno_reversals` ACLs to the canonical set (`GRANT SELECT, INSERT, UPDATE, DELETE ON ... TO authenticated; GRANT ALL ... TO service_role;` after `REVOKE ALL ... FROM anon, authenticated`). No column changes.
-   - New file: `supabase/migrations/<new-ts>_pheno_crosses_acl_normalize.sql`.
-   - Ship via normal PR + `Apply pinned production migrations` workflow.
-
-2. **Re-dispatch** `.github/workflows/apply-pinned-production-migrations.yml` for `20260728090000_production_schema_reconciliation.sql`. With the ACL leak closed, the `DO $reconcile$` guard will pass and `channel`, `generation`, `recurrent_parent_id` will be added to `pheno_crosses`.
-
-## Verification after apply
-- `/operator/schema-audit` should show `pheno_crosses` taxonomy columns present and RLS/ACL audit clean.
-- `select column_name from information_schema.columns where table_name='pheno_crosses' and column_name in ('channel','generation','recurrent_parent_id');` returns 3 rows.
-- Pheno Hunt cross list stops emitting `42703` in edge logs.
-
-## Rollback
-Both migrations are additive; no destructive change. Rollback is only necessary if the REVOKE breaks a policy — mitigate by re-granting the exact prior set from the schema baseline at `/mnt/documents/db-baselines/schema-baseline-20260724T103225Z.txt`.
+4. **Deployed version:** I last redeployed `auth-email-hook` at 2026-11-12 14:08 UTC from code at `a6be0915`. The native-hook support came later in commits `c1cf32d30`, `d7a5d775d` and `cb79b7edf` (all 2026-11-16). So the deployed function is most likely older and lacks native-hook support. I can't list deploy history, so it's possible someone else deployed it since; this is NOT_MEASURED.

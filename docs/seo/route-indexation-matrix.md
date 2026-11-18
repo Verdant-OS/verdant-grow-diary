@@ -10,7 +10,7 @@
 - **Build artifacts** from `scripts/generate-seo-artifacts.ts` are `dist/seo-manifest.json` and per-route Open Graph PNGs. That script does not write per-route `index.html` files. There is no root `index.html` in this repository. `fileName` on each document is retained metadata.
 - **Client head** means `usePageSeo` (`src/hooks/usePageSeo.ts`). The default is `index, follow` and a self-canonical. `noindex: true` emits `noindex, follow`. It runs after hydration.
 - **Root shell** is `src/routes/__root.tsx`: `robots` `index, follow`, no canonical link, and sitewide Organization, WebSite, and SoftwareApplication JSON-LD. A route with no `head()` keeps that shell until a client head replaces it.
-- **Sitemap** means a concrete `<loc>` in `public/sitemap.xml` (57 URLs, all on `https://verdantgrowdiary.com`). Pattern routes are not sitemap URLs.
+- **Sitemap** means a concrete `<loc>` in `public/sitemap.xml` (58 URLs, all on `https://verdantgrowdiary.com`). Pattern routes are not sitemap URLs.
 - **robots.txt** crawl rules are separate from meta robots. `src/test/robots-private-route-coverage.test.ts` treats a rule as matching when the path equals it or starts with it. Whether a live crawler fetches a URL is **NOT_MEASURED**.
 - Production runs on Cloudflare Workers at https://verdantgrowdiary.com (Matthew Cheek, 2026-10-10). `vercel.json` redirects and the `/unsubscribe` `X-Robots-Tag` header are historical repository configuration from an earlier host. They are not the live host's configuration. Whether the Cloudflare host serves the same redirects and headers is **NOT_MEASURED** in this file.
 
@@ -49,7 +49,6 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 - `/docs/mcp-api` — robots `index, follow`; sitemap yes; canonical `/docs/mcp-api`
 - `/guides` — robots `index, follow`; sitemap yes; canonical `/guides`
 - `/guides/grow-diary-app` — robots `index, follow`; sitemap yes; canonical `/guides/grow-diary-app`
-- `/guides/grow-log-without-spreadsheets` — robots `index, follow`; sitemap yes; canonical `/guides/grow-log-without-spreadsheets`
 - `/guides/grow-log-app-vs-grow-journal` — robots `index, follow`; sitemap yes; canonical `/guides/grow-log-app-vs-grow-journal`
 - `/guides/grow-room-vpd-tracker` — robots `index, follow`; sitemap yes; canonical `/guides/grow-room-vpd-tracker`
 - `/guides/ac-infinity-data-logging` — robots `index, follow`; sitemap yes; canonical `/guides/ac-infinity-data-logging`
@@ -78,6 +77,7 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 - `/guides/cannabis-leaves-turning-yellow` — robots `index, follow`; sitemap yes; canonical `/guides/cannabis-leaves-turning-yellow`
 - `/guides/cannabis-leaf-spots-lesions` — robots `index, follow`; sitemap yes; canonical `/guides/cannabis-leaf-spots-lesions`
 - `/guides/cannabis-burnt-crispy-leaf-tips` — robots `index, follow`; sitemap yes; canonical `/guides/cannabis-burnt-crispy-leaf-tips`
+- `/guides/grow-log-without-spreadsheets` — robots `index, follow`; sitemap yes; canonical `/guides/grow-log-without-spreadsheets`
 - `/cultivars` — robots `index, follow`; sitemap yes; canonical `/cultivars`
 - `/customer/guide/oreoz-vs-gelonade-comparison` — robots `noindex, follow`; sitemap no; canonical `/customer/guide/oreoz-vs-gelonade-comparison`
 - `/cultivars/sour-diesel` — robots `noindex, follow`; sitemap no; canonical `/cultivars/sour-diesel`
@@ -116,7 +116,7 @@ One line per `STATIC_PUBLIC_OUTPUT_DOCUMENTS` entry. `sitemap yes` means that ex
 
 - Guide documents (`buildStaticGuideJsonLd`) emit WebPage, FAQPage, and BreadcrumbList. HowTo is added when the guide declares `howTo` steps; `/guides/import-grow-sensor-csv` is the guide that does. Article is added only when `publishedOn` is set. These 7 guides set it: `/guides/cannabis-grow-light-distance-and-schedule`, `/guides/cannabis-light-stress-light-burn-bleaching-or-heat`, `/guides/oreoz-vs-gelonade-comparison`, `/guides/cannabis-leaf-symptoms`, `/guides/cannabis-leaves-turning-yellow`, `/guides/cannabis-leaf-spots-lesions`, `/guides/cannabis-burnt-crispy-leaf-tips`.
 - No cultivar detail document is indexable today. `buildStaticCultivarJsonLd` still gives each `/cultivars/<slug>` document WebPage, a cultivar collection node, FAQPage, BreadcrumbList, and Article, but all ten are `noindex, follow` (see the inventory), so that schema is not on an indexable document. It would be once a slug reaches `reviewed` or `verified`. The `/cultivars` hub document is indexable and uses the default WebPage node.
-- `/guides` emits WebPage, FAQPage, and BreadcrumbList. `/guides/:slug` is the manifest pattern for `VERDANT_SEO_GUIDES` (29 slugs). `/guides/grow-stage-care-guide` is its own manifest route and its own document. `/guides/athena-feed-chart-log` emits WebPage, Article, FAQPage, BreadcrumbList, and WebApplication. It stores nothing. `/guides/isolate-male-cannabis-plant`, `/guides/cannabis-tissue-culture`, `/guides/still-air-box-vs-flow-hood`, and `/guides/steady-climate-multiple-grow-tents` emit WebPage, Article, FAQPage, and BreadcrumbList, and store nothing.
+- `/guides` emits WebPage, FAQPage, and BreadcrumbList. `/guides/:slug` is the manifest pattern for `VERDANT_SEO_GUIDES` (30 slugs). `/guides/grow-stage-care-guide` is its own manifest route and its own document. `/guides/athena-feed-chart-log` emits WebPage, Article, FAQPage, BreadcrumbList, and WebApplication. It stores nothing. `/guides/isolate-male-cannabis-plant`, `/guides/cannabis-tissue-culture`, `/guides/still-air-box-vs-flow-hood`, and `/guides/steady-climate-multiple-grow-tents` emit WebPage, Article, FAQPage, and BreadcrumbList, and store nothing.
 - `/tools/blueprint-targets` emits WebPage, FAQPage, and BreadcrumbList. `/quick-log` emits WebPage, SoftwareApplication, and FAQPage. Other acquisition documents in the inventory use the default WebPage node unless the row above says otherwise.
 - `/cultivars` with a non-empty query string is a client `noindex, follow` variant (`buildCultivarsIndexSeo` in `src/lib/cultivarIndexSeoRules.ts`). The canonical stays `/cultivars`. Those query URLs are not sitemap locs. The clean `/cultivars` document stays `index, follow`.
 

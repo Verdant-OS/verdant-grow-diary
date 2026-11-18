@@ -103,6 +103,9 @@ describe("grok-review workflow safety contract", () => {
     expect(run).toContain("--sandbox review-locked");
     const profile = runOf(review, "Write locked sandbox profile").run!;
     expect(profile).toContain('extends = "strict"');
+    // The docs name ~/.grok/sandbox.toml; GROK_HOME is the documented home override.
+    expect(profile).toContain('"$GROK_HOME/sandbox.toml"');
+    expect(profile).toContain('"$HOME/.grok/sandbox.toml"');
     for (const path of ['"/proc"', '"/sys"']) expect(profile).toContain(path);
   });
 
@@ -164,9 +167,9 @@ describe("grok-review workflow safety contract", () => {
     expect(step.run).not.toMatch(/gh pr review|--approve|pr merge/);
     const header = runOf(post, "Build comment body").run!;
     expect(header).toContain("not an independent review");
-    for (const marker of ["VERDICT", "ROUTE", "ACK", "CLAIM", "FIX REQUEST"]) {
-      expect(header).toContain(marker);
-    }
+    // Any bracketed review-protocol tag, in any case, is defanged.
+    expect(header).toMatch(/\/gI'/);
+    expect(header).toContain("YES-RECORDED");
   });
 
   it("never interpolates PR-controlled text into a shell script", () => {

@@ -7,8 +7,9 @@
  * The stored VPD chip says "Stored reading"; the VPD calculated from the
  * temperature and RH on the same card sits beside it, labelled "Calculated
  * from temperature and RH". The calculated value appears only beside a stored
- * one, only from the card's own temperature and RH, never from missing or
- * invalid inputs, and stale inputs keep it stale.
+ * one, only from the card's own temperature and RH (one capture, one source),
+ * never from missing or invalid inputs; stale inputs keep it stale and CSV
+ * inputs keep it Historical.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -30,8 +31,14 @@ const OLD = "2026-11-15T01:50:00.000Z";
 const TENT = "tent-1";
 const F77_IN_C = (77 - 32) / 1.8; // 25 °C
 
-const row = (metric: string, value: number, ts = FRESH, extra: { quality?: string } = {}) => ({
-  id: `${metric}-${ts}`,
+interface RowExtra {
+  quality?: string;
+  source?: string;
+  device_id?: string;
+}
+
+const row = (metric: string, value: number, ts = FRESH, extra: RowExtra = {}) => ({
+  id: `${metric}-${ts}-${extra.device_id ?? "none"}`,
   metric,
   value,
   ts,
@@ -133,6 +140,62 @@ describe("tentsListCalculatedVpd", () => {
       metric.key === "rh" ? { ...metric, status: "invalid", statusLabel: "Invalid" } : metric,
     );
     expect(tentsListCalculatedVpd({ metrics }, WALK_ROWS, "veg")).toBeNull();
+  });
+
+  it("keeps CSV inputs Historical, never a healthy cue", () => {
+    const csv = { source: "csv" };
+    const rows = [
+      row("temperature_c", F77_IN_C, FRESH, csv),
+      row("humidity_pct", 65, FRESH, csv),
+      row("vpd_kpa", 1.1, FRESH, csv),
+    ];
+    const calculated = tentsListCalculatedVpd(viewFor(rows), rows, "veg");
+    expect(calculated).toMatchObject({
+      kpa: 1.11,
+      status: "degraded",
+      statusLabel: "Historical",
+    });
+    expect(calculated?.chipStatus).not.toBe("ok");
+  });
+
+  it("calculates nothing from temperature and RH of two devices at one instant", () => {
+    const deviceA = { source: "live", device_id: "A" };
+    const deviceB = { source: "live", device_id: "B" };
+    const rows = [
+      row("temperature_c", F77_IN_C, FRESH, deviceA),
+      row("humidity_pct", 55, FRESH, deviceB),
+      row("vpd_kpa", 1.1, FRESH, deviceA),
+      row("temperature_c", 22, FRESH, deviceB),
+      row("humidity_pct", 70, FRESH, deviceA),
+    ];
+    expect(vpdOf(rows)?.origin).toBe("stored");
+    expect(tentsListCalculatedVpd(viewFor(rows), rows, "veg")).toBeNull();
+  });
+
+  it("still calculates when one device reports both", () => {
+    const deviceA = { source: "live", device_id: "A" };
+    const rows = [
+      row("temperature_c", F77_IN_C, FRESH, deviceA),
+      row("humidity_pct", 55, FRESH, deviceA),
+      row("vpd_kpa", 1.1, FRESH, deviceA),
+    ];
+    expect(tentsListCalculatedVpd(viewFor(rows), rows, "veg")).toMatchObject({ kpa: 1.43 });
+  });
+
+  it("calculates nothing from temperature and RH of different sources", () => {
+    const rows = [
+      row("temperature_c", F77_IN_C, FRESH, { source: "manual" }),
+      row("humidity_pct", 55, FRESH, { source: "live" }),
+      row("vpd_kpa", 1.1),
+    ];
+    expect(vpdOf(rows)?.origin).toBe("stored");
+    expect(tentsListCalculatedVpd(viewFor(rows), rows, "veg")).toBeNull();
+  });
+
+  it("calculates nothing from RH pinned at 100%", () => {
+    const rows = [row("temperature_c", F77_IN_C), row("humidity_pct", 100), row("vpd_kpa", 1.1)];
+    const okMetrics: MetricView[] = viewFor(WALK_ROWS).metrics;
+    expect(tentsListCalculatedVpd({ metrics: okMetrics }, rows, "veg")).toBeNull();
   });
 
   it("treats a zero temperature as a real value, not missing", () => {

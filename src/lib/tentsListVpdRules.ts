@@ -23,7 +23,13 @@ import { calculateVPD } from "@/lib/sensors/calculateVPD";
 import { snapshotFromReadings } from "@/lib/sensorSnapshot";
 import { formatSensorChartDisplayNumber } from "@/lib/sensorChartAxisRules";
 import { classifyVpdAgainstStage, vpdMetricChipStatus } from "@/lib/stageAwareVpdTargets";
-import { sensorCaptureRef, snapshotCaptureRef } from "@/lib/sensorCaptureRefRules";
+import {
+  captureRefsMatch,
+  rowCaptureRef,
+  sensorCaptureRef,
+  snapshotCaptureRef,
+} from "@/lib/sensorCaptureRefRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 import { normalizeSensorSource, type SensorSource } from "@/lib/sensor/sensorSourceRules";
 
 /** Label for a VPD from a generic diary snapshot: historical, not current. */
@@ -305,16 +311,53 @@ function isCalculableStatus(status: MetricStatus): status is CalculableStatus {
   return status in CALCULATED_STATUS_RANK;
 }
 
+/** The status word a historical (CSV or diary) value carries elsewhere on the strip. */
+const HISTORICAL_STATUS_LABEL = "Historical";
+
+/**
+ * The one source two inputs share, as Tonight's `compositeVpdSource` reads it:
+ * the same source, or live with stale reads stale. Anything else is null.
+ */
+function sharedInputSource(a: unknown, b: unknown): SensorSource | null {
+  const left = normalizeSensorSource(a);
+  const right = normalizeSensorSource(b);
+  if (left === right) return left;
+  const pair = new Set([left, right]);
+  return pair.has("live") && pair.has("stale") ? "stale" : null;
+}
+
+/**
+ * The temperature and RH rows the card shows: the first of each at the latest
+ * instant, as `snapshotFromReadings` picks them.
+ */
+function cohortClimateRows(
+  rows: readonly BuildTentSnapshotInput[],
+  cohortTs: string,
+): { temp: BuildTentSnapshotInput | undefined; rh: BuildTentSnapshotInput | undefined } {
+  const cohortMs = Date.parse(cohortTs);
+  const atCohort = rows.filter((row) => {
+    const observed = resolveSensorObservationTime(row);
+    return observed !== null && Date.parse(observed) === cohortMs;
+  });
+  return {
+    temp: atCohort.find((row) => row.metric === "temperature_c"),
+    rh: atCohort.find((row) => row.metric === "humidity_pct"),
+  };
+}
+
 /**
  * The calculated VPD to show beside a stored one, or null.
  *
  * Shown only when the card's VPD is a stored reading. It is calculated from
  * the same temperature and RH the card shows (one capture, the latest cohort
- * of `rows`), so it never borrows another capture's values. A missing,
- * unknown or invalid temperature or RH yields nothing: a calculation from
- * flagged inputs must not read as a measurement. Zero is a real value. The
- * result keeps the worse of its inputs' Stale/Degraded status, so stale data
- * never reads as healthy.
+ * of `rows`), and only under the fences Tonight applies to its own calculated
+ * VPD (`calculatedVpdCandidate`): the two inputs must not be known, different
+ * captures (two devices at one instant), must share one source (live with
+ * stale reads stale), and RH pinned at 0% or 100% is a stuck sensor, not a
+ * reading (Codex on #3006 at ddea75b3). A missing, unknown or invalid
+ * temperature or RH yields nothing. Zero temperature is a real value. The
+ * result keeps the worse of its inputs' Stale/Degraded status, and CSV inputs
+ * read Historical, so neither stale nor historical data reads as healthy.
  */
 export function tentsListCalculatedVpd(
   view: Pick<TentSnapshotView, "metrics">,
@@ -332,7 +375,15 @@ export function tentsListCalculatedVpd(
   const cohort = snapshotFromReadings([...rows]);
   const tempC = cohort?.temp;
   const rhPct = cohort?.rh;
-  if (typeof tempC !== "number" || typeof rhPct !== "number") return null;
+  if (!cohort?.ts || typeof tempC !== "number" || typeof rhPct !== "number") return null;
+  if (rhPct <= 0 || rhPct >= 100) return null;
+  const inputRows = cohortClimateRows(rows, cohort.ts);
+  if (!inputRows.temp || !inputRows.rh) return null;
+  const tempRef = rowCaptureRef(inputRows.temp);
+  const rhRef = rowCaptureRef(inputRows.rh);
+  if (tempRef && rhRef && !captureRefsMatch(tempRef, rhRef)) return null;
+  const source = sharedInputSource(inputRows.temp.source, inputRows.rh.source);
+  if (source === null || source === "invalid") return null;
   const kpa = calculateVPD(tempC, rhPct);
   if (kpa === null || !Number.isFinite(kpa)) return null;
   const worst =
@@ -340,14 +391,28 @@ export function tentsListCalculatedVpd(
     CALCULATED_STATUS_RANK[temp.status as CalculableStatus]
       ? rh
       : temp;
-  const status = worst.status as CalculableStatus;
+  const historical = source === "csv";
+  const inputStatus: CalculableStatus =
+    source === "stale" ? "stale" : (worst.status as CalculableStatus);
+  const status: CalculableStatus =
+    inputStatus === "stale" ? "stale" : historical ? "degraded" : inputStatus;
+  const statusLabel =
+    status === "ok"
+      ? null
+      : status === "stale"
+        ? worst.status === "stale" && worst.statusLabel
+          ? worst.statusLabel
+          : "Stale"
+        : historical
+          ? HISTORICAL_STATUS_LABEL
+          : worst.statusLabel;
   const stageChip = vpdMetricChipStatus(classifyVpdAgainstStage({ value: kpa, stage }));
   return {
     kpa,
     display: formatSensorChartDisplayNumber(kpa, "vpd"),
     unit: " kPa",
     status,
-    statusLabel: status === "ok" ? null : worst.statusLabel,
+    statusLabel,
     chipStatus: status !== "ok" && stageChip === "ok" ? "warn" : stageChip,
     label: TENTS_LIST_VPD_ORIGIN_COPY.calculated,
   };

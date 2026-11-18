@@ -175,7 +175,7 @@ describe("/guides/:slug detail — public render", () => {
     renderAt("/guides/grow-diary-app");
     const page = screen.getByTestId("guide-page");
     expect(page.getAttribute("data-guide-slug")).toBe("grow-diary-app");
-    expect(screen.getByText(/Best grow diary app for serious growers/i)).toBeTruthy();
+    expect(screen.getByText(/Best grow diary app for cannabis: Verdant/i)).toBeTruthy();
   });
 
   it("emits unique canonical + OG url per guide", () => {

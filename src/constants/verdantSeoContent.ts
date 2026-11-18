@@ -2657,7 +2657,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     h1: "How to log your grow without spreadsheets",
     description:
       "Stop fighting a Google Sheets or Excel grow log. What to log per plant, what to do with your old sheet, when a spreadsheet is still fine, and offline grow journal alternatives.",
-    targetKeyword: "log grow without spreadsheets",
+    targetKeyword: "log your grow without spreadsheets",
     introHeading: "How do I log my grow without a spreadsheet?",
     intro:
       "Log each plant in a grow diary built for it. In Verdant, that means a 30-second Quick Log entry per watering, feed, or observation, on one plant timeline with photos and sensor readings attached. Keep your old Google Sheets or Excel grow log as the archive for past runs, and start your current run in the diary. A spreadsheet can work, and many good growers use one. But if your sheet has turned into twenty columns you fill in on Sundays from memory, here's how to replace it for your next entries without losing what you've already recorded. To be upfront: Verdant is new and still in early build, and it doesn't import spreadsheet diaries yet.",

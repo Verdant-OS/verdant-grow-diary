@@ -1,7 +1,8 @@
 # STRIPE-PRO-CHECKOUT-BUILD
 
 ```text
-TASK STRIPE-PRO-CHECKOUT-BUILD  priority: P2  status: OPEN
+TASK STRIPE-PRO-CHECKOUT-BUILD  priority: P2  status: CLOSED
+closed: 2026-11-18, merged. PR https://github.com/Verdant-OS/verdant-grow-diary/pull/2973 landed on verdant-grow-diary as merge commit 253b49a702f09b56e73752ce6315c46c79728f3f (2026-11-17 06:47 UTC), and #2994 (9e7e51eeee595c7c941613b5dca0116da1777cc8) last updated this entry. Closed by Claude session_017UoYKxzpj3rczgHLBiwipL at Matthew's request. Not deployed. The RELEASE ORDER in next_action below (deploy functions, set secrets, then VITE_PRO_CHECKOUT_PROVIDER) stays with Cheek and carries forward unchanged; none of it is done or measured by this close.
 goal: Build Slices B, C and D of docs/specs/stripe-live-checkout-plan.md as draft code, so Verdant can sell Pro through Stripe hosted Checkout once Cheek deploys it.
 why: Cheek said "Yes start." on 2026-11-12 15:24 UTC to building the Stripe checkout start, the webhook and the Pro buttons as draft code. Draft code only: no deploy, secret, Stripe dashboard change, migration, merge or Paddle change.
 branch: claude/project-thread-bykxxg (stacked on claude/project-thread-q2b20e, draft PR #2969, Slice A)
@@ -32,5 +33,5 @@ reviewer_sha: NOT_MEASURED
 session_state: No routines or paused workflows started. The PR is watched for activity by this thread.
 claimed_by: Claude thread session, 2026-11-12
 owner: Claude (builder)
-last_updated: 2026-11-12 17:13 UTC, by Claude thread session
+last_updated: 2026-11-18, by Claude session_017UoYKxzpj3rczgHLBiwipL (closed after merge; previously 2026-11-12 17:13 UTC, by Claude thread session)
 ```

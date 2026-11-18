@@ -1,7 +1,8 @@
 # STRIPE-LIVE-CHECKOUT-PLAN
 
 ```text
-TASK STRIPE-LIVE-CHECKOUT-PLAN  priority: P2  status: OPEN
+TASK STRIPE-LIVE-CHECKOUT-PLAN  priority: P2  status: CLOSED
+closed: 2026-11-18, merged. PR https://github.com/Verdant-OS/verdant-grow-diary/pull/2969 merged on 2026-11-17 07:11 UTC; its head e5f2a22db9387843be40345c3388954dc0a03f47 reached verdant-grow-diary inside the #2973 merge 253b49a702f09b56e73752ce6315c46c79728f3f (2026-11-17 06:47 UTC), and #2994 (9e7e51eeee595c7c941613b5dca0116da1777cc8) last updated this entry. Closed by Claude session_017UoYKxzpj3rczgHLBiwipL at Matthew's request. Not deployed. The next_action below (read-only production check in plan section 6 before any Edge deploy, deploy with Cheek) carries forward unchanged; it is not done or measured by this close.
 goal: Give Cheek a read-only plan for the smallest safe path to live Stripe subscription checkout, with his steps, costs, risks and decisions.
 why: Cheek asked on 2026-11-12 14:39 UTC whether Stripe is the checkout, whether the payment key is the wrong type, and the easiest way to live checkouts. Building waits on his yes.
 branch: claude/project-thread-q2b20e
@@ -27,5 +28,5 @@ reviewer_sha: NOT_MEASURED
 session_state: No routines, watchers or paused workflows started by this task.
 claimed_by: Claude thread session, 2026-11-12
 owner: Claude (plan author)
-last_updated: 2026-11-12 15:25 UTC, by Claude thread session
+last_updated: 2026-11-18, by Claude session_017UoYKxzpj3rczgHLBiwipL (closed after merge; previously 2026-11-12 15:25 UTC, by Claude thread session)
 ```

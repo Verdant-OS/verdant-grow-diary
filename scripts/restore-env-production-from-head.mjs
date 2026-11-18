@@ -16,8 +16,9 @@
  * by the client host rule in src/lib/paddleEnvironment.ts (production
  * hostnames only).
  *
- * Fail closed when HEAD has no `.env.production`, or when git is unavailable.
- * Never invents a file. Stdout reports token CLASS only (never token bytes).
+ * Fail closed when HEAD has no `.env.production`, when git is unavailable, or
+ * when `git show` fails for any other reason (reported as head_git_show_failed
+ * with git's exit status and sanitized stderr). Never invents a file. Stdout reports token CLASS only (never token bytes).
  */
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -65,6 +66,89 @@ export function classifyPaymentsClientTokenClass(envText) {
   return TOKEN_CLASS.malformed;
 }
 
+const MAX_GIT_STDERR_CHARS = 300;
+const NO_GIT_STDERR = "(no stderr)";
+
+// Only these git messages mean "the file is not in HEAD". Exit status 128 alone
+// does not: git also uses it for "not a git repository", an unborn or missing
+// HEAD, "dubious ownership" (safe.directory) and an unreachable directory.
+const HEAD_PATH_MISSING_PATTERNS = Object.freeze([
+  /fatal: path ['"][^'"]*['"] does not exist in ['"]?HEAD['"]?/iu,
+  /fatal: path ['"][^'"]*['"] exists on disk, but not in ['"]?HEAD['"]?/iu,
+  /pathspec ['"]\.env\.production['"] did not match/iu,
+]);
+
+/**
+ * Make git's stderr safe to print in a build log: one line, length-capped, and
+ * with any dotenv-style assignment value or payments token redacted. git writes
+ * blob bytes to stdout, not stderr, so this is defense in depth.
+ *
+ * @param {unknown} stderr
+ * @returns {string}
+ */
+export function sanitizeGitStderr(stderr) {
+  let text = "";
+  if (Buffer.isBuffer(stderr)) text = stderr.toString("utf8");
+  else if (typeof stderr === "string") text = stderr;
+
+  text = text
+    .replace(
+      /[A-Z][A-Z0-9_]{2,}\s*=\s*\S+/gu,
+      (match) => `${match.split("=")[0].trim()}=[redacted]`,
+    )
+    .replace(/\b(?:live|test)_[A-Za-z0-9_-]+/gu, "[redacted]")
+    .replace(/[\u0000-\u001f\u007f]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+
+  if (text.length === 0) return NO_GIT_STDERR;
+  if (text.length > MAX_GIT_STDERR_CHARS) {
+    return `${text.slice(0, MAX_GIT_STDERR_CHARS)}…[truncated]`;
+  }
+  return text;
+}
+
+/**
+ * Classify a non-zero `git show HEAD:.env.production` exit. A path git says is
+ * absent from HEAD is `head_env_production_missing`; every other failure is
+ * `head_git_show_failed` with git's exit status and sanitized stderr. Both fail
+ * closed.
+ *
+ * @param {{ status: number | null, stderr: unknown }} failure
+ * @returns {{ ok: false, reason: "head_env_production_missing" } |
+ *   { ok: false, reason: "head_git_show_failed", gitStatus: number | null, gitStderr: string }}
+ */
+export function classifyGitShowFailure({ status, stderr }) {
+  let raw = "";
+  if (Buffer.isBuffer(stderr)) raw = stderr.toString("utf8");
+  else if (typeof stderr === "string") raw = stderr;
+
+  if (HEAD_PATH_MISSING_PATTERNS.some((pattern) => pattern.test(raw))) {
+    return { ok: false, reason: "head_env_production_missing" };
+  }
+  return {
+    ok: false,
+    reason: "head_git_show_failed",
+    gitStatus: typeof status === "number" ? status : null,
+    gitStderr: sanitizeGitStderr(raw),
+  };
+}
+
+/**
+ * One log line for a failed restore. The reason token always comes first.
+ *
+ * @param {{ reason: string, gitStatus?: number | null, gitStderr?: string }} result
+ * @returns {string}
+ */
+export function formatRestoreFailure(result) {
+  if (result.reason === "head_git_show_failed") {
+    const status = typeof result.gitStatus === "number" ? result.gitStatus : "unknown";
+    const detail = result.gitStderr ?? NO_GIT_STDERR;
+    return `[restore-env-production] ${result.reason} (git exit ${status}): ${detail}`;
+  }
+  return `[restore-env-production] ${result.reason}`;
+}
+
 /**
  * Read `HEAD:.env.production` via `git show`. Does not touch the index.
  * Safer for a single-path restore than a broad checkout: only this blob is read.
@@ -100,14 +184,7 @@ export function gitShowHeadEnvProduction(rootDir, relPath = ENV_PRODUCTION_REL_P
     return { ok: false, reason: "git_unavailable" };
   }
   if (shown.status !== 0) {
-    const errText = Buffer.isBuffer(shown.stderr) ? shown.stderr.toString("utf8") : "";
-    if (
-      /does not exist|exists on disk|pathspec|fatal: path ['"]/iu.test(errText) ||
-      shown.status === 128
-    ) {
-      return { ok: false, reason: "head_env_production_missing" };
-    }
-    return { ok: false, reason: "git_unavailable" };
+    return classifyGitShowFailure({ status: shown.status, stderr: shown.stderr });
   }
 
   const bytes = shown.stdout;
@@ -158,7 +235,7 @@ export function restoreEnvProductionFromHead({
 function main() {
   const result = restoreEnvProductionFromHead();
   if (!result.ok) {
-    console.error(`[restore-env-production] ${result.reason}`);
+    console.error(formatRestoreFailure(result));
     process.exitCode = 1;
     return;
   }

@@ -35,7 +35,6 @@ const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "project-ref-unse
 export const MCP_ALLOWED_ORIGINS = [
   "https://verdantgrowdiary.com",
   "https://www.verdantgrowdiary.com",
-  "https://verdantgrowdiary-com.lovable.app",
   "https://id-preview--66255e7b-892c-4be5-8686-ab1cfc3666db.lovable.app",
   "https://66255e7b-892c-4be5-8686-ab1cfc3666db.lovableproject.com",
 ] as const;

@@ -1,7 +1,8 @@
 # CLOSE-CORE-LOOP-FIX-HANDOFFS-20261118
 
 ```text
-TASK CLOSE-CORE-LOOP-FIX-HANDOFFS-20261118  priority: other  status: OPEN
+TASK CLOSE-CORE-LOOP-FIX-HANDOFFS-20261118  priority: other  status: CLOSED
+closed: 2026-11-18, merged. Landed on verdant-grow-diary as 898f4853842fdc70915ec03525565c2ec86117e4 (#3002, 2026-11-18 05:22 UTC) through the merge queue after Matthew's approval and enqueue. Closed by the Claude thread session for the core-loop walk task in the TENTS-LIST-STORED-AND-CALCULATED-VPD PR, as proposed in the thread, so no separate close PR is needed. Its post_merge_check carries forward; it is not measured by this close.
 goal: Close the four handoff entries for the core-loop walk fixes, which merged on 2026-11-18, each with the SHA it landed as.
 why: AGENTS.md section 12 closes a merged task the same day with the final SHA. This session owns all four entries.
 branch: claude/project-thread-nggu4s
@@ -29,5 +30,5 @@ reviewer_sha: none
 session_state: no production access used; no paused workflows; no scheduled routines.
 claimed_by: the Claude thread session for the core-loop walk task, 2026-11-18 03:45 UTC
 owner: the Claude thread session for the core-loop walk task
-last_updated: 2026-11-18 03:45 UTC, by the Claude thread session for the core-loop walk task
+last_updated: 2026-11-18 05:50 UTC, by the Claude thread session for the core-loop walk task (previously 2026-11-18 03:45 UTC, by the Claude thread session for the core-loop walk task)
 ```

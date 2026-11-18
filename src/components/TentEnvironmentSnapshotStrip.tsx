@@ -14,7 +14,12 @@ import {
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
 import { normalizeVpdStage } from "@/lib/vpdStageTargetRules";
-import { tentsListCanonicalVpd, tentsListDiarySnapshotRows } from "@/lib/tentsListVpdRules";
+import {
+  TENTS_LIST_VPD_ORIGIN_COPY,
+  tentsListCalculatedVpd,
+  tentsListCanonicalVpd,
+  tentsListDiarySnapshotRows,
+} from "@/lib/tentsListVpdRules";
 import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
 import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
 
@@ -245,6 +250,9 @@ export default function TentEnvironmentSnapshotStrip({
   });
   const vpdMetric = snapView.metrics.find((metric) => metric.key === "vpd");
   const hasVpdValue = !!vpdMetric && vpdMetric.status !== "unknown";
+  // A stored VPD is shown beside the VPD calculated from the temperature and
+  // RH on this card, each labelled with where it came from.
+  const calculatedVpd = tentsListCalculatedVpd(snapView, rows, stage);
 
   if (!snapView.hasReading) {
     return (
@@ -309,8 +317,43 @@ export default function TentEnvironmentSnapshotStrip({
                 {metric.statusLabel}
               </span>
             ) : null}
+            {metric.key === "vpd" && metric.origin ? (
+              <span
+                data-testid={`tents-list-vpd-origin-${tentId}`}
+                data-vpd-origin={metric.origin}
+                className="text-[10px] text-muted-foreground"
+              >
+                {TENTS_LIST_VPD_ORIGIN_COPY[metric.origin]}
+              </span>
+            ) : null}
           </div>
         ))}
+        {calculatedVpd ? (
+          <div
+            data-testid={`tents-list-vpd-calculated-${tentId}`}
+            data-calculated-status={calculatedVpd.status}
+            className="inline-flex items-center gap-1"
+          >
+            <MetricChip
+              label="VPD"
+              value={calculatedVpd.display}
+              unit={calculatedVpd.unit}
+              status={calculatedVpd.chipStatus}
+            />
+            {calculatedVpd.statusLabel ? (
+              <span
+                className={
+                  calculatedVpd.status === "stale"
+                    ? "text-[10px] uppercase tracking-wide text-amber-600"
+                    : "text-[10px] uppercase tracking-wide text-muted-foreground"
+                }
+              >
+                {calculatedVpd.statusLabel}
+              </span>
+            ) : null}
+            <span className="text-[10px] text-muted-foreground">{calculatedVpd.label}</span>
+          </div>
+        ) : null}
       </div>
       <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
         <span

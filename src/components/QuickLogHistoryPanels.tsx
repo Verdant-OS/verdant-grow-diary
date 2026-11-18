@@ -20,6 +20,7 @@ import {
   buildPestDiseaseHistory,
   buildRecentQuickLogActivity,
   buildTrainingHistory,
+  type QuickLogHistoryBuildOptions,
   type QuickLogHistoryRow,
 } from "@/lib/quickLogHistoryRules";
 import { getEventType } from "@/lib/diary";
@@ -61,7 +62,10 @@ import {
   type QuickLogTargetNameDirectory,
 } from "@/lib/quickLogHistoryTargetLabelRules";
 
-type Builder = (entries: ReturnType<typeof normalizeDiaryEntries>) => QuickLogHistoryRow[];
+type Builder = (
+  entries: ReturnType<typeof normalizeDiaryEntries>,
+  options?: QuickLogHistoryBuildOptions,
+) => QuickLogHistoryRow[];
 
 interface QuickLogHistorySectionProps {
   rawEntries: NormalizeDiaryInput["rawEntries"];
@@ -188,7 +192,9 @@ function buildRecentDiaryPdfInput(
 ): BuildGrowDiaryReportInput {
   const lifted = liftEntries(rawEntries);
   const normalized = normalizeDiaryEntries({ rawEntries: lifted });
-  const allRows = buildRecentQuickLogActivity(normalized, Number.MAX_SAFE_INTEGER);
+  const allRows = buildRecentQuickLogActivity(normalized, Number.MAX_SAFE_INTEGER, {
+    temperatureUnit,
+  });
   const recentRows = allRows.slice(0, Math.max(0, limit));
   const detailsById = new Map<string, unknown>();
   for (const raw of lifted) {
@@ -414,11 +420,13 @@ function QuickLogHistorySection({
   onEntryChanged,
   targetNames,
 }: QuickLogHistorySectionProps) {
+  // Sensor temperatures in a row's summary follow the grower's unit.
+  const temperatureUnit = useTemperatureUnitPreference();
   const rows = useMemo(() => {
     const lifted = liftEntries(rawEntries);
     const normalized = normalizeDiaryEntries({ rawEntries: lifted });
-    return builder(normalized).slice(0, Math.max(0, limit));
-  }, [rawEntries, builder, limit]);
+    return builder(normalized, { temperatureUnit }).slice(0, Math.max(0, limit));
+  }, [rawEntries, builder, limit, temperatureUnit]);
 
   // Correction/retraction handles (issue #786): resolved from the raw
   // entries so only identifiable Quick Log rows get controls; legacy rows
@@ -546,7 +554,7 @@ export function RecentQuickLogActivityPanel({
         onEntryChanged={onEntryChanged}
         targetNames={targetNames}
         icon={<Activity className="h-3.5 w-3.5 text-primary" />}
-        builder={(entries) => buildRecentQuickLogActivity(entries, limit)}
+        builder={(entries, options) => buildRecentQuickLogActivity(entries, limit, options)}
         emptyTitle={emptyCopy.title}
         emptyHelp={emptyCopy.help}
         limit={limit}

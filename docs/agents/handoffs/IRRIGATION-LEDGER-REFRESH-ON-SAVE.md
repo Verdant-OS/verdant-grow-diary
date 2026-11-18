@@ -1,7 +1,8 @@
 # IRRIGATION-LEDGER-REFRESH-ON-SAVE
 
 ```text
-TASK IRRIGATION-LEDGER-REFRESH-ON-SAVE  priority: P2  status: OPEN
+TASK IRRIGATION-LEDGER-REFRESH-ON-SAVE  priority: P2  status: CLOSED
+closed: 2026-11-18, merged. Landed on verdant-grow-diary as 5719269baec2245b4f3f0a372d57bf0ca1c1a2e1 (#2997, 2026-11-18 03:35 UTC) through the merge queue after Matthew's approval and enqueue. Closed by the Claude thread session for the core-loop walk task. The post_merge_check below carries forward unchanged; it is not measured by this close.
 goal: A Water or Feed entry saved from Quick Log shows up in the tent and plant irrigation panels right away, without a page reload.
 why: Found in the 2026-11-18 core-loop walk on production (b7e0521, UX Audit Test Tent, signed-in test entries tagged [smoke]). After saving a Water entry, the Timeline showed it but the tent irrigation history stayed stale until reload. Matthew asked (2026-11-18 01:13 UTC, via coordinator relay) for each rough spot found in the walk to get its own focused branch and draft PR with tests, ready for independent review, no merges.
 root_cause: useTentIrrigationLedger keys its query ["irrigation","ledger",owner,tent,plant,pageSize]; applyQuickLogV2Refresh never invalidated that prefix, so React Query kept the pre-save ledger.
@@ -26,5 +27,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows. Pending human decision: Matthew's merge yes after review.
 claimed_by: Claude cse_017UoYKywjU6h8V7ndDq9JPe, 2026-11-18 01:21 UTC
 owner: Claude cse_017UoYKywjU6h8V7ndDq9JPe
-last_updated: 2026-11-18 01:40 UTC, by Claude cse_017UoYKywjU6h8V7ndDq9JPe
+last_updated: 2026-11-18 03:45 UTC, by the Claude thread session for the core-loop walk task (previously 2026-11-18 01:40 UTC, by Claude cse_017UoYKywjU6h8V7ndDq9JPe)
 ```

@@ -1,7 +1,8 @@
 # AI-DOCTOR-EVIDENCE-LOCAL-TIME
 
 ```text
-TASK AI-DOCTOR-EVIDENCE-LOCAL-TIME  priority: P2  status: OPEN
+TASK AI-DOCTOR-EVIDENCE-LOCAL-TIME  priority: P2  status: CLOSED
+closed: 2026-11-18, merged. Landed on verdant-grow-diary as 6cdfd720599f41860abcacc73275cf480b60e836 (#3000, 2026-11-18 03:12 UTC) through the merge queue after Matthew's approval and enqueue. Closed by the Claude thread session for the core-loop walk task. The post_merge_check below carries forward unchanged; it is not measured by this close.
 goal: AI Doctor Phase 1 evidence cards on the Quick Log grouped timeline show their saved time in the viewer's own zone with the zone's short name ("Nov 17, 2026, 19:16 CST"), not UTC.
 why: Found in the 2026-11-18 core-loop walk on production. The card read a UTC time for a grower in Chicago, so an evening entry looked like it was saved the next morning. Matthew asked (2026-11-18, via coordinator relay) for each rough spot found in the walk to get its own focused branch and draft PR with tests, no merges.
 root_cause: formatAiDoctorPhase1TimelineSavedAt in src/lib/aiDoctorPhase1TimelineEvidenceViewModel.ts hard-coded timeZone "UTC".
@@ -24,5 +25,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows. Pending human decisions: Matthew's merge yes after review.
 claimed_by: Claude thread session for the core-loop walk task, 2026-11-18 01:55 UTC
 owner: Claude thread session for the core-loop walk task
-last_updated: 2026-11-18 01:55 UTC, by Claude thread session for the core-loop walk task
+last_updated: 2026-11-18 03:45 UTC, by the Claude thread session for the core-loop walk task (previously 2026-11-18 01:55 UTC, by Claude thread session for the core-loop walk task)
 ```

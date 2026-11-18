@@ -6,7 +6,7 @@ goal: Upgrade @lovable.dev/mcp-js from 0.24.0 to 3.5.0 so the MCP edge function 
 why: The committed edge bundle imports npm:@lovable.dev/mcp-js@0.24.0, which pins SDK 1.28.0. The root override already holds the app at 1.32.0, but the edge function resolves its own tree. Matthew typed "Go ahead on #2288" on the timeline (2026-11-18 11:48 UTC); the retired bot that held this is gone, so Taproot (Claude thread session) owns it.
 branch: claude/project-thread-qw95uh
 base: verdant-grow-diary at 0d9e9c081973ea3e4ff86f5cd8822d5cfab3f1be
-pr: #3017 (draft) https://github.com/Verdant-OS/verdant-grow-diary/pull/3017, code head a36930d0f1c6e86d89535743efb0e21c60fecc8b (test pin renegotiated to SDK 1.32.2; this handoff commit follows it)
+pr: #3017 (draft) https://github.com/Verdant-OS/verdant-grow-diary/pull/3017, code head cbb89768b8c1857753027c28937634c36e712355 (adds src/lib/mcp/tools/_json.ts asStructuredJson, a type-only bridge for mcp-js 3.x structuredContent: JsonValueInput, which fixed 4 TS2322 errors CI found at 1f837845d; this handoff commit follows it)
 state: in progress; blocked on the bundle and manifest regeneration
 next_action: someone with registry access sets .lovable/mcp/manifest.json sdk_version to 3.5.0 (by Lovable's extractor, or by hand only if sanctioned), runs bun install --frozen-lockfile then node scripts/sync-mcp-edge-bundle.mjs --write, commits the regenerated supabase/functions/mcp/index.ts, then typecheck, lint, the mcp tests and build run, and the independent reviewer is routed at that head.
 post_merge_check: after Matthew republishes and the mcp edge function redeploys, confirm the deployed function resolves @modelcontextprotocol/sdk at 1.32.2 or later (NOT_MEASURED until then).
@@ -21,5 +21,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows. Pending human decisions: Matthew's merge yes at the reviewed head, then his republish.
 claimed_by: Taproot (Claude thread session), 2026-11-18 12:00 UTC
 owner: Taproot (Claude thread session)
-last_updated: 2026-11-18 12:20 UTC, by Taproot (Claude thread session)
+last_updated: 2026-11-18 12:45 UTC, by Taproot (Claude thread session)
 ```

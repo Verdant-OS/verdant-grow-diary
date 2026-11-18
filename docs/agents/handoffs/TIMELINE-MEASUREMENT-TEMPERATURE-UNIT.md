@@ -7,7 +7,7 @@ why: Found in the 2026-11-18 core-loop walk on production (b7e0521, UX Audit Tes
 root_cause: buildSummarySuffix in quickLogEventIdentityRules.ts pushed `${snap.temp}°` straight from the stored canonical Celsius value, with no unit symbol and no conversion to the grower's preference.
 branch: claude/timeline-measurement-temperature-unit
 base: verdant-grow-diary at 9e7e51ee
-pr: draft, number in the PR list for this branch
+pr: #2998 (draft) https://github.com/Verdant-OS/verdant-grow-diary/pull/2998
 state: pushed; draft PR open; required checks running; no independent review yet
 next_action: (1) 35/35 required checks at the PR head; (2) one independent exact-head review by a session that did not write this (exclude cse_017UoYKywjU6h8V7ndDq9JPe); (3) Matthew's per-item yes naming the PR and SHA, then the Merge Steward queues it.
 post_merge_check: after live /version.json reports the merge SHA, signed in on the disposable test account, open the UX Audit Test Tent, save a sensor snapshot tagged [smoke <timestamp>] from Quick Log with a temperature, and expect the history headline to read the temperature in °F (or °C if the account prefers Celsius), matching the row body.

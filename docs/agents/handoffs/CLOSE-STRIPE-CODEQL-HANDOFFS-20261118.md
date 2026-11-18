@@ -1,0 +1,33 @@
+# CLOSE-STRIPE-CODEQL-HANDOFFS-20261118
+
+```text
+TASK CLOSE-STRIPE-CODEQL-HANDOFFS-20261118  priority: other  status: OPEN
+goal: Close three handoff entries that still read OPEN on verdant-grow-diary although their PRs have merged, keeping their unfinished release and post-merge steps in place.
+why: AGENTS.md section 12 closes a merged task with its final SHA. Matthew asked on 2026-11-18 ("close the stale handoff entries that are still open") and chose these three.
+branch: claude/close-stripe-codeql-handoffs-20261118
+base: verdant-grow-diary @ 898f4853842fdc70915ec03525565c2ec86117e4
+pr: the draft PR for this branch (number in the PR body)
+head_sha: read the current head from the PR and verify with git ls-remote
+state: pushed draft; no review requested
+next_action: one eligible independent reviewer (not this session) at the exact head; then Matthew's per-item yes and the Merge Steward. This writer does not approve, enqueue or merge.
+post_merge_check: on the merged deploy tip, the TASK lines of STRIPE-LIVE-CHECKOUT-PLAN, STRIPE-PRO-CHECKOUT-BUILD and MQ-CODEQL-SENTINEL read status: CLOSED, and git grep -lE '^TASK .*status: OPEN' -- docs/agents/handoffs/ lists none of them. Docs only; no production check.
+decisions:
+  - Same convention as #2995 and #3002: per closed file, the TASK line reads status: CLOSED, one closed: line is added under it, and last_updated is replaced with the old value kept in parentheses. No other line changes.
+  - Closed here: STRIPE-LIVE-CHECKOUT-PLAN (#2969, merged 2026-11-17 07:11 UTC; its head e5f2a22d reached the deploy branch inside the #2973 merge 253b49a7, so #2969 has no first-parent commit of its own), STRIPE-PRO-CHECKOUT-BUILD (#2973, merge commit 253b49a7), MQ-CODEQL-SENTINEL (#2960, merge commit 625761e0).
+  - Each entry's next_action stays in place and is not claimed as done. The two Stripe entries still carry the pre-deploy check and release order that are Cheek's; MQ-CODEQL-SENTINEL still carries the NOT_MEASURED merge_group confirmation.
+  - Left OPEN on purpose: CLOSE-STALE-HANDOFF-BLOCKS-20261112 (its owner keeps it as the carried-forward record, renewed 2026-11-17). Not touched because another writer's open PR already closes them: CLOSE-STALE-HANDOFF-BLOCKS-20261118 (#3007) and CLOSE-CORE-LOOP-FIX-HANDOFFS-20261118 (#3006).
+tried_and_rejected: none
+commands: git log origin/verdant-grow-diary --first-parent --format='%H %cI %P' --grep='(#<N>)$' -1; git grep -lE '^TASK .*status: OPEN' origin/verdant-grow-diary -- docs/agents/handoffs/
+files_touched: docs/agents/handoffs/{STRIPE-LIVE-CHECKOUT-PLAN,STRIPE-PRO-CHECKOUT-BUILD,MQ-CODEQL-SENTINEL}.md; this file (new)
+files_remaining: none
+blockers: none for the docs. Independent exact-head review and Matthew's per-item yes are the standing gates.
+open_questions: none
+gotchas: these three entries belong to other writers (Claude thread sessions and Grok). This change only marks them closed. Closing does not mean any deploy, secret, production check or merge_group confirmation happened; none did.
+exclusions_for_review: Claude session_017UoYKxzpj3rczgHLBiwipL (this writer)
+reviewer_seat: none requested yet
+reviewer_sha: none
+session_state: no production access used; no paused workflows; no scheduled routines.
+claimed_by: Claude session_017UoYKxzpj3rczgHLBiwipL, 2026-11-18 (Matthew's request)
+owner: Claude session_017UoYKxzpj3rczgHLBiwipL
+last_updated: 2026-11-18 06:05 UTC, by Claude session_017UoYKxzpj3rczgHLBiwipL
+```

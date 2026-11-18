@@ -1,7 +1,8 @@
 # MQ-CODEQL-SENTINEL
 
 ```text
-TASK MQ-CODEQL-SENTINEL  priority: P1  status: OPEN
+TASK MQ-CODEQL-SENTINEL  priority: P1  status: CLOSED
+closed: 2026-11-18, merged. PR https://github.com/Verdant-OS/verdant-grow-diary/pull/2960 landed on verdant-grow-diary as merge commit 625761e03288945bc3a695a0df3eaa21dacbe39e (2026-11-12 15:26 UTC) from head 119f03589a20caec211f6d0f91e2a625222c6fab. Closed by Claude session_017UoYKxzpj3rczgHLBiwipL at Matthew's request; owner Grok (Cursor cloud) is unchanged. The next_action below carries forward unchanged: the four contexts on a real merge_group commit are NOT_MEASURED, and they must not be re-required before that is confirmed.
 goal: Make four GitHub checks report on merge_group builds so they can be required again on verdant-grow-diary.
 why: The merge queue stalled because Governance files agree on Sentinel-Version, Analyze (actions), Analyze (python), and the CodeQL rollup never run on merge_group commits.
 branch: cursor/merge-group-codeql-sentinel-52b1
@@ -30,5 +31,5 @@ reviewer_sha: a45192784e036b8c001b7b3d3e3777e4333c26c4 (superseded by the rebase
 session_state: cloud agent implementation; no production writes
 claimed_by: Grok (Cursor cloud), 2026-11-12
 owner: Grok (Cursor cloud) until transferred
-last_updated: 2026-11-12, by Grok
+last_updated: 2026-11-18, by Claude session_017UoYKxzpj3rczgHLBiwipL (closed after merge; previously 2026-11-12, by Grok)
 ```

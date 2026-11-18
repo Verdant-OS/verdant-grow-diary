@@ -34,6 +34,7 @@ const symptomGuidePaths = [
   "/guides/cannabis-leaf-spots-lesions",
   "/guides/cannabis-leaf-symptoms",
   "/guides/cannabis-leaves-turning-yellow",
+  "/guides/grow-log-without-spreadsheets",
   "/guides/import-grow-sensor-csv",
 ];
 

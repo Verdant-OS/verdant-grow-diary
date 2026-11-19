@@ -23,7 +23,7 @@ commands: bunx vitest run src/test/auth-page-title-mode.test.tsx --reporter=dot 
 files_touched: src/lib/authModeTabRules.ts; src/pages/Auth.tsx; src/test/auth-page-title-mode.test.tsx; src/components/AppShell.tsx (header icon labels only); src/test/app-shell-global-search-trigger.test.tsx; src/lib/plantLastActivityRules.ts; src/test/plant-detail-last-activity-pairing.test.tsx; this file
 files_remaining: none planned. Item 5 (header Quick Log opens QuickLogV2Sheet; plant page opens legacy QuickLog) needs Matthew to pick the canonical form, and both files are in #3030/#3031. Item 9 (saved start screen, localStorage, read in Auth.tsx) overlaps #3030 B1 dashboard landing; needs a live check after #3030 lands.
 blockers: none for item 6. Items 5 and 9 may collide with #3030 (QuickLogV2Sheet.tsx, AppShell.tsx, startRoomDashboardHandoff.ts); collisions are reported, not worked around.
-open_questions: item 7 (keep internal UTMs on owned links or switch to a non-UTM signal) is Matthew's call.
+open_questions: none for item 7. Matthew chose "Keep the tag" (2026-11-19 11:26 UTC): the Start Free paid_launch owned-link tag is intended; no change.
 gotchas: stay clear of #3031 files (MobileNav.tsx, QuickLog.tsx, QuickLogAllActivitiesSection.tsx, mobileTentNavRules.ts, quickLogNoteSaveRules.ts) and #3030 files. Do not regress no-email-verification sign-up, the single Start your room form, note read-back, or Delete account.
 exclusions_for_review: the Claude thread session for the first-use friction P3 task (author)
 reviewer_seat: none requested yet

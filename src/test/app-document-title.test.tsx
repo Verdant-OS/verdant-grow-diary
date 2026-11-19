@@ -13,7 +13,7 @@ const EXACT_TITLES: Record<string, string> = {
   "/grows": "Grows | Verdant Grow Diary",
   "/alerts": "Alerts | Verdant Grow Diary",
   "/actions": "Actions | Verdant Grow Diary",
-  "/daily-check": "Daily Check | Verdant Grow Diary",
+  "/daily-check": "Quick Log | Verdant Grow Diary",
   "/doctor": "AI Doctor | Verdant Grow Diary",
   "/settings": "Settings | Verdant Grow Diary",
   "/reports": "Reports | Verdant Grow Diary",

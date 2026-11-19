@@ -16,6 +16,7 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import {
   deriveDailyGrowCheckOnboarding,
   deriveDailyGrowCheckSetupReadState,
+  isCtaForCurrentPath,
   type OnboardingGuidance,
 } from "@/lib/dailyGrowCheckOnboardingRules";
 import { deriveDailyGrowCheckStatus } from "@/lib/dailyGrowCheckStatusRules";
@@ -32,6 +33,11 @@ interface Props {
   /** When true, the card hides itself once setup is ready. */
   hideWhenReady?: boolean;
   /**
+   * The path of the page rendering the card. When the CTA would link to this
+   * same page, the button is left out (no self-link); the guidance text stays.
+   */
+  currentPath?: string | null;
+  /**
    * Scope key for the one-session "Hide guidance" dismissal. Cards sharing
    * the same key dismiss together (e.g. all Dashboard cards). Defaults to
    * the focused plant/tent identity so per-plant dismissals don't bleed
@@ -47,6 +53,7 @@ export default function DailyGrowCheckOnboardingCard({
   focusedTentId = null,
   tentIds = null,
   hideWhenReady = false,
+  currentPath = null,
   dismissScope,
   className,
 }: Props) {
@@ -240,17 +247,19 @@ export default function DailyGrowCheckOnboardingCard({
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <Button
-          asChild
-          size={compact ? "sm" : "default"}
-          className="gradient-leaf text-primary-foreground"
-          data-testid="daily-grow-check-onboarding-cta"
-        >
-          <Link to={guidance.ctaHref}>
-            {guidance.ctaLabel}
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Button>
+        {isCtaForCurrentPath(guidance.ctaHref, currentPath) ? null : (
+          <Button
+            asChild
+            size={compact ? "sm" : "default"}
+            className="gradient-leaf text-primary-foreground"
+            data-testid="daily-grow-check-onboarding-cta"
+          >
+            <Link to={guidance.ctaHref}>
+              {guidance.ctaLabel}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        )}
         {dismissButton}
       </div>
     </Card>

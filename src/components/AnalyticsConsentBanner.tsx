@@ -61,8 +61,10 @@ export function AnalyticsConsentBanner() {
     >
       <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <p className="text-xs leading-snug text-muted-foreground sm:text-sm sm:leading-normal">
-          We use Google Analytics to understand which parts of Verdant growers actually use. Nothing
-          loads until you accept, and your grow data is never sent to analytics.
+          We use Google Analytics to understand which parts of Verdant growers actually use.
+          Accepting also enables Ahrefs and PostHog. PostHog uses your account ID to record when you
+          first activate a paid plan. Your diary entries, payment details and email stay out of that
+          event.
         </p>
         <div className="flex shrink-0 gap-2">
           <Button

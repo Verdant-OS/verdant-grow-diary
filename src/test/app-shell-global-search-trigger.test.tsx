@@ -34,7 +34,10 @@ vi.mock("@/components/AppSidebar", () => ({ default: () => null }));
 vi.mock("@/components/MobileNav", () => ({ default: () => null }));
 vi.mock("@/components/GlobalFastAddButton", () => ({ default: () => null }));
 vi.mock("@/components/AuthStatusIndicator", () => ({ default: () => null }));
-vi.mock("@/components/SignOutConfirmDialog", () => ({ default: () => null }));
+// Render the trigger so the header's own Sign out button stays in the tree.
+vi.mock("@/components/SignOutConfirmDialog", () => ({
+  default: ({ trigger }: { trigger: ReactNode }) => <>{trigger}</>,
+}));
 vi.mock("@/components/VerificationPendingBanner", () => ({ default: () => null }));
 vi.mock("@/components/SubscriptionPastDueBanner", () => ({
   SubscriptionPastDueBanner: () => null,

@@ -30,6 +30,7 @@ import {
   WATER_ENTRY_UNIT_GROUP_LABEL,
   WATER_ENTRY_UNIT_LABELS,
   waterVolumeFieldLabel,
+  waterVolumePlaceholder,
   waterVolumeTooLargeCopy,
 } from "@/constants/quickLogWaterVolumeUnitCopy";
 import {
@@ -241,7 +242,7 @@ export default function QuickLogWateringForm({
                 : "qlv2-volume-help qlv2-volume-presets-help"
           }
           onChange={(event) => setVolumeText(event.target.value)}
-          placeholder="e.g. 500"
+          placeholder={waterVolumePlaceholder(unit)}
         />
         {savedVolumeMl ? (
           <p data-testid="qlv2-volume-saves-as" className="mt-1 text-xs text-muted-foreground">

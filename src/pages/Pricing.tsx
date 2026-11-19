@@ -582,7 +582,7 @@ export default function Pricing() {
       ],
       [
         "Can I cancel anytime?",
-        "Yes. Pro Monthly and Pro Annual can be canceled at any time. Your grow history stays on your account with read-only access to your logs.",
+        "Yes. Pro Monthly and Pro Annual can be canceled at any time. You keep paid features until the end of the billing period you paid for, then your account moves to Free.",
       ],
       [checkoutTrustCopy.faqQuestion, checkoutTrustCopy.faqAnswer],
       ...VERDANT_PRICING_FAQ_ADDITIONS.map(
@@ -1303,8 +1303,8 @@ export default function Pricing() {
           <AccordionItem value="cancel">
             <AccordionTrigger>Can I cancel anytime?</AccordionTrigger>
             <AccordionContent className="text-muted-foreground">
-              Yes. Pro Monthly and Pro Annual can be canceled at any time. If you cancel, your grow
-              history stays on your account and you keep read-only access to your logs.
+              Yes. Pro Monthly and Pro Annual can be canceled at any time. You keep paid features
+              until the end of the billing period you paid for, then your account moves to Free.
             </AccordionContent>
           </AccordionItem>
 

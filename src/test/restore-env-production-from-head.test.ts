@@ -174,6 +174,58 @@ describe("restoreEnvProductionFromHead", () => {
     expect(result).toEqual({ ok: false, reason: "git_unavailable" });
   });
 
+  it("reports a non-repository as head_git_show_failed with git's status and stderr", async () => {
+    const mod = await import(/* @vite-ignore */ RESTORE_MODULE_URL);
+    const root = createTemporaryRoot();
+    // Stop git discovery at the temp root so an enclosing repository is never found.
+    const ceiling = { GIT_CEILING_DIRECTORIES: dirname(root) };
+    writeFileSync(resolve(root, ".env.production"), `${TOKEN_NAME}=${TEST_LIVE_TOKEN}\n`, "utf8");
+
+    const priorCeiling = process.env.GIT_CEILING_DIRECTORIES;
+    process.env.GIT_CEILING_DIRECTORIES = ceiling.GIT_CEILING_DIRECTORIES;
+    let result;
+    try {
+      result = mod.restoreEnvProductionFromHead({ rootDir: root });
+    } finally {
+      if (priorCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+      else process.env.GIT_CEILING_DIRECTORIES = priorCeiling;
+    }
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("head_git_show_failed");
+    expect(result.gitStatus).toBe(128);
+    expect(result.gitStderr).toMatch(/not a git repository/u);
+    // The working tree is left as it was; nothing is invented.
+    expect(readFileSync(resolve(root, ".env.production"), "utf8")).toContain(TOKEN_NAME);
+
+    const cli = runRestoreCli(root, ceiling);
+    expect(cli.status).toBe(1);
+    expect(cli.stderr).toMatch(
+      /^\[restore-env-production\] head_git_show_failed \(git exit 128\): fatal: not a git repository/u,
+    );
+    expect(cli.stderr).not.toContain("head_env_production_missing");
+    expect(combinedOutput(cli)).not.toContain(TEST_LIVE_TOKEN);
+  });
+
+  it("reports a repository with no HEAD commit as head_git_show_failed", async () => {
+    const mod = await import(/* @vite-ignore */ RESTORE_MODULE_URL);
+    const root = createTemporaryRoot();
+    expect(git(root, ["init"]).status).toBe(0);
+    writeFileSync(resolve(root, ".env.production"), `${TOKEN_NAME}=${TEST_LIVE_TOKEN}\n`, "utf8");
+
+    const result = mod.restoreEnvProductionFromHead({ rootDir: root });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("head_git_show_failed");
+    expect(result.gitStatus).toBe(128);
+    expect(result.gitStderr).toMatch(/HEAD/u);
+
+    const cli = runRestoreCli(root);
+    expect(cli.status).toBe(1);
+    expect(cli.stderr).toMatch(
+      /^\[restore-env-production\] head_git_show_failed \(git exit 128\): /u,
+    );
+    expect(combinedOutput(cli)).not.toContain(TEST_LIVE_TOKEN);
+  });
+
   it("refuses to restore any path other than .env.production", async () => {
     const mod = await import(/* @vite-ignore */ RESTORE_MODULE_URL);
     const root = initRepoWithEnvProduction(TEST_SANDBOX_TOKEN);
@@ -181,6 +233,109 @@ describe("restoreEnvProductionFromHead", () => {
       ok: false,
       reason: "unsupported_restore_path",
     });
+  });
+});
+
+describe("classifyGitShowFailure (synthetic stderr fixtures)", () => {
+  it("keeps head_env_production_missing only for git's path-absent messages", async () => {
+    const mod = await import(/* @vite-ignore */ RESTORE_MODULE_URL);
+    expect(
+      mod.classifyGitShowFailure({
+        status: 128,
+        stderr: Buffer.from("fatal: path '.env.production' does not exist in 'HEAD'\n"),
+      }),
+    ).toEqual({ ok: false, reason: "head_env_production_missing" });
+    expect(
+      mod.classifyGitShowFailure({
+        status: 128,
+        stderr: "fatal: path '.env.production' exists on disk, but not in 'HEAD'\n",
+      }),
+    ).toEqual({ ok: false, reason: "head_env_production_missing" });
+  });
+
+  it.each([
+    [
+      "not a git repository",
+      "fatal: not a git repository (or any of the parent directories): .git\n",
+    ],
+    ["bad revision HEAD", "fatal: bad revision 'HEAD'\n"],
+    ["invalid object name HEAD", "fatal: invalid object name 'HEAD'.\n"],
+    ["unreachable directory", "fatal: cannot change to '/missing': No such file or directory\n"],
+    [
+      "dubious ownership",
+      "fatal: detected dubious ownership in repository at '/repo'\nTo add an exception run git config --global --add safe.directory /repo\n",
+    ],
+  ])("reports %s as head_git_show_failed with git's status and stderr", async (_label, stderr) => {
+    const mod = await import(/* @vite-ignore */ RESTORE_MODULE_URL);
+    const result = mod.classifyGitShowFailure({ status: 128, stderr: Buffer.from(stderr) });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("head_git_show_failed");
+    expect(result.gitStatus).toBe(128);
+    expect(result.gitStderr).toBe(stderr.replace(/\s+/gu, " ").trim());
+  });
+
+  it("reports empty or absent stderr explicitly", async () => {
+    const mod = await import(/* @vite-ignore */ RESTORE_MODULE_URL);
+    for (const stderr of [Buffer.alloc(0), "", "   \n", undefined, null]) {
+      expect(mod.classifyGitShowFailure({ status: 128, stderr })).toEqual({
+        ok: false,
+        reason: "head_git_show_failed",
+        gitStatus: 128,
+        gitStderr: "(no stderr)",
+      });
+    }
+    expect(mod.classifyGitShowFailure({ status: null, stderr: undefined }).gitStatus).toBeNull();
+  });
+
+  it("redacts token-like values and dotenv assignments from surfaced stderr", async () => {
+    const mod = await import(/* @vite-ignore */ RESTORE_MODULE_URL);
+    const result = mod.classifyGitShowFailure({
+      status: 1,
+      stderr: `warning: ${TOKEN_NAME}=${TEST_LIVE_TOKEN} OTHER_KEY = secretfixture ${TEST_SANDBOX_TOKEN}\n`,
+    });
+    expect(result.reason).toBe("head_git_show_failed");
+    expect(result.gitStderr).not.toContain(TEST_LIVE_TOKEN);
+    expect(result.gitStderr).not.toContain(TEST_SANDBOX_TOKEN);
+    expect(result.gitStderr).not.toContain("secretfixture");
+    expect(result.gitStderr).toContain(`${TOKEN_NAME}=[redacted]`);
+    expect(result.gitStderr).toContain("OTHER_KEY=[redacted]");
+  });
+
+  it("caps surfaced stderr length", async () => {
+    const mod = await import(/* @vite-ignore */ RESTORE_MODULE_URL);
+    const result = mod.classifyGitShowFailure({
+      status: 128,
+      stderr: `fatal: ${"x".repeat(5000)}`,
+    });
+    expect(result.gitStderr.length).toBeLessThanOrEqual(300 + "…[truncated]".length);
+    expect(result.gitStderr.endsWith("…[truncated]")).toBe(true);
+  });
+});
+
+describe("formatRestoreFailure", () => {
+  it("keeps the reason token first and adds git detail only for head_git_show_failed", async () => {
+    const mod = await import(/* @vite-ignore */ RESTORE_MODULE_URL);
+    expect(mod.formatRestoreFailure({ ok: false, reason: "head_env_production_missing" })).toBe(
+      "[restore-env-production] head_env_production_missing",
+    );
+    expect(
+      mod.formatRestoreFailure({
+        ok: false,
+        reason: "head_git_show_failed",
+        gitStatus: 128,
+        gitStderr: "fatal: bad revision 'HEAD'",
+      }),
+    ).toBe(
+      "[restore-env-production] head_git_show_failed (git exit 128): fatal: bad revision 'HEAD'",
+    );
+    expect(
+      mod.formatRestoreFailure({
+        ok: false,
+        reason: "head_git_show_failed",
+        gitStatus: null,
+        gitStderr: "(no stderr)",
+      }),
+    ).toBe("[restore-env-production] head_git_show_failed (git exit unknown): (no stderr)");
   });
 });
 

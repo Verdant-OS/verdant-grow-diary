@@ -91,12 +91,13 @@ describe("creator beta page analytics isolation", () => {
     expect(gaOptedOut()).toBe(true);
   });
 
-  it("opts Google Analytics out without a reload when no Ahrefs tag ran", () => {
+  it("opts Google Analytics out and reloads away the Tag Manager container when no Ahrefs tag ran", () => {
     setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     applyAnalyticsConsentDecision("granted", PRICING);
     expect(providerNodes()).toEqual({ google: 1, ahrefs: 0 });
 
-    expect(tearDownAnalyticsForExcludedRoute(readAnalyticsConsent(), CREATOR_BETA)).toBe(false);
+    // Tag Manager has no kill switch, so a container that ran forces a reload (GTM, 2026-11-18).
+    expect(tearDownAnalyticsForExcludedRoute(readAnalyticsConsent(), CREATOR_BETA)).toBe(true);
 
     expect(providerNodes()).toEqual({ google: 1, ahrefs: 0 });
     expect(gaOptedOut()).toBe(true);

@@ -55,10 +55,16 @@ must convert by hand today, which invites typos that the 10,000 ml warning will 
 - **R8. Prefill keeps the stored value.** The last-watering prefill shows the stored ml converted
   into the entry unit for display (L to 3 decimals, gal to 2, trailing zeros dropped). If the grower
   saves without editing the prefill, the original stored ml is saved, not the rounded round trip.
-- **R9. Presets follow the unit (D3, revised 2026-11-19).** In `ml` the six presets read "500 ml" …
-  "2500 ml"; in `L` the same amounts read "0.5 L" … "2.5 L"; in `gal` there are none. Selecting one
-  keeps the entry unit, fills the field with the amount in that unit, and saves its exact ml.
-  Selecting the chosen preset again clears it. A preset never changes the remembered unit (R13).
+- **R9. Presets follow the unit (D3, revised 2026-11-19).** In `ml` the six presets read "500 ml",
+  "1000 ml", "1500 ml", "1800 ml", "2000 ml", "2500 ml". In `L` the same canonical amounts read
+  "0.5 L", "1 L", "1.5 L", "1.8 L", "2 L", "2.5 L". In `gal` the form shows no shortcut chips.
+  Gallons currently getting no chips is an open product question; this spec records that behaviour
+  and does not decide a gallon chip set. A chip is pressed when the canonical ml text matches that
+  preset, including after the grower types the same amount in `ml` or `L`. Selecting one keeps the
+  entry unit, clears typed entry text, stores the canonical ml, and the field shows that amount in
+  the current unit. Selecting the chosen preset again clears it. A preset never writes the
+  remembered unit (R13); only the unit control does. Changing unit afterwards keeps the stored ml
+  and redisplays it in the new unit.
 - **R13. Remembered unit (D1 b).** The default entry unit is `L` since 2026-11-12
   (docs/specs/quick-log-water-unit-liters-default.md; it was `ml`). Choosing a unit with the unit
   control stores it on this device under `verdant:waterVolumeEntryUnit` (opaque enum value only,
@@ -150,11 +156,15 @@ Component and payload (`src/test/quick-log-water-volume-units-ui.test.tsx`):
     is declared in the PR with `scripts/scorer-lock.mjs`.
 
 14. D1: choosing `gal` stores `gal`; a new form opens in `gal`; a stored `"quart"` or a throwing
-    `localStorage` opens in `ml`; selecting a preset does not overwrite the stored unit.
+    `localStorage` opens in `L` (the default when nothing valid is stored); selecting a preset does
+    not overwrite the stored unit.
 15. D2: in `gal`, Runoff `0.25` saves `runoff_ml: 946`; in `L`, Runoff `1000.001` is rejected by
     the existing bound (1,000,001 ml); Runoff blank saves no runoff, as today.
-16. D3 (revised): in `gal` there are no preset chips; in `L` the `1000` chip reads `1 L`, and
-    selecting it keeps `Volume (L)`, shows `1`, and saves `volume_ml: 1000` with runoff unchanged.
+16. D3 (revised): in `gal` there are no preset chips (open product question; see R9); in `L` the
+    six chips read `0.5 L` … `2.5 L`, and the `1000` chip reads `1 L`. Selecting it keeps
+    `Volume (L)`, shows `1`, and saves `volume_ml: 1000` with runoff unchanged. In `ml` the chips
+    stay `500 ml` … `2500 ml`. A chip whose canonical ml matches the field is shown selected in
+    `ml` and in `L`, and tapping that selected chip clears the volume.
 
 Each new test must be shown failing before the change (RED count in the PR body).
 
@@ -164,9 +174,12 @@ Each new test must be shown failing before the change (RED count in the PR body)
   the two test files above.
 - Edit: `src/lib/quickLogWateringFormViewModel.ts` (optional entry-unit fields; choosing a unit
   alone leaves the form pristine),
-  `src/components/QuickLogWateringForm.tsx` (unit control, "Saves as" lines, runoff; presets are
-  ml amounts, so only an ml entry shows one selected and a tap stores canonical ml with no typed
-  text; the remembered unit updates on every choice so a form reset keeps it),
+  `src/components/QuickLogWateringForm.tsx` (unit control, "Saves as" lines, runoff; shortcut chips
+  come from `wateringVolumePresetOptionsForUnit`: `ml` and `L` show the six amounts labelled in
+  that unit and a matching canonical ml shows the chip selected, `gal` shows none — an open
+  product question, see R9; a tap stores canonical ml and clears typed entry text so the box
+  shows the amount in the current unit; only the unit control writes the remembered unit, and a
+  form reset keeps that remembered unit),
   new `src/lib/waterVolumeEntryUnitPreference.ts` (R13 storage, modelled on `temperatureUnitPreference.ts`),
   `src/components/QuickLogV2Sheet.tsx` (the last-watering prefill sets `volumeMl` and clears
   `volumeEntryText` together, so a cleared field never sits over a saveable hidden value).

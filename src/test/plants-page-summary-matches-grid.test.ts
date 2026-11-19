@@ -18,7 +18,11 @@ describe("plants page summary counts the grid's list", () => {
   it("a plant in an archived grow is counted archived, matching the cards", () => {
     const list = withGrowArchiveVisibility(PLANTS, new Set(["g-old"]));
     const cards = list.filter((p) => isActivePlant(p)).length;
-    const summary = summarizePlantsPageFilters(list, { selectedGrowId: null, search: "" });
+    const summary = summarizePlantsPageFilters(list, {
+      selectedGrowId: null,
+      selectedGrowName: null,
+      search: "",
+    });
     expect(cards).toBe(2);
     expect(summary.activeCount).toBe(cards);
     expect(summary.archivedHiddenCount).toBe(list.filter((p) => !isActivePlant(p)).length);
@@ -26,7 +30,11 @@ describe("plants page summary counts the grid's list", () => {
   });
 
   it("without archived grows nothing changes", () => {
-    const summary = summarizePlantsPageFilters(PLANTS, { selectedGrowId: null, search: "" });
+    const summary = summarizePlantsPageFilters(PLANTS, {
+      selectedGrowId: null,
+      selectedGrowName: null,
+      search: "",
+    });
     expect(summary.archivedHiddenCount).toBe(1);
   });
 });

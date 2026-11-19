@@ -261,22 +261,13 @@ describe("dependency security Phase A resolution floors", () => {
     expect(packageJson.overrides?.picomatch).toBeUndefined();
   });
 
-  // picomatch 1247710 (GHSA-fc5q-39xc-vjpf) has no fixed release, so it carries the one
-  // reviewed, dated exception. Remove it and return this pin to [] once upstream ships a fix.
-  it("keeps the reviewed exception set to the single dated picomatch exception", () => {
+  it("keeps the reviewed exception set empty once every tracked advisory is remediated", () => {
     expect(
       exceptionDocument.exceptions.map(
-        (exception: {
-          package: string;
-          advisoryId: string;
-          severity: string;
-          recheckOn: string;
-          expiresOn: string;
-        }) =>
-          `${exception.package}#${exception.advisoryId}:${exception.severity}` +
-          ` recheck ${exception.recheckOn} expires ${exception.expiresOn}`,
+        (exception: { package: string; advisoryId: string; severity: string }) =>
+          `${exception.package}#${exception.advisoryId}:${exception.severity}`,
       ),
-    ).toEqual(["picomatch#1247710:high recheck 2026-11-25 expires 2026-12-09"]);
+    ).toEqual([]);
   });
 
   it("does not import security-sensitive transitive packages from production source", () => {

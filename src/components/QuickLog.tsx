@@ -75,6 +75,7 @@ import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
   QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
   applyPanelSavedNoteToPreviewWarnings,
+  buildQuickLogNoteSavedToast,
   buildQuickLogSavedNoteExcerpt,
   isDuplicateOfPanelSavedNote,
 } from "@/lib/quickLogNoteSaveRules";
@@ -542,6 +543,10 @@ export default function QuickLog({
     text: string;
     plantId: string | null;
   } | null>(null);
+  // A confirmed Note panel save closes Quick Log once the child save has
+  // released its lock, so the grower ends on one entry and a clear end state.
+  const [closeAfterPanelNoteSave, setCloseAfterPanelNoteSave] = useState(false);
+  const resetAfterPanelNoteCloseRef = useRef(false);
   const [savedDraftHandoffKey, setSavedDraftHandoffKey] = useState<string | null>(null);
   const [earlyMilestone, setEarlyMilestone] = useState<EarlyStageMilestone | null>(null);
   const [earlyVigor, setEarlyVigor] = useState<EarlyStageVigor | null>(null);
@@ -1112,6 +1117,14 @@ export default function QuickLog({
         return;
       if (result.noteText) {
         setPanelSavedNote({ text: result.noteText, plantId: result.target.plantId ?? null });
+        if (!result.recovered && result.activityId === "note") {
+          const savedToast = buildQuickLogNoteSavedToast(result.noteText);
+          toast.success(
+            savedToast.title,
+            savedToast.description ? { description: savedToast.description } : undefined,
+          );
+          setCloseAfterPanelNoteSave(true);
+        }
       }
       if (draftHandoffKey !== null) setSavedDraftHandoffKey(draftHandoffKey);
       consumeReviewedPublicStarterDraft();
@@ -1338,6 +1351,24 @@ export default function QuickLog({
     setSelectedPhenoEvidenceGoal(null);
     setInFlightSaveContext(null);
   }
+
+  // Close after a confirmed Note panel save, once no child save holds the lock.
+  useEffect(() => {
+    if (!closeAfterPanelNoteSave || childSaveBusy || saveInFlightRef.current) return;
+    setCloseAfterPanelNoteSave(false);
+    if (!open) return;
+    resetAfterPanelNoteCloseRef.current = true;
+    onOpenChange(false);
+  }, [closeAfterPanelNoteSave, childSaveBusy, open, onOpenChange]);
+
+  // The parent owns `open`: clear the form only once it has actually closed,
+  // the same reset every other close path runs.
+  useEffect(() => {
+    if (open || !resetAfterPanelNoteCloseRef.current) return;
+    resetAfterPanelNoteCloseRef.current = false;
+    reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset is a per-render function
+  }, [open]);
 
   /**
    * Wrap setEventType so switching activity clears stale event-specific

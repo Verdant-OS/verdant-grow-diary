@@ -19,6 +19,7 @@ import {
   tentsListCalculatedVpd,
   tentsListCanonicalVpd,
   tentsListDiarySnapshotRows,
+  tentsListStoredVpdStatusLabel,
 } from "@/lib/tentsListVpdRules";
 import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
 import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
@@ -253,6 +254,11 @@ export default function TentEnvironmentSnapshotStrip({
   // A stored VPD is shown beside the VPD calculated from the temperature and
   // RH on this card, each labelled with where it came from.
   const calculatedVpd = tentsListCalculatedVpd(snapView, rows, stage);
+  // The cohort's own stored VPD names its source and age, as a VPD from
+  // another capture already does.
+  const vpdStatusLabel = tentsListStoredVpdStatusLabel(snapView, vpdMetric, now);
+  const statusLabelFor = (metric: (typeof snapView.metrics)[number]) =>
+    metric.key === "vpd" ? vpdStatusLabel : metric.statusLabel;
 
   if (!snapView.hasReading) {
     return (
@@ -303,7 +309,7 @@ export default function TentEnvironmentSnapshotStrip({
               unit={metric.unit}
               status={metric.chipStatus}
             />
-            {metric.statusLabel ? (
+            {statusLabelFor(metric) ? (
               <span
                 data-testid={`tents-list-metric-status-${tentId}-${metric.key}`}
                 className={
@@ -314,7 +320,7 @@ export default function TentEnvironmentSnapshotStrip({
                       : "text-[10px] uppercase tracking-wide text-muted-foreground"
                 }
               >
-                {metric.statusLabel}
+                {statusLabelFor(metric)}
               </span>
             ) : null}
             {metric.key === "vpd" && metric.origin ? (

@@ -30,7 +30,12 @@ import {
   snapshotCaptureRef,
 } from "@/lib/sensorCaptureRefRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
-import { normalizeSensorSource, type SensorSource } from "@/lib/sensor/sensorSourceRules";
+import {
+  normalizeSensorSource,
+  sensorSourceLabel,
+  type SensorSource,
+} from "@/lib/sensor/sensorSourceRules";
+import { formatAgeLabel } from "@/lib/sensorSnapshotFreshnessRules";
 
 /** Label for a VPD from a generic diary snapshot: historical, not current. */
 export { DIARY_SOURCE_LABEL } from "@/lib/tonightTentHomeViewModel";
@@ -285,6 +290,39 @@ export const TENTS_LIST_VPD_ORIGIN_COPY = {
   stored: "Stored reading",
   calculated: "Calculated from temperature and RH",
 } as const;
+
+/**
+ * The status caption beside the Tents list's stored VPD. A VPD from another
+ * capture already names its own source and age ("Stale · Manual reading ·
+ * 13d ago"); the latest cohort's own stored VPD named only its status word,
+ * so two stored readings on one page read differently (core-loop walk,
+ * 2026-11-19). This names the cohort's source and age the same way.
+ *
+ * Live is named only beside an ok status, so a stale or flagged reading never
+ * reads as live. An unverified cohort names no source. Every other VPD keeps
+ * its own status label unchanged. Pure: the clock is injected.
+ */
+export function tentsListStoredVpdStatusLabel(
+  view: Pick<TentSnapshotView, "cohortVpdProvenance" | "lastUpdatedIso">,
+  metric: Pick<MetricView, "status" | "statusLabel"> | undefined,
+  nowMs: number,
+): string | null {
+  const statusLabel = metric?.statusLabel ?? null;
+  const provenance = view.cohortVpdProvenance;
+  if (!metric || !provenance || metric.status === "unknown") return statusLabel;
+  const source: SensorSource | null =
+    provenance === "unverified" || (provenance === "live" && metric.status !== "ok")
+      ? null
+      : provenance;
+  const capturedMs = view.lastUpdatedIso ? Date.parse(view.lastUpdatedIso) : Number.NaN;
+  const ageText = Number.isFinite(capturedMs)
+    ? formatAgeLabel(Math.max(0, nowMs - capturedMs))
+    : null;
+  const label = [statusLabel, source ? sensorSourceLabel(source) : null, ageText]
+    .filter((part): part is string => !!part)
+    .join(" · ");
+  return label || null;
+}
 
 /** The VPD calculated from the temperature and RH the card shows. */
 export interface TentsListCalculatedVpd {

@@ -50,9 +50,6 @@ vi.mock("@/components/PlantDetailAiDoctorContextReadinessMount", () => ({
 vi.mock("@/components/PlantDetailAiDoctorLiveReview", () => ({
   default: () => <div data-testid="ai-doctor-live-review-mounted" />,
 }));
-vi.mock("@/components/PlantDetailAiDoctorSafeReviewStart", () => ({
-  default: () => <div data-testid="ai-doctor-safe-review-start-mounted" />,
-}));
 vi.mock("@/components/PlantAssignedTentActionsPanel", () => ({
   default: () => <div data-testid="assigned-tent-actions-mounted" />,
 }));
@@ -150,7 +147,6 @@ describe("PlantDetail archived-timeline read-only mode", () => {
     expect(screen.queryByTestId("ai-doctor-readiness-mounted")).toBeNull();
     expect(screen.queryByTestId("ai-doctor-context-readiness-mounted")).toBeNull();
     expect(screen.queryByTestId("ai-doctor-live-review-mounted")).toBeNull();
-    expect(screen.queryByTestId("ai-doctor-safe-review-start-mounted")).toBeNull();
 
     // No Action Queue write surface.
     expect(screen.queryByTestId("assigned-tent-actions-mounted")).toBeNull();

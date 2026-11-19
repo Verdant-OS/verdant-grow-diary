@@ -123,7 +123,7 @@ describe("Daily Check legacy plant save context", () => {
 
       expect(screen.getByTestId("note-save-context")).toHaveAttribute("data-grow", GROW);
       expect(screen.getByTestId("note-save-context")).toHaveAttribute("data-plant", PLANT);
-      expect(screen.getByTestId("note-save-context")).toHaveAttribute("data-open", "1");
+      expect(screen.getByTestId("note-save-context")).toHaveAttribute("data-open", "0");
       expect(screen.getByTestId("activity-save-context")).toHaveAttribute("data-grow", GROW);
       expect(screen.getByTestId("activity-save-context")).toHaveAttribute("data-plant", PLANT);
       expect(screen.getByTestId("activity-save-context")).toHaveAttribute("data-tent", TENT);

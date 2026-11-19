@@ -16,7 +16,9 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 
 const insertSpy = vi.fn();
+const rpcSpy = vi.fn();
 let insertError: { message: string; code?: string; details?: string } | null = null;
+let rpcError: { message: string; code?: string; details?: string } | null = null;
 let insertFailureCall: number | null = null;
 let authUserId = "u-1";
 let existingRows: Array<Record<string, unknown>> = [];
@@ -120,6 +122,10 @@ vi.mock("@/integrations/supabase/client", () => ({
         return Promise.resolve({ error });
       },
     }),
+    rpc: (...args: unknown[]) => {
+      rpcSpy(...args);
+      return Promise.resolve({ data: { ok: true, deleted_count: 3 }, error: rpcError });
+    },
   },
 }));
 
@@ -139,7 +145,9 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
   beforeEach(() => {
     trackFunnelEvent.mockReset();
     insertSpy.mockReset();
+    rpcSpy.mockReset();
     insertError = null;
+    rpcError = null;
     insertFailureCall = null;
     authUserId = "u-1";
     existingRows = [];
@@ -237,6 +245,28 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["grow", "sensors"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["sensor_readings"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["csv-timeline-context"] });
+  });
+
+  it("done state offers undo for this import batch and calls undo RPC", async () => {
+    const qc = new QueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+    render(
+      withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />, qc),
+    );
+    fireEvent.click(screen.getByTestId("x-button"));
+    const input = screen.getByTestId("csv-import-file-input") as HTMLInputElement;
+    const file = new File(["Timestamp,Temperature (C),RH (%)\n2026-06-01T10:00:00Z,25,50\n"], "e.csv", {
+      type: "text/csv",
+    });
+    Object.defineProperty(input, "files", { value: [file] });
+    fireEvent.change(input);
+    await waitFor(() => expect(screen.queryByTestId("csv-import-preview")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("csv-import-confirm"));
+    await waitFor(() => expect(screen.queryByTestId("csv-import-done")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("csv-import-undo-batch"));
+    await waitFor(() => expect(rpcSpy).toHaveBeenCalledTimes(1));
+    expect(rpcSpy.mock.calls[0]?.[0]).toBe("undo_csv_sensor_import_batch");
+    expect(invalidateSpy).toHaveBeenCalled();
   });
 
   it("fails open when presence lookup errors instead of blocking import", async () => {

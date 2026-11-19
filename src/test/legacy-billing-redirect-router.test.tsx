@@ -35,6 +35,12 @@ vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
 // Lazy import so the mocks above apply.
 import Pricing from "@/pages/Pricing";
 
+// This file covers the Paddle Pro checkout path. Pin it, so these assertions
+// hold even in a build with VITE_PRO_CHECKOUT_PROVIDER=stripe
+// (src/config/checkoutProvider.ts); pricing-stripe-pro-checkout.test.tsx
+// covers the Stripe path.
+vi.mock("@/config/checkoutProvider", () => ({ PRO_CHECKOUT_PROVIDER: "paddle" }));
+
 function LocationProbe() {
   const loc = useLocation();
   return (

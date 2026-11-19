@@ -1,7 +1,7 @@
 /**
  * Unit tests for `buildAiDoctorSnapshotFreshnessStatus` — verify the
  * fresh/stale/missing state transitions and the deterministic
- * age-label string at and around the 48h freshness cutoff.
+ * age-label string at and around the 24h freshness cutoff.
  *
  * Pure/copy-only. No app/schema/RLS/Edge/AI/writes touched.
  */
@@ -22,7 +22,7 @@ describe("buildAiDoctorSnapshotFreshnessStatus — missing", () => {
     expect(r.snapshotAtIso).toBeNull();
     expect(r.ageMinutes).toBeNull();
     expect(r.label).toBe("No snapshot");
-    expect(r.description).toContain("48h freshness window");
+    expect(r.description).toContain("24h freshness window");
   });
 
   it("returns 'missing' for an unparseable ISO string", () => {
@@ -36,18 +36,18 @@ describe("buildAiDoctorSnapshotFreshnessStatus — missing", () => {
   });
 });
 
-describe("buildAiDoctorSnapshotFreshnessStatus — 48h boundary", () => {
-  it("stays 'fresh' at exactly the 48h cutoff (inclusive)", () => {
+describe("buildAiDoctorSnapshotFreshnessStatus — 24h boundary", () => {
+  it("stays 'fresh' at exactly the 24h cutoff (inclusive)", () => {
     const r = buildAiDoctorSnapshotFreshnessStatus({
       latestSnapshotAtIso: iso(NOW - AI_DOCTOR_SNAPSHOT_FRESH_MS),
       now: NOW,
     });
     expect(r.state).toBe("fresh");
-    // formatAge rolls to days once hours >= 48.
-    expect(r.label).toBe("Fresh · 2d ago");
-    expect(r.ageMinutes).toBe(48 * 60);
+    // At the cutoff the age label is still in hours.
+    expect(r.label).toBe("Fresh · 24h ago");
+    expect(r.ageMinutes).toBe(24 * 60);
     expect(r.description).toBe(
-      "Latest manual sensor snapshot is 2d ago — inside the 48h freshness window.",
+      "Latest manual sensor snapshot is 24h ago — inside the 24h freshness window.",
     );
   });
 
@@ -57,9 +57,9 @@ describe("buildAiDoctorSnapshotFreshnessStatus — 48h boundary", () => {
       now: NOW,
     });
     expect(r.state).toBe("stale");
-    expect(r.label).toBe("Stale · 2d ago");
+    expect(r.label).toBe("Stale · 24h ago");
     expect(r.description).toBe(
-      "Latest manual sensor snapshot is 2d ago — older than the 48h freshness cutoff.",
+      "Latest manual sensor snapshot is 24h ago — older than the 24h freshness cutoff.",
     );
   });
 
@@ -69,7 +69,7 @@ describe("buildAiDoctorSnapshotFreshnessStatus — 48h boundary", () => {
       now: NOW,
     });
     expect(r.state).toBe("fresh");
-    expect(r.label).toBe("Fresh · 47h ago");
+    expect(r.label).toBe("Fresh · 23h ago");
   });
 });
 
@@ -80,7 +80,7 @@ describe("buildAiDoctorSnapshotFreshnessStatus — age label formatting", () => 
     { msAgo: 60 * 1000, label: "Fresh · 1m ago", minutes: 1 },
     { msAgo: 59 * 60 * 1000, label: "Fresh · 59m ago", minutes: 59 },
     { msAgo: 60 * 60 * 1000, label: "Fresh · 1h ago", minutes: 60 },
-    { msAgo: 47 * 60 * 60 * 1000, label: "Fresh · 47h ago", minutes: 47 * 60 },
+    { msAgo: 23 * 60 * 60 * 1000, label: "Fresh · 23h ago", minutes: 23 * 60 },
   ];
   it.each(cases)("renders '$label' for $msAgo ms ago (fresh side)", ({ msAgo, label, minutes }) => {
     const r = buildAiDoctorSnapshotFreshnessStatus({
@@ -159,13 +159,13 @@ describe("buildAiDoctorSnapshotFreshnessStatus — custom snapshotFreshMs", () =
     expect(r.description).toContain("older than the 1h freshness cutoff");
   });
 
-  it("falls back to the default 48h when override is invalid (0)", () => {
+  it("falls back to the default 24h when override is invalid (0)", () => {
     const r = buildAiDoctorSnapshotFreshnessStatus({
       latestSnapshotAtIso: iso(NOW - ONE_HOUR),
       now: NOW,
       snapshotFreshMs: 0,
     });
     expect(r.state).toBe("fresh");
-    expect(r.description).toContain("48h freshness window");
+    expect(r.description).toContain("24h freshness window");
   });
 });

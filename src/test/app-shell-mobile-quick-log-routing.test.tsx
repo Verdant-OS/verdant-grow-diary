@@ -575,6 +575,15 @@ describe("AppShell mobile Quick Log routing", () => {
     );
   });
 
+  it("opens Quick Log for an explicit watering intent and keeps that activity", async () => {
+    renderAt("/dashboard?open=quick-log&type=watering");
+
+    const dialog = await screen.findByTestId("legacy-quick-log");
+    expect(dialog).toHaveAttribute("data-event-type", "watering");
+    await waitFor(() => expect(screen.getByTestId("current-search").textContent).toBe(""));
+    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+
   it("does not open Quick Log for an unrecognized query value", () => {
     renderAt("/dashboard?open=dashboard");
     expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();

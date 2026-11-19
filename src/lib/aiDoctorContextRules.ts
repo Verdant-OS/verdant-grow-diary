@@ -80,6 +80,18 @@ export interface AiDoctorContextCounts {
 
 export interface AiDoctorContextLatest {
   manualSnapshotAt: string | null;
+  /**
+   * True when that newest snapshot is dated more than
+   * MANUAL_SNAPSHOT_FUTURE_SKEW_MS ahead of `now`, so its age is unknown.
+   * Optional so older result literals stay valid; absent means false.
+   */
+  manualSnapshotFutureDated?: boolean;
+  /**
+   * Newest snapshot no more than MANUAL_SNAPSHOT_FUTURE_SKEW_MS ahead of `now`:
+   * the one the freshness grade uses. Null when every snapshot is future-dated
+   * or none exists. Optional so older result literals stay valid.
+   */
+  freshCandidateSnapshotAt?: string | null;
 }
 
 export interface AiDoctorContextResult {
@@ -99,6 +111,7 @@ import {
   AI_DOCTOR_CONTEXT_READINESS_CONFIG,
   type AiDoctorContextReadinessConfig,
 } from "@/constants/aiDoctorContextReadiness";
+import { MANUAL_SNAPSHOT_FUTURE_SKEW_MS } from "@/constants/sensorTiming";
 import { normalizePlantType } from "@/lib/plantTypeRules";
 
 /** Re-exported for back-compat. Source of truth lives in constants/. */
@@ -160,6 +173,11 @@ export function evaluateAiDoctorContext(
   // --- Recent manual snapshots ------------------------------------------
   let latestSnapAt: number | null = null;
   let latestSnapIso: string | null = null;
+  // Newest snapshot no further ahead of the clock than the tolerated skew.
+  // A capture time beyond it is never current (isManualSnapshotCurrent), so
+  // it cannot be fresh evidence, and it must not hide an older fresh one.
+  let latestFreshCandidateAt: number | null = null;
+  let latestFreshCandidateIso: string | null = null;
   let recentSnaps = 0;
   let snapWarnings = 0;
   for (const s of snaps) {
@@ -175,7 +193,16 @@ export function evaluateAiDoctorContext(
       latestSnapAt = t;
       latestSnapIso = typeof s.at === "string" ? s.at : new Date(t).toISOString();
     }
+    if (
+      t - now <= MANUAL_SNAPSHOT_FUTURE_SKEW_MS &&
+      (latestFreshCandidateAt == null || t > latestFreshCandidateAt)
+    ) {
+      latestFreshCandidateAt = t;
+      latestFreshCandidateIso = typeof s.at === "string" ? s.at : new Date(t).toISOString();
+    }
   }
+  const freshSnap =
+    latestFreshCandidateAt != null && now - latestFreshCandidateAt <= snapshotFreshMs;
 
   const counts: AiDoctorContextCounts = {
     recentEvents: recent.length,
@@ -221,7 +248,7 @@ export function evaluateAiDoctorContext(
   // --- Sensor snapshots -------------------------------------------------
   if (recentSnaps > 0) {
     evidence.push("recent-manual-sensor-snapshot");
-    if (latestSnapAt != null && now - latestSnapAt <= snapshotFreshMs) {
+    if (freshSnap) {
       evidence.push("fresh-manual-sensor-snapshot");
     }
   } else {
@@ -245,7 +272,6 @@ export function evaluateAiDoctorContext(
   const hasKnownPlantType = !!plant && normalizePlantType(plant.plantType ?? null) !== "unknown";
   const hasRecentActivity = recent.length >= 2;
   const hasRecentSnap = recentSnaps > 0;
-  const freshSnap = latestSnapAt != null && now - latestSnapAt <= snapshotFreshMs;
   const hasPhotoOrWaterFeed = (plant?.hasPlantPhoto ?? false) || recentWaterFeed > 0;
 
   let readiness: AiDoctorContextReadiness;
@@ -271,10 +297,28 @@ export function evaluateAiDoctorContext(
     missing,
     evidence,
     counts,
-    latest: { manualSnapshotAt: latestSnapIso },
+    latest: {
+      manualSnapshotAt: latestSnapIso,
+      manualSnapshotFutureDated:
+        latestSnapAt != null && latestSnapAt - now > MANUAL_SNAPSHOT_FUTURE_SKEW_MS,
+      freshCandidateSnapshotAt: latestFreshCandidateIso,
+    },
     safeNextStep: SAFE_NEXT_STEPS[readiness],
     diagnosisClaimed: false,
   };
+}
+
+/**
+ * The snapshot the freshness presenters (readiness chip, launch-dialog stale
+ * explanation, saved readiness check) should describe: the one the grade
+ * used. Falls back to the newest row when every snapshot is future-dated, so
+ * the presenters can say its age is unknown, and for results that predate
+ * `freshCandidateSnapshotAt`.
+ */
+export function selectAiDoctorFreshnessSnapshotAt(
+  result: Pick<AiDoctorContextResult, "latest">,
+): string | null {
+  return result.latest.freshCandidateSnapshotAt ?? result.latest.manualSnapshotAt;
 }
 
 export const AI_DOCTOR_INSUFFICIENT_NOTICE =

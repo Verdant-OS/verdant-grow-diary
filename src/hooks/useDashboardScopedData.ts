@@ -76,9 +76,10 @@ export type PendingState =
 export interface UseDashboardScopedData {
   recent: RecentState;
   pending: PendingState;
+  reload: () => Promise<void>;
 }
 
-async function readDashboardRecent(growId: string): Promise<RecentState> {
+export async function readDashboardRecent(growId: string): Promise<RecentState> {
   const [diaryRes, growEventsRes, eventsRes] = await Promise.all([
     fetchDashboardDiaryRows(growId),
     supabase
@@ -238,7 +239,7 @@ export function useDashboardScopedData(growId: string | null | undefined): UseDa
     load();
   }, [load]);
 
-  return { recent, pending };
+  return { recent, pending, reload: load };
 }
 
 export default useDashboardScopedData;

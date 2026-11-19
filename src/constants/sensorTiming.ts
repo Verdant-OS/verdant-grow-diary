@@ -80,6 +80,13 @@ export const ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS = 60 * 60 * 1000;
 export const MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 24;
 
 /**
+ * Tolerated client clock skew for a manual snapshot stamped slightly in the
+ * future — 5 minutes. A capture time further ahead is never current
+ * (isManualSnapshotCurrent) and never fresh AI Doctor evidence.
+ */
+export const MANUAL_SNAPSHOT_FUTURE_SKEW_MS = 5 * 60_000;
+
+/**
  * AI context sufficiency coarse sensor window — 24h
  * (aiContextSufficiencyRules; aligned with manual current-context).
  */

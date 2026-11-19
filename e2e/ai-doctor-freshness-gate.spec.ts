@@ -1,4 +1,4 @@
-// Playwright boundary proof for the AI Doctor 48h snapshot-freshness gate
+// Playwright boundary proof for the AI Doctor 24h snapshot-freshness gate
 // on Plant Detail's canonical context + cautious live-review surfaces.
 //
 // SAFETY:
@@ -10,16 +10,16 @@
 //   authenticated surface never relies on bundled mock/demo fallback data.
 //
 // GATE SEMANTICS UNDER TEST (the load-bearing part):
-// - FRESH  (snapshot <= 48h old + recent activity) → fresh evidence is
+// - FRESH  (snapshot <= 24h old + recent activity) → fresh evidence is
 //   present and the explicit review action is enabled.
-// - STALE  (snapshot > 48h old but within the 7d window, activity present)
-//   → fresh evidence is absent but the review action STAYS ENABLED. The 48h
+// - STALE  (snapshot > 24h old but within the 7d window, activity present)
+//   → fresh evidence is absent but the review action STAYS ENABLED. The 24h
 //   cutoff downgrades confidence; it does not by itself block the flow.
 // - BLOCKED (no activity, no snapshot) → readiness "insufficient" and the
 //   paid/costly live-review action is not rendered.
 //
 // TIME CONTROL: repo convention — fixture timestamps are computed relative
-// to Date.now() at test time with ≥30min margins on both sides of the 48h
+// to Date.now() at test time with ≥30min margins on both sides of the 24h
 // boundary. Exact inclusive boundary arithmetic remains pinned by the pure
 // ai-doctor-snapshot-freshness-boundary unit contract.
 import { test, expect, type Page } from "@playwright/test";
@@ -93,7 +93,7 @@ const CURRENT_AGREEMENT_ROWS = [
 ];
 
 const HOUR_MS = 3_600_000;
-const FRESH_WINDOW_MS = 48 * HOUR_MS;
+const FRESH_WINDOW_MS = 24 * HOUR_MS;
 const ROUTE_READY_TIMEOUT_MS = 90_000;
 
 // Requests this presentation-only surface must never make.
@@ -393,7 +393,7 @@ async function installFreshnessHarness(page: Page, diaryRows: readonly DiaryFixt
   return traffic;
 }
 
-test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => {
+test.describe("AI Doctor snapshot freshness gate (mocked, 24h boundary)", () => {
   test.beforeEach(() => {
     // The first mocked Plant Detail visit can include cold Vite transforms.
     // Route readiness remains bounded above and every app/page error still
@@ -405,7 +405,7 @@ test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => 
     );
   });
 
-  test("FRESH: snapshot 47h30m old → fresh evidence and review action", async ({ page }) => {
+  test("FRESH: snapshot 23h30m old → fresh evidence and review action", async ({ page }) => {
     const traffic = await installFreshnessHarness(
       page,
       buildDiaryFixture(Date.now(), FRESH_WINDOW_MS - 30 * 60_000),
@@ -424,7 +424,7 @@ test.describe("AI Doctor snapshot freshness gate (mocked, 48h boundary)", () => 
     expectIsolatedReadOnlyTraffic(traffic);
   });
 
-  test("STALE: snapshot 48h30m old → fresh evidence absent, review STAYS enabled", async ({
+  test("STALE: snapshot 24h30m old → fresh evidence absent, review STAYS enabled", async ({
     page,
   }) => {
     const fixtureNowMs = Date.now();

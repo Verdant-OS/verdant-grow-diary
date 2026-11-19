@@ -14,7 +14,10 @@ import {
   isQuickLogObservationDraftEmpty,
   parseQuickLogObservationDraft,
   QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
+  quickLogDraftSlotHeldByOtherTarget,
+  quickLogFeedingDraftFields,
   quickLogObservationDraftRestoredCopy,
+  quickLogWateringDraftFields,
   QUICK_LOG_OBSERVATION_SAVE_ERROR,
   restorableQuickLogObservationDraft,
 } from "@/lib/quickLogObservationDraftRules";
@@ -1369,17 +1372,25 @@ function QuickLogV2SheetForOwner({
       }
       // A draft saved while Feed was active carries its words in form.note, but
       // Feed shows and submits feedingForm.note; hand them over as switching does.
+      // The Feed recipe and readings, and the Water details, come back too.
       setFeedingForm(
         restoredDraft?.action === "feed"
-          ? { ...EMPTY_QUICKLOG_FEEDING_FORM, note: restoredDraft.note }
+          ? { ...(restorable?.feeding ?? EMPTY_QUICKLOG_FEEDING_FORM), note: restoredDraft.note }
           : EMPTY_QUICKLOG_FEEDING_FORM,
       );
-      feedingTempEntryUnitRef.current = null;
-      setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
-      wateringTempEntryUnitRef.current = null;
+      feedingTempEntryUnitRef.current = restorable?.feedingTempEntryUnit ?? null;
+      // A restored recipe that was a prefill stays a prefill, so a target
+      // change still clears it for the new plant.
+      const restoredPrefill =
+        restoredDraft?.action === "feed" ? restorable?.feedingPrefilledRecipe : undefined;
+      appliedFeedingDefaultsRef.current = restoredPrefill
+        ? { ...EMPTY_QUICKLOG_FEEDING_FORM, ...restoredPrefill }
+        : null;
+      setWateringForm(restorable?.watering ?? EMPTY_QUICKLOG_WATERING_FORM);
+      wateringTempEntryUnitRef.current = restorable?.wateringTempEntryUnit ?? null;
       clearLargeWaterConfirmation();
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
-      setFeedingDefaultsApplied(false);
+      setFeedingDefaultsApplied(Boolean(restoredPrefill));
       setWateringVolumeDefaultsApplied(false);
       setLocalError(restorable?.saveFailed ? QUICK_LOG_OBSERVATION_SAVE_ERROR : null);
       setNoteFirstSaveFailedMessage(
@@ -1433,20 +1444,54 @@ function QuickLogV2SheetForOwner({
     // Feed shows and submits feedingForm.note, so while Feed is active that is
     // the note the grower sees; persist it, not the hidden form.note.
     const draftForm = form.action === "feed" ? { ...form, note: feedingForm.note } : form;
+    // Water and Feed details the grower entered. A prefilled last-used volume
+    // or recipe on its own is not an entry and never creates a draft.
+    const draftDetails = {
+      watering:
+        form.action === "water"
+          ? quickLogWateringDraftFields(
+              wateringForm,
+              wateringVolumeDefaultsApplied
+                ? applyWateringVolumeDefaultsToForm(wateringVolumeDefaults).volumeMl
+                : null,
+            )
+          : null,
+      feeding:
+        form.action === "feed"
+          ? quickLogFeedingDraftFields(
+              feedingForm,
+              feedingDefaultsApplied ? appliedFeedingDefaultsRef.current : null,
+            )
+          : null,
+    };
     if (observationDraftSuppressedRef.current) {
-      if (open && isQuickLogObservationDraftEmpty(draftForm, structuredInput)) {
+      if (open && isQuickLogObservationDraftEmpty(draftForm, structuredInput, draftDetails)) {
         observationDraftSuppressedRef.current = false;
       }
       return;
     }
     if (!open || postSave) return;
-    if (isQuickLogObservationDraftEmpty(draftForm, structuredInput)) {
+    if (isQuickLogObservationDraftEmpty(draftForm, structuredInput, draftDetails)) {
       if (observationDraftOwnedRef.current) {
         clearBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID);
         observationDraftOwnedRef.current = false;
       }
       return;
     }
+    // Details alone do not take the slot from another target's unsaved entry.
+    if (
+      !observationDraftOwnedRef.current &&
+      isQuickLogObservationDraftEmpty(draftForm, structuredInput) &&
+      quickLogDraftSlotHeldByOtherTarget(
+        readBrowserSessionFormDraft(
+          user.id,
+          QUICK_LOG_OBSERVATION_DRAFT_FORM_ID,
+          parseQuickLogObservationDraft,
+        ),
+        draftForm.selectedKey,
+      )
+    )
+      return;
     observationDraftOwnedRef.current = true;
     writeBrowserSessionFormDraft(user.id, QUICK_LOG_OBSERVATION_DRAFT_FORM_ID, {
       form: draftForm,
@@ -1456,10 +1501,39 @@ function QuickLogV2SheetForOwner({
       chipStatus: chipAuthoredStatusRef.current,
       structured: structuredInput,
       soilTempEntryUnit: soilTempEntryUnitRef.current,
+      ...(draftDetails.watering
+        ? {
+            watering: draftDetails.watering,
+            wateringTempEntryUnit: wateringTempEntryUnitRef.current,
+          }
+        : {}),
+      ...(draftDetails.feeding
+        ? { feeding: draftDetails.feeding, feedingTempEntryUnit: feedingTempEntryUnitRef.current }
+        : {}),
+      ...(draftDetails.feeding && feedingDefaultsApplied && appliedFeedingDefaultsRef.current
+        ? {
+            feedingPrefilledRecipe: {
+              lineId: appliedFeedingDefaultsRef.current.lineId,
+              products: appliedFeedingDefaultsRef.current.products,
+            },
+          }
+        : {}),
     });
     // localError is a trigger, not an input: when only the error flips, this
     // re-persists the ref-held saveFailed flag even though the form is unchanged.
-  }, [user?.id, open, form, feedingForm.note, postSave, localError, structuredInput]);
+  }, [
+    user?.id,
+    open,
+    form,
+    feedingForm,
+    wateringForm,
+    feedingDefaultsApplied,
+    wateringVolumeDefaultsApplied,
+    wateringVolumeDefaults,
+    postSave,
+    localError,
+    structuredInput,
+  ]);
 
   // Tent-scoped pick: recent plant in the tent, else the sole plant, else the
   // selected tent. Only when selectedKey is still empty — never rewrite an

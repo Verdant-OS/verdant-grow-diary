@@ -18,9 +18,9 @@ describe("aiDoctorContextReadiness config", () => {
     expect(AI_DOCTOR_CONTEXT_READINESS_CONFIG.recentEventWindowMs).toBe(7 * 24 * 60 * 60 * 1000);
   });
 
-  it("defaults to 48 hours of snapshot freshness", () => {
-    expect(AI_DOCTOR_SNAPSHOT_FRESH_HOURS).toBe(48);
-    expect(AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs).toBe(48 * 60 * 60 * 1000);
+  it("defaults to 24 hours of snapshot freshness", () => {
+    expect(AI_DOCTOR_SNAPSHOT_FRESH_HOURS).toBe(24);
+    expect(AI_DOCTOR_CONTEXT_READINESS_CONFIG.snapshotFreshMs).toBe(24 * 60 * 60 * 1000);
   });
 
   it("rules library re-exports the shared thresholds", () => {
@@ -51,7 +51,7 @@ describe("evaluateAiDoctorContext respects config overrides", () => {
   };
 
   it("treats an older snapshot as fresh when freshness window is widened", () => {
-    // 5 days old snapshot: stale under the default 48h window…
+    // 5 days old snapshot: stale under the default 24h window…
     const stale = {
       plant,
       recentEvents: [

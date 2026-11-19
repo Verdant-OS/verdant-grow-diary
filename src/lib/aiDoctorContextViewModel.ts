@@ -23,6 +23,7 @@ import {
   normalizeRootZoneMetricsV1,
   type RootZoneObservationV1,
 } from "@/lib/rootZoneObservationRules";
+import { AI_DOCTOR_SNAPSHOT_FRESH_HOURS } from "@/constants/aiDoctorContextReadiness";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
 import { classifyTimelineMemoryItem } from "@/lib/timelineFilterRules";
 import {
@@ -257,7 +258,7 @@ export const AI_DOCTOR_EVIDENCE_LABELS: Record<string, string> = {
   "recent-timeline-activity": "Recent timeline activity",
   "recent-watering-or-feeding": "Recent watering or feeding logged",
   "recent-manual-sensor-snapshot": "Recent manual sensor snapshot",
-  "fresh-manual-sensor-snapshot": "Manual sensor snapshot within 48 hours",
+  "fresh-manual-sensor-snapshot": `Manual sensor snapshot within ${AI_DOCTOR_SNAPSHOT_FRESH_HOURS} hours`,
   "recent-warnings": "Recent warnings flagged",
   "plant-type": "Plant type recorded",
   "root-zone-history": "Root-zone history recorded",

@@ -30,6 +30,13 @@ on:
       - "scripts/check-sentinel-version-parity.mjs"
       - "scripts/check-sentinel-version-parity.test.mjs"
       - ".github/workflows/sentinel-version-parity.yml"
+  # The copilot-advisory-review ruleset requires this job's context on the deploy branch, and
+  # the merge queue waits for every required context on its own test merge. Without this
+  # trigger the queue never receives the context and drops each entry at its timeout.
+  # merge_group takes no paths filter, so the job runs on every queue entry; it needs no
+  # install and finishes in seconds.
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -61,8 +68,9 @@ jobs:
       # No dependencies: the checker uses only node:fs and git, so it runs before install.
       - name: Check Sentinel-Version parity and bump
         env:
-          # PRs compare to their target branch; pushes compare to the exact pre-push
-          # commit. The latter matters because main and the deploy branch intentionally
-          # diverge, so origin/main is not a safe push baseline for verdant-grow-diary.
-          SENTINEL_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          # PRs compare to their target branch; queue entries compare to the branch tip the
+          # queue built on; pushes compare to the exact pre-push commit. The last matters
+          # because main and the deploy branch intentionally diverge, so origin/main is not a
+          # safe push baseline for verdant-grow-diary.
+          SENTINEL_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: node scripts/check-sentinel-version-parity.mjs

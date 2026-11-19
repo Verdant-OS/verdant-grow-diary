@@ -4,7 +4,7 @@ Slice: `CLAUDE-CODE-ACTION-001`. Infrastructure owner: Codex. Independent
 reviewer: Critical Mass. This is a draft-only builder integration; it does not
 authorize merging, publishing, production database access, or spend changes.
 Routing follows `docs/agents/CURRENT_STATE.md`: GDP retired on 2026-09-29, and
-Grok 91 now routes and merges; `docs/agents/OWNERSHIP.md` rows that still name
+the Main Coordinator seat (holder in the roster) now routes and the Merge Steward merges (Grok 91 was an earlier name); `docs/agents/OWNERSHIP.md` rows that still name
 GDP are stale until it is updated. Repository [AGENTS.md](../../AGENTS.md), [CLAUDE.md](../../CLAUDE.md), and
 [CURRENT_STATE.md](CURRENT_STATE.md) govern every run.
 
@@ -19,7 +19,7 @@ GDP are stale until it is updated. Repository [AGENTS.md](../../AGENTS.md), [CLA
   meaning not P1, not publish-gating and not data-integrity; and Copilot-sized
   slices when Copilot is backed up.
 - Claude stalls: 0 files about 10 minutes after starting counts as a stall. The
-  first gets a nudge from Grok 91, and the second sends the slice to Codex.
+  first gets a nudge from the Main Coordinator seat, and the second sends the slice to Codex.
 - Claude never reviews its own work. Claude-built PRs go to Blue Dream for any
   `.tsx` outside `src/test/`, P1s or publish gates, and to Critical Mass for
   everything else. Claude may still be the independent reviewer on Codex-owned
@@ -34,9 +34,9 @@ sensor truth) over any new surface.
 
 ## Routing entry point
 
-Claude slice: Grok 91 opens the slice issue in the same block format it uses for Copilot, then comments `@claude Implement this slice as a draft PR. Stay draft. Owner Claude; reviewer per path routing.` (or applies the `claude-slice` label). No paste.
+Claude slice: the Main Coordinator seat opens the slice issue in the same block format it uses for Copilot, then comments `@claude Implement this slice as a draft PR. Stay draft. Owner Claude; reviewer per path routing.` (or applies the `claude-slice` label). No paste.
 
-Only events performed by `cheekhimself`, the account Grok 91 posts through, can start
+Only events performed by `cheekhimself`, the account the Main Coordinator seat posts through, can start
 the builder. Accepted events are a newly created comment (on an issue or a PR)
 containing `@claude`, or an issue labeled `claude-slice`. Opening an issue whose
 body mentions `@claude` does not start it; comment `@claude` afterwards. A comment from any other account
@@ -44,7 +44,7 @@ skips at the job gate. Labels applied by another account also skip. PR events
 only run configuration tests and, for `claude-slice/**` heads, the path guard; they
 cannot enter the Claude builder. There is no schedule or `pull_request_target`.
 
-Grok 91 must provide a closed file plan and a slice ID in the issue. Claude checks
+The Main Coordinator seat must provide a closed file plan and a slice ID in the issue. Claude checks
 for collisions, branches from `verdant-grow-diary` as `claude-slice/<slice-id>`, and
 commits locally. Nudges continue the existing Claude draft. Claude cannot push,
 merge, mark ready, review or open a PR: its job holds only a read-only token. A
@@ -77,7 +77,7 @@ which names its owner and independent reviewer.
    and each merge-queue entry uses its own group keyed on the queued head SHA,
    so neither waits behind or is cancelled by a builder run.
 5. After this workflow is independently reviewed and lands through the normal
-   release process, Grok 91 can post one real authorized slice. Confirm the real run
+   release process, the Main Coordinator seat can post one real authorized slice. Confirm the real run
    opens a draft into `verdant-grow-diary` and that its locked-path check passes.
 
 The workflow also accepts `ANTHROPIC_API_KEY` as an alternative when no OAuth
@@ -381,7 +381,7 @@ no-credential exit, locked-path policy and workflow syntax. A real Claude trigge
 Max model access, draft creation, and automatic review routing remain
 **NOT_MEASURED** until Matthew adds the secret and a real `@claude` run opens a
 draft (no GitHub App is needed). Whether the bubblewrap gate passes on
-`ubuntu-latest` is also measured only by that first real run. Grok 91 owns its routing/stall handling (formerly GDP's, with the #1767
+`ubuntu-latest` is also measured only by that first real run. The Main Coordinator seat owns its routing/stall handling (formerly GDP's, with the #1767
 ownership follow-up); this slice provides the entry point and instructions.
 
 The repository's existing `required-check-audit` workflow is a post-merge audit

@@ -21,6 +21,8 @@
  *    queues, automation, sessions, or hardware.
  */
 
+import { IRRIGATION_LEDGER_QUERY_KEY_PREFIX } from "@/lib/irrigation/irrigationLedgerRules";
+
 export type QuickLogV2RefreshTargetType = "plant" | "tent";
 
 export interface QuickLogV2RefreshScope {
@@ -46,6 +48,8 @@ export type QuickLogV2RefreshKey = readonly unknown[];
  *  - grow_events                 → any panel reading grow_events directly
  *  - latest-sensor-snapshot      → mounted Dashboard current environment
  *  - timeline                    → legacy/generic timeline consumers
+ *  - irrigation/ledger           → tent + plant irrigation panels (dryback,
+ *                                  watering cadence, irrigation history)
  *
  * Dashboard prefixes (`dashboard_recent_activity`, `dashboard_memory`) are
  * also returned here so the rule view stays complete and stable, but
@@ -61,6 +65,7 @@ const ALWAYS_KEYS: ReadonlyArray<QuickLogV2RefreshKey> = [
   ["grow_events"],
   ["latest-sensor-snapshot"],
   ["timeline"],
+  [...IRRIGATION_LEDGER_QUERY_KEY_PREFIX],
   // Dashboard recent activity / memory surfaces. Conditional at apply time.
   ["dashboard_recent_activity"],
   ["dashboard_memory"],

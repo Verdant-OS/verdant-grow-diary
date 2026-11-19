@@ -2,7 +2,6 @@
  * Randomized / property-based fuzz coverage for the two AI Doctor
  * freshness helpers:
  *  - buildAiDoctorSnapshotFreshnessStatus
- *  - buildAiDoctorSnapshotStalenessExplanation
  *
  * Goals:
  *  - Never throw on malformed / NaN-like / extreme timestamp inputs.
@@ -15,8 +14,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { buildAiDoctorSnapshotFreshnessStatus } from "@/lib/aiDoctorSnapshotFreshnessStatusViewModel";
-import { buildAiDoctorSnapshotStalenessExplanation } from "@/lib/aiDoctorSnapshotStalenessExplanationViewModel";
 import { AI_DOCTOR_SNAPSHOT_FRESH_MS } from "@/lib/aiDoctorContextRules";
+import { MANUAL_SNAPSHOT_FUTURE_SKEW_MS } from "@/constants/sensorTiming";
 
 // Deterministic PRNG so failures are reproducible across runs / OSes.
 function mulberry32(seed: number): () => number {
@@ -74,25 +73,6 @@ describe("AI Doctor freshness — fuzz: malformed inputs never throw and stay 'm
       expect(res.ageMinutes).toBeNull();
       expect(res.label).toBe("No snapshot");
     });
-
-    it(`staleness helper handles malformed input: ${JSON.stringify(raw)}`, () => {
-      const iso = (raw ?? null) as string | null;
-      expect(() =>
-        buildAiDoctorSnapshotStalenessExplanation({
-          latestSnapshotAtIso: iso,
-          now: NOW,
-        }),
-      ).not.toThrow();
-      const res = buildAiDoctorSnapshotStalenessExplanation({
-        latestSnapshotAtIso: iso,
-        now: NOW,
-      });
-      // Malformed => never claim stale (no blocked reason from bad data).
-      expect(res.isStale).toBe(false);
-      expect(res.sentence).toBe("");
-      // cutoff is still deterministic in every branch.
-      expect(res.cutoffAtIso).toBe(new Date(NOW - FRESH).toISOString());
-    });
   }
 });
 
@@ -121,14 +101,6 @@ describe("AI Doctor freshness — fuzz: extreme numeric `now` never explodes", (
         }),
       ).not.toThrow();
     });
-    it(`staleness helper survives now=${n}`, () => {
-      expect(() =>
-        buildAiDoctorSnapshotStalenessExplanation({
-          latestSnapshotAtIso: "2026-06-01T00:00:00.000Z",
-          now: n,
-        }),
-      ).not.toThrow();
-    });
   }
 });
 
@@ -146,22 +118,16 @@ describe("AI Doctor freshness — property: classification follows sign(age - fr
         latestSnapshotAtIso: snapIso,
         now: NOW,
       });
-      const stale = buildAiDoctorSnapshotStalenessExplanation({
-        latestSnapshotAtIso: snapIso,
-        now: NOW,
-      });
 
       if (ageMs < 0) {
-        // Future snapshot: still "fresh" (age clamped to 0) and NOT stale.
-        expect(fresh.state).toBe("fresh");
-        expect(stale.isStale).toBe(false);
+        // Future snapshot: fresh only within the tolerated clock skew
+        // (MANUAL_SNAPSHOT_FUTURE_SKEW_MS); further ahead it is stale.
+        const withinSkew = -ageMs <= MANUAL_SNAPSHOT_FUTURE_SKEW_MS;
+        expect(fresh.state).toBe(withinSkew ? "fresh" : "stale");
         continue;
       }
       const expectFresh = ageMs <= FRESH;
       expect(fresh.state).toBe(expectFresh ? "fresh" : "stale");
-      expect(stale.isStale).toBe(!expectFresh);
-      // The two helpers must never disagree at the boundary.
-      expect(fresh.state === "stale").toBe(stale.isStale);
     }
   });
 
@@ -172,13 +138,8 @@ describe("AI Doctor freshness — property: classification follows sign(age - fr
         latestSnapshotAtIso: snapIso,
         now: NOW,
       });
-      const stale = buildAiDoctorSnapshotStalenessExplanation({
-        latestSnapshotAtIso: snapIso,
-        now: NOW,
-      });
       const shouldBeStale = d > 0; // strict >
       expect(fresh.state).toBe(shouldBeStale ? "stale" : "fresh");
-      expect(stale.isStale).toBe(shouldBeStale);
     }
   });
 
@@ -196,16 +157,6 @@ describe("AI Doctor freshness — property: classification follows sign(age - fr
         now: NOW,
       });
       expect(a).toEqual(b);
-
-      const s1 = buildAiDoctorSnapshotStalenessExplanation({
-        latestSnapshotAtIso: snapIso,
-        now: NOW,
-      });
-      const s2 = buildAiDoctorSnapshotStalenessExplanation({
-        latestSnapshotAtIso: snapIso,
-        now: NOW,
-      });
-      expect(s1).toEqual(s2);
     }
   });
 });

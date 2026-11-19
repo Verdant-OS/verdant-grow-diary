@@ -246,10 +246,10 @@ describe("dependency security Phase A resolution floors", () => {
       "form-data": "4.0.6",
       "follow-redirects": "1.16.2",
       "@modelcontextprotocol/sdk": "1.32.0",
-      "@hono/node-server": "2.1.3",
+      "@hono/node-server": "2.1.6",
       "js-yaml": "4.3.2",
       "launch-editor": "2.14.2",
-      hono: "4.13.11",
+      hono: "4.13.16",
       qs: "6.16.1",
       "body-parser": "2.4.0",
       nanoid: "3.3.18",
@@ -261,13 +261,22 @@ describe("dependency security Phase A resolution floors", () => {
     expect(packageJson.overrides?.picomatch).toBeUndefined();
   });
 
-  it("keeps the reviewed exception set empty once every tracked advisory is remediated", () => {
+  // picomatch 1247710 (GHSA-fc5q-39xc-vjpf) has no fixed release, so it carries the one
+  // reviewed, dated exception. Remove it and return this pin to [] once upstream ships a fix.
+  it("keeps the reviewed exception set to the single dated picomatch exception", () => {
     expect(
       exceptionDocument.exceptions.map(
-        (exception: { package: string; advisoryId: string; severity: string }) =>
-          `${exception.package}#${exception.advisoryId}:${exception.severity}`,
+        (exception: {
+          package: string;
+          advisoryId: string;
+          severity: string;
+          recheckOn: string;
+          expiresOn: string;
+        }) =>
+          `${exception.package}#${exception.advisoryId}:${exception.severity}` +
+          ` recheck ${exception.recheckOn} expires ${exception.expiresOn}`,
       ),
-    ).toEqual([]);
+    ).toEqual(["picomatch#1247710:high recheck 2026-11-25 expires 2026-12-09"]);
   });
 
   it("does not import security-sensitive transitive packages from production source", () => {

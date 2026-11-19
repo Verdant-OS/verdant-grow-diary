@@ -4,6 +4,7 @@ import { Outlet, useLocation, useNavigate } from "@/lib/react-router-compat";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { useNotebookSessionOwner } from "@/hooks/useNotebookSessionOwner";
 import { useAuth } from "@/store/auth";
 import { useManualSensorCorrectionRefresh } from "@/hooks/useManualSensorCorrectionRefresh";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -77,6 +78,7 @@ import {
 
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading, isSignOutNavigationPending } = useAuth();
+  useNotebookSessionOwner({ clearOnUnmount: true });
   const hydrated = useHydrated();
   const observedLocation = useLocation();
   const protectedLocationRef = useRef(observedLocation);
@@ -256,6 +258,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     setOpenScopedLog(false);
     setMobileLaunchTargetKey(null);
     setStructuredOpenIntent(null);
+    // An explicit open=quick-log marker reached this effect. Keep the guide
+    // prompt or activity, open Quick Log once, then drop the marker so a
+    // refresh does not open it again. A saved preference with no marker
+    // returned above and does not open Quick Log.
     setPrefill(guidePrefill ?? startPrefill);
     setOpenLog(true);
     nav(

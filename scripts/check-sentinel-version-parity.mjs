@@ -143,10 +143,10 @@ const CLAUDE_IMPORTS = `@AGENTS.md
  * is not a violation; any wording or ordering change is.
  */
 const CLAUDE_STATE_READ_INSTRUCTION =
-  "**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file " +
-  "tool before you acknowledge.**";
+  "**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read its \"Start here\" " +
+  "section with a file tool before you acknowledge.**";
 const CLAUDE_STATE_READ_STEP =
-  "1. Read `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.";
+  "1. Read the \"Start here\" section of `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.";
 
 /** Collapse whitespace runs so line-wrapping differences cannot defeat an exact-copy pin. */
 function normalizeWhitespace(text) {

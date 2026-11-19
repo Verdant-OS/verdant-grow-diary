@@ -12,6 +12,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" && node .claude/skills/verdant-auto-handoff/context-mark.mjs",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

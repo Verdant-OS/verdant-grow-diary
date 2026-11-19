@@ -20,7 +20,10 @@ import {
   VWC_RANGE,
 } from "@/constants/csvValidationRanges";
 
-import { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS } from "../constants/sensorTiming";
+import {
+  MANUAL_SNAPSHOT_CURRENT_STALE_HOURS,
+  MANUAL_SNAPSHOT_FUTURE_SKEW_MS,
+} from "../constants/sensorTiming";
 import { isSoilEcMscmRealistic, isSoilEcUnitMismatchSuspected } from "@/lib/sensorTruthRules";
 /** Default staleness threshold for "current" room confidence. */
 export { MANUAL_SNAPSHOT_CURRENT_STALE_HOURS };
@@ -493,8 +496,11 @@ export function applySnapshotValidationSeverity(
   };
 }
 
-/** Tolerated client clock skew for a snapshot stamped slightly in the future. */
-export const MANUAL_SNAPSHOT_FUTURE_SKEW_MS = 5 * 60_000;
+/**
+ * Tolerated client clock skew for a snapshot stamped slightly in the future.
+ * Defined in constants/sensorTiming so the AI Doctor rules share it.
+ */
+export { MANUAL_SNAPSHOT_FUTURE_SKEW_MS };
 
 /**
  * True when a manual snapshot is inside the current window: at most

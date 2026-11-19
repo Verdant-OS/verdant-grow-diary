@@ -1,0 +1,13 @@
+{
+  "timezone": "America/Chicago",
+  "stale_after_seconds": 30,
+  "trust_device_clock": false,
+  "controllers": [
+    {
+      "advertised_name": "SYNTHETIC-CONTROLLER-A",
+      "alias": "synthetic-alias-a",
+      "tent_id": "synthetic-tent-alpha",
+      "zone": "zone1"
+    }
+  ]
+}

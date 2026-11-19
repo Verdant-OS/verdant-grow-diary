@@ -9,7 +9,7 @@
  *    grow_event inside a single atomic RPC — they are near-simultaneous.
  *  - A tight window prevents two unrelated manual logs that happened to
  *    occur seconds apart from being merged into one card.
- *  - This is NOT the AI Doctor readiness 48h window. Do not reuse the
+ *  - This is NOT the AI Doctor readiness freshness window. Do not reuse the
  *    readiness configuration here — readiness asks "is anything recent?",
  *    grouping asks "were these written by the same QuickLog save?".
  */

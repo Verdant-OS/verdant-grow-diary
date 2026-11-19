@@ -13,6 +13,16 @@ import { EVENT_TYPES } from "@/lib/diary";
 import type { NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { resolveQuickLogEventIdentity } from "@/lib/quickLogEventIdentityRules";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
+import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+
+/**
+ * Display options for the history builders. `temperatureUnit` is the
+ * grower's unit for a sensor temperature in `summarySuffix`; omitted, the
+ * identity resolver uses the app default. Stored values stay Celsius.
+ */
+export interface QuickLogHistoryBuildOptions {
+  temperatureUnit?: TemperatureUnitPreference;
+}
 
 export type HistoryLane =
   | "watering"
@@ -304,10 +314,13 @@ function enrichEntryWithNestedActivity(entry: NormalizedDiaryEntry): NormalizedD
   return changed ? { ...entry, details: nextDetails } : entry;
 }
 
-function toRow(entry: NormalizedDiaryEntry): QuickLogHistoryRow {
+function toRow(
+  entry: NormalizedDiaryEntry,
+  options?: QuickLogHistoryBuildOptions,
+): QuickLogHistoryRow {
   const enriched = enrichEntryWithNestedActivity(entry);
   const split = splitHardwareReadingsFromNote(enriched.note);
-  const identity = resolveQuickLogEventIdentity(enriched);
+  const identity = resolveQuickLogEventIdentity(enriched, options);
   return {
     id: enriched.id,
     occurredAt: enriched.createdAt,
@@ -339,28 +352,32 @@ function compareNewestFirst(a: QuickLogHistoryRow, b: QuickLogHistoryRow): numbe
 function buildLane(
   entries: readonly NormalizedDiaryEntry[],
   predicate: (e: NormalizedDiaryEntry) => boolean,
+  options?: QuickLogHistoryBuildOptions,
 ): QuickLogHistoryRow[] {
-  const rows = entries.filter(predicate).map(toRow);
+  const rows = entries.filter(predicate).map((e) => toRow(e, options));
   rows.sort(compareNewestFirst);
   return rows;
 }
 
 export function buildPestDiseaseHistory(
   entries: readonly NormalizedDiaryEntry[],
+  options?: QuickLogHistoryBuildOptions,
 ): QuickLogHistoryRow[] {
-  return buildLane(entries, (e) => laneForEventType(e.eventType) === "pest_disease");
+  return buildLane(entries, (e) => laneForEventType(e.eventType) === "pest_disease", options);
 }
 
 export function buildTrainingHistory(
   entries: readonly NormalizedDiaryEntry[],
+  options?: QuickLogHistoryBuildOptions,
 ): QuickLogHistoryRow[] {
-  return buildLane(entries, (e) => laneForEventType(e.eventType) === "training");
+  return buildLane(entries, (e) => laneForEventType(e.eventType) === "training", options);
 }
 
 export function buildObservationHistory(
   entries: readonly NormalizedDiaryEntry[],
+  options?: QuickLogHistoryBuildOptions,
 ): QuickLogHistoryRow[] {
-  return buildLane(entries, (e) => laneForEventType(e.eventType) === "observation");
+  return buildLane(entries, (e) => laneForEventType(e.eventType) === "observation", options);
 }
 
 /**
@@ -371,12 +388,17 @@ export function buildObservationHistory(
  */
 export function buildMeasurementHistory(
   entries: readonly NormalizedDiaryEntry[],
+  options?: QuickLogHistoryBuildOptions,
 ): QuickLogHistoryRow[] {
-  return buildLane(entries, (e) => {
-    if (hasManualHandheldReadings(e.note)) return true;
-    if (climateFromSnapshot(e.details.sensorSnapshot)) return true;
-    return laneForEventType(e.eventType) === "measurement";
-  });
+  return buildLane(
+    entries,
+    (e) => {
+      if (hasManualHandheldReadings(e.note)) return true;
+      if (climateFromSnapshot(e.details.sensorSnapshot)) return true;
+      return laneForEventType(e.eventType) === "measurement";
+    },
+    options,
+  );
 }
 
 function climateFromSnapshot(
@@ -445,8 +467,9 @@ export function dedupeRecentQuickLogCompanionRows(
 export function buildRecentQuickLogActivity(
   entries: readonly NormalizedDiaryEntry[],
   limit = 10,
+  options?: QuickLogHistoryBuildOptions,
 ): QuickLogHistoryRow[] {
-  const rows = dedupeRecentQuickLogCompanionRows(entries.map(toRow));
+  const rows = dedupeRecentQuickLogCompanionRows(entries.map((e) => toRow(e, options)));
   rows.sort(compareNewestFirst);
   return rows.slice(0, Math.max(0, limit));
 }

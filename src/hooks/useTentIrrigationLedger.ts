@@ -13,6 +13,7 @@ import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import {
+  IRRIGATION_LEDGER_QUERY_KEY_PREFIX,
   IRRIGATION_LEDGER_SELECT,
   buildIrrigationLedger,
   buildKeysetPage,
@@ -64,8 +65,7 @@ export function useTentIrrigationLedger(
 
   const query = useInfiniteQuery<LedgerPage>({
     queryKey: [
-      "irrigation",
-      "ledger",
+      ...IRRIGATION_LEDGER_QUERY_KEY_PREFIX,
       ownerId ?? "anon",
       tentId ?? "none",
       plantId ?? "all",

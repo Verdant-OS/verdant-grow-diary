@@ -16,6 +16,7 @@ import {
   matchesRetractedWaterReceipt,
   resolveStarterWaterReceiptTarget,
 } from "@/lib/quickLogWaterReceiptRules";
+import { DEFINITIVE_MANUAL_REJECTIONS } from "@/lib/quickLogManualRejectionRules";
 import {
   hasMatchingQuickLogNoteTarget,
   matchesActiveQuickLogNoteEvent,
@@ -39,6 +40,8 @@ export interface QuickLogV2SaveResult {
   waterContextChanged?: boolean;
   /** Exact Watering was saved previously, then retracted; it is not an active save. */
   savedThenRetracted?: boolean;
+  /** Server grow_events.occurred_at from the note readback. Never a client clock. */
+  serverOccurredAt?: string | null;
 }
 
 interface RpcResponse {
@@ -67,28 +70,14 @@ export interface QuickLogV2SaveOptions {
 // These normal RPC responses are emitted before the manual event insert.
 // Missing/malformed replies, exceptions, save_failed and receipt failures do
 // not establish non-commit and must retain the caller's original submission.
-const DEFINITIVE_MANUAL_REJECTIONS = new Set([
-  "not_authenticated",
-  "invalid_idempotency_key",
-  "invalid_target_type",
-  "missing_target_id",
-  "unsupported_action",
-  "invalid_volume",
-  "invalid_details",
-  "invalid_logged_at",
-  "target_not_owned",
-  "grow_not_owned",
-  "plant_tent_grow_mismatch",
-]);
+const DEFINITIVE_MANUAL_REJECTION_SET = new Set<string>(DEFINITIVE_MANUAL_REJECTIONS);
 
 export function useQuickLogV2Save() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const guardRef = useRef<QuickLogSubmitGuardController<QuickLogV2SaveResult> | null>(null);
   if (guardRef.current === null) {
-    guardRef.current = createQuickLogSubmitGuard(
-      () => ({ ok: false, reason: "save_in_flight" }),
-    );
+    guardRef.current = createQuickLogSubmitGuard(() => ({ ok: false, reason: "save_in_flight" }));
   }
 
   const saveRequest = useCallback(
@@ -128,7 +117,7 @@ export function useQuickLogV2Save() {
           return {
             ok: false,
             reason,
-            ...(r.ok === false && DEFINITIVE_MANUAL_REJECTIONS.has(reason)
+            ...(r.ok === false && DEFINITIVE_MANUAL_REJECTION_SET.has(reason)
               ? { definitiveRejected: true }
               : {}),
           };
@@ -197,6 +186,7 @@ export function useQuickLogV2Save() {
             waterContextChanged = resolved.contextChanged;
           }
         }
+        let serverOccurredAt: string | null | undefined;
         let persistedNote: string | null | undefined;
         let persistedGrowId: string | null | undefined;
         let persistedTentId: string | null | undefined;
@@ -218,11 +208,19 @@ export function useQuickLogV2Save() {
             }
             const { data: event, error: readError } = await supabase
               .from("grow_events")
-              .select("id,note,grow_id,plant_id,tent_id,event_type,source,is_deleted")
+              .select("id,note,grow_id,plant_id,tent_id,event_type,source,is_deleted,occurred_at")
               .eq("id", r.grow_event_id)
               .maybeSingle();
             if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
-            if (readError || !event || event.id !== r.grow_event_id) {
+            if (readError || !event) {
+              setError("receipt_unverified");
+              return {
+                ok: false,
+                reason: "receipt_unverified",
+                growEventId: r.grow_event_id,
+              };
+            }
+            if (event.id !== r.grow_event_id) {
               setError("receipt_unverified");
               return { ok: false, reason: "receipt_unverified" };
             }
@@ -256,6 +254,10 @@ export function useQuickLogV2Save() {
               };
             }
             persistedNote = event.note;
+            serverOccurredAt =
+              typeof event.occurred_at === "string" && event.occurred_at.length > 0
+                ? event.occurred_at
+                : null;
           }
         }
         if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
@@ -272,6 +274,7 @@ export function useQuickLogV2Save() {
           ...(persistedTentId !== undefined ? { persistedTentId } : {}),
           ...(persistedPlantId !== undefined ? { persistedPlantId } : {}),
           ...(persistedNote !== undefined ? { persistedNote } : {}),
+          ...(serverOccurredAt !== undefined ? { serverOccurredAt } : {}),
         };
       } catch (thrown) {
         if (!canContinue()) return { ok: false, reason: "receipt_unverified" };

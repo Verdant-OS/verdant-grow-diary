@@ -89,10 +89,10 @@ STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
 Do not continue until the context issue is resolved.`;
 
 const CLAUDE_STATE_READ_INSTRUCTION =
-  "**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file " +
-  "tool before you acknowledge.**";
+  "**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read its \"Start here\" " +
+  "section with a file tool before you acknowledge.**";
 const CLAUDE_STATE_READ_STEP =
-  "1. Read `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.";
+  "1. Read the \"Start here\" section of `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.";
 
 const fixtures = [];
 
@@ -384,7 +384,7 @@ test("passes when the read instruction is merely re-wrapped across different lin
     root,
     "CLAUDE.md",
     CLAUDE_STATE_READ_INSTRUCTION,
-    CLAUDE_STATE_READ_INSTRUCTION.replace(" read it with a file ", "\nread it with a file\n"),
+    CLAUDE_STATE_READ_INSTRUCTION.replace(" section with a file ", "\nsection with a file\n"),
   );
   // Commit the re-wrap so the BUMP gate sees no drift — this test isolates the
   // whitespace-normalized pin comparison, not the content-change rule.

@@ -29,6 +29,18 @@ import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { resolveTimelineSensorHandoffIds } from "@/lib/oneTentLoopNavigationRules";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  TIMELINE_LOAD_OLDER_ACTIVITY_ERROR_COPY,
+  appendTimelineOlderActivity,
+  mergeTimelineRefreshedActivity,
+  mergeTimelineRefreshedFirstPage,
+  timelineActivityCursor,
+  timelineActivityTotalAfterOlderPage,
+  timelineActivityTruncationNotice,
+  timelineHiddenFetchedRows,
+  timelineLoadOlderActivityLabel,
+  type TimelinePagedRow,
+} from "@/lib/timelinePagedHistoryRules";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
@@ -670,8 +682,24 @@ export default function Timeline() {
   // settles, the page must not read as complete.
   const [directorySensorsLoading, setDirectorySensorsLoading] = useState(false);
   const [loadOlderError, setLoadOlderError] = useState(false);
+  const [loadingOlderActivity, setLoadingOlderActivity] = useState(false);
+  const [loadOlderActivityError, setLoadOlderActivityError] = useState(false);
   const readRequestIdRef = useRef(0);
   const entriesSnapshotRef = useRef<Entry[]>([]);
+  // Activity rows on screen, for the same-scope refresh merge below.
+  const growEventsSnapshotRef = useRef<GrowEventRowForRecent[]>([]);
+  const growEventsTotalRef = useRef<number | null>(null);
+  // What a same-scope refresh needs to keep already-loaded older pages: the
+  // read key the rows on screen belong to, their keyset cursor, and the
+  // fetched rows the page projection hid (the server count includes them).
+  const entriesReadKeyRef = useRef<string | null>(null);
+  const oldestFetchedCursorRef = useRef<TimelineKeysetCursor | null>(null);
+  const hiddenFetchedRowsRef = useRef<TimelinePagedRow[]>([]);
+  // Set when an existing row was corrected, retracted or removed. The next
+  // committed read then replaces every loaded page: a refetch of the newest
+  // page alone cannot show what changed on an older one.
+  const discardLoadedPagesRef = useRef(false);
+  const entriesTotalRef = useRef<number | null>(null);
   const directorySensorGenerationRef = useRef(0);
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [eventFilter, setEventFilter] = useState<EventFilter>("all");
@@ -818,6 +846,10 @@ export default function Timeline() {
   const activeReadKeyRef = useRef(activeReadKey);
   activeReadKeyRef.current = activeReadKey;
   entriesSnapshotRef.current = entries;
+  growEventsSnapshotRef.current = growEvents;
+  growEventsTotalRef.current = growEventsTotal;
+  oldestFetchedCursorRef.current = oldestFetchedCursor;
+  entriesTotalRef.current = entriesTotal;
 
   // Same fail-closed grow-list gate as the owner name directory: no
   // supplemental tents / sensor_readings while ownership proof is
@@ -858,7 +890,10 @@ export default function Timeline() {
       setSupplementalLoading(false);
       setCoreRead({ status: "idle" });
       setLoadOlderError(false);
+      setLoadOlderActivityError(false);
       setLoading(false);
+      entriesReadKeyRef.current = null;
+      hiddenFetchedRowsRef.current = [];
       return;
     }
 
@@ -883,7 +918,10 @@ export default function Timeline() {
       setSupplementalLoading(false);
       setCoreRead({ status: "idle" });
       setLoadOlderError(false);
+      setLoadOlderActivityError(false);
       setLoading(false);
+      entriesReadKeyRef.current = null;
+      hiddenFetchedRowsRef.current = [];
       return;
     }
 
@@ -893,11 +931,15 @@ export default function Timeline() {
 
     setLoading(true);
     setLoadingOlder(false);
+    // A replacement core read supersedes any older-activity request in flight;
+    // its own `finally` no longer runs for this scope, so clear the flag here.
+    setLoadingOlderActivity(false);
     setCoreRead({ status: "loading", readKey: requestedReadKey });
     setPartialReadSources([]);
     setManualSensorHistoryLimited(false);
     setSupplementalLoading(true);
     setLoadOlderError(false);
+    setLoadOlderActivityError(false);
 
     try {
       // `diary_entries` and `grow_events` are the two authoritative core
@@ -991,17 +1033,54 @@ export default function Timeline() {
       // Core plant memory is confirmed for the exact active scope. Make it
       // visible immediately; photos/action/alert context continues separately
       // and is never allowed to hold the diary or watering history hostage.
-      setEntries(coreRows);
-      setDiaryPhotoIds(nextDiaryPhotoIds);
+      // A same-scope refresh (a save, a new reading) refetches only the
+      // newest page. Keep the older pages the grower already loaded.
+      const sameScope =
+        entriesReadKeyRef.current === requestedReadKey && !discardLoadedPagesRef.current;
+      const refreshed = mergeTimelineRefreshedFirstPage({
+        sameScope,
+        previousRows: entriesSnapshotRef.current,
+        previousCursor: oldestFetchedCursorRef.current,
+        previousHiddenRows: hiddenFetchedRowsRef.current,
+        firstPageRows: coreRows,
+        firstPageCursor: entriesPage.oldestFetchedCursor,
+        firstPageHiddenRows: timelineHiddenFetchedRows(entriesResult.data as Entry[], rows),
+        // entriesTotal is the server count minus the hidden fetched rows.
+        previousServerCount:
+          entriesTotalRef.current === null
+            ? null
+            : entriesTotalRef.current + hiddenFetchedRowsRef.current.length,
+        firstPageServerCount: typeof entriesResult.count === "number" ? entriesResult.count : null,
+      });
+      const committedRows = refreshed.rows;
+      entriesReadKeyRef.current = requestedReadKey;
+      discardLoadedPagesRef.current = false;
+      hiddenFetchedRowsRef.current = refreshed.hiddenRows;
+      setEntries(committedRows);
+      setDiaryPhotoIds((current) =>
+        refreshed.keptOlderPages
+          ? unionTimelineDiaryPhotoIds(current, nextDiaryPhotoIds)
+          : nextDiaryPhotoIds,
+      );
       setManualSensorMeasurementEntries([]);
       setManualSensorHistoryLimited(false);
       setEntriesTotal(
         typeof entriesResult.count === "number"
-          ? entriesResult.count - entriesPage.hiddenCount
+          ? entriesResult.count - refreshed.hiddenRows.length
           : null,
       );
-      setOldestFetchedCursor(entriesPage.oldestFetchedCursor);
-      setGrowEvents(nextGrowEvents);
+      setOldestFetchedCursor(refreshed.cursor);
+      // Same rule for activity: older pages the grower loaded stay when the
+      // refreshed newest page reaches them.
+      const refreshedActivity = mergeTimelineRefreshedActivity({
+        sameScope,
+        previousRows: growEventsSnapshotRef.current,
+        firstPageRows: nextGrowEvents,
+        previousServerCount: growEventsTotalRef.current,
+        firstPageServerCount:
+          typeof growEventsResult.count === "number" ? growEventsResult.count : null,
+      });
+      setGrowEvents(refreshedActivity.rows);
       setTimelineSensorEvents(nextSensorEvents);
       setTimelineLinkedRoots([]);
       setGrowEventsTotal(
@@ -1040,13 +1119,13 @@ export default function Timeline() {
       // meant to be exhaustive.
       supplementalTasks.push(
         (async () => {
-          const diaryRows = coreRows.map((row) => ({
+          const diaryRows = committedRows.map((row) => ({
             id: row.id,
             details: (row.details ?? null) as Record<string, unknown> | null,
           }));
           await resolveMissingLinkedGrowEventParents({
             growId: activeGrowId,
-            diaryRows: coreRows,
+            diaryRows: committedRows,
             knownGrowEvents: nextGrowEvents,
             isCurrent: isCurrentRequest,
             onResolved: (rows) =>
@@ -1378,6 +1457,10 @@ export default function Timeline() {
       }
       if (isCurrentPage() && older.length) {
         setOldestFetchedCursor(olderPage.oldestFetchedCursor);
+        hiddenFetchedRowsRef.current = [
+          ...hiddenFetchedRowsRef.current,
+          ...timelineHiddenFetchedRows(olderResult.data as Entry[] | null, rawOlder),
+        ];
         if (olderPage.hiddenCount > 0) {
           setEntriesTotal((total) => (total === null ? null : total - olderPage.hiddenCount));
         }
@@ -1485,6 +1568,65 @@ export default function Timeline() {
     }
   }
 
+  // Older Quick Log activity, one keyset page at a time. Read-only; stays
+  // inside the applied date bounds like the diary pager above.
+  async function loadOlderActivity() {
+    if (
+      !activeGrowId ||
+      !activeReadKey ||
+      coreRead.status !== "success" ||
+      coreRead.readKey !== activeReadKey ||
+      loadingOlderActivity
+    )
+      return;
+    const cursor = timelineActivityCursor(growEvents);
+    if (!cursor) return;
+    const requestedGrowId = activeGrowId;
+    const requestedReadKey = activeReadKey;
+    const pageRequestId = readRequestIdRef.current;
+    const isCurrentPage = () =>
+      pageRequestId === readRequestIdRef.current && activeReadKeyRef.current === requestedReadKey;
+    setLoadingOlderActivity(true);
+    setLoadOlderActivityError(false);
+    try {
+      let olderQuery = orderNewestFirstStable(
+        filterOlderThanCursor(
+          supabase
+            .from("grow_events")
+            .select(ROOT_ZONE_GROW_EVENT_SELECT)
+            .eq("grow_id", requestedGrowId)
+            .eq("is_deleted", false),
+          "occurred_at",
+          cursor,
+        ),
+        "occurred_at",
+      ).limit(100);
+      if (timelineDateRangeBounds.startIso)
+        olderQuery = olderQuery.gte("occurred_at", timelineDateRangeBounds.startIso);
+      if (timelineDateRangeBounds.endIso)
+        olderQuery = olderQuery.lte("occurred_at", timelineDateRangeBounds.endIso);
+      const olderResult = await olderQuery;
+      if (!isCurrentPage()) return;
+      if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
+      const olderPage = (olderResult.data as unknown as GrowEventRowForRecent[] | null) ?? [];
+      const nextRows = appendTimelineOlderActivity(growEventsSnapshotRef.current, olderPage);
+      setGrowEvents(nextRows);
+      setGrowEventsTotal((total) =>
+        timelineActivityTotalAfterOlderPage(total, nextRows.length, olderPage.length),
+      );
+    } catch {
+      if (isCurrentPage()) setLoadOlderActivityError(true);
+    } finally {
+      if (isCurrentPage()) setLoadingOlderActivity(false);
+    }
+  }
+  // Reload after a change to a row that already exists. Unlike a new save,
+  // this must not keep older loaded pages.
+  const reloadAfterRevision = useCallback(() => {
+    discardLoadedPagesRef.current = true;
+    void load();
+  }, [load]);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -1499,9 +1641,9 @@ export default function Timeline() {
   useEffect(
     () =>
       subscribeManualSensorCorrections(ownerId, () => {
-        void load();
+        reloadAfterRevision();
       }),
-    [ownerId, load],
+    [ownerId, reloadAfterRevision],
   );
   useEffect(() => {
     const h = () => load();
@@ -1830,6 +1972,10 @@ export default function Timeline() {
     return m;
   }, [diaryChipEntries, evidenceFilteredEntries, stageFilter, diaryPhotoIds]);
 
+  const activityTruncationNotice = timelineActivityTruncationNotice(
+    growEvents.length,
+    growEventsTotal,
+  );
   const filtered = useMemo(() => {
     return evidenceFilteredEntries.filter((e) => {
       if (stageFilter !== "all" && resolveTimelineDiaryEntryStage(e) !== stageFilter) return false;
@@ -2709,6 +2855,51 @@ export default function Timeline() {
             ? " · Quick Log activity appears in the history panels below."
             : ""}
         </p>
+        {!loading && activityTruncationNotice && (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="timeline-activity-truncation-notice"
+          >
+            {activityTruncationNotice}
+          </p>
+        )}
+        {!loading &&
+          growEvents.length > 0 &&
+          growEventsTotal !== null &&
+          growEventsTotal > growEvents.length && (
+            <button
+              type="button"
+              data-testid="timeline-load-older-activity"
+              className="text-xs underline text-muted-foreground hover:text-foreground disabled:opacity-50"
+              onClick={() => void loadOlderActivity()}
+              disabled={loadingOlderActivity}
+            >
+              {timelineLoadOlderActivityLabel(
+                growEvents.length,
+                growEventsTotal,
+                loadingOlderActivity,
+              )}
+            </button>
+          )}
+        {loadOlderActivityError && (
+          <div
+            className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"
+            role="alert"
+            data-testid="timeline-load-older-activity-error"
+          >
+            <p>{TIMELINE_LOAD_OLDER_ACTIVITY_ERROR_COPY}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              data-testid="timeline-load-older-activity-retry"
+              onClick={() => void loadOlderActivity()}
+            >
+              Try again
+            </Button>
+          </div>
+        )}
         {/* Guard against the scope-switch race: while a grow reload is in
             flight the previous grow's entries (and cursor) are still in
             state, so pagination must stay hidden until the new page lands. */}
@@ -2941,7 +3132,7 @@ export default function Timeline() {
           dateFiltered={Boolean(effectiveStartDate || effectiveEndDate)}
           targetNames={recentLaneTargetNames}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -2953,6 +3144,7 @@ export default function Timeline() {
           rawEntries={scopedRecentLaneRawEntries}
           activeStage={activeGrow?.stage ?? null}
           plantStartedAt={activeGrow?.started_at ?? null}
+          plantNamesById={plantNamesById}
         />
       </div>
 
@@ -2962,7 +3154,7 @@ export default function Timeline() {
           reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -2973,7 +3165,7 @@ export default function Timeline() {
           reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -2983,7 +3175,7 @@ export default function Timeline() {
           rawEntries={scopedHistoryEntries}
           limit={20}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -2993,7 +3185,7 @@ export default function Timeline() {
           rawEntries={scopedHistoryEntries}
           limit={20}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -3003,7 +3195,7 @@ export default function Timeline() {
           rawEntries={scopedMeasurementEntries}
           limit={20}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -3016,7 +3208,7 @@ export default function Timeline() {
             if (findTimelinePhotoIndexById(lightboxItems, id) >= 0) setLightboxPhotoId(id);
           }}
           onEntryChanged={() => {
-            void load();
+            reloadAfterRevision();
           }}
         />
       </div>
@@ -3322,7 +3514,7 @@ export default function Timeline() {
                                       ...timelineSensorEvents,
                                     ])}
                                     environmentCheckDetails={e.details}
-                                    onChanged={() => void load()}
+                                    onChanged={() => reloadAfterRevision()}
                                   />
                                 ) : !isTimelineSensorDerivedDiaryId(e.id) ? (
                                   <>
@@ -3366,7 +3558,7 @@ export default function Timeline() {
                                               // A same-scope refresh may still include this deletion
                                               // or already count it. Reload after confirmation instead
                                               // of guessing, superseding any older in-flight read.
-                                              void load();
+                                              reloadAfterRevision();
                                             }
                                             return;
                                           }
@@ -3796,7 +3988,14 @@ export default function Timeline() {
             ),
           );
         }}
-        onDeleted={(id) => setEntries((rows) => rows.filter((r) => r.id !== id))}
+        onDeleted={(id) => {
+          // Count each loaded row once, as the remove button does.
+          const rows = entriesSnapshotRef.current;
+          if (!rows.some((row) => row.id === id)) return;
+          entriesSnapshotRef.current = rows.filter((row) => row.id !== id);
+          setEntries((current) => current.filter((r) => r.id !== id));
+          setEntriesTotal(diaryEntriesTotalAfterRemoval);
+        }}
       />
       {lightboxIndex >= 0 && lightboxItems.length > 0 && (
         <TimelinePhotoLightbox
@@ -3833,7 +4032,7 @@ export default function Timeline() {
                 environmentCheckDetails={detailView.entry.details}
                 onChanged={() => {
                   setDetailRecordRefreshKey((key) => key + 1);
-                  void load();
+                  reloadAfterRevision();
                 }}
               />
             ) : null

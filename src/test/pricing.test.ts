@@ -440,13 +440,28 @@ describe("Safety: no private data on public page", () => {
     // needed to avoid selling an AI credit pack the current plan cannot spend.
     // It renders only a generic eligibility state; no subscription fields.
     // Any other @/hooks import (dashboard data hooks) remains forbidden.
-    expect(PAGE).not.toMatch(/@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useMyEntitlements\b)/);
+    // useStripeCheckout starts the Stripe Pro checkout; its guard is below.
+    expect(PAGE).not.toMatch(
+      /@\/hooks\/(?!usePageSeo\b|usePaddleCheckout\b|useMyEntitlements\b|useStripeCheckout\b)/,
+    );
     // And the checkout hook itself must stay free of private data reads —
     // it may read auth session state, never tables or the supabase client.
     const CHECKOUT_HOOK = readSrc("hooks/usePaddleCheckout.ts");
     expect(CHECKOUT_HOOK).not.toMatch(/@\/integrations\/supabase\/client/);
     expect(CHECKOUT_HOOK).not.toMatch(/supabase\s*\.\s*from\(/);
     expect(CHECKOUT_HOOK).not.toMatch(/service_role/);
+    // The Stripe checkout hook and its service read no tables and hold no
+    // privileged key; the service calls only the stripe-checkout function.
+    const STRIPE_HOOK = readSrc("hooks/useStripeCheckout.ts");
+    const STRIPE_SERVICE = readSrc("lib/stripeCheckoutService.ts");
+    for (const text of [STRIPE_HOOK, STRIPE_SERVICE]) {
+      expect(text).not.toMatch(/\.from\(/);
+      expect(text).not.toMatch(/service_role/);
+    }
+    expect(STRIPE_HOOK).not.toMatch(/@\/integrations\/supabase\/client/);
+    expect(
+      [...STRIPE_SERVICE.matchAll(/functions\.invoke\(\s*["']([^"']+)["']/g)].map((m) => m[1]),
+    ).toEqual(["stripe-checkout"]);
     // The entitlement hook may read only the signed-in grower's billing
     // evidence and verified staff role for presentation. It must never expand
     // into grow data or use a privileged credential.

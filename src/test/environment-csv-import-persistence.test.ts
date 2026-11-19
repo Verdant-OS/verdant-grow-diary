@@ -5,6 +5,7 @@ import {
   buildSensorReadingInserts,
   persistCsvEnvironmentRows,
   CSV_SENSOR_SOURCE,
+  UNSPECIFIED_CSV_IMPORT_BATCH_ID,
 } from "@/lib/environmentCsvImportPersistence";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 
@@ -38,6 +39,10 @@ describe("environmentCsvImportPersistence — shape", () => {
     const inserts = buildSensorReadingInserts([row(), row()], SCOPE);
     expect(inserts.every((i) => i.source === CSV_SENSOR_SOURCE)).toBe(true);
     expect(inserts.every((i) => i.raw_payload.source_tag === "csv")).toBe(true);
+    expect(inserts.every((i) => i.raw_payload.csv_import === true)).toBe(true);
+    expect(inserts.every((i) => i.raw_payload.import_batch_id === UNSPECIFIED_CSV_IMPORT_BATCH_ID)).toBe(
+      true,
+    );
   });
 
   it("preserves raw + canonical fields (test 27)", () => {
@@ -68,6 +73,14 @@ describe("environmentCsvImportPersistence — shape", () => {
     const inserts = buildSensorReadingInserts([row({ vpd_source: "csv" })], SCOPE);
     const vpd = inserts.find((i) => i.metric === "vpd_kpa");
     expect(vpd?.raw_payload.vpd_source).toBe("csv");
+  });
+
+  it("uses the scoped import_batch_id when provided", () => {
+    const inserts = buildSensorReadingInserts([row()], {
+      ...SCOPE,
+      import_batch_id: "batch-xyz",
+    });
+    expect(inserts.every((i) => i.raw_payload.import_batch_id === "batch-xyz")).toBe(true);
   });
 
   it("persists Spider Farmer CO2 and PPFD metrics", () => {

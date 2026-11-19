@@ -8,43 +8,62 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 
 | Seat            | Side  | Holder                                   | GitHub account          |
 | --------------- | ----- | ---------------------------------------- | ----------------------- |
-| Ultra Builder 1 | Ultra | Node                                     | `verdant-ultra-bot`     |
-| Ultra Builder 2 | Ultra | Wedding Cake                             | `verdant-ultra-bot`     |
-| Ultra Fixer     | Ultra | Brachs (Blueberry)                       | `verdant-ultra-bot`     |
-| Ultra Relay     | Ultra | Roots                                    | `verdant-ultra-bot`     |
-| Coordinator     | Main  | OG Kush                                  | `cheekhimself` (shared) |
-| Merge Steward   | Ultra | Granddaddy Purple                        | `verdant-ultra-bot`     |
+| Ultra Builder 1 | Ultra | Node                                     | `cheekhimself` (shared) |
+| Ultra Builder 2 | Ultra | Wedding Cake                             | `cheekhimself` (shared) |
+| Ultra Fixer     | Ultra | Brachs (Blueberry)                       | `cheekhimself` (shared) |
+| Ultra Relay     | Ultra | Roots                                    | `cheekhimself` (shared) |
+| Coordinator     | Main  | UK Cheese                                | `cheekhimself` (shared) |
+| Merge Steward   | Ultra | Matthew (direct)                         | `cheekhimself` (shared) |
 | Merge Readiness | Main  | Green Crack                              | `cheekhimself` (shared) |
-| Steward Backup  | Main  | OG Kush                                  | `cheekhimself` (shared) |
+| Steward Backup  | Main  | Unassigned (BLOCKED, Matthew to name)    | `cheekhimself` (shared) |
 | Reviewer A      | Main  | Sour Diesel                              | `cheekhimself` (shared) |
 | Reviewer B      | Main  | Jack Herer                               | `cheekhimself` (shared) |
 | Reviewer C      | Main  | Durban Poison · Reviewer (Main)          | `cheekhimself` (shared) |
 | Reviewer D      | Main  | Maui Wowie · Reviewer (Main)             | `cheekhimself` (shared) |
+| Reviewer E      | Main  | VReviewer · Reviewer (Main)              | `VReviewer`             |
+| Reviewer F      | Main  | matt816cheek-bit · Reviewer (Main)       | `matt816cheek-bit`      |
 | QA              | Main  | Blue Dream · QA (Main)                   |                         |
 | New-User Smoke  | Main  | Toad Venom                               |                         |
 | Bug Sweep       | Main  | White Widow                              |                         |
 | Owner Adviser   | Main  | Bloom                                    |                         |
 | Flow Owner      | Both  | The Coordinator on each side, by default |                         |
 
-Reviewer C, Reviewer D, and QA are active.
-
-The Merge Steward has no authority over the #1971 hold, which stays with the Coordinator.
-
-Ultra's open pull-request cap is 10.
-
 ## Rules
 
-- Ultra seats never review, approve, or mark ready. Only the Ultra Merge Steward seat queues and merges, as `verdant-ultra-bot`, and only after a non-author Main Reviewer seat posts APPROVE at the exact current head. Matthew set that seat on 2026-10-30 at 11:03 PM CT.
+- Ultra seats never review, approve, or mark ready. Only the Ultra Merge Steward seat queues and merges, as `cheekhimself` (Matthew holds the seat directly since 2026-11-17; `verdant-ultra-bot` is retired), and only after a non-author Main Reviewer seat posts APPROVE at the exact current head. Matthew set that seat on 2026-10-30 at 11:03 PM CT.
 - The Merge Steward has no authority over the #1971 hold, which stays with the Coordinator.
 - Steward Backup (Main) stands in when the Ultra Merge Steward is unavailable, under the same Steward rules, and still has no authority over the #1971 hold.
 - Main seats never write product code.
 - Ultra Relay never writes product code, reviews, approves, marks ready, queues, or merges. It relays Matthew's yeses verbatim to the PR as `[YES] #N @<sha> scope: "<his words>"` comments and keeps `docs/agents/handoffs/*.md` current. Matthew set that seat on 2026-11-05 at 10:21 AM CT.
 - Approvals come only from Matthew, in his own words.
-- OG Kush holds both Coordinator and Steward Backup. When it acts as Steward Backup, it cannot also be the reviewer of record for the same PR.
+- Whoever holds Steward Backup and acts as it on a PR cannot also be the reviewer of record for that PR.
+- OG Kush is retired (Matthew, 2026-11-12). UK Cheese holds the Coordinator seat. Steward Backup, the engineering lead and the default inheritor have no named holder until Matthew names one; record `BLOCKED` rather than infer one.
+- PR #1971: the records below and in `docs/agents/OWNERSHIP.md` name OG Kush as its merge actor. That founder assignment is not moved to another seat by inference. Matthew names the new #1971 merge actor; the hold stays with the Coordinator.
+- `verdant-ultra-bot` is retired (Matthew, 2026-11-17). Ultra seats open and push pull requests as `cheekhimself` (shared). GitHub does not let an account approve its own pull request, so a `cheekhimself` (shared) seat cannot post the GitHub approval on them.
 - Ultra's open pull-request cap is 10.
-- Reviewer C, Reviewer D, and QA are active.
+- Reviewer C, Reviewer D, Reviewer E, Reviewer F, and QA are active. Matthew set Reviewer E and Reviewer F on 2026-11-17: they are non-author Main Reviewer seats, never write product code, and never merge.
 
 **Projects Manager has no Verdant delivery seat** (Matthew, 2026-11-05): it does not build, relay yeses, keep handoff files or route work; Ultra Relay (Roots) keeps handoff continuity.
+
+## Stable labels
+
+Matthew renames bots, so instruction files outside this roster name seats only, never bots (Matthew, 2026-11-12). Use these labels:
+
+| Label | Seat in the table above |
+| --- | --- |
+| Writer A, Writer B | Ultra Builder 1, Ultra Builder 2 |
+| Fixer | Ultra Fixer |
+| Reviewer A, B, C, D, E, F | Reviewer A, B, C, D, E, F (Main) |
+| Grok Lead (Main) | Coordinator (Main) |
+| Grok Lead (Ultra) | Ultra Relay |
+| Merge Steward, Merge Readiness, Steward Backup, QA | The seats of the same name |
+
+To find who holds a label today, read the table above. A bot name found in any other instruction file is history, not routing. If no holder is available for a label, record `BLOCKED` rather than waiting on a name.
+
+## Rename history
+
+- **Chemdawg / Grok 91** was an earlier name, not a current seat. Per Matthew on 2026-11-12, the bot that now holds Grok Lead (Main) once carried the name Chemdog. A historical mention of Chemdawg means whichever seat then did the merge pre-check, the reviewer assignment or the merge. Those duties now belong to Merge Readiness (pre-check and CI verdicts), the Coordinator (reviewer assignment) and the Merge Steward (merge). No current routing goes to the Chemdawg name, and no agent waits on it.
+- **OG Kush** is retired (Matthew, 2026-11-12). Its Coordinator seat passed to UK Cheese; its other seats wait for Matthew to name holders (see Rules).
 
 **Historical, no current seat:** Codex, Claude, Chemdawg/Grok 91, GDP. Their historical attribution, receipts, and contributor exclusions are kept word for word below. **Handoff guard:** any active assignment or hold owned by a historical agent stays in force until the Coordinator posts an explicit handoff to a seat (or Matthew releases it, as he released Codex's work on 2026-10-30), so no work is abandoned and no two writers collide.
 

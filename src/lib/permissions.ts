@@ -24,7 +24,6 @@ import {
   type GrowUpdate,
   type HarvestInsert,
   type HarvestRow,
-  type PlantRow,
   type UserRoleInsert,
   type UserRoleRow,
   archiveGrow as _archiveGrow,
@@ -204,19 +203,6 @@ export function createHarvestForCaller(
   row: Omit<HarvestInsert, "user_id">,
 ): Promise<HarvestRow> {
   return _insertHarvestRow({ ...row, user_id: caller.userId });
-}
-
-/* ---------- Plants (operator-only cross-user moderation example) ---------- */
-export async function moderatePlantAsOperator(
-  caller: Caller,
-  plantId: string,
-  patch: Partial<Pick<PlantRow, "health" | "stage" | "is_archived">>,
-): Promise<void> {
-  requireRole(caller, "operator", "moderatePlantAsOperator");
-  const { error } = await supabase.from("plants").update(patch).eq("id", plantId);
-  if (error) {
-    throw new Error(`permissions.moderatePlantAsOperator: ${error.message}`);
-  }
 }
 
 /* ---------- Role assignment (operator only) ---------- */

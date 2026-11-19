@@ -81,8 +81,9 @@ function fetchEntitlementSnapshot(
   const load = (async (): Promise<EntitlementSnapshot> => {
     // All reads are RLS-protected (select-own) and PRESENTATION-ONLY.
     // Subscription reads use bounded newest-first WINDOWS, not limit(1):
-    // public.subscriptions is unique per paddle_subscription_id, so a newer
-    // canceled row (e.g. Pro) must not shadow an older entitling row (e.g.
+    // public.subscriptions holds several rows per user (Paddle and Stripe),
+    // so a newer canceled row (e.g. Pro) must not shadow an older entitling
+    // row (e.g.
     // Founder Lifetime). Same semantics as the server helper
     // supabase/functions/_shared/unionEntitlementLookup.ts.
     const subscriptionRows = (environment: "live" | "sandbox") =>
@@ -91,11 +92,13 @@ function fetchEntitlementSnapshot(
         .select("*")
         .eq("user_id", userId)
         .eq("environment", environment)
-        // created_at is not unique; paddle_subscription_id is — without the
-        // tiebreak, equal timestamps make the window order (and therefore
-        // the picked row) nondeterministic.
+        // created_at is not unique and paddle_subscription_id is null on
+        // Stripe rows, so the primary key id is the final tiebreak — without
+        // a unique tiebreak, equal timestamps make the window order (and
+        // therefore the picked row) nondeterministic.
         .order("created_at", { ascending: false })
-        .order("paddle_subscription_id", { ascending: false })
+        .order("paddle_subscription_id", { ascending: false, nullsFirst: false })
+        .order("id", { ascending: false })
         .limit(SUBSCRIPTION_ROW_SCAN_LIMIT);
 
     // Live rows are canonical production evidence and unlock regardless of

@@ -53,12 +53,13 @@ describe("tentPlantRosterPreferences", () => {
   });
 
   it("does not write when tentId is missing or invalid", () => {
+    const before = window.localStorage.length;
     writeTentPlantRosterIncludeArchived(null, true);
     writeTentPlantRosterIncludeArchived(undefined, true);
     writeTentPlantRosterIncludeArchived("   ", true);
     expect(tentPlantRosterIncludeArchivedKey(null)).toBeNull();
     expect(tentPlantRosterIncludeArchivedKey("   ")).toBeNull();
-    expect(window.localStorage.length).toBe(0);
+    expect(window.localStorage.length).toBe(before);
   });
 
   it("swallows storage errors on read and write", () => {

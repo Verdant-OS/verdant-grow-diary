@@ -49,8 +49,34 @@ export function isAnalyticsCollectionHost(hostname: string | null | undefined): 
   return (PRODUCTION_HOSTNAMES as readonly string[]).includes(normalized);
 }
 
+/**
+ * Public pages whose own copy tells the visitor "No analytics." (#2714): the
+ * two beta landing pages, which render the same BetaLanding component.
+ * No provider may load or send on them, even with consent granted.
+ */
+const NO_ANALYTICS_PUBLIC_PATHS: readonly string[] = ["/creator-beta", "/breeder-beta"];
+
 export function isExcludedAnalyticsPath(pathname: string): boolean {
-  return pathname === GROW_HELP_TOOLKIT_PATH || pathname === `${GROW_HELP_TOOLKIT_PATH}/`;
+  if (pathname === GROW_HELP_TOOLKIT_PATH || pathname === `${GROW_HELP_TOOLKIT_PATH}/`) return true;
+  return isNoAnalyticsPublicPath(pathname);
+}
+
+/**
+ * The router serves these pages in any letter case, with repeated or trailing
+ * slashes, and with percent-escapes, so the match ignores all of them.
+ */
+function isNoAnalyticsPublicPath(pathname: unknown): boolean {
+  if (typeof pathname !== "string" || pathname === "") return false;
+  let decoded = pathname;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    // A malformed escape is compared as written.
+  }
+  const collapsed = decoded.toLowerCase().replace(/\/{2,}/g, "/");
+  const canonical =
+    collapsed.length > 1 && collapsed.endsWith("/") ? collapsed.slice(0, -1) : collapsed;
+  return NO_ANALYTICS_PUBLIC_PATHS.includes(canonical);
 }
 
 /** Empty means the US cloud default. Any other value must be an https origin. */
@@ -334,22 +360,47 @@ const SDK_TRANSPORT_PROPERTY_KEYS = [
 
 const SDK_TRANSPORT_MAX_LENGTH = 200;
 
+/**
+ * The browser user agent and the fields posthog-js parses from it. PostHog
+ * ingestion classifies an event with no `$raw_user_agent` as Automation.
+ */
+const SDK_USER_AGENT_PROPERTY_KEYS = [
+  "$raw_user_agent",
+  "$browser",
+  "$browser_version",
+  "$os",
+  "$os_version",
+  "$device_type",
+] as const;
+
+const SDK_USER_AGENT_MAX_LENGTH = 512;
+
 function copySdkTransportProperties(
   source: Record<string, unknown>,
   out: Record<string, unknown>,
 ): void {
-  for (const key of SDK_TRANSPORT_PROPERTY_KEYS) {
+  copySafeSdkProperties(source, out, SDK_TRANSPORT_PROPERTY_KEYS, SDK_TRANSPORT_MAX_LENGTH);
+  copySafeSdkProperties(source, out, SDK_USER_AGENT_PROPERTY_KEYS, SDK_USER_AGENT_MAX_LENGTH);
+}
+
+function copySafeSdkProperties(
+  source: Record<string, unknown>,
+  out: Record<string, unknown>,
+  keys: readonly string[],
+  maxLength: number,
+): void {
+  for (const key of keys) {
     const value = source[key];
     if (typeof value === "string") {
-      if (isSafeSdkTransportString(value)) out[key] = value;
+      if (isSafeSdkTransportString(value, maxLength)) out[key] = value;
       continue;
     }
     if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
   }
 }
 
-function isSafeSdkTransportString(value: string): boolean {
-  if (!value || value.length > SDK_TRANSPORT_MAX_LENGTH) return false;
+function isSafeSdkTransportString(value: string, maxLength: number): boolean {
+  if (!value || value.length > maxLength) return false;
   if (value !== value.trim()) return false;
   if (value.includes("@") || value.includes("\n") || value.includes("\r")) return false;
   return true;

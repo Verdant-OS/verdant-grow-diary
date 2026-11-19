@@ -51,7 +51,17 @@ export interface MetricView {
   status: MetricStatus;
   /** "Stale" | "Invalid" | "Degraded" | "Unknown" or null when ok. */
   statusLabel: string | null;
+  /**
+   * VPD only, and only when a number is shown: whether that number is a
+   * stored vpd_kpa reading or was calculated from temperature and RH. The
+   * Tents list labels it and shows the calculated value beside a stored one
+   * (core-loop walk, 2026-11-18). Omitted when unknown or not a VPD.
+   */
+  origin?: VpdOrigin;
 }
+
+/** Where a shown VPD number came from. */
+export type VpdOrigin = "stored" | "calculated";
 
 export interface TentSnapshotView {
   hasReading: boolean;
@@ -243,6 +253,8 @@ export interface CanonicalTentVpd {
    * are unknown. Decides whether it is the cohort's own capture.
    */
   captureRefs?: readonly (string | null)[];
+  /** True when Tonight calculated this VPD from temperature and RH (no stored vpd_kpa). */
+  calculated?: boolean;
 }
 
 /**
@@ -318,6 +330,7 @@ function ownCaptureVpdMetric(
           : chipStatus,
     status,
     statusLabel,
+    origin: canonical.calculated === true ? "calculated" : "stored",
   };
 }
 
@@ -564,6 +577,21 @@ export function buildTentSnapshotView(
       "vpd",
     ),
   ];
+
+  // Where the shown VPD number came from: Tonight's own canonical value keeps
+  // its own origin, the cohort's stored vpd_kpa is a stored reading, and the
+  // cohort's temperature/RH fallback is calculated.
+  if (vpdShownKpa !== null) {
+    metrics[2] = {
+      ...metrics[2],
+      origin:
+        useCanonicalVpd && canonical?.calculated === true
+          ? "calculated"
+          : vpdKpa !== null
+            ? "stored"
+            : "calculated",
+    };
+  }
 
   // A canonical VPD from another capture, or from a mixed-source one, keeps
   // its own source and age.

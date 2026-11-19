@@ -3,7 +3,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import { STARTER_WATER_RECOVERY_PENDING } from "@/lib/quickLogPendingStarterWaterStore";
-import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const writer = vi.fn();
 vi.mock("@/lib/writeQuickLogWateringTypedEvent", () => ({
@@ -92,6 +95,7 @@ const legacyRecord = {
 const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks");
 beforeEach(() => {
   clearLocalStorageForTest();
+  setLocalStorageItemForTest("verdant:waterVolumeEntryUnit", "ml");
   window.sessionStorage.clear();
   let tail: Promise<unknown> = Promise.resolve();
   Object.defineProperty(window.navigator, "locks", {

@@ -441,7 +441,7 @@ describe("presenter labels", () => {
 
   it("provides human labels for known missing/evidence codes", () => {
     expect(labelMissing("plant-profile")).toMatch(/Plant profile/);
-    expect(labelEvidence("fresh-manual-sensor-snapshot")).toMatch(/48 hours/);
+    expect(labelEvidence("fresh-manual-sensor-snapshot")).toMatch(/24 hours/);
   });
 
   it("falls back to the raw code for unknown labels", () => {

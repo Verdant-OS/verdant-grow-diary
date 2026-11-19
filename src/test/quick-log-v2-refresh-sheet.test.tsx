@@ -11,7 +11,10 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
-import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const rpcMock = vi.fn();
 
@@ -110,6 +113,7 @@ const originalLocks = Object.getOwnPropertyDescriptor(window.navigator, "locks")
 beforeEach(() => {
   window.sessionStorage.clear();
   clearLocalStorageForTest();
+  setLocalStorageItemForTest("verdant:waterVolumeEntryUnit", "ml");
   let tail: Promise<unknown> = Promise.resolve();
   Object.defineProperty(window.navigator, "locks", {
     configurable: true,

@@ -243,6 +243,51 @@ describe("useGoogleAnalyticsPageViews — gtag behavior", () => {
     );
   });
 
+  // #2714: the beta landing pages say "No analytics." Consent does not change that.
+  it("neither loads the tag nor sends a view on a beta landing page", () => {
+    const betaPaths = [
+      "/creator-beta",
+      "/Creator-Beta/",
+      "//creator-beta",
+      "/breeder-beta",
+      "/Breeder-Beta/",
+    ];
+    for (const pathname of betaPaths) {
+      locationState.pathname = pathname;
+      const { unmount } = renderHook(() => useGoogleAnalyticsPageViews());
+      unmount();
+    }
+
+    expect(loadGoogleAnalytics).not.toHaveBeenCalled();
+    expect(gtagMock).not.toHaveBeenCalled();
+  });
+
+  it("stays silent on the creator beta page when consent is granted there", () => {
+    consentState.value = "unset";
+    locationState.pathname = "/creator-beta";
+    renderHook(() => useGoogleAnalyticsPageViews());
+
+    act(() => {
+      consentState.value = "granted";
+      consentState.listener?.();
+    });
+
+    expect(loadGoogleAnalytics).not.toHaveBeenCalled();
+    expect(gtagMock).not.toHaveBeenCalled();
+  });
+
+  it("sends views before and after the creator beta page, and none for it", () => {
+    const { rerender } = renderHook(() => useGoogleAnalyticsPageViews());
+    locationState.pathname = "/creator-beta";
+    rerender();
+    locationState.pathname = "/pricing";
+    rerender();
+
+    expect(gtagMock.mock.calls.map((call) => (call[2] as { page_path: string }).page_path)).toEqual(
+      ["/dashboard", "/pricing"],
+    );
+  });
+
   it("emits one explicit event for each settled route change", () => {
     const { rerender } = renderHook(() => useGoogleAnalyticsPageViews());
     locationState.pathname = "/guides/cannabis-light-stress-light-burn-bleaching-or-heat";

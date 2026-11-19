@@ -956,10 +956,7 @@ export default function AlertDetail() {
                   <li key={e.id} className="text-xs text-muted-foreground">
                     <span className="font-medium">{e.event_type}</span>
                     {e.previous_status && e.new_status ? (
-                      <span>
-                        {" "}
-                        — {formatStatusTransition(e.previous_status, e.new_status)}
-                      </span>
+                      <span> — {formatStatusTransition(e.previous_status, e.new_status)}</span>
                     ) : null}{" "}
                     <span className="opacity-70">
                       {formatDistanceToNow(new Date(e.created_at), {

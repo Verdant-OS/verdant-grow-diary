@@ -75,11 +75,27 @@ export function resolveSelectedTentPlantStages(
   growTents: ReadonlyArray<{ readonly id: string }>,
   selectedTentIds: ReadonlyArray<string>,
 ): Array<string | null> {
+  return resolveSelectedTentStagePlants(plants, growId, growTents, selectedTentIds).map(
+    (p) => p.stage,
+  );
+}
+
+/**
+ * The same plants as resolveSelectedTentPlantStages, with their tent kept, so
+ * the Dashboard can narrow the stage vote to the tent its reading came from
+ * (alertSnapshotStageScopeRules), as the Alerts page does (Codex on #3021).
+ */
+export function resolveSelectedTentStagePlants(
+  plants: ReadonlyArray<SelectedTentStagePlant>,
+  growId: string,
+  growTents: ReadonlyArray<{ readonly id: string }>,
+  selectedTentIds: ReadonlyArray<string>,
+): Array<{ tent_id: string | null; stage: string | null }> {
   const selected = new Set(selectedTentIds);
   const inSelection = plants
     .filter((p) => p.isArchived !== true && typeof p.tentId === "string" && selected.has(p.tentId))
     .map((p) => ({ grow_id: p.growId ?? null, tent_id: p.tentId ?? null, stage: p.stage ?? null }));
-  return [...(resolveGrowPlantStages(inSelection, growId, growTents) ?? [])];
+  return [...(resolveGrowStagePlants(inSelection, growId, growTents) ?? [])];
 }
 
 export interface ReadForAlertWrite<T> {

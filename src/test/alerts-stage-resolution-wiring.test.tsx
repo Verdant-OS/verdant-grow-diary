@@ -139,7 +139,13 @@ describe("Dashboard — static wiring of the shared stage resolver", () => {
     expect(DASHBOARD_PAGE).toContain(
       "const stageContextTents = tents.filter((t) => selectedTentIds.includes(t.id));",
     );
-    expect(DASHBOARD_PAGE).toContain("tentStages: stageContextTents.map((t) => t.stage)");
+    // When the snapshot names a selected tent, only that tent and its plants
+    // vote, as on the Alerts page (Codex on #3021); the selection stays the
+    // fallback scope.
+    expect(DASHBOARD_PAGE).toContain("snapshotTentId: dashboardHealthSnapshot?.tent_id ?? null,");
+    expect(DASHBOARD_PAGE).toContain("tents: stageContextTents,");
+    expect(DASHBOARD_PAGE).toContain("tentStages: dashboardStageScope.tentStages");
+    expect(DASHBOARD_PAGE).toContain("plantStages: dashboardStageScope.plantStages");
     // Persist hook + stage-aware VPD box + Environment Alerts panel all
     // consume the shared resolved value.
     const uses = DASHBOARD_PAGE.match(/stage:\s*alertContextStage/g) ?? [];

@@ -201,7 +201,7 @@ export interface QuickLogAllActivitiesSaveSuccess {
   /** Existing uncertain write confirmed later; compare its handoff before consuming a draft. */
   readonly recovered?: true;
   readonly reviewedStarterHandoffKey?: string | null;
-  /** Trimmed note text this save persisted; omitted when the save had no note. */
+  /** Trimmed text of a saved Note activity; omitted for other activities and empty notes. */
   readonly noteText?: string;
 }
 
@@ -905,7 +905,7 @@ export default function QuickLogAllActivitiesSection({
           growEventId,
           recovered: true,
           reviewedStarterHandoffKey: record.reviewedStarterHandoffKey ?? null,
-          ...(record.input.note && record.input.note.trim()
+          ...(record.input.activityId === "note" && record.input.note && record.input.note.trim()
             ? { noteText: record.input.note.trim() }
             : {}),
         });
@@ -1486,7 +1486,7 @@ export default function QuickLogAllActivitiesSection({
           activityId: selected.id,
           target: capturedTarget,
           growEventId: savedGrowEventId,
-          ...(activityInput.note ? { noteText: activityInput.note } : {}),
+          ...(selected.id === "note" && activityInput.note ? { noteText: activityInput.note } : {}),
         });
       } catch {
         // Persistence already succeeded. A caller-owned local cleanup

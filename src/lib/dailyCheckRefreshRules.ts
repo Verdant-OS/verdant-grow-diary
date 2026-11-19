@@ -55,7 +55,10 @@ export const DAILY_CHECK_REFRESH_QUERY_KEYS: ReadonlyArray<ReadonlyArray<string>
 ];
 
 export interface DailyCheckRefreshClient {
-  invalidateQueries: (args: { queryKey: ReadonlyArray<string> }) => unknown;
+  invalidateQueries: (
+    args: { queryKey: ReadonlyArray<string> },
+    options: { cancelRefetch: boolean },
+  ) => unknown;
 }
 
 /**
@@ -63,8 +66,11 @@ export interface DailyCheckRefreshClient {
  * Dashboard panel and Plant Detail consistency card cannot drift apart.
  */
 export function refreshDailyCheckQueries(client: DailyCheckRefreshClient): void {
+  // The saving surface has usually already started a refetch. Joining it
+  // (`cancelRefetch: false`) instead of restarting it means one save causes
+  // one read per list, however many listeners are mounted.
   for (const key of DAILY_CHECK_REFRESH_QUERY_KEYS) {
-    client.invalidateQueries({ queryKey: key });
+    client.invalidateQueries({ queryKey: key }, { cancelRefetch: false });
   }
 }
 

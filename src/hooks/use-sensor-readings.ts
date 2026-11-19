@@ -179,18 +179,20 @@ export function useSensorReadings(
   // non-UUID legacy/mock id must never be sent to a UUID column.
   const enabled = !tentScope && (tentId === undefined || isUuid(tentId));
   const scopeKey = enabled ? (tentId ?? "all") : "none";
+  // A valid single tent reads exactly the window the per-tent form reads, so
+  // it shares that cache entry instead of loading the same rows twice.
+  const singleTentId = enabled && typeof tentId === "string" ? tentId : null;
   const single = useQuery({
     // Keep explicit no-scope separate from the intentional all-tents cache so
     // a disabled query can never surface aggregate readings from cache.
-    queryKey: buildPrivateSensorQueryKey(user?.id, [
-      scopeKey,
-      limit,
-      EFFECTIVE_SENSOR_QUERY_VERSION,
-    ]),
+    queryKey: singleTentId
+      ? tentWindowQueryKey(user?.id, singleTentId, limit, NO_TENT_SCOPE)
+      : buildPrivateSensorQueryKey(user?.id, [scopeKey, limit, EFFECTIVE_SENSOR_QUERY_VERSION]),
     enabled,
     retry: false,
     queryFn: async () => {
       if (!enabled) return [];
+      if (singleTentId) return fetchTentSensorWindow(singleTentId, limit, NO_TENT_SCOPE);
       let q = effectiveSensorReadingsQuery()
         .select(TimelineBoundedRead.sensorListSelect)
         // Actual observation time takes precedence. CSV rows retain historical

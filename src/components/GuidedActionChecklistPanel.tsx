@@ -78,7 +78,7 @@ function priorityTone(priority: GuidedActionItem["priority"]): string {
 export default function GuidedActionChecklistPanel({ scopedGrowId, className }: Props) {
   const plantsQuery = useGrowPlants(undefined, scopedGrowId ?? undefined);
   const tentsQuery = useGrowTents(scopedGrowId ?? undefined);
-  const diaryQuery = useDiaryEntries();
+  const diaryQuery = useDiaryEntries({ enabled: Boolean(scopedGrowId) });
   // Per-tent windows over this grow's tents; never the unscoped all-tents
   // read, which hit the Postgres statement timeout (BUG-003). With no grow in
   // scope the panel renders nothing, so it reads nothing. Unresolved or

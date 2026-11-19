@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/store/auth";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export async function fetchDiaryEntries() {
@@ -13,9 +14,22 @@ export async function fetchDiaryEntries() {
   return data ?? [];
 }
 
-export const useDiaryEntries = (options?: { enabled?: boolean }) =>
-  useQuery({
-    queryKey: ["diary_entries"],
+/**
+ * Cache key for the signed-in grower's diary list. The owner id keeps one
+ * account's cached diary from ever being served to another; the
+ * `["diary_entries"]` prefix keeps every existing prefix invalidation working.
+ */
+export function diaryEntriesQueryKey(ownerId: string | null | undefined) {
+  return ["diary_entries", ownerId ?? "anon"] as const;
+}
+
+export const useDiaryEntries = (options?: { enabled?: boolean }) => {
+  const { user } = useAuth();
+  const ownerId = user?.id ?? null;
+  return useQuery({
+    queryKey: diaryEntriesQueryKey(ownerId),
     queryFn: fetchDiaryEntries,
-    enabled: options?.enabled ?? true,
+    // Wait for sign-in so an anonymous read never fills the owner's cache.
+    enabled: (options?.enabled ?? true) && ownerId !== null,
   });
+};

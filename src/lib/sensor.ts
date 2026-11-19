@@ -44,10 +44,12 @@ export interface LatestTentSensorSnapshotState {
 const ROW_FETCH_LIMIT = 50;
 
 /**
- * Debounce window for realtime-triggered React Query invalidations.
- * Coalesces bursts of `sensor_readings` INSERTs into a single refetch.
+ * Throttle window for realtime-triggered React Query invalidations.
+ * Coalesces `sensor_readings` INSERTs into at most one refetch per window
+ * per tent. 500 ms re-read the snapshot almost continuously while a
+ * controller streamed readings; 30 s keeps the card current without that load.
  */
-export const LATEST_SENSOR_REALTIME_INVALIDATE_DEBOUNCE_MS = 500;
+export const LATEST_SENSOR_REALTIME_INVALIDATE_DEBOUNCE_MS = 30_000;
 
 /** Stable React Query key for the latest single-tent sensor snapshot. */
 export function latestTentSensorSnapshotQueryKey(

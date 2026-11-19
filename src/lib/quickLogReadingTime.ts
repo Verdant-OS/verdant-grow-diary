@@ -31,6 +31,36 @@ export class QuickLogReadingTime {
     return { ok: true, iso: new Date(ms).toISOString() };
   }
 
+  /**
+   * The datetime-local value ("YYYY-MM-DDTHH:MM") for an instant in the given
+   * zone. Quick Log shows this for "now" so the field is never blank, and uses
+   * it as the input's max so the picker offers no future time (#2976).
+   * Returns "" for an unusable instant or zone.
+   */
+  static toLocalInputValue(ms: number, timeZone?: string): string {
+    if (!Number.isFinite(ms)) return "";
+    try {
+      const bag: Record<string, string> = {};
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        hourCycle: "h23",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).formatToParts(new Date(ms));
+      for (const part of parts) {
+        if (part.type !== "literal") bag[part.type] = part.value;
+      }
+      if (!bag.year || !bag.month || !bag.day || !bag.hour || !bag.minute) return "";
+      const hour = bag.hour === "24" ? "00" : bag.hour;
+      return `${bag.year}-${bag.month}-${bag.day}T${hour}:${bag.minute}`;
+    } catch {
+      return "";
+    }
+  }
+
   static parse(value: string, timeZone?: string): number | null {
     if (!LOCAL_VALUE.test(value)) {
       const parsed = Date.parse(value);

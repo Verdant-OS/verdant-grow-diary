@@ -181,7 +181,9 @@ describe("Vercel telemetry stays off on the no-analytics beta pages", () => {
   it.each(["/creator-beta", "/breeder-beta", "/Creator-Beta/", "//breeder-beta"])(
     "does not load either SDK on %s with consent granted",
     (path) => {
-      window.history.replaceState(null, "", path);
+      // A bare "//breeder-beta" would be read as a protocol-relative URL with
+      // host "breeder-beta"; prefix the origin so it stays a same-origin path.
+      window.history.replaceState(null, "", `${window.location.origin}${path}`);
       setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
       render(<BothTelemetryMounts />);
       act(() => writeAnalyticsConsent("granted"));

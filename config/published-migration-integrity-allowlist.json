@@ -1,0 +1,8 @@
+{
+  "allow": [
+    {
+      "path": "supabase/migrations/20260707153206_email_infra.sql",
+      "reason": "Owner-approved deletion (Matthew, 2026-11-19, commit 5818bcd88) required by the Lovable-managed email update. Repo-only removal: the applied database objects and the email data tables stay in production. No other published migration is exempt."
+    }
+  ]
+}

@@ -20,6 +20,7 @@ on:
     paths:
       - "supabase/migrations/**"
       - "scripts/verify-published-migration-integrity.mjs"
+      - "config/published-migration-integrity-allowlist.json"
       - ".github/workflows/published-migration-integrity.yml"
     types: [opened, synchronize, reopened, ready_for_review]
 
@@ -66,6 +67,7 @@ jobs:
           set -o pipefail
           node scripts/verify-published-migration-integrity.mjs \
             --baseline="origin/${BASE_REF}" \
+            --allow-file=config/published-migration-integrity-allowlist.json \
             --json \
             > "${{ github.workspace }}/audit/migration-integrity/report.json"
 
@@ -77,6 +79,7 @@ jobs:
           set -o pipefail
           node scripts/verify-published-migration-integrity.mjs \
             --baseline="origin/${BASE_REF}" \
+            --allow-file=config/published-migration-integrity-allowlist.json \
             2>&1 | tee "${{ github.workspace }}/audit/migration-integrity/report.txt"
 
       - name: Write PR-comment body on failure

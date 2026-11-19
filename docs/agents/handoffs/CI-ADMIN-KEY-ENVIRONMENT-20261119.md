@@ -1,16 +1,16 @@
 # CI-ADMIN-KEY-ENVIRONMENT-20261119
 
 ```text
-TASK CI-ADMIN-KEY-ENVIRONMENT-20261119  priority: P1  status: CLOSED
+TASK CI-ADMIN-KEY-ENVIRONMENT-20261119  priority: P1  status: OPEN
 goal: No pull-request workflow can read the Supabase database admin key (SUPABASE_SERVICE_ROLE_KEY). The only job that still needs it reads it from a protected GitHub Environment, so the repository-level secret can be deleted and the key rotated.
 why: Security review finding B1 (2026-11-18, read-only review): the key is a plain repository secret, and ci.yml's PR-triggered `test` job names it, so any pushed branch can edit a workflow on its own PR and read it. Matthew asked "Draft the CI key fix" on 2026-11-19 08:02 UTC.
 branch: claude/project-thread-bju4hh
 base: verdant-grow-diary at 25f8bf6d1c05574488a8d2c48c65aba81f1d0b4d
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3025 (taken out of draft 2026-11-19 08:58 UTC by the matt816cheek-bit account)
-head_sha: 335101d7023637f370ec055550f3c60b45cd1f2f (final PR head)
-closed: 2026-11-19. Reason: merged. #3025 merged to verdant-grow-diary at 2026-11-19 12:57 UTC as c81a47d227ce3e0430abe5df451746d1ad45b387, from the merge queue Matthew queued himself.
-state: merged. 35/35 required checks green at 335101d7. Approvals at that head came only from matt816cheek-bit (Reviewer F, Matthew's own account, not independent). No independent exact-head review was posted before the merge; a post-merge independent review of 335101d7 is owed (requested on the PR 2026-11-19).
-next_action: none for this task. Owed elsewhere: an independent post-merge review of 335101d7 by an eligible seat that did not author it. Follow-ups listed in #3025 (SUPABASE_DB_URL secret, workflows without permissions blocks, a local-Supabase lane, guards for direct save-event/save-manual runs) are separate tasks.
+head_sha: 335101d7023637f370ec055550f3c60b45cd1f2f (final PR head of #3025; the owed review covers this SHA)
+state: merged. #3025 merged to verdant-grow-diary at 2026-11-19 12:57 UTC as c81a47d227ce3e0430abe5df451746d1ad45b387, from the merge queue Matthew queued himself. 35/35 required checks green at 335101d7023637f370ec055550f3c60b45cd1f2f. Approvals at that head came only from matt816cheek-bit (Reviewer F, Matthew's own account, not independent). No independent exact-head review was posted before the merge. This entry stays OPEN until that review lands, so startup readers still see it.
+next_action: Keep this entry OPEN until the post-merge review lands. Owner: Coordinator seat, routing to Reviewer D (fallback C). Full SHA: 335101d7023637f370ec055550f3c60b45cd1f2f. Canonical request: https://github.com/Verdant-OS/verdant-grow-diary/pull/3025#issuecomment-7015612365. Follow-ups listed in #3025 (SUPABASE_DB_URL secret, workflows without permissions blocks, a local-Supabase lane, guards for direct save-event/save-manual runs) are separate tasks.
+links: https://github.com/Verdant-OS/verdant-grow-diary/pull/3025#issuecomment-7015612365
 post_merge_check: on the deploy branch after merge, `grep -n "secrets.SUPABASE_SERVICE_ROLE_KEY" .github/workflows/*.yml` lists only gamification-staging-smoke.yml, and the required ci.yml checks stay green on the next PR. Repository-secret deletion and key rotation are Matthew's settings actions: NOT_MEASURED until he reports them.
 decisions:
   - ci.yml: removed the "QuickLog RPC runtime harnesses (conditional)" step from the `test` job instead of moving it. Corrected 2026-11-19 09:10 UTC after Codex finding r4626475413 (P1): the orchestrator does NOT refuse hosted URLs. It runs save-event, save-manual, then dual-timestamp, and only dual-timestamp refuses a non-loopback host; the first two create users and write rows with the admin key. That is a further reason the step must not hold a hosted key. Its `if` reads env values set only in the step's own env block, so it never ran (inference, matching workflow-branch-filter-liveness.test.ts on the same pattern). Run the harnesses only against a local disposable Supabase. Matthew chose "Add the guard" (2026-11-19 09:06 UTC): scripts/run-quicklog-rpc-rls-harnesses.ts now refuses a non-loopback SUPABASE_URL before spawning any harness (same host list and SKIP exit 0 as the dual-timestamp harness). Scorer unlock recorded with `node scripts/scorer-lock.mjs --unlock scripts/run-quicklog-rpc-rls-harnesses.ts --reason ...` (git-ignored .claude/scorer-unlock.json, 24h). New test src/test/quicklog-rpc-orchestrator-loopback-guard.test.ts runs the real script with https://example.invalid. RED with the guard set aside: the orchestrator spawned all three harnesses; GREEN: one SKIP line, exit 0 (bun run, local). Not covered: running save-event or save-manual directly still has no host check.
@@ -29,10 +29,10 @@ gotchas: once the environment exists with required reviewers, every push to main
 blockers: none.
 post_merge_result: PASS (2026-11-19 12:58 UTC): on verdant-grow-diary at c81a47d, only gamification-staging-smoke.yml names secrets.SUPABASE_SERVICE_ROLE_KEY and ci.yml names it nowhere. Matthew reported on 2026-11-19 15:51 UTC that the settings steps are done (environment with protections, environment secret, repository secret deleted, key rotated); this session did not read settings, so that part is his report, NOT_MEASURED here.
 exclusions_for_review: this Claude thread session and the earlier session on the same thread (both authors)
-reviewer_seat: Reviewer D (fallback C), requested pre-merge; no verdict before merge; post-merge review requested
-reviewer_sha: none (pending post-merge review of 335101d7023637f370ec055550f3c60b45cd1f2f)
+reviewer_seat: Coordinator seat routing to Reviewer D (fallback C); post-merge review requested; no verdict yet
+reviewer_sha: none yet; the owed review covers 335101d7023637f370ec055550f3c60b45cd1f2f
 session_state: no routines, no paused workflows; no secrets read or set; no settings read or changed.
 claimed_by: released 2026-11-19 16:45 UTC (task closed)
 owner: Claude thread session for the CI admin-key task
-last_updated: 2026-11-19 16:45 UTC, by Claude thread session for the CI admin-key task
+last_updated: 2026-11-19 16:51 UTC, by the #3039 review fix that keeps this entry open for the owed review
 ```

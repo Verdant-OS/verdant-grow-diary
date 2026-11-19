@@ -13,7 +13,14 @@
 // `reason` code so the webhook handler can surface why an email was
 // (or was not) sent, without ever escalating to a non-2xx HTTP response
 // that would cause Paddle to requeue the underlying billing event.
+import * as React from "npm:react@18.3.1";
+import { renderAsync } from "npm:@react-email/components@0.0.22";
+import { EmailAPIError, sendLovableEmail } from "npm:@lovable.dev/email-js@0.6.0";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { TEMPLATES } from "../_shared/transactional-email-templates/registry.ts";
+
+const TEMPLATE_NAME = "order-confirmation";
+const SENDER_DOMAIN = "notify.verdantgrowdiary.com";
 
 interface SdkEventLike {
   eventType?: string;
@@ -140,22 +147,52 @@ export async function maybeSendPurchaseConfirmation(
 
     const idempotencyKey = `order-confirm:${evt.data?.id ?? crypto.randomUUID()}`;
 
-    const resp = await fetch(`${deps.supabaseUrl}/functions/v1/send-transactional-email`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${deps.serviceRoleKey}`,
-      },
-      body: JSON.stringify({
-        templateName: "order-confirmation",
-        recipientEmail: recipient,
-        idempotencyKey,
-        templateData,
-      }),
-    });
-    if (!resp.ok) {
+    const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    const template = TEMPLATES[TEMPLATE_NAME];
+    if (!apiKey || !template) {
       return logSkip({ reason: "skipped:send_non_2xx" }, evt);
     }
+    const element = React.createElement(template.component, templateData);
+    const html = await renderAsync(element);
+    const text = await renderAsync(element, { plainText: true });
+    const subject =
+      typeof template.subject === "function" ? template.subject(templateData) : template.subject;
+
+    const writeLog = async (status: "sent" | "suppressed" | "failed", errorMessage?: string) => {
+      const { error } = await supabase.from("email_send_log").insert({
+        message_id: null,
+        template_name: TEMPLATE_NAME,
+        recipient_email: recipient,
+        status,
+        error_message: errorMessage ?? null,
+      });
+      if (error) console.error("order-confirmation audit failed", { code: error.code, message: error.message });
+    };
+
+    try {
+      await sendLovableEmail(
+        {
+          to: recipient,
+          from: `Matt at Verdant Grow Diary <matt@${SENDER_DOMAIN}>`,
+          sender_domain: SENDER_DOMAIN,
+          subject,
+          html,
+          text,
+          purpose: "transactional",
+          label: TEMPLATE_NAME,
+          idempotency_key: idempotencyKey,
+        },
+        { apiKey, sendUrl: Deno.env.get("LOVABLE_SEND_URL") },
+      );
+    } catch (error) {
+      const suppressed = error instanceof EmailAPIError && error.code === "recipient_suppressed";
+      await writeLog(
+        suppressed ? "suppressed" : "failed",
+        suppressed ? undefined : error instanceof Error ? error.message.slice(0, 1000) : "Email send failed",
+      );
+      return logSkip({ reason: "skipped:send_non_2xx" }, evt);
+    }
+    await writeLog("sent");
     return { reason: "sent" };
   } catch {
     return logSkip({ reason: "skipped:dispatch_threw" }, evt);

@@ -118,6 +118,7 @@ import { Route as AppSettingsAgentIntegrationsRouteImport } from './routes/_app/
 import { Route as AppSettingsAnalyticsRouteImport } from './routes/_app/settings_.analytics'
 import { Route as AppTentsIdRouteImport } from './routes/_app/tents_.$id'
 import { Route as CustomerGuideOreozVsGelonadeComparisonRouteImport } from './routes/customer.guide.oreoz-vs-gelonade-comparison'
+import { Route as LovableEmailEventsRouteImport } from './routes/lovable/email/events'
 import { Route as PhenoHuntsIdCompareRouteImport } from './routes/pheno-hunts.$id.compare'
 import { Route as PhenoHuntsIdShowcaseRouteImport } from './routes/pheno-hunts.$id.showcase'
 import { Route as AppOperatorAdminLeadsRouteImport } from './routes/_app/_operator/admin.leads'
@@ -724,6 +725,11 @@ const CustomerGuideOreozVsGelonadeComparisonRoute =
     path: '/customer/guide/oreoz-vs-gelonade-comparison',
     getParentRoute: () => rootRouteImport,
   } as any)
+const LovableEmailEventsRoute = LovableEmailEventsRouteImport.update({
+  id: '/lovable/email/events',
+  path: '/lovable/email/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PhenoHuntsIdCompareRoute = PhenoHuntsIdCompareRouteImport.update({
   id: '/pheno-hunts/$id/compare',
   path: '/pheno-hunts/$id/compare',
@@ -1089,6 +1095,7 @@ export interface FileRoutesByFullPath {
   '/settings/analytics': typeof AppSettingsAnalyticsRoute
   '/tents/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
+  '/lovable/email/events': typeof LovableEmailEventsRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
   '/genetics/': typeof AppGeneticsIndexRoute
@@ -1242,6 +1249,7 @@ export interface FileRoutesByTo {
   '/settings/analytics': typeof AppSettingsAnalyticsRoute
   '/tents/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
+  '/lovable/email/events': typeof LovableEmailEventsRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
   '/genetics': typeof AppGeneticsIndexRoute
@@ -1399,6 +1407,7 @@ export interface FileRoutesById {
   '/_app/settings_/analytics': typeof AppSettingsAnalyticsRoute
   '/_app/tents_/$id': typeof AppTentsIdRoute
   '/customer/guide/oreoz-vs-gelonade-comparison': typeof CustomerGuideOreozVsGelonadeComparisonRoute
+  '/lovable/email/events': typeof LovableEmailEventsRoute
   '/pheno-hunts/$id/compare': typeof PhenoHuntsIdCompareRoute
   '/pheno-hunts/$id/showcase': typeof PhenoHuntsIdShowcaseRoute
   '/_app/genetics/': typeof AppGeneticsIndexRoute
@@ -1555,6 +1564,7 @@ export interface FileRouteTypes {
     | '/settings/analytics'
     | '/tents/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
+    | '/lovable/email/events'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
     | '/genetics/'
@@ -1708,6 +1718,7 @@ export interface FileRouteTypes {
     | '/settings/analytics'
     | '/tents/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
+    | '/lovable/email/events'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
     | '/genetics'
@@ -1864,6 +1875,7 @@ export interface FileRouteTypes {
     | '/_app/settings_/analytics'
     | '/_app/tents_/$id'
     | '/customer/guide/oreoz-vs-gelonade-comparison'
+    | '/lovable/email/events'
     | '/pheno-hunts/$id/compare'
     | '/pheno-hunts/$id/showcase'
     | '/_app/genetics/'
@@ -1973,6 +1985,7 @@ export interface RootRouteChildren {
   StrainsIndexRoute: typeof StrainsIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   CustomerGuideOreozVsGelonadeComparisonRoute: typeof CustomerGuideOreozVsGelonadeComparisonRoute
+  LovableEmailEventsRoute: typeof LovableEmailEventsRoute
   PhenoHuntsIdCompareRoute: typeof PhenoHuntsIdCompareRoute
   PhenoHuntsIdShowcaseRoute: typeof PhenoHuntsIdShowcaseRoute
   LovableEmailAuthWebhookRoute: typeof LovableEmailAuthWebhookRoute
@@ -2743,6 +2756,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomerGuideOreozVsGelonadeComparisonRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lovable/email/events': {
+      id: '/lovable/email/events'
+      path: '/lovable/email/events'
+      fullPath: '/lovable/email/events'
+      preLoaderRoute: typeof LovableEmailEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pheno-hunts/$id/compare': {
       id: '/pheno-hunts/$id/compare'
       path: '/pheno-hunts/$id/compare'
@@ -3357,6 +3377,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   CustomerGuideOreozVsGelonadeComparisonRoute:
     CustomerGuideOreozVsGelonadeComparisonRoute,
+  LovableEmailEventsRoute: LovableEmailEventsRoute,
   PhenoHuntsIdCompareRoute: PhenoHuntsIdCompareRoute,
   PhenoHuntsIdShowcaseRoute: PhenoHuntsIdShowcaseRoute,
   LovableEmailAuthWebhookRoute: LovableEmailAuthWebhookRoute,

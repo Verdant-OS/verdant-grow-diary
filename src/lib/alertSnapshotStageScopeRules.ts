@@ -21,10 +21,17 @@
  *  - `plantStages` null (read pending or failed) and undefined (no plant
  *    signal) pass through untouched so persistence keeps waiting.
  *  - Precedence (grow row, consensus, harvest cap, most advanced wins) stays
- *    in resolveAlertContextStage; this helper only chooses its inputs.
+ *    in resolveAlertContextStage; resolveSnapshotStageScope only chooses its
+ *    inputs.
+ *  - resolveSnapshotAlertStage is the one path from a grow's rows and a
+ *    confirmed snapshot to the stage. The Alerts header and the alerts it
+ *    saves both call it, so the "Using <stage> targets" line names the stage
+ *    the saved alert was judged by (Sour Diesel on #3021).
  *
  * Pure: no I/O, no React, no Supabase, no time.
  */
+import { type AlertStagePlant, resolveGrowStagePlants } from "@/lib/alertPlantStageScopeRules";
+import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 
 export interface SnapshotStageScopeTent {
   readonly id: string;
@@ -88,4 +95,37 @@ export function resolveSnapshotStageScope(input: SnapshotStageScopeInput): Snaps
             .map((p) => p.stage ?? null),
     scope: "tent",
   };
+}
+
+export interface SnapshotAlertStageInput {
+  /** The grow the alerts belong to; null/undefined when none is known. */
+  readonly growId: string | null | undefined;
+  /** The grow row's stage. */
+  readonly growStage: string | null | undefined;
+  /** This grow's tents. */
+  readonly tents: ReadonlyArray<SnapshotStageScopeTent>;
+  /**
+   * Active plants (any grow); the ones that resolve to growId vote. null =
+   * read pending/failed; undefined = no plant signal.
+   */
+  readonly plants: ReadonlyArray<AlertStagePlant> | null | undefined;
+  /** Tent of the confirmed snapshot; null when there is none or it spans tents. */
+  readonly snapshotTentId: string | null | undefined;
+}
+
+/** The stage a confirmed reading's alerts are judged by, scoped to its tent. */
+export function resolveSnapshotAlertStage(input: SnapshotAlertStageInput): string | null {
+  const growStagePlants = input.growId
+    ? resolveGrowStagePlants(input.plants, input.growId, input.tents)
+    : input.plants;
+  const scope = resolveSnapshotStageScope({
+    snapshotTentId: input.snapshotTentId ?? null,
+    tents: input.tents,
+    plants: growStagePlants,
+  });
+  return resolveAlertContextStage({
+    growStage: input.growStage,
+    tentStages: scope.tentStages,
+    plantStages: scope.plantStages ?? null,
+  }).stage;
 }

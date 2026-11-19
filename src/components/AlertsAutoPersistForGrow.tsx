@@ -23,13 +23,8 @@ import { useGrowTargets } from "@/hooks/useGrowTargets";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { compareSnapshotToTargets } from "@/lib/environmentTargetComparison";
-import { resolveAlertContextStage } from "@/lib/alertStageResolution";
-import {
-  type AlertStagePlant,
-  isCurrentReadForAlertWrite,
-  resolveGrowStagePlants,
-} from "@/lib/alertPlantStageScopeRules";
-import { resolveSnapshotStageScope } from "@/lib/alertSnapshotStageScopeRules";
+import { type AlertStagePlant, isCurrentReadForAlertWrite } from "@/lib/alertPlantStageScopeRules";
+import { resolveSnapshotAlertStage } from "@/lib/alertSnapshotStageScopeRules";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 
 interface Props {
@@ -67,17 +62,15 @@ export default function AlertsAutoPersistForGrow({ growId, stage, plants }: Prop
   // stages, most advanced known stage wins on disagreement. The inputs are
   // scoped to the snapshot's tent when it names one (friction item 1): only
   // that tent and its plants vote, never plants elsewhere in the grow.
-  const growStagePlants = safeGrowId ? resolveGrowStagePlants(plants, safeGrowId, tents) : plants;
-  const stageScope = resolveSnapshotStageScope({
-    snapshotTentId: snapshot ? (snapshot.tent_id ?? null) : null,
-    tents,
-    plants: growStagePlants,
-  });
-  const resolvedStage = resolveAlertContextStage({
+  // The Alerts header resolves through the same helper, so the stage it
+  // names is the stage these alerts are saved with (Sour Diesel on #3021).
+  const resolvedStage = resolveSnapshotAlertStage({
+    growId: safeGrowId,
     growStage: stage,
-    tentStages: stageScope.tentStages,
-    plantStages: stageScope.plantStages ?? null,
-  }).stage;
+    tents,
+    plants,
+    snapshotTentId: snapshot ? (snapshot.tent_id ?? null) : null,
+  });
   const plantsSettled = plants !== null;
   const targetsPending = targetsState.status !== "ok";
 

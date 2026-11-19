@@ -4,7 +4,10 @@
  * tent of the same grow. Pure; resolves through the real precedence helper.
  */
 import { describe, expect, it } from "vitest";
-import { resolveSnapshotStageScope } from "@/lib/alertSnapshotStageScopeRules";
+import {
+  resolveSnapshotAlertStage,
+  resolveSnapshotStageScope,
+} from "@/lib/alertSnapshotStageScopeRules";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 import {
   resolveGrowStagePlants,
@@ -156,5 +159,61 @@ describe("Dashboard and Alerts persist with the same stage (Codex on #3021)", ()
     expect(
       resolveSelectedTentStagePlants(DASHBOARD_PLANTS, "g1", TENTS, ids).map((p) => p.stage),
     ).toEqual(resolveSelectedTentPlantStages(DASHBOARD_PLANTS, "g1", TENTS, ids));
+  });
+});
+
+describe("resolveSnapshotAlertStage: one path for the Alerts header and saved alerts (Sour Diesel on #3021)", () => {
+  const PLANTS = [
+    { grow_id: "g1", tent_id: "tent-a", stage: "flower" },
+    { grow_id: "g1", tent_id: "tent-b", stage: "veg" },
+  ];
+  const base = { growId: "g1", growStage: "seedling", tents: TENTS, plants: PLANTS };
+
+  it("matches the scoped composition for every reading tent", () => {
+    for (const snapshotTentId of ["tent-a", "tent-b", null, "tent-elsewhere"]) {
+      const stage = resolveSnapshotAlertStage({ ...base, snapshotTentId });
+      const scope = resolveSnapshotStageScope({
+        snapshotTentId,
+        tents: TENTS,
+        plants: resolveGrowStagePlants(PLANTS, "g1", TENTS),
+      });
+      expect(stage).toBe(
+        resolveAlertContextStage({
+          growStage: "seedling",
+          tentStages: scope.tentStages,
+          plantStages: scope.plantStages ?? null,
+        }).stage,
+      );
+    }
+  });
+
+  it("a Flower plant's tent reading is judged as flower, not the grow-wide seedling", () => {
+    expect(resolveSnapshotAlertStage({ ...base, snapshotTentId: "tent-a" })).toBe("flower");
+    expect(resolveSnapshotAlertStage({ ...base, snapshotTentId: null })).toBe("seedling");
+  });
+
+  it("ignores plants of another grow and passes a pending plant read through", () => {
+    expect(
+      resolveSnapshotAlertStage({
+        ...base,
+        plants: [{ grow_id: "g2", tent_id: "tent-a", stage: "flower" }],
+        snapshotTentId: "tent-a",
+      }),
+    ).toBe("seedling");
+    expect(resolveSnapshotAlertStage({ ...base, plants: null, snapshotTentId: "tent-a" })).toBe(
+      "seedling",
+    );
+  });
+
+  it("with no grow id, the plants vote as given", () => {
+    expect(
+      resolveSnapshotAlertStage({
+        growId: null,
+        growStage: "seedling",
+        tents: TENTS,
+        plants: [{ tent_id: "tent-a", stage: "flower" }],
+        snapshotTentId: "tent-a",
+      }),
+    ).toBe("flower");
   });
 });

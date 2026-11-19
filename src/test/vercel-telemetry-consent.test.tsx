@@ -75,6 +75,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   resetSdkState();
+  window.history.replaceState(null, "", "/");
 });
 
 describe("Vercel telemetry uses the existing consent contract", () => {
@@ -171,5 +172,45 @@ describe("Vercel telemetry uses the existing consent contract", () => {
       throw new Error("Storage unavailable");
     });
     filters.forEach((filter) => expect(filter({ type: "event" })).toBeNull());
+  });
+});
+
+describe("Vercel telemetry stays off on the no-analytics beta pages", () => {
+  it.each(["/creator-beta", "/breeder-beta", "/Creator-Beta", "/breeder-beta/", "//creator-beta"])(
+    "loads neither SDK on %s even with a stored grant",
+    (path) => {
+      window.history.replaceState(null, "", path);
+      setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+      render(<BothTelemetryMounts />);
+      act(() => writeAnalyticsConsent("granted"));
+      expect(scriptSources()).toEqual([]);
+      expect(telemetryWindow.va).toBeUndefined();
+      expect(telemetryWindow.si).toBeUndefined();
+    },
+  );
+
+  it("still loads both SDKs on an ordinary public page with a grant", () => {
+    window.history.replaceState(null, "", "/creator-beta-guide");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    render(<BothTelemetryMounts />);
+    expectBothScriptsOnce();
+  });
+
+  it("drops events once the visitor moves to a beta page after the SDKs loaded", () => {
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    render(<BothTelemetryMounts />);
+    const filters = registeredFilters();
+    const homeEvent = { type: "pageview", url: "https://verdantgrowdiary.com/" };
+    filters.forEach((filter) => expect(filter(homeEvent)).toBe(homeEvent));
+
+    window.history.pushState(null, "", "/breeder-beta");
+    filters.forEach((filter) => expect(filter({ type: "pageview" })).toBeNull());
+  });
+
+  it("drops an event whose own URL is a beta page", () => {
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    render(<BothTelemetryMounts />);
+    const event = { type: "pageview", url: "https://verdantgrowdiary.com/Creator-Beta/?ref=x" };
+    registeredFilters().forEach((filter) => expect(filter(event)).toBeNull());
   });
 });

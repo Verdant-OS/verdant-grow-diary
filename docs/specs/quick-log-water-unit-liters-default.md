@@ -36,8 +36,9 @@ first CI run, §6.2.1) and one new test file (§6), which is the real cost of th
 - **L5. The unit is always visible.** The labels read `Volume (L)` and `Runoff (L)`, the L button is
   pressed, and valid L text shows `Saves as N ml.` (R6). No unit is ever inferred from the number
   (R10). This is what keeps the change from being a silent conversion.
-- **L6. Presets stay in ml (D3 b).** Tapping `1000 ml` switches that form to ml and saves 1000. It does
-  not store a preference, so the next new form opens in liters again.
+- **L6. Presets follow the unit (D3, revised 2026-11-19).** In liters the chips read `0.5 L` … `2.5 L`.
+  Tapping `1 L` keeps the form in liters, shows `1` and saves 1000. It does not store a preference,
+  so the next new form opens in liters again.
 - **L7. Prefill keeps the stored value (R8).** A last-watering prefill of 1,893 ml shows `1.893` in
   liters; saving it unedited sends `volume_ml: 1893`.
 - **L8. The ml-habit guard already exists.** A grower used to milliliters who types `500` into the
@@ -121,8 +122,8 @@ Writable (new scorer). Each `beforeEach` removes `verdant:waterVolumeEntryUnit`.
 6. Typing `500` in the default liters field: the too-large ceiling copy shows in liters and the
    payload is not buildable. Typing `20` needs the large-water confirmation (L8).
 7. Runoff: the label is `Runoff (L)`; `0.25` saves `runoff_ml: 250`.
-8. Tapping `1000 ml`: the label becomes `Volume (ml)`, `volume_ml: 1000`, the key stays empty, and a
-   freshly mounted form opens in liters (L6).
+8. Tapping `1 L`: the label stays `Volume (L)`, the field shows `1`, `volume_ml: 1000`, the key stays
+   empty, and a freshly mounted form opens in liters (L6).
 9. A 1,893 ml prefill shows `1.893` and saves `volume_ml: 1893` unedited (L7).
 10. An untouched form opened in liters is pristine (no draft from the default alone).
 

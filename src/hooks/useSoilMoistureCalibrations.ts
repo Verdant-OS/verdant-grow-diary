@@ -94,10 +94,16 @@ export function resolveSoilMoistureCalibrationRead(
 export function useSoilMoistureCalibrations(args: {
   growId: string | null | undefined;
   tentId: string | null | undefined;
+  /**
+   * Set false when the caller has nothing that needs calibration (for example
+   * a tent with no soil moisture readings). The lookup is then skipped and
+   * availability stays "idle". Defaults to true.
+   */
+  enabled?: boolean;
 }): UseSoilMoistureCalibrationsResult {
   const growId = isUuid(args.growId) ? args.growId : null;
   const tentId = isUuid(args.tentId) ? args.tentId : null;
-  const enabled = Boolean(growId && tentId);
+  const enabled = Boolean(growId && tentId) && args.enabled !== false;
 
   const query = useQuery<SoilMoistureCalibrationReadResult>({
     queryKey: ["soil_moisture_calibrations", growId ?? "none", tentId ?? "none"],

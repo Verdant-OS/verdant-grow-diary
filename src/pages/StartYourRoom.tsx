@@ -31,6 +31,7 @@ import {
   firstMissingStep,
   oneStepProgressLabel,
   startRoomFormWithDefaults,
+  startRoomPendingNamesLine,
   plantDetailQuickLogHref,
   resolveStartYourRoomResume,
   START_YOUR_ROOM_DEFAULT_GROW_NAME,
@@ -41,6 +42,10 @@ import {
   type StartYourRoomResumePlant,
   type StartYourRoomStep,
 } from "@/lib/startYourRoomRules";
+import {
+  startRoomHandoffMemory,
+  markStartRoomDashboardHandoff,
+} from "@/lib/startRoomDashboardHandoff";
 import {
   DEFAULT_START_SCREEN,
   routeForStartScreen,
@@ -412,6 +417,7 @@ export default function StartYourRoom() {
       }
     : form;
   const shownStep: StartYourRoomStep = firstMissingStep(shownIds);
+  const pendingNamesLine = startRoomPendingNamesLine(shownForm, shownIds);
   // Drafts retain unsent typing. Saved names come from the matching owner-scoped
   // records, or the confirmed response while those lists are still refreshing.
   const savedNames = confirmedNames?.ownerId === ownerId ? confirmedNames : null;
@@ -693,6 +699,9 @@ export default function StartYourRoom() {
       if (!mountedRef.current || !submissionIsCurrent()) return;
       // Persist diary-first start screen so next login skips empty onboarding.
       setStartScreenChoice(user.id, "quickLog");
+      // After this first Quick Log closes, AppShell lands the grower on the
+      // dashboard so the checklist is reachable without guessing (B1).
+      markStartRoomDashboardHandoff(startRoomHandoffMemory, plantId);
       nav(plantDetailQuickLogHref(plantId), { replace: true });
     } finally {
       createInFlightRef.current = false;
@@ -717,6 +726,7 @@ export default function StartYourRoom() {
     if (!canFinish(shownIds) || !shownIds.plantId || !user) return;
     // Persist diary-first start screen so next login skips empty onboarding.
     setStartScreenChoice(user.id, "quickLog");
+    markStartRoomDashboardHandoff(startRoomHandoffMemory, shownIds.plantId);
     nav(plantDetailQuickLogHref(shownIds.plantId), { replace: true });
   }
 
@@ -887,6 +897,14 @@ export default function StartYourRoom() {
                       · tent <span className="font-medium">{boundTentName}</span>
                     </>
                   ) : null}
+                </p>
+              ) : null}
+              {pendingNamesLine ? (
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid="start-room-pending-names"
+                >
+                  {pendingNamesLine}
                 </p>
               ) : null}
               {!shownIds.growId || !shownIds.tentId ? (

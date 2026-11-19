@@ -18,6 +18,8 @@ import { buildQuickLogGroupedTimelineQueryOptions } from "@/hooks/useQuickLogGro
 import { reflectionFromEvidence } from "@/lib/fieldNotebookReflection";
 import type { FieldNotebookServerEntry, RefreshReflection } from "@/lib/fieldNotebookOutcomeRules";
 import type { ReadingSlot } from "@/lib/fieldNotebookViewModel";
+import { buildFieldNotebookTentAgeLabels } from "@/lib/fieldNotebookTentAgeRules";
+import { useGrows } from "@/store/grows";
 
 const EMPTY_REFLECTION: RefreshReflection = {
   timelineHasEntry: false,
@@ -36,6 +38,13 @@ export function FieldNotebookScope({
   tents: Array<{ id: string; name: string }>;
   reloadRecent?: () => Promise<void>;
 }) {
+  // The grow row's saved start date drives the tent card's week and age.
+  // Outside a GrowsProvider the context is empty and the card says so plainly.
+  const grows = useGrows()?.grows;
+  const growStartedAt =
+    growId && Array.isArray(grows)
+      ? (grows.find((grow) => grow.id === growId)?.started_at ?? null)
+      : null;
   if (growsLoading || !growId) {
     return (
       <p className="text-sm text-muted-foreground" data-testid="field-notebook-scope">
@@ -45,7 +54,14 @@ export function FieldNotebookScope({
       </p>
     );
   }
-  return <FieldNotebookMount growId={growId} tents={tents} reloadRecent={reloadRecent} />;
+  return (
+    <FieldNotebookMount
+      growId={growId}
+      tents={tents}
+      reloadRecent={reloadRecent}
+      growStartedAt={growStartedAt}
+    />
+  );
 }
 
 export default function FieldNotebookMount({
@@ -53,20 +69,25 @@ export default function FieldNotebookMount({
   tents,
   readingsByTent = {},
   reloadRecent,
+  growStartedAt = null,
 }: {
   growId: string;
   tents: Array<{ id: string; name: string }>;
   readingsByTent?: Record<string, ReadingSlot[]>;
   reloadRecent?: () => Promise<void>;
+  growStartedAt?: string | null;
 }) {
   const queryClient = useQueryClient();
   const { save } = useQuickLogV2Save();
+  const ageLabels = buildFieldNotebookTentAgeLabels({
+    startedAt: growStartedAt,
+    nowMs: Date.now(),
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
   const notebookTents: FieldNotebookTent[] = tents.map((tent) => ({
     id: tent.id,
     name: tent.name,
-    weekLabel: "Week —",
-    ageLabel: "Age: —",
-    startedLabel: "—",
+    ...ageLabels,
   }));
 
   async function reflect(growEventId: string, tentId: string): Promise<RefreshReflection> {

@@ -186,10 +186,15 @@ describe("Quick Log Water volume units", () => {
     chooseUnit("gal");
     expect(getLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("gal");
     first.unmount();
-    render(<Harness />);
+    const second = render(<Harness />);
     expect(screen.getByTestId("qlv2-volume-unit-gal")).toHaveAttribute("aria-pressed", "true");
+    chooseUnit("L");
+    expect(getLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("L");
+    second.unmount();
+    render(<Harness />);
     fireEvent.click(screen.getByTestId("qlv2-volume-preset-1000"));
-    expect(getLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("gal");
+    expect(getLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY)).toBe("L");
+    expect(screen.getByLabelText("Volume (L)")).toBeInTheDocument();
   });
 
   it("14: an unknown stored unit opens in L", () => {
@@ -217,18 +222,20 @@ describe("Quick Log Water volume units", () => {
     expect(payloadVolume(latest).runoff_ml).toBeUndefined();
   });
 
-  it("16: ml presets stay in ml and switch the entry unit to ml", () => {
+  it("16: presets follow the unit: none in gal, liters in L, and a tap keeps the unit", () => {
     render(<Harness />);
     chooseUnit("gal");
+    expect(screen.queryByTestId("qlv2-volume-presets")).not.toBeInTheDocument();
+    chooseUnit("L");
     fireEvent.change(runoffInput(), { target: { value: "0.25" } });
-    expect(screen.getByTestId("qlv2-volume-preset-1000")).toHaveTextContent("1000 ml");
+    expect(screen.getByTestId("qlv2-volume-preset-1000")).toHaveTextContent("1 L");
     fireEvent.click(screen.getByTestId("qlv2-volume-preset-1000"));
-    expect(screen.getByLabelText("Volume (ml)")).toBeInTheDocument();
-    expect(volumeInput().value).toBe("1000");
+    expect(screen.getByLabelText("Volume (L)")).toBeInTheDocument();
+    expect(volumeInput().value).toBe("1");
     const payload = payloadVolume(latest);
     expect(payload.volume_ml).toBe(1000);
-    expect(payload.runoff_ml).toBe(946);
-    expect(runoffInput().value).toBe("946");
+    expect(payload.runoff_ml).toBe(250);
+    expect(runoffInput().value).toBe("0.25");
   });
 });
 
@@ -252,16 +259,17 @@ describe("Quick Log Water volume units: review fixes (#2814 Bugbot)", () => {
     expect(screen.getByLabelText("Volume (gal)")).toBeInTheDocument();
   });
 
-  it("does not mark a preset selected for L/gal text, and a tap sets the preset", () => {
+  it("marks the matching preset selected for typed liters, and a tap clears it", () => {
     render(<Harness />);
     chooseUnit("L");
     fireEvent.change(volumeInput(), { target: { value: "1" } });
     expect(latest.volumeMl).toBe("1000");
     const chip = screen.getByTestId("qlv2-volume-preset-1000");
-    expect(chip).toHaveAttribute("aria-pressed", "false");
+    expect(chip).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(chip);
-    expect(latest.volumeMl).toBe("1000");
-    expect(screen.getByLabelText("Volume (ml)")).toBeInTheDocument();
+    expect(latest.volumeMl).toBe("");
+    expect(volumeInput().value).toBe("");
+    expect(screen.getByLabelText("Volume (L)")).toBeInTheDocument();
   });
 
   it("keeps a preset's ml amount when the unit changes afterwards", () => {

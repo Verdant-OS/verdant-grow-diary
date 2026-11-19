@@ -54,6 +54,11 @@ function readLastUsedQuickLogKey(userId: string | null): string | null {
 }
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
 import {
+  START_ROOM_DASHBOARD_HREF,
+  startRoomHandoffMemory,
+  takeStartRoomDashboardHandoff,
+} from "@/lib/startRoomDashboardHandoff";
+import {
   QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS,
   QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS,
   mainContentFabClearanceCss,
@@ -135,6 +140,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   >(null);
   const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
+  // Set only by Start your room's one-shot hand-off: when this legacy Quick
+  // Log next closes (saved or dismissed), land on the dashboard.
+  const [dashboardAfterLegacyLog, setDashboardAfterLegacyLog] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const registerTentQuickLogTarget = useCallback((registration: TentQuickLogTargetRegistration) => {
     setTentQuickLogTargetEvidence((current) => {
@@ -170,6 +178,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     // before opening V2, so two modal focus locks can never remain active.
     setOpenLog(false);
     setPrefill(null);
+    setDashboardAfterLegacyLog(false);
     setLegacyQuickLogSession((session) => session + 1);
     setStructuredOpenIntent(null);
     setMobileLaunchTargetKey(launchTargetKey);
@@ -201,6 +210,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       // before opening V2, so two modal focus locks can never remain active.
       setOpenLog(false);
       setPrefill(null);
+      setDashboardAfterLegacyLog(false);
       setLegacyQuickLogSession((session) => session + 1);
       setMobileLaunchTargetKey(null);
       setStructuredOpenIntent(detail);
@@ -212,6 +222,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       if (!isQuickLogV2FeedOpenIntent(detail)) return;
       setOpenLog(false);
       setPrefill(null);
+      setDashboardAfterLegacyLog(false);
       setLegacyQuickLogSession((session) => session + 1);
       setMobileLaunchTargetKey(null);
       setStructuredOpenIntent(detail);
@@ -230,6 +241,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       setOpenScopedLog(false);
       setMobileLaunchTargetKey(null);
       setStructuredOpenIntent(null);
+      setDashboardAfterLegacyLog(false);
       setPrefill(detail);
       setOpenLog(true);
     }
@@ -263,6 +275,12 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     // refresh does not open it again. A saved preference with no marker
     // returned above and does not open Quick Log.
     setPrefill(guidePrefill ?? startPrefill);
+    // Start your room's hand-off names this plant: the first close of this
+    // Quick Log lands on the dashboard. Set only, never cleared here, so a
+    // repeated effect run cannot drop a hand-off it already took.
+    if (takeStartRoomDashboardHandoff(startRoomHandoffMemory, routePlantId)) {
+      setDashboardAfterLegacyLog(true);
+    }
     setOpenLog(true);
     nav(
       {
@@ -529,6 +547,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
             if (!o) {
               setPrefill(null);
               setLegacyQuickLogSession((session) => session + 1);
+              if (dashboardAfterLegacyLog) {
+                setDashboardAfterLegacyLog(false);
+                nav(START_ROOM_DASHBOARD_HREF);
+              }
             }
           }}
           prefill={prefill}

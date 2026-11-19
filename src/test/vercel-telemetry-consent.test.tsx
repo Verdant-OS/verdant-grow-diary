@@ -75,6 +75,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   resetSdkState();
+  window.history.replaceState(null, "", "/");
 });
 
 describe("Vercel telemetry uses the existing consent contract", () => {
@@ -171,5 +172,46 @@ describe("Vercel telemetry uses the existing consent contract", () => {
       throw new Error("Storage unavailable");
     });
     filters.forEach((filter) => expect(filter({ type: "event" })).toBeNull());
+  });
+});
+
+// #2714: /creator-beta and /breeder-beta tell the visitor "No analytics."
+// Vercel telemetry must stay off there even with a stored grant.
+describe("Vercel telemetry stays off on the no-analytics beta pages", () => {
+  it.each(["/creator-beta", "/breeder-beta", "/Creator-Beta/", "//breeder-beta"])(
+    "does not load either SDK on %s with consent granted",
+    (path) => {
+      // A bare "//breeder-beta" would be read as a protocol-relative URL with
+      // host "breeder-beta"; prefix the origin so it stays a same-origin path.
+      window.history.replaceState(null, "", `${window.location.origin}${path}`);
+      setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+      render(<BothTelemetryMounts />);
+      act(() => writeAnalyticsConsent("granted"));
+      expect(scriptSources()).toEqual([]);
+      expect(telemetryWindow.va).toBeUndefined();
+      expect(telemetryWindow.si).toBeUndefined();
+    },
+  );
+
+  it("still loads both SDKs once on an ordinary public page with consent granted", () => {
+    window.history.replaceState(null, "", "/pricing");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    render(<BothTelemetryMounts />);
+    expectBothScriptsOnce();
+  });
+
+  it("drops events from already-loaded SDKs once the visitor reaches a beta page", () => {
+    window.history.replaceState(null, "", "/pricing");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    render(<BothTelemetryMounts />);
+    const filters = registeredFilters();
+    const beta = { type: "pageview", url: "https://verdantgrowdiary.com/creator-beta" };
+    const breeder = { type: "vital", url: "https://verdantgrowdiary.com/Breeder-Beta/?ref=x" };
+    const pricing = { type: "pageview", url: "https://verdantgrowdiary.com/pricing" };
+    filters.forEach((filter) => {
+      expect(filter(beta)).toBeNull();
+      expect(filter(breeder)).toBeNull();
+      expect(filter(pricing)).toBe(pricing);
+    });
   });
 });

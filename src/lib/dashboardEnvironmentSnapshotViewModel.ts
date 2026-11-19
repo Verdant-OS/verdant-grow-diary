@@ -78,6 +78,13 @@ export interface TentSnapshotView {
   /** Fresh, valid, provenance-eligible evidence may receive stage guidance. */
   canAssessStage: boolean;
   metrics: MetricView[];
+  /**
+   * Set only when the shown VPD is the latest cohort's own stored reading,
+   * so its source and age are the cohort's. The Tents list names them beside
+   * that VPD, as it already does for a VPD from another capture. Omitted
+   * otherwise.
+   */
+  cohortVpdProvenance?: TentSnapshotProvenance;
 }
 
 export interface BuildTentSnapshotInput extends SensorReadingLike {
@@ -130,7 +137,7 @@ const EMPTY: TentSnapshotView = {
   metrics: [],
 };
 
-type TentSnapshotProvenance = "live" | "manual" | "csv" | "demo" | "unverified";
+export type TentSnapshotProvenance = "live" | "manual" | "csv" | "demo" | "unverified";
 
 function classifyRowProvenance(row: BuildTentSnapshotInput): TentSnapshotProvenance {
   if (isDiagnosticSensorProvenanceRow(row)) return "demo";
@@ -642,5 +649,6 @@ export function buildTentSnapshotView(
     canAssessStage:
       canAssessStage && !cohortVpdRejected && (!vpdReplaced || metrics[2].status === "ok"),
     metrics,
+    ...(!vpdReplaced && metrics[2].origin === "stored" ? { cohortVpdProvenance: provenance } : {}),
   };
 }

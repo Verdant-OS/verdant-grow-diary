@@ -42,8 +42,6 @@ const CALL_SITES: Record<string, RegExp> = {
     /from "\.\/lib\/lib\/timingSafeCompareRules\.ts"/,
   "supabase/functions/_shared/verifyPaddleSignature.ts":
     /from "\.\/lib\/lib\/timingSafeCompareRules\.ts"/,
-  "supabase/functions/send-transactional-email/contract.ts":
-    /from "\.\.\/_shared\/lib\/lib\/timingSafeCompareRules\.ts"/,
   "supabase/functions/preview-transactional-email/index.ts":
     /from "\.\.\/_shared\/lib\/lib\/timingSafeCompareRules\.ts"/,
   "supabase/functions/auth-email-hook/index.ts":

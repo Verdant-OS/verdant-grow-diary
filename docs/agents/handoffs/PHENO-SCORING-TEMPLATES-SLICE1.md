@@ -11,8 +11,8 @@ branch: claude/project-thread-n7led3
 base: verdant-grow-diary at 5719269b
 pr: #3004
 state: merged (see closed). Earlier history: marked ready on Matthew's word 2026-11-18; second commit fixed a Codex bot P2 (malformed section became a validation issue instead of a crash).
-next_action: only the owed post-merge independent review at da6b937 (see review_gap). Starter field review, scale default, Winner/Overall mapping and persistence stay open decisions for Matthew in later slices.
-post_merge_check: none user-visible. No route, component or write path uses these modules yet. Post-merge check is that the pheno-scoring-template-rules test file stays green on the deploy branch.
+next_action: (1) the owed post-merge independent review at da6b937 (see review_gap); (2) the post_merge_check below, owned by this task's owner: confirm the pheno-scoring-template-rules test file stays green on the deploy branch and record the result here. Starter field review, scale default, Winner/Overall mapping and persistence stay open decisions for Matthew in later slices.
+post_merge_check: none user-visible. No route, component or write path uses these modules yet. Post-merge check is that the pheno-scoring-template-rules test file stays green on the deploy branch. Result so far: PASS for the merge commit only. The CI workflow push run 44457695858 on verdant-grow-diary at 30cd21e2f033deb759bb92ad5331181fd2bf8778 concluded success, with all 32 Full test suite shards and Lint, typecheck, test, build green (GitHub API, read 2026-11-19 04:50 UTC). Later deploy-branch heads are NOT_MEASURED. The same commit's Dependency & Security CI push run 44457695567 failed in check:deps on the picomatch reviewed-exception mismatch, which this slice did not touch.
 decisions: (1) The rating scale is a template parameter {min,max,step,labels}, with optional per-field override; nothing hard-codes 0-10 or 1-5. Starter pheno scorecard uses 1-5 step 1; starter tasting scorecard uses 0-10 step 0.5. (2) Null or absent means not scored, never 0. (3) No total, average, composite, rank or keeper output; the engine reports per-field validity, counts, required-missing and completeness only. (4) Winner and Overall mapping are left out of slice 1. (5) Starter templates are draft and internal-only.
 open_decisions_for_matthew: the 0-10 versus 1-5 default; which starter fields to keep, rename or drop; Winner/Overall mapping; whether to persist responses in a new table (later slice).
 behavior_change: none at runtime. New pure modules and constants only; nothing imports them yet.
@@ -26,8 +26,8 @@ blockers: local vitest, tsc and eslint through the repo toolchain are BLOCKED. b
 gotchas: pheno-copy-regression.test.ts scans pheno files for ranking and winner wording; the new files avoid it. The test file's own banned-phrase list is a guard, not copy.
 reviewer_seat: Reviewer E (VReviewer), routed by PR comment [ROUTE]; one request per full head SHA, refreshed for the new head
 reviewer_sha: none yet (earlier head c1b6d495 superseded before any verdict)
-session_state: no routines, no paused workflows. Pending human decisions: starter field review, scale default, merge yes.
+session_state: no routines, no paused workflows. Pending human decisions: starter field review, scale default, Winner/Overall mapping, persistence. The merge yes is no longer pending: #3004 merged (see closed).
 claimed_by: Claude session_017UoYKydSdb658VBhhuatv9, 2026-11-18 04:09 UTC
 owner: Claude session_017UoYKydSdb658VBhhuatv9
-last_updated: 2026-11-19 04:25 UTC, by Claude session_017UoYKydSdb658VBhhuatv9
+last_updated: 2026-11-19 04:52 UTC, by Claude session_017UoYKydSdb658VBhhuatv9
 ```

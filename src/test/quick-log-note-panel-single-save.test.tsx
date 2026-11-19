@@ -4,6 +4,7 @@
  * again, pressed Save log, and got two entries. The confirmation also never
  * showed the note text.
  */
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,7 +68,27 @@ function renderQuickLog(prefill: QuickLogPrefill = { plantId: "p1", growId: "g1"
   );
 }
 
-async function saveNoteInPanel(text: string) {
+function ClosableQuickLog({
+  onOpenChange,
+  prefill,
+}: {
+  onOpenChange: (open: boolean) => void;
+  prefill: QuickLogPrefill;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <QuickLog
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        setOpen(next);
+      }}
+      prefill={prefill}
+    />
+  );
+}
+
+async function saveNoteInPanel(text: string, { expectSavedItem = true } = {}) {
   await waitFor(() =>
     expect(screen.getByTestId("quick-log-target-card")).toHaveAttribute(
       "data-target-plant-id",
@@ -83,7 +104,7 @@ async function saveNoteInPanel(text: string) {
   fireEvent.change(screen.getByTestId(`${prefix}-note`), { target: { value: text } });
   fireEvent.click(screen.getByTestId(`${prefix}-save`));
   await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
-  await screen.findByTestId(`${prefix}-saved-item`);
+  if (expectSavedItem) await screen.findByTestId(`${prefix}-saved-item`);
 }
 
 beforeEach(() => {
@@ -141,6 +162,25 @@ describe("Quick Log Note panel saves once", () => {
     await waitFor(() => expect(save).toBeEnabled());
     fireEvent.click(save);
     await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("Note panel save ends Quick Log with a clear confirmation", () => {
+  it("shows a Note saved toast quoting the first line and closes Quick Log", async () => {
+    const onOpenChange = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ClosableQuickLog onOpenChange={onOpenChange} prefill={{ plantId: "p1", growId: "g1" }} />
+      </QueryClientProvider>,
+    );
+    await saveNoteInPanel("Leaf tips curling\nsecond line", { expectSavedItem: false });
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(toast.success).toHaveBeenCalledWith("Note saved", {
+      description: "“Leaf tips curling”",
+    });
+    await waitFor(() => expect(screen.queryByTestId("quick-log-save")).toBeNull());
+    expect(harness.rpc).toHaveBeenCalledTimes(1);
   });
 });
 

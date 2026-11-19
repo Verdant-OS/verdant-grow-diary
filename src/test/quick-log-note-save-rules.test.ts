@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
   QUICK_LOG_PANEL_NOTE_SAVED_CODE,
+  QUICK_LOG_NOTE_SAVED_TOAST_TITLE,
   applyPanelSavedNoteToPreviewWarnings,
+  buildQuickLogNoteSavedToast,
   buildQuickLogSavedNoteExcerpt,
   isDuplicateOfPanelSavedNote,
 } from "@/lib/quickLogNoteSaveRules";
@@ -99,5 +101,25 @@ describe("isDuplicateOfPanelSavedNote", () => {
 
   it("names the already-saved state in plain words", () => {
     expect(QUICK_LOG_NOTE_ALREADY_SAVED_COPY).toMatch(/already saved/i);
+  });
+});
+
+describe("buildQuickLogNoteSavedToast", () => {
+  it("titles the toast Note saved and quotes the first non-empty line", () => {
+    expect(buildQuickLogNoteSavedToast("\n  Leaf tips curling  \nsecond line")).toEqual({
+      title: QUICK_LOG_NOTE_SAVED_TOAST_TITLE,
+      description: "“Leaf tips curling”",
+    });
+    expect(QUICK_LOG_NOTE_SAVED_TOAST_TITLE).toBe("Note saved");
+  });
+
+  it("shortens a long first line", () => {
+    const toast = buildQuickLogNoteSavedToast("b".repeat(300));
+    expect(toast.description).toBe(`“${"b".repeat(79)}…”`);
+  });
+
+  it("has no description without text", () => {
+    expect(buildQuickLogNoteSavedToast("   ").description).toBeNull();
+    expect(buildQuickLogNoteSavedToast(null).description).toBeNull();
   });
 });

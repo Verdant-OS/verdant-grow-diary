@@ -92,3 +92,28 @@ export function isDuplicateOfPanelSavedNote(input: DuplicatePanelNoteInput): boo
   const saved = normalizeQuickLogNoteText(input.panelSavedNote);
   return note.length > 0 && note === saved;
 }
+
+/** Title of the toast shown when the All activity types Note panel saves. */
+export const QUICK_LOG_NOTE_SAVED_TOAST_TITLE = "Note saved";
+
+/** Length of the first-line quote in the Note-saved toast. */
+export const QUICK_LOG_NOTE_SAVED_TOAST_EXCERPT_MAX = 80;
+
+export interface QuickLogNoteSavedToast {
+  title: string;
+  /** The note's first non-empty line, quoted; null when there is no text. */
+  description: string | null;
+}
+
+/** Toast for a confirmed Note panel save: the title and the note's first line. */
+export function buildQuickLogNoteSavedToast(note: unknown): QuickLogNoteSavedToast {
+  const firstLine =
+    typeof note === "string"
+      ? (note.split(/\r?\n/).find((line) => line.trim().length > 0) ?? "")
+      : "";
+  const excerpt = buildQuickLogSavedNoteExcerpt(firstLine, QUICK_LOG_NOTE_SAVED_TOAST_EXCERPT_MAX);
+  return {
+    title: QUICK_LOG_NOTE_SAVED_TOAST_TITLE,
+    description: excerpt ? `“${excerpt}”` : null,
+  };
+}

@@ -1,3 +1,4 @@
+import { isNoAnalyticsPublicPath } from "@/lib/posthogAnalyticsRules";
 import { buildLegacyStrainSlugAliasTarget, buildRouteAliasTarget } from "@/lib/routeAliasRules";
 import {
   CONTENT_SECURITY_POLICY_REPORT_ONLY_HEADER,
@@ -44,6 +45,16 @@ export const UNSUBSCRIBE_HEADERS = [
 ] as const;
 
 export const ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
+/**
+ * Cloudflare Web Analytics' automatic setup injects its beacon script into
+ * HTML pages it is allowed to transform. `no-transform` asks Cloudflare to
+ * leave the payload alone, which keeps that beacon off /creator-beta and
+ * /breeder-beta, the two pages that tell visitors "No analytics." (#2714).
+ * It is a single directive, so it changes nothing about caching, and
+ * `withHostHeaders` adds it beside any directives the response already has.
+ */
+export const NO_ANALYTICS_PAGE_CACHE_CONTROL = "no-transform";
 
 /**
  * Build-time only. The SEO snapshot capture sends this so a permanent alias
@@ -120,6 +131,9 @@ export function hostHeadersForPathname(pathname: string | null | undefined): Hos
   }
   if (path.startsWith("/assets/") || exact.startsWith("/assets/")) {
     headers.set("Cache-Control", ASSET_CACHE_CONTROL);
+  }
+  if (isNoAnalyticsPublicPath(path)) {
+    headers.set("Cache-Control", NO_ANALYTICS_PAGE_CACHE_CONTROL);
   }
   return [...headers.entries()];
 }
@@ -283,14 +297,27 @@ export function redirectResponseFor(request: Request, env?: unknown): Response |
   return new Response(null, { status: decision.status, headers });
 }
 
+/** Adds one directive to a Cache-Control value and keeps every directive already there. */
+function cacheControlWithDirective(existing: string | null, directive: string): string {
+  if (existing === null || existing.trim() === "") return directive;
+  const present = existing
+    .split(",")
+    .some((part) => part.trim().toLowerCase() === directive.toLowerCase());
+  return present ? existing : `${existing}, ${directive}`;
+}
+
 export function withHostHeaders(request: Request, response: Response): Response {
   if (!response) return response;
   const desired = hostHeadersForPathname(pathnameFromRequest(request));
   const headers = new Headers(response.headers);
   let changed = false;
   for (const [name, value] of desired) {
-    if (headers.get(name) === value) continue;
-    headers.set(name, value);
+    const next =
+      name === "Cache-Control" && value === NO_ANALYTICS_PAGE_CACHE_CONTROL
+        ? cacheControlWithDirective(headers.get(name), value)
+        : value;
+    if (headers.get(name) === next) continue;
+    headers.set(name, next);
     changed = true;
   }
   if (!changed) return response;

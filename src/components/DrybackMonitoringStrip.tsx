@@ -119,8 +119,11 @@ export function DrybackMonitoringStrip({
   });
   const calibrationAvailable =
     calibrationsQuery.availability === "available" && !calibrationsQuery.isError;
+  // Gate the notice on soil readings too: a disabled query keeps any cached
+  // read error, which must not resurface for a tent with no soil sensor.
   const calibrationUnavailable =
-    calibrationsQuery.availability === "schema_unavailable" || calibrationsQuery.isError;
+    hasSoilMoistureReadings &&
+    (calibrationsQuery.availability === "schema_unavailable" || calibrationsQuery.isError);
 
   const model = useMemo(() => {
     const waterings = ledger.rows

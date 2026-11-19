@@ -423,9 +423,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   onClick={() => setSearchOpen(true)}
                   aria-label="Search"
                   data-testid="mobile-global-search-trigger"
-                  className="md:hidden"
+                  className="md:hidden h-auto w-auto min-h-11 min-w-11 flex-col gap-0.5 px-1.5 py-1"
                 >
-                  <Search className="h-4 w-4" />
+                  <Search className="h-4 w-4" aria-hidden="true" />
+                  <span className="text-[10px] font-medium leading-none">Search</span>
                 </Button>
                 {/* Quick Log is the single grower-facing logging entry
                     point on desktop. Opens QuickLogV2Sheet (Field Edition
@@ -446,9 +447,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   size="icon"
                   onClick={() => nav("/alerts")}
                   aria-label="Alerts"
-                  className="relative"
+                  className="relative h-auto w-auto min-h-11 min-w-11 flex-col gap-0.5 px-1.5 py-1"
                 >
-                  <Bell className="h-4 w-4" />
+                  <Bell className="h-4 w-4" aria-hidden="true" />
+                  <span className="text-[10px] font-medium leading-none">Alerts</span>
                   {unread > 0 && (
                     <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
                   )}
@@ -456,8 +458,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                 <AuthStatusIndicator className="hidden sm:inline-flex" />
                 <SignOutConfirmDialog
                   trigger={
-                    <Button variant="ghost" size="icon" aria-label="Sign out">
-                      <LogOut className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Sign out"
+                      className="h-auto w-auto min-h-11 min-w-11 flex-col gap-0.5 px-1.5 py-1"
+                    >
+                      <LogOut className="h-4 w-4" aria-hidden="true" />
+                      <span className="text-[10px] font-medium leading-none">Sign out</span>
                     </Button>
                   }
                 />

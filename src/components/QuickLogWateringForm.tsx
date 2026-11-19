@@ -37,7 +37,7 @@ import {
   applyWateringVolumePreset,
   isWateringVolumePresetSelected,
   QUICK_LOG_WATERING_VOLUME_PRESET_HELP,
-  QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS,
+  wateringVolumePresetOptionsForUnit,
 } from "@/lib/quickLogWateringVolumePresetRules";
 import {
   buildWateringReview,
@@ -116,6 +116,8 @@ export default function QuickLogWateringForm({
   // Updated on every unit choice so a form reset (save, Log another) keeps the grower's unit.
   const [rememberedUnit, setRememberedUnit] = useState<WaterEntryUnit>(loadWaterVolumeEntryUnit);
   const unit: WaterEntryUnit = value.volumeEntryUnit ?? rememberedUnit;
+  const presetOptions = wateringVolumePresetOptionsForUnit(unit);
+  const presetsHelpId = presetOptions.length > 0 ? " qlv2-volume-presets-help" : "";
   const volumeText = waterEntryDisplayText(value.volumeEntryText, value.volumeMl, unit);
   const runoffText = waterEntryDisplayText(value.runoffEntryText, value.runoffMl, unit);
   // Display-side canonicalization only: the write seam converts from the
@@ -236,10 +238,10 @@ export default function QuickLogWateringForm({
           aria-invalid={Boolean(shownVolumeError) || largeWater.needsConfirmation || undefined}
           aria-describedby={
             shownVolumeError
-              ? "qlv2-volume-help qlv2-volume-presets-help qlv2-volume-error"
+              ? `qlv2-volume-help${presetsHelpId} qlv2-volume-error`
               : largeWaterMessage
-                ? "qlv2-volume-help qlv2-volume-presets-help qlv2-large-water-warning"
-                : "qlv2-volume-help qlv2-volume-presets-help"
+                ? `qlv2-volume-help${presetsHelpId} qlv2-large-water-warning`
+                : `qlv2-volume-help${presetsHelpId}`
           }
           onChange={(event) => setVolumeText(event.target.value)}
           placeholder={waterVolumePlaceholder(unit)}
@@ -291,52 +293,48 @@ export default function QuickLogWateringForm({
             {shownVolumeError}
           </p>
         ) : null}
-        <div
-          className="mt-2 flex flex-wrap gap-2"
-          role="group"
-          aria-label="Volume presets"
-          data-testid="qlv2-volume-presets"
-        >
-          {QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS.map((preset) => {
-            // Presets are ml amounts: only an ml entry can be "on" a preset.
-            const selected =
-              unit === "ml" && isWateringVolumePresetSelected(value.volumeMl, preset);
-            return (
-              <Button
-                key={preset.ml}
-                type="button"
-                size="sm"
-                variant={selected ? "default" : "outline"}
-                aria-pressed={selected}
-                disabled={disabled}
-                data-testid={`qlv2-volume-preset-${preset.ml}`}
-                onClick={() => {
-                  // D3 b: presets are ml amounts, so choosing one switches the entry to ml
-                  // (without changing the remembered unit). Runoff keeps its ml amount.
-                  // From L/gal a tap always sets the preset (toggle-off is an ml-only gesture).
-                  // The amount is stored as canonical ml, not as typed text, so a later unit
-                  // change shows it converted instead of reinterpreting its digits.
-                  const nextMl =
-                    unit === "ml"
-                      ? applyWateringVolumePreset(value.volumeMl, preset)
-                      : preset.value;
-                  onChange({
-                    ...value,
-                    volumeEntryUnit: "ml",
-                    volumeEntryText: undefined,
-                    volumeMl: nextMl,
-                    runoffEntryText: undefined,
-                  });
-                }}
-              >
-                {preset.label}
-              </Button>
-            );
-          })}
-        </div>
-        <p id="qlv2-volume-presets-help" className="mt-1 text-xs text-muted-foreground">
-          {QUICK_LOG_WATERING_VOLUME_PRESET_HELP}
-        </p>
+        {presetOptions.length > 0 ? (
+          <>
+            <div
+              className="mt-2 flex flex-wrap gap-2"
+              role="group"
+              aria-label="Volume presets"
+              data-testid="qlv2-volume-presets"
+            >
+              {presetOptions.map((preset) => {
+                const selected = isWateringVolumePresetSelected(value.volumeMl, preset);
+                return (
+                  <Button
+                    key={preset.ml}
+                    type="button"
+                    size="sm"
+                    variant={selected ? "default" : "outline"}
+                    aria-pressed={selected}
+                    disabled={disabled}
+                    data-testid={`qlv2-volume-preset-${preset.ml}`}
+                    onClick={() => {
+                      // The chips follow the unit, so a tap keeps it (and never changes the
+                      // remembered unit). The amount is stored as canonical ml, not typed text,
+                      // so the box shows it in the current unit and a later unit change converts
+                      // it. Tapping the chosen chip again clears it.
+                      onChange({
+                        ...value,
+                        volumeEntryUnit: unit,
+                        volumeEntryText: undefined,
+                        volumeMl: applyWateringVolumePreset(value.volumeMl, preset),
+                      });
+                    }}
+                  >
+                    {preset.label}
+                  </Button>
+                );
+              })}
+            </div>
+            <p id="qlv2-volume-presets-help" className="mt-1 text-xs text-muted-foreground">
+              {QUICK_LOG_WATERING_VOLUME_PRESET_HELP}
+            </p>
+          </>
+        ) : null}
         <p id="qlv2-volume-help" className="mt-1 text-sm text-muted-foreground">
           Required. Record the total water delivered to this target.
         </p>

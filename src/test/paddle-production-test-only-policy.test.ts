@@ -33,10 +33,13 @@ afterEach(() => {
 });
 
 describe("Paddle production test-only policy", () => {
-  it("tracks a sandbox or live class client token in the production build", () => {
-    // Standing production prebuild gate: Lovable publish may inject live_.
-    // Checkout runtime remaining sandbox-authorized is a separate slice.
-    expect(["sandbox", "live"]).toContain(classifyPaddleToken(readProductionToken()));
+  it("production build carries exactly one live Stripe publishable key", async () => {
+    // Owner-approved go-live with Stripe: the prebuild gate now accepts only a
+    // single well-formed pk_live_ key (scripts/stripe-production-key-rules.mjs).
+    const { classifyStripeProductionKey } = await import(
+      "../../scripts/stripe-production-key-rules.mjs"
+    );
+    expect(classifyStripeProductionKey(readProductionToken()).ok).toBe(true);
   });
 
   it("reads the same last duplicate assignment that Vite resolves for production", () => {

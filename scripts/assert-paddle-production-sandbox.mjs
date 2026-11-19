@@ -3,7 +3,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { resolveCanonicalPaddleProductionToken } from "./e2e/managed-session-materialize-core.mjs";
+import {
+  classifyStripeProductionKey,
+  resolveCanonicalStripeLiveKey,
+} from "./stripe-production-key-rules.mjs";
 
 const TOKEN_NAME = "VITE_PAYMENTS_CLIENT_TOKEN";
 const MAX_PRODUCTION_ENV_BYTES = 64 * 1024;
@@ -16,29 +19,21 @@ function readCanonicalProductionEnv(rootDir) {
   try {
     const bytes = readFileSync(resolve(rootDir, ".env.production"));
     if (bytes.byteLength > MAX_PRODUCTION_ENV_BYTES) {
-      return fixedFailure("canonical_paddle_env_too_large");
+      return fixedFailure("canonical_payments_env_too_large");
     }
     return {
       ok: true,
       text: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
     };
   } catch {
-    return fixedFailure("canonical_paddle_env_read_failed");
+    return fixedFailure("canonical_payments_env_read_failed");
   }
 }
 
 function resolveEffectiveProductionToken(token) {
-  if (typeof token !== "string") {
-    return fixedFailure("effective_paddle_token_invalid");
-  }
-
-  // JSON quoting keeps line breaks and delimiter bytes inert while reusing the
-  // strict canonical parser instead of introducing a second token classifier.
-  const resolved = resolveCanonicalPaddleProductionToken(`${TOKEN_NAME}=${JSON.stringify(token)}`);
-  if (!resolved.ok) {
-    return fixedFailure("effective_paddle_token_invalid");
-  }
-  return resolved;
+  const classified = classifyStripeProductionKey(token);
+  if (!classified.ok) return fixedFailure(`effective_${classified.reason}`);
+  return classified;
 }
 
 async function loadEffectiveProductionEnv(rootDir) {
@@ -69,7 +64,7 @@ async function loadEffectiveProductionEnv(rootDir) {
     const { loadEnv } = await import("vite");
     return { ok: true, env: loadEnv("production", rootDir, "VITE_PAYMENTS_") };
   } catch {
-    return fixedFailure("effective_paddle_env_resolution_failed");
+    return fixedFailure("effective_payments_env_resolution_failed");
   } finally {
     process.stdout.write = previousStdoutWrite;
     process.stderr.write = previousStderrWrite;
@@ -84,41 +79,36 @@ async function loadEffectiveProductionEnv(rootDir) {
 }
 
 /**
- * Standing production client-token gate: verify the committed production
- * source and the exact value Vite will bundle. The committed token must be a
- * well-formed live_ token (prefix + 27 letters/digits); test_ is refused.
- * Results contain fixed codes only; token bytes never leave locals.
+ * Standing production client-key gate: production accepts exactly one
+ * well-formed live Stripe publishable key (pk_live_), in the committed file and
+ * in the exact value Vite will bundle. Test keys, Paddle tokens, malformed
+ * values and duplicate assignments are refused. Fixed codes only.
  */
-async function verifyPaddleProductionClientToken(rootDir = process.cwd()) {
+async function verifyStripeProductionClientKey(rootDir = process.cwd()) {
   const rawEnv = readCanonicalProductionEnv(rootDir);
   if (!rawEnv.ok) return rawEnv;
 
-  const canonical = resolveCanonicalPaddleProductionToken(rawEnv.text);
+  const canonical = resolveCanonicalStripeLiveKey(rawEnv.text);
   if (!canonical.ok) return fixedFailure(canonical.reason);
-  // Production ships live checkout: a well-formed sandbox token is refused, so
-  // a later commit cannot quietly restore sandbox checkout in production.
-  if (!canonical.token.startsWith("live_")) return fixedFailure("canonical_paddle_token_not_live");
 
   const effectiveEnv = await loadEffectiveProductionEnv(rootDir);
   if (!effectiveEnv.ok) return effectiveEnv;
 
   const effective = resolveEffectiveProductionToken(effectiveEnv.env[TOKEN_NAME]);
   if (!effective.ok) return effective;
-  if (effective.token !== canonical.token) {
-    return fixedFailure("effective_paddle_token_mismatch");
-  }
+  if (effective.key !== canonical.key) return fixedFailure("effective_stripe_key_mismatch");
 
   return { ok: true };
 }
 
 async function main() {
-  const result = await verifyPaddleProductionClientToken();
+  const result = await verifyStripeProductionClientKey();
   if (!result.ok) {
-    console.error(`[paddle-production-policy] ${result.reason}`);
+    console.error(`[payments-production-policy] ${result.reason}`);
     process.exitCode = 1;
     return;
   }
-  console.log("[paddle-production-policy] production client token verified.");
+  console.log("[payments-production-policy] live Stripe key verified.");
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : null;

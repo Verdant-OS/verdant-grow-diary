@@ -259,11 +259,13 @@ function harnessExemptions(): Record<string, { class: string; reason: string }> 
   // #3025 removed the only workflow line naming these: a ci.yml step that passed the
   // repository's database admin key to a pull-request job. That step's `if` read env set
   // only in its own env block, so it never ran (workflow-branch-filter-liveness.test.ts
-  // records the same broken gate in gamification-staging-smoke.yml), and the orchestrator
-  // refuses every non-loopback API host (quicklog-rpc-harness-static-safety.test.ts), so a
-  // hosted key could never be used. They need a local Supabase lane, not a CI secret.
+  // records the same broken gate in gamification-staging-smoke.yml). The save-event and
+  // save-manual harnesses create users and write rows with the admin key and have no host
+  // check; only run-quicklog-dual-timestamp-rls-harness.ts refuses a non-loopback host
+  // (quicklog-rpc-harness-static-safety.test.ts). They need a local Supabase lane, not a CI
+  // secret.
   const localOnlyQuickLogRpc =
-    "Runtime harness needing a local (loopback) Supabase and its service-role key. run-quicklog-rpc-rls-harnesses.ts refuses every non-loopback API host and runs the other two. Its only CI caller was a ci.yml step that never ran and exposed the admin key to pull-request code; #3025 removed it. Wire into a local-Supabase lane like community-v1-db-proof.yml.";
+    "Runtime harness that writes with the service-role key; run it only against a local disposable Supabase. run-quicklog-rpc-rls-harnesses.ts runs save-event, save-manual, then dual-timestamp; only dual-timestamp refuses a non-loopback host. Its only CI caller was a ci.yml step that never ran and handed the admin key to pull-request code; #3025 removed it. Wire into a local-Supabase lane like community-v1-db-proof.yml.";
   for (const file of [
     "scripts/run-quicklog-rpc-rls-harnesses.ts",
     "scripts/run-quicklog-save-event-rls-harness.ts",

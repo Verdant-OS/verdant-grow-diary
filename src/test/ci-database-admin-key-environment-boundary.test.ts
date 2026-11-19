@@ -52,8 +52,18 @@ describe("CI database admin key stays behind a protected environment", () => {
     }
   });
 
+  it("never references the key outside a job, where every job would inherit it", () => {
+    // A workflow-level `env:` is visible to every job's steps, so no job-level
+    // environment binding could protect it.
+    for (const { file, wf } of workflows) {
+      const outsideJobs = Object.fromEntries(Object.entries(wf).filter(([key]) => key !== "jobs"));
+      expect(JSON.stringify(outsideJobs), file).not.toMatch(ADMIN_KEY_REF);
+    }
+  });
+
   it("keeps the key out of ci.yml, which runs on every pull request", () => {
     const ci = workflows.find(({ file }) => file === "ci.yml")!.wf;
+    expect(JSON.stringify(ci)).not.toMatch(ADMIN_KEY_REF);
     for (const [id, job] of Object.entries(ci.jobs ?? {})) {
       expect(JSON.stringify(job), `ci.yml#${id}`).not.toMatch(ADMIN_KEY_REF);
     }

@@ -27,12 +27,12 @@ files_remaining: none for this slice
 not_in_scope: SUPABASE_DB_URL and SUPABASE_ANON_KEY repository secrets (DB_URL is admin-grade too; follow-up); the 29 workflows with no permissions block (finding B2); the #1250 hold files (untouched); any GitHub or Supabase settings change.
 gotchas: once the environment exists with required reviewers, every push to main that triggers gamification-staging-smoke waits for approval. Deleting the repo secret before the environment secret exists makes that smoke skip, not fail.
 blockers: none.
-post_merge_result: PASS (2026-11-19 12:58 UTC): on verdant-grow-diary at c81a47d, only gamification-staging-smoke.yml names secrets.SUPABASE_SERVICE_ROLE_KEY and ci.yml names it nowhere. Matthew reported on 2026-11-19 15:51 UTC that the settings steps are done (environment with protections, environment secret, repository secret deleted, key rotated); this session did not read settings, so that part is his report, NOT_MEASURED here.
+post_merge_result: source inspection PASS (2026-11-19 12:58 UTC): on verdant-grow-diary at c81a47d227ce3e0430abe5df451746d1ad45b387, only gamification-staging-smoke.yml names secrets.SUPABASE_SERVICE_ROLE_KEY and ci.yml names it nowhere. Required ci.yml checks on the next PR after the merge: NOT_MEASURED (the next same-repo PR is #3039, a draft, which skips the full suite). Settings steps: Matthew reported on 2026-11-19 15:51 UTC that they are done (environment with protections, environment secret, repository secret deleted, key rotated); this session did not read settings, so that part is NOT_MEASURED here.
 exclusions_for_review: this Claude thread session and the earlier session on the same thread (both authors)
 reviewer_seat: Coordinator seat routing to Reviewer D (fallback C); post-merge review requested; no verdict yet
 reviewer_sha: none yet; the owed review covers 335101d7023637f370ec055550f3c60b45cd1f2f
 session_state: no routines, no paused workflows; no secrets read or set; no settings read or changed.
-claimed_by: released 2026-11-19 16:45 UTC (task closed)
+claimed_by: Claude thread session for the CI admin-key task, 2026-11-19 08:30 UTC (Matthew's request); held while the owed review is open
 owner: Claude thread session for the CI admin-key task
-last_updated: 2026-11-19 16:51 UTC, by the #3039 review fix that keeps this entry open for the owed review
+last_updated: 2026-11-19 17:05 UTC, by Claude thread session for the CI admin-key task
 ```

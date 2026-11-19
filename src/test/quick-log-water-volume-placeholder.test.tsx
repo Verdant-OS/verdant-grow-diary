@@ -83,11 +83,12 @@ describe("Quick Log Water: the volume hint follows the unit", () => {
     expect(latest.volumeMl ?? "").toBe("");
   });
 
-  it("5: a 500 ml shortcut still switches to ml and fills 500 (D3 b unchanged)", () => {
+  it("5: a 0.5 L shortcut keeps liters, fills 0.5 and keeps the liters hint", () => {
     render(<Harness />);
     fireEvent.click(screen.getByTestId("qlv2-volume-preset-500"));
-    expect(screen.getByLabelText("Volume (ml)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Volume (L)")).toBeInTheDocument();
     expect(latest.volumeMl).toBe("500");
-    expect(volumeInput()).toHaveAttribute("placeholder", "e.g. 500");
+    expect(volumeInput().value).toBe("0.5");
+    expect(volumeInput()).toHaveAttribute("placeholder", "e.g. 1.5");
   });
 });

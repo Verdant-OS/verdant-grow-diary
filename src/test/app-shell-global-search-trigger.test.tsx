@@ -6,7 +6,7 @@
  * select, or contenteditable surface.
  */
 import type { ReactNode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -84,5 +84,17 @@ describe("AppShell global-search triggers", () => {
     input.focus();
     fireEvent.keyDown(input, { key: "k", ctrlKey: true });
     expect(screen.queryByTestId("global-search-dialog-open")).toBeNull();
+  });
+});
+
+// FA-20261119-M1 item 8: a first-time grower on /onboarding saw the header's
+// icon-only controls with no words. Each icon control in the header row must
+// carry a short visible label, not only an aria-label.
+describe("AppShell header icon controls show visible labels", () => {
+  it.each(["Search", "Alerts", "Sign out"])("shows the word %s on its icon button", (name) => {
+    renderShell();
+    const header = screen.getByTestId("app-shell-header-row");
+    const button = within(header).getByRole("button", { name });
+    expect(within(button).getByText(name)).toBeVisible();
   });
 });

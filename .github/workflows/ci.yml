@@ -487,9 +487,9 @@ jobs:
       # referenced anywhere in this workflow. This job runs on pull requests,
       # so any secret it names is reachable from branch code. The QuickLog RPC
       # runtime harnesses (bun run test:db:quicklog-rpc-runtime) create users
-      # and write rows with the admin key, and only the last of the three
-      # (dual-timestamp) refuses a non-loopback API host. Run them only against
-      # a local disposable Supabase, never with a hosted key. Privileged CI
+      # and write rows with the admin key. The runner refuses a non-loopback
+      # API host before starting any of them (#3025); run them only against a
+      # local disposable Supabase, never with a hosted key. Privileged CI
       # work belongs in a job bound to the protected `supabase-admin` environment.
 
       # NOTE: the full Vitest suite (~21k tests) is intentionally NOT run here.

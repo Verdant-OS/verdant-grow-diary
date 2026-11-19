@@ -1,6 +1,5 @@
 import {
   persistedGrantWouldSurviveReload,
-  revocationSurvivesReload,
   type AnalyticsConsentDecision,
 } from "@/lib/analyticsConsent";
 import {
@@ -9,19 +8,12 @@ import {
   removeAhrefsAnalyticsScript,
 } from "@/lib/ahrefsAnalyticsLoader";
 import { loadGoogleAnalytics, setGoogleAnalyticsOptOut } from "@/lib/googleAnalyticsLoader";
-import { denyGoogleTagManagerConsent, loadGoogleTagManager } from "@/lib/googleTagManagerLoader";
 import { isExcludedAnalyticsPath } from "@/lib/posthogAnalyticsRules";
 import { syncPostHogWithConsent } from "@/lib/posthogClient";
 
 /**
  * Apply the browser-local consent decision to every site analytics provider.
  * Provider loaders remain idempotent and receive no grower-content payloads.
- *
- * Google Tag Manager cannot be unloaded and has no kill switch. A container that
- * already ran gets Google consent-mode denial at once, and the document reloads
- * whenever the reload keeps the denial: after a failed revoke that left the old
- * grant in localStorage, the session-scoped denial is enough. Only when neither
- * store can hold the denial does the container stay, under consent denial.
  */
 export function applyAnalyticsConsentDecision(
   decision: AnalyticsConsentDecision,
@@ -30,10 +22,9 @@ export function applyAnalyticsConsentDecision(
   if (isExcludedAnalyticsPath(location.pathname)) {
     syncPostHogWithConsent("denied", location);
     setGoogleAnalyticsOptOut(true);
-    const containerRan = denyGoogleTagManagerConsent();
-    const tagWasPresent = isAhrefsAnalyticsLoaded() || containerRan;
+    const tagWasPresent = isAhrefsAnalyticsLoaded();
     removeAhrefsAnalyticsScript();
-    if (persistedGrantWouldSurviveReload()) return containerRan && revocationSurvivesReload();
+    if (persistedGrantWouldSurviveReload()) return false;
     return tagWasPresent;
   }
 
@@ -43,17 +34,15 @@ export function applyAnalyticsConsentDecision(
 
   if (granted) {
     loadGoogleAnalytics();
-    loadGoogleTagManager();
     if (location.pathname === "/" && location.search === "" && location.hash === "") {
       loadAhrefsAnalytics();
       return false;
     }
   }
 
-  const containerRan = !granted && denyGoogleTagManagerConsent();
-  const mustReload = isAhrefsAnalyticsLoaded() || containerRan;
+  const mustReload = isAhrefsAnalyticsLoaded();
   removeAhrefsAnalyticsScript();
-  if (persistedGrantWouldSurviveReload()) return containerRan && revocationSurvivesReload();
+  if (persistedGrantWouldSurviveReload()) return false;
   return mustReload;
 }
 

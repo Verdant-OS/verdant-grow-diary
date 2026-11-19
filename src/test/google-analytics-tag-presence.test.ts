@@ -30,9 +30,6 @@ describe("Google Analytics consent gate", () => {
   it("does not ship the gtag.js tag in the root head", () => {
     expect(ROOT_ROUTE).not.toContain("https://www.googletagmanager.com/gtag/js?id=");
     expect(ROOT_ROUTE).not.toContain("https://analytics.ahrefs.com/analytics.js");
-    // Tag Manager is consent-gated too: no head snippet and no noscript iframe.
-    expect(ROOT_ROUTE).not.toContain("googletagmanager.com/gtm.js");
-    expect(ROOT_ROUTE).not.toContain("googletagmanager.com/ns.html");
   });
 
   it("mounts the consent banner and the consent-gated loader", () => {

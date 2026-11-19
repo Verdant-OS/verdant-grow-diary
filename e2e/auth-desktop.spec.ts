@@ -99,7 +99,7 @@ test.describe("Desktop auth loading/disabled smoke (mocked, 1280x800)", () => {
   test("desktop forgot password: loading + generic non-enumerating success", async ({ page }) => {
     const gate = holdAndCount(page, /recover/i, {}, 200);
     await page.goto("/auth");
-    await page.getByRole("tab", { name: /forgot password/i }).click();
+    await page.getByRole("button", { name: /forgot password\?/i }).click();
     await page.getByLabel(/email/i).fill(SAFE_EMAIL);
     await page.getByRole("button", { name: /send reset link/i }).click();
     const loading = page.getByRole("button", { name: /sending reset link…/i });

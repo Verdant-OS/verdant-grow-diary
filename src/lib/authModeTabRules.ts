@@ -6,25 +6,32 @@
  * No I/O. No auth calls. No routing.
  */
 
-export const AUTH_MODE_TABS = [
+export const AUTH_MODES = [
   { value: "signin", label: "Sign in", compact: false },
   { value: "signup", label: "Create account", compact: true },
   { value: "forgot", label: "Forgot password", compact: true },
 ] as const;
 
-export type AuthMode = (typeof AUTH_MODE_TABS)[number]["value"];
+export type AuthMode = (typeof AUTH_MODES)[number]["value"];
 
-export const AUTH_TAB_LIST_CLASSNAME = "grid grid-cols-3 w-full h-auto gap-1 p-1 mb-4";
+/**
+ * Visible tabs. "Forgot password" is a mode, not a tab: it opens from the one
+ * "Forgot password?" link under the password field (field-notebook walk,
+ * 2026-11-19, friction item 12: it appeared twice).
+ */
+export const AUTH_MODE_TABS = AUTH_MODES.filter((mode) => mode.value !== "forgot");
+
+export const AUTH_TAB_LIST_CLASSNAME = "grid grid-cols-2 w-full h-auto gap-1 p-1 mb-4";
 
 const AUTH_TAB_BASE_CLASSNAME = "min-h-10 px-1.5 py-2 text-center leading-tight whitespace-normal";
 
 export function getAuthTabTriggerClassName(mode: AuthMode): string {
-  const tab = AUTH_MODE_TABS.find((item) => item.value === mode);
+  const tab = AUTH_MODES.find((item) => item.value === mode);
   return tab?.compact
     ? `${AUTH_TAB_BASE_CLASSNAME} text-[10px] sm:text-xs`
     : `${AUTH_TAB_BASE_CLASSNAME} text-xs sm:text-sm`;
 }
 
 export function getAuthModeLabel(mode: AuthMode): string {
-  return AUTH_MODE_TABS.find((tab) => tab.value === mode)?.label ?? "Sign in";
+  return AUTH_MODES.find((tab) => tab.value === mode)?.label ?? "Sign in";
 }

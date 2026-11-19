@@ -194,7 +194,7 @@ describe("Auth — loading & disabled states", () => {
 
   it("forgot button shows Sending reset link… and disables during request", async () => {
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "grower@verdant.app" },
     });
@@ -228,7 +228,7 @@ describe("Auth — friendly non-enumerating errors", () => {
   it("forgot-password network failure shows generic retry copy", async () => {
     resetForEmailResult = { error: { message: "rate limited" } };
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "grower@verdant.app" },
     });
@@ -241,7 +241,7 @@ describe("Auth — friendly non-enumerating errors", () => {
 
   it("forgot-password success copy is generic (does not reveal account)", async () => {
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "grower@verdant.app" },
     });

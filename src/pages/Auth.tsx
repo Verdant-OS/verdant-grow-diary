@@ -684,19 +684,6 @@ export default function Auth() {
             </TabsList>
 
             <TabsContent value="signin">
-              <p className="text-xs text-muted-foreground mb-3">
-                Sign-in is kept separately in each tab. If you opened a new tab, sign in here or
-                return to your signed-in tab.
-              </p>
-              <p
-                className="text-xs text-muted-foreground mb-3"
-                data-testid={AUTH_CRASHED_TAB_RELOAD_TESTID}
-              >
-                {AUTH_CRASHED_TAB_RELOAD_COPY}
-              </p>
-              <p className="text-xs text-muted-foreground mb-3">
-                Use the email and password you used to create your Verdant account.
-              </p>
               <form onSubmit={signIn} noValidate className="grid gap-3" aria-label="Sign in">
                 <AuthTextField
                   id="signin-email"
@@ -827,6 +814,23 @@ export default function Auth() {
                   ) : null}
                 </div>
               </form>
+              {/* Sign-in help sits below the form so the email field comes first
+                  (field-notebook walk, 2026-11-19, friction item 12). */}
+              <div className="mt-3" data-testid="auth-signin-help">
+                <p className="text-xs text-muted-foreground mb-3">
+                  Sign-in is kept separately in each tab. If you opened a new tab, sign in here or
+                  return to your signed-in tab.
+                </p>
+                <p
+                  className="text-xs text-muted-foreground mb-3"
+                  data-testid={AUTH_CRASHED_TAB_RELOAD_TESTID}
+                >
+                  {AUTH_CRASHED_TAB_RELOAD_COPY}
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Use the email and password you used to create your Verdant account.
+                </p>
+              </div>
               <div className="relative my-4" aria-hidden="true">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t border-border/50" />

@@ -217,6 +217,38 @@ describe("DrybackMonitoringStrip calibration lookup gate", () => {
     expect(screen.queryByTestId("dryback-monitoring-calibration-unavailable")).toBeNull();
   });
 
+  it("a cached calibration read error is not shown once the tent has no soil readings", async () => {
+    // Codex review on #3029: disabling the query keeps React Query's cached
+    // error, so the notice must also be gated on soil readings.
+    state.calibrationError = {
+      code: "PGRST301",
+      message: "soil_moisture_calibrations could not be read because the JWT expired",
+    };
+    state.sensorRows = [soilRow("s1", 50, 30), soilRow("s2", 48, 20)];
+
+    const queryClient = newQueryClient();
+    const tree = () => (
+      <QueryClientProvider client={queryClient}>
+        <DrybackMonitoringStrip growId={GROW_ID} tentId={TENT_ID} />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(tree());
+    expect(
+      await screen.findByTestId("dryback-monitoring-calibration-unavailable"),
+    ).toBeInTheDocument();
+
+    state.sensorRows = [tempRow("t1")];
+    rerender(tree());
+
+    await waitFor(() =>
+      expect(screen.getByTestId("dryback-monitoring-strip")).toHaveAttribute(
+        "data-calibration-availability",
+        "idle",
+      ),
+    );
+    expect(screen.queryByTestId("dryback-monitoring-calibration-unavailable")).toBeNull();
+  });
+
   it("a grower with soil readings on a deployment without the table is told calibration is unknown", async () => {
     state.calibrationError = MISSING_TABLE_ERROR;
     state.sensorRows = [soilRow("s1", 50, 30), soilRow("s2", 48, 20)];

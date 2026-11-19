@@ -59,7 +59,7 @@ export function isExcludedAnalyticsPath(pathname: string): boolean {
  * The router serves these pages in any letter case, with repeated or trailing
  * slashes, and with percent-escapes, so the match ignores all of them.
  */
-function isNoAnalyticsPublicPath(pathname: unknown): boolean {
+export function isNoAnalyticsPublicPath(pathname: unknown): boolean {
   if (typeof pathname !== "string" || pathname === "") return false;
   let decoded = pathname;
   try {

@@ -161,6 +161,7 @@ import {
 
 import { Input } from "@/components/ui/input";
 import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
+import { formatStatusTransition } from "@/lib/statusTransitionLabelRules";
 
 /**
  * Narrow cast for `action_queue_transition` (typing may lag generated Database
@@ -2115,7 +2116,7 @@ function EventHistory({ items }: { items?: EventRow[] }) {
               {e.event_type}
             </Badge>
             <span>
-              {e.previous_status ?? "—"} → {e.new_status ?? "—"}
+              {formatStatusTransition(e.previous_status, e.new_status)}
             </span>
             <span className="ml-auto">{new Date(e.created_at).toLocaleString()}</span>
             {e.note && <span className="italic">· {e.note}</span>}

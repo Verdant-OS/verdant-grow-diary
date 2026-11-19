@@ -72,6 +72,7 @@ import {
 import { showAlertsOneTentLoopNextStep } from "@/lib/oneTentLoopNavigationRules";
 import { actionsPath, alertDetailPath, alertsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
+import { formatStatusTransition } from "@/lib/statusTransitionLabelRules";
 
 type StatusFilter = AlertStatusRow | "all";
 type SeverityFilter = AlertSeverityRow | "all";
@@ -637,7 +638,7 @@ function AlertHistory({ alertId }: { alertId: string }) {
             {e.previous_status && e.new_status ? (
               <span>
                 {" "}
-                — {e.previous_status} → {e.new_status}
+                — {formatStatusTransition(e.previous_status, e.new_status)}
               </span>
             ) : null}{" "}
             <span className="opacity-70">

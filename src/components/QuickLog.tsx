@@ -73,6 +73,12 @@ import { useTents } from "@/hooks/use-tents";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
+  QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
+  applyPanelSavedNoteToPreviewWarnings,
+  buildQuickLogSavedNoteExcerpt,
+  isDuplicateOfPanelSavedNote,
+} from "@/lib/quickLogNoteSaveRules";
+import {
   appendHardwareReadingsToNote,
   computeQuickLogHardwareDefaultOpen,
   hasAnyHardwareReading,
@@ -371,6 +377,8 @@ type SavedTarget = {
   savedAt: string;
   growStageUnconfirmed?: boolean;
   waterContextChanged?: boolean;
+  /** Excerpt of the note this save wrote, shown in the confirmation. */
+  noteExcerpt?: string | null;
 };
 
 type LastQuickLogTarget = {
@@ -527,6 +535,13 @@ export default function QuickLog({
   const [historyReviewNavigation, setHistoryReviewNavigation] =
     useState<ReturnType<typeof buildQuickLogTimelineNavTarget>>(null);
   const [savedTarget, setSavedTarget] = useState<SavedTarget | null>(null);
+  // Note text the All activity types panel saved for a plant in this Quick Log
+  // session. While it matches, the form below stops asking for a note and
+  // Save log refuses to write the same note again.
+  const [panelSavedNote, setPanelSavedNote] = useState<{
+    text: string;
+    plantId: string | null;
+  } | null>(null);
   const [savedDraftHandoffKey, setSavedDraftHandoffKey] = useState<string | null>(null);
   const [earlyMilestone, setEarlyMilestone] = useState<EarlyStageMilestone | null>(null);
   const [earlyVigor, setEarlyVigor] = useState<EarlyStageVigor | null>(null);
@@ -977,6 +992,10 @@ export default function QuickLog({
   );
   const editorResolvedTarget = editorTarget.status === "ready" ? editorTarget.target : null;
   const resolvedTarget = inFlightSaveContext?.target ?? editorResolvedTarget;
+  const panelSavedNoteForTarget =
+    panelSavedNote && panelSavedNote.plantId === (resolvedTarget?.plantId ?? null)
+      ? panelSavedNote.text
+      : null;
   const sameTargetRecoveryLocked =
     !!resolvedTarget && activityRecoveryLockKey === buildQuickLogTargetKey(resolvedTarget);
   const resolvedTargetGrow = useMemo(
@@ -1091,6 +1110,9 @@ export default function QuickLog({
           result.reviewedStarterHandoffKey !== reviewedStarterHandoffKey)
       )
         return;
+      if (result.noteText) {
+        setPanelSavedNote({ text: result.noteText, plantId: result.target.plantId ?? null });
+      }
       if (draftHandoffKey !== null) setSavedDraftHandoffKey(draftHandoffKey);
       consumeReviewedPublicStarterDraft();
       const plantId = result.target.plantId;
@@ -1278,6 +1300,7 @@ export default function QuickLog({
     saveIdempotencyKeyRef.current = newQuickLogSaveKey();
     lastFailedSaveSigRef.current = null;
     setNote("");
+    setPanelSavedNote(null);
     setShowMore(false);
     eventTypeUserTouchedRef.current = false;
     setEventType("observation");
@@ -1388,6 +1411,7 @@ export default function QuickLog({
     lastFailedSaveSigRef.current = null;
     const keepPlantId = savedTarget?.id ?? plantId;
     setNote("");
+    setPanelSavedNote(null);
     setShowMore(false);
     eventTypeUserTouchedRef.current = true;
     setEventType("observation");
@@ -1527,6 +1551,16 @@ export default function QuickLog({
     const savePlant = selectedPlant;
     const saveTent = selectedTent;
     const saveGrow = resolvedTargetGrow;
+    if (
+      isDuplicateOfPanelSavedNote({
+        note,
+        panelSavedNote: panelSavedNoteForTarget,
+        eventType: saveEventType,
+      })
+    ) {
+      toast.message(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
+      return;
+    }
     if (!note.trim() && saveEventType !== "watering") {
       const message = "Add a quick note";
       setSaveError(message);
@@ -1922,6 +1956,7 @@ export default function QuickLog({
         savedAt: new Date().toISOString(),
         growStageUnconfirmed,
         waterContextChanged,
+        noteExcerpt: buildQuickLogSavedNoteExcerpt(note),
       });
       onCreated?.();
       // Public starter handoff consume-once: the shared helper clears the
@@ -3885,7 +3920,11 @@ export default function QuickLog({
                 remindAt,
                 details,
               });
-              if (preview.warnings.length === 0) return null;
+              const previewLines = applyPanelSavedNoteToPreviewWarnings(
+                preview.warnings,
+                panelSavedNoteForTarget,
+              );
+              if (previewLines.length === 0) return null;
               return (
                 <div
                   data-testid="quicklog-preview"
@@ -3896,7 +3935,7 @@ export default function QuickLog({
                     Validation preview
                   </p>
                   <ul className="space-y-1">
-                    {preview.warnings.map((w) => {
+                    {previewLines.map((w) => {
                       const Icon = w.severity === "warning" ? AlertTriangle : Info;
                       const tone =
                         w.severity === "warning" ? "text-amber-300" : "text-muted-foreground";
@@ -3984,6 +4023,14 @@ export default function QuickLog({
                         photoAttached: false,
                       })}
                     </p>
+                    {savedTarget.noteExcerpt && (
+                      <p
+                        className="mt-1 whitespace-pre-wrap break-words text-[12px] text-foreground"
+                        data-testid="quick-log-post-save-note"
+                      >
+                        “{savedTarget.noteExcerpt}”
+                      </p>
+                    )}
                     {savedTarget.growStageUnconfirmed && (
                       <p
                         className="mt-2 text-xs text-amber-700 dark:text-amber-400"

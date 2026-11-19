@@ -62,7 +62,7 @@ export interface QuickLogPreviewLine {
 export function applyPanelSavedNoteToPreviewWarnings<T extends QuickLogPreviewLine>(
   warnings: readonly T[],
   panelSavedNote: string | null | undefined,
-): readonly T[] | Array<T | QuickLogPreviewLine> {
+): ReadonlyArray<T | QuickLogPreviewLine> {
   const message = buildPanelSavedNotePreviewMessage(panelSavedNote);
   if (!message) return warnings;
   if (!warnings.some((w) => w.code === "note:missing")) return warnings;

@@ -8,10 +8,13 @@
  * intent for the same plant, it takes the marker, and the first time that
  * Quick Log closes (saved or dismissed) the grower lands on the dashboard.
  *
- * The marker is tab-scoped (sessionStorage), names one plant id and is removed
- * the first time it is read, so it can never redirect a later visit. Storage is
- * injected so the rules stay testable; an unavailable store simply means no
- * hand-off (the grower stays on Plant Detail, as before).
+ * The marker lives in memory for this page load only (the Start your room →
+ * Plant Detail step is a client-side navigation), names one plant id and is
+ * removed the first time it is read, so it can never redirect a later visit.
+ * Nothing is written to browser storage: Start your room leaves sessionStorage
+ * empty once the room is saved. A reload in between simply means no hand-off
+ * (the grower stays on Plant Detail, as before). The store is injected so the
+ * rules stay testable.
  */
 
 export const START_ROOM_DASHBOARD_HANDOFF_KEY = "verdant:startRoomDashboardHandoff";
@@ -23,14 +26,18 @@ const PLANT_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
 export type HandoffStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
-export function browserSessionStorage(): HandoffStorage | null {
-  try {
-    if (typeof window === "undefined") return null;
-    return window.sessionStorage;
-  } catch {
-    return null;
-  }
-}
+const memory = new Map<string, string>();
+
+/** The in-memory store the app uses. */
+export const startRoomHandoffMemory: HandoffStorage = {
+  getItem: (key) => memory.get(key) ?? null,
+  setItem: (key, value) => {
+    memory.set(key, value);
+  },
+  removeItem: (key) => {
+    memory.delete(key);
+  },
+};
 
 function validPlantId(value: unknown): value is string {
   return typeof value === "string" && PLANT_ID.test(value);

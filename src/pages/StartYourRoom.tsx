@@ -43,7 +43,7 @@ import {
   type StartYourRoomStep,
 } from "@/lib/startYourRoomRules";
 import {
-  browserSessionStorage,
+  startRoomHandoffMemory,
   markStartRoomDashboardHandoff,
 } from "@/lib/startRoomDashboardHandoff";
 import {
@@ -701,7 +701,7 @@ export default function StartYourRoom() {
       setStartScreenChoice(user.id, "quickLog");
       // After this first Quick Log closes, AppShell lands the grower on the
       // dashboard so the checklist is reachable without guessing (B1).
-      markStartRoomDashboardHandoff(browserSessionStorage(), plantId);
+      markStartRoomDashboardHandoff(startRoomHandoffMemory, plantId);
       nav(plantDetailQuickLogHref(plantId), { replace: true });
     } finally {
       createInFlightRef.current = false;
@@ -726,7 +726,7 @@ export default function StartYourRoom() {
     if (!canFinish(shownIds) || !shownIds.plantId || !user) return;
     // Persist diary-first start screen so next login skips empty onboarding.
     setStartScreenChoice(user.id, "quickLog");
-    markStartRoomDashboardHandoff(browserSessionStorage(), shownIds.plantId);
+    markStartRoomDashboardHandoff(startRoomHandoffMemory, shownIds.plantId);
     nav(plantDetailQuickLogHref(shownIds.plantId), { replace: true });
   }
 

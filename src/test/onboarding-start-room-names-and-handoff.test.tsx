@@ -11,7 +11,10 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
-import { START_ROOM_DASHBOARD_HANDOFF_KEY } from "@/lib/startRoomDashboardHandoff";
+import {
+  START_ROOM_DASHBOARD_HANDOFF_KEY,
+  startRoomHandoffMemory,
+} from "@/lib/startRoomDashboardHandoff";
 import {
   startRoomPendingNamesLine,
   type StartYourRoomForm,
@@ -173,7 +176,7 @@ describe("Start your room names what it creates (B3)", () => {
 
 describe("Start your room dashboard hand-off (B1)", () => {
   it("leaves a one-shot marker for the new plant before opening its Quick Log", async () => {
-    window.sessionStorage.clear();
+    startRoomHandoffMemory.removeItem(START_ROOM_DASHBOARD_HANDOFF_KEY);
     const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={["/start-room"]}>
@@ -182,17 +185,19 @@ describe("Start your room dashboard hand-off (B1)", () => {
     );
 
     await user.type(screen.getByTestId("start-room-plant-name"), "First plant");
-    expect(window.sessionStorage.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
+    expect(startRoomHandoffMemory.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
     await user.click(screen.getByTestId("start-room-submit"));
     expect(await screen.findByTestId("start-your-room-step-done")).toBeInTheDocument();
 
-    expect(window.sessionStorage.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBe(
+    expect(startRoomHandoffMemory.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBe(
       ATTEMPT_IDS.plant,
     );
     expect(navMock).toHaveBeenCalledTimes(1);
     expect(navMock).toHaveBeenCalledWith(`/plants/${ATTEMPT_IDS.plant}?open=quick-log`, {
       replace: true,
     });
-    window.sessionStorage.clear();
+    // The marker never lands in browser storage.
+    expect(window.sessionStorage.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
+    startRoomHandoffMemory.removeItem(START_ROOM_DASHBOARD_HANDOFF_KEY);
   });
 });

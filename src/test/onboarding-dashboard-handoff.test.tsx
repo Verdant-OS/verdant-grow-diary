@@ -11,6 +11,7 @@ import {
   START_ROOM_DASHBOARD_HANDOFF_KEY,
   START_ROOM_DASHBOARD_HREF,
   markStartRoomDashboardHandoff,
+  startRoomHandoffMemory,
   takeStartRoomDashboardHandoff,
   type HandoffStorage,
 } from "@/lib/startRoomDashboardHandoff";
@@ -162,20 +163,21 @@ describe("start room dashboard hand-off marker", () => {
 
 describe("AppShell after the first onboarding Quick Log", () => {
   beforeEach(() => {
-    window.sessionStorage.clear();
+    startRoomHandoffMemory.removeItem(START_ROOM_DASHBOARD_HANDOFF_KEY);
   });
   afterEach(() => {
-    window.sessionStorage.clear();
+    startRoomHandoffMemory.removeItem(START_ROOM_DASHBOARD_HANDOFF_KEY);
+    expect(window.sessionStorage.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
   });
 
   it.each(["Save and close", "Dismiss"])(
     "lands on the dashboard after %s",
     async (closeLabel) => {
-      window.sessionStorage.setItem(START_ROOM_DASHBOARD_HANDOFF_KEY, PLANT_ID);
+      startRoomHandoffMemory.setItem(START_ROOM_DASHBOARD_HANDOFF_KEY, PLANT_ID);
       renderAt(`/plants/${PLANT_ID}?open=quick-log`);
 
       await screen.findByTestId("legacy-quick-log");
-      expect(window.sessionStorage.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
+      expect(startRoomHandoffMemory.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
       expect(screen.getByTestId("current-path")).toHaveTextContent(`/plants/${PLANT_ID}`);
 
       fireEvent.click(screen.getByRole("button", { name: closeLabel }));
@@ -198,11 +200,11 @@ describe("AppShell after the first onboarding Quick Log", () => {
   });
 
   it("stays when the marker names a different plant", async () => {
-    window.sessionStorage.setItem(START_ROOM_DASHBOARD_HANDOFF_KEY, OTHER_PLANT_ID);
+    startRoomHandoffMemory.setItem(START_ROOM_DASHBOARD_HANDOFF_KEY, OTHER_PLANT_ID);
     renderAt(`/plants/${PLANT_ID}?open=quick-log`);
 
     await screen.findByTestId("legacy-quick-log");
-    expect(window.sessionStorage.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
+    expect(startRoomHandoffMemory.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
     await waitFor(() =>
@@ -212,7 +214,7 @@ describe("AppShell after the first onboarding Quick Log", () => {
   });
 
   it("hands off only once: a later Quick Log on the dashboard stays put", async () => {
-    window.sessionStorage.setItem(START_ROOM_DASHBOARD_HANDOFF_KEY, PLANT_ID);
+    startRoomHandoffMemory.setItem(START_ROOM_DASHBOARD_HANDOFF_KEY, PLANT_ID);
     renderAt(`/plants/${PLANT_ID}?open=quick-log`);
     await screen.findByTestId("legacy-quick-log");
     fireEvent.click(screen.getByRole("button", { name: "Save and close" }));

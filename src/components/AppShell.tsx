@@ -55,7 +55,7 @@ function readLastUsedQuickLogKey(userId: string | null): string | null {
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
 import {
   START_ROOM_DASHBOARD_HREF,
-  browserSessionStorage,
+  startRoomHandoffMemory,
   takeStartRoomDashboardHandoff,
 } from "@/lib/startRoomDashboardHandoff";
 import {
@@ -278,7 +278,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     // Start your room's hand-off names this plant: the first close of this
     // Quick Log lands on the dashboard. Set only, never cleared here, so a
     // repeated effect run cannot drop a hand-off it already took.
-    if (takeStartRoomDashboardHandoff(browserSessionStorage(), routePlantId)) {
+    if (takeStartRoomDashboardHandoff(startRoomHandoffMemory, routePlantId)) {
       setDashboardAfterLegacyLog(true);
     }
     setOpenLog(true);

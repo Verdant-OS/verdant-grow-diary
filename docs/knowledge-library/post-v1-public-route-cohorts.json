@@ -19,6 +19,12 @@
       "sourcePullRequest": 2775,
       "rationale": "This public guide explains how a shipped CSV import reads controller history, and it sits outside the immutable v1 roadmap allocation.",
       "paths": ["/guides/import-grow-sensor-csv"]
+    },
+    {
+      "id": "PV1-SPREADSHEET-EXIT-GUIDE",
+      "sourcePullRequest": 3003,
+      "rationale": "This public guide answers how to log a grow without a spreadsheet, states that spreadsheet diary import is not available, and sits outside the immutable v1 roadmap allocation.",
+      "paths": ["/guides/grow-log-without-spreadsheets"]
     }
   ]
 }

@@ -15,6 +15,7 @@ import {
   DRYBACK_MONITORING_CAVEAT,
   DRYBACK_MONITORING_TITLE,
   buildDrybackMonitoringFromSensorRows,
+  hasDrybackSoilMoistureReadings,
   type DrybackWindowView,
 } from "@/lib/drybackMonitoringRules";
 import { cn } from "@/lib/utils";
@@ -104,9 +105,17 @@ export function DrybackMonitoringStrip({
     plantId: plant,
     pageSize: 30,
   });
+  // Calibration only applies to soil moisture. A tent with no soil readings
+  // (for example a new Free grower with no sensor) skips the lookup, so it
+  // makes no request and shows no calibration notice.
+  const hasSoilMoistureReadings = useMemo(
+    () => hasDrybackSoilMoistureReadings(readingsQuery.data),
+    [readingsQuery.data],
+  );
   const calibrationsQuery = useSoilMoistureCalibrations({
     growId,
     tentId: tent,
+    enabled: hasSoilMoistureReadings,
   });
   const calibrationAvailable =
     calibrationsQuery.availability === "available" && !calibrationsQuery.isError;

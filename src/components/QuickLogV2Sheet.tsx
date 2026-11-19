@@ -605,6 +605,13 @@ function QuickLogV2SheetForOwner({
   // query cannot hide options on the next open.
   const [targetFilterQuery, setTargetFilterQuery] = useState("");
   const [readingTimeLocal, setReadingTimeLocal] = useState("");
+  // An untouched reading time still means "now at save" (the empty state is
+  // kept, so retry locking is unchanged). The field shows the current local
+  // time instead of a blank box, and never offers a future time (#2976).
+  const readingTimeNowLocal = QuickLogReadingTime.toLocalInputValue(
+    Date.now(),
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
   // Structured soil/light readings for Note saves (grower bug item 14).
   const [structuredInput, setStructuredInput] = useState<StructuredReadingTextInput>(
     EMPTY_STRUCTURED_READING_INPUT,
@@ -3663,12 +3670,17 @@ function QuickLogV2SheetForOwner({
               <input
                 id="qlv2-reading-time"
                 type="datetime-local"
-                value={readingTimeLocal}
+                value={readingTimeLocal || readingTimeNowLocal}
+                max={readingTimeNowLocal || undefined}
                 onChange={(event) => setReadingTimeLocal(event.target.value)}
+                aria-describedby="qlv2-reading-time-help"
                 data-testid="qlv2-reading-time"
                 className="mt-1 w-full rounded-md border border-border/60 bg-background p-2 text-sm text-foreground"
               />
             </label>
+            <p id="qlv2-reading-time-help" className="mt-1 text-xs text-muted-foreground">
+              {readingTimeLocal ? "Saved at the time shown." : "Now, unless you change it."}
+            </p>
             {selectedTargetMissing && (
               <p
                 className="mt-2 rounded-md border border-border/60 bg-secondary/20 p-2 text-sm text-muted-foreground"

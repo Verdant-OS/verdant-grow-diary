@@ -400,7 +400,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                 <BrandLogo size="md" showText />
               </div>
 
-              <div className="ml-auto flex items-center gap-2">
+              <div className="ml-auto flex items-center gap-1 md:gap-2">
                 <button
                   type="button"
                   onClick={() => setSearchOpen(true)}
@@ -423,10 +423,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   onClick={() => setSearchOpen(true)}
                   aria-label="Search"
                   data-testid="mobile-global-search-trigger"
-                  className="md:hidden h-auto w-auto min-h-11 min-w-11 flex-col gap-0.5 px-1.5 py-1"
+                  className="md:hidden h-auto w-auto min-h-11 min-w-10 flex-col gap-0.5 px-0.5 py-1"
                 >
                   <Search className="h-4 w-4" aria-hidden="true" />
-                  <span className="text-[10px] font-medium leading-none">Search</span>
+                  <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">Search</span>
                 </Button>
                 {/* Quick Log is the single grower-facing logging entry
                     point on desktop. Opens QuickLogV2Sheet (Field Edition
@@ -447,10 +447,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   size="icon"
                   onClick={() => nav("/alerts")}
                   aria-label="Alerts"
-                  className="relative h-auto w-auto min-h-11 min-w-11 flex-col gap-0.5 px-1.5 py-1"
+                  className="relative h-auto w-auto min-h-11 min-w-10 flex-col gap-0.5 px-0.5 py-1"
                 >
                   <Bell className="h-4 w-4" aria-hidden="true" />
-                  <span className="text-[10px] font-medium leading-none">Alerts</span>
+                  <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">Alerts</span>
                   {unread > 0 && (
                     <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
                   )}
@@ -462,10 +462,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                       variant="ghost"
                       size="icon"
                       aria-label="Sign out"
-                      className="h-auto w-auto min-h-11 min-w-11 flex-col gap-0.5 px-1.5 py-1"
+                      className="h-auto w-auto min-h-11 min-w-10 flex-col gap-0.5 px-0.5 py-1"
                     >
                       <LogOut className="h-4 w-4" aria-hidden="true" />
-                      <span className="text-[10px] font-medium leading-none">Sign out</span>
+                      <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">Sign out</span>
                     </Button>
                   }
                 />

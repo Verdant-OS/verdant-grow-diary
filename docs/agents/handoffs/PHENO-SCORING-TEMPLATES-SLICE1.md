@@ -1,14 +1,17 @@
 # PHENO-SCORING-TEMPLATES-SLICE1
 
 ```text
-TASK PHENO-SCORING-TEMPLATES-SLICE1  priority: P3  status: OPEN
+TASK PHENO-SCORING-TEMPLATES-SLICE1  priority: P3  status: CLOSED
+closed: merged. #3004 merged into verdant-grow-diary through the merge queue on 2026-11-19 04:20:54 UTC as 30cd21e2f033deb759bb92ad5331181fd2bf8778 (final SHA; GitHub API, read 2026-11-19 04:21 UTC) from final head da6b93793a9bb6d8a44fb047366a0cc218189336. Queued and merged by the cheekhimself account. Closed the same day by Claude session_017UoYKydSdb658VBhhuatv9.
+review_gap: #3004 merged WITHOUT the independent exact-head review this file routed to Reviewer E (AGENTS.md sections 11 and 13). Reviews on record at merge: a Codex bot COMMENT on superseded head c1b6d495, a cheekhimself COMMENT on superseded head 3c3d4fa, and a matt816cheek-bit APPROVE at da6b937. None is a Reviewer E verdict at da6b937. Owed: a post-merge independent review at da6b93793a9bb6d8a44fb047366a0cc218189336 by Reviewer E or another eligible non-contributing reviewer (exclude session_017UoYKydSdb658VBhhuatv9). Any P1 or P2 it finds reopens this work with the same owner.
+deploy_state: not deployed or published by this task. A merge is not a deployment; live /version.json was not checked.
 goal: A typed, deterministic scoring-template engine for pheno hunts, plus two original Verdant starter templates (pheno scorecard, tasting scorecard), so later slices can render and save scorecards without guessing the data shape.
 why: Matthew asked (2026-11-18, via coordinator relay) for slice 1 of the pheno rubric template spec as a draft PR: templates and scoring rules only. He then asked for Verdant's own starter rubrics built from common cultivation criteria, so no outside permission is needed.
 branch: claude/project-thread-n7led3
 base: verdant-grow-diary at 5719269b
 pr: #3004
-state: ready for review (Matthew said "Mark it ready", 2026-11-18, via coordinator relay; AGENTS.md section 11 says builder seats never mark ready, conflict reported to him). Second commit fixes a Codex bot P2: a malformed section (not an object, or no fields array) is now a validation issue instead of a crash in evaluation. Required checks restart at the new head; the review routed to Reviewer E must cover the new full SHA. Not a merge yes.
-next_action: (1) 35/35 required checks at the PR head; (2) one independent exact-head review by a session that did not write this (exclude session_017UoYKydSdb658VBhhuatv9); (3) Matthew reviews the starter template fields; (4) Matthew's per-item yes naming the PR and SHA, then the Merge Steward queues it.
+state: merged (see closed). Earlier history: marked ready on Matthew's word 2026-11-18; second commit fixed a Codex bot P2 (malformed section became a validation issue instead of a crash).
+next_action: only the owed post-merge independent review at da6b937 (see review_gap). Starter field review, scale default, Winner/Overall mapping and persistence stay open decisions for Matthew in later slices.
 post_merge_check: none user-visible. No route, component or write path uses these modules yet. Post-merge check is that the pheno-scoring-template-rules test file stays green on the deploy branch.
 decisions: (1) The rating scale is a template parameter {min,max,step,labels}, with optional per-field override; nothing hard-codes 0-10 or 1-5. Starter pheno scorecard uses 1-5 step 1; starter tasting scorecard uses 0-10 step 0.5. (2) Null or absent means not scored, never 0. (3) No total, average, composite, rank or keeper output; the engine reports per-field validity, counts, required-missing and completeness only. (4) Winner and Overall mapping are left out of slice 1. (5) Starter templates are draft and internal-only.
 open_decisions_for_matthew: the 0-10 versus 1-5 default; which starter fields to keep, rename or drop; Winner/Overall mapping; whether to persist responses in a new table (later slice).
@@ -26,5 +29,5 @@ reviewer_sha: none yet (earlier head c1b6d495 superseded before any verdict)
 session_state: no routines, no paused workflows. Pending human decisions: starter field review, scale default, merge yes.
 claimed_by: Claude session_017UoYKydSdb658VBhhuatv9, 2026-11-18 04:09 UTC
 owner: Claude session_017UoYKydSdb658VBhhuatv9
-last_updated: 2026-11-18 04:32 UTC, by Claude session_017UoYKydSdb658VBhhuatv9
+last_updated: 2026-11-19 04:25 UTC, by Claude session_017UoYKydSdb658VBhhuatv9
 ```

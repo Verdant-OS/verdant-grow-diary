@@ -27,8 +27,9 @@ import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 import {
   type AlertStagePlant,
   isCurrentReadForAlertWrite,
-  resolveGrowPlantStages,
+  resolveGrowStagePlants,
 } from "@/lib/alertPlantStageScopeRules";
+import { resolveSnapshotStageScope } from "@/lib/alertSnapshotStageScopeRules";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 
 interface Props {
@@ -63,12 +64,19 @@ export default function AlertsAutoPersistForGrow({ growId, stage, plants }: Prop
   const snapshot = buildSensorSnapshotReadState(sensorState).confirmedSnapshot;
   const targetsState = useGrowTargets(safeGrowId, { retryOnUnavailable: true });
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
-  // stages, most advanced known stage wins on disagreement.
-  const plantStages = safeGrowId ? resolveGrowPlantStages(plants, safeGrowId, tents) : plants;
+  // stages, most advanced known stage wins on disagreement. The inputs are
+  // scoped to the snapshot's tent when it names one (friction item 1): only
+  // that tent and its plants vote, never plants elsewhere in the grow.
+  const growStagePlants = safeGrowId ? resolveGrowStagePlants(plants, safeGrowId, tents) : plants;
+  const stageScope = resolveSnapshotStageScope({
+    snapshotTentId: snapshot ? (snapshot.tent_id ?? null) : null,
+    tents,
+    plants: growStagePlants,
+  });
   const resolvedStage = resolveAlertContextStage({
     growStage: stage,
-    tentStages: tents.map((t) => t.stage),
-    plantStages: plantStages ?? null,
+    tentStages: stageScope.tentStages,
+    plantStages: stageScope.plantStages ?? null,
   }).stage;
   const plantsSettled = plants !== null;
   const targetsPending = targetsState.status !== "ok";

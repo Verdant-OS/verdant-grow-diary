@@ -26,6 +26,21 @@ export function resolveGrowPlantStages(
   growId: string,
   growTents: ReadonlyArray<{ readonly id: string }> | null | undefined,
 ): ReadonlyArray<string | null> | null | undefined {
+  const rows = resolveGrowStagePlants(plants, growId, growTents);
+  if (rows === undefined || rows === null) return rows;
+  return rows.map((p) => p.stage);
+}
+
+/**
+ * The plants that resolve to `growId`, with their tent kept, so a caller can
+ * narrow the stage vote to the tent a reading came from
+ * (alertSnapshotStageScopeRules). Same attribution as resolveGrowPlantStages.
+ */
+export function resolveGrowStagePlants(
+  plants: ReadonlyArray<AlertStagePlant> | null | undefined,
+  growId: string,
+  growTents: ReadonlyArray<{ readonly id: string }> | null | undefined,
+): ReadonlyArray<{ tent_id: string | null; stage: string | null }> | null | undefined {
   if (plants === undefined || plants === null) return plants;
   // growTents are this grow's tents, so each one rolls up to growId.
   const tentGrowById = buildTentGrowIndex((growTents ?? []).map((t) => ({ id: t.id, growId })));
@@ -34,7 +49,10 @@ export function resolveGrowPlantStages(
     tentId: plant.tent_id ?? null,
     stage: plant.stage ?? null,
   }));
-  return filterPlantsByResolvedGrow(attributable, growId, tentGrowById).map((p) => p.stage);
+  return filterPlantsByResolvedGrow(attributable, growId, tentGrowById).map((p) => ({
+    tent_id: p.tentId,
+    stage: p.stage,
+  }));
 }
 
 /** A plant row as the Dashboard's grow-scoped read returns it. */

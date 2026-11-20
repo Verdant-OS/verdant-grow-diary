@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-11-20.2**
+**Sentinel-Version: 2026-11-20.3**
 
 Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
 Start page (do not restate): docs/agents/START_HERE.md
@@ -11,7 +11,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-11-20.2**
+**Sentinel-Version: 2026-11-20.3**
 
 Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
 Start page (do not restate): docs/agents/START_HERE.md
@@ -580,6 +580,7 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-11-20.3** — The start page states that publish-gate, P1, then P2 outrank the milestone list, and that the stop-anywhere note is extra to the existing push, handoff entry, and `resume here` steps.
 - **2026-11-20.2** — The parity check requires the full moved copies in operative prose, and a change to `docs/agents/SENTINEL_BLOCK.md` or `docs/agents/START_HERE.md` requires the same version bump as the eighteen files. `sync-sentinel-mirror.mjs` stamps the block's version. The pre-acknowledgment read list includes those two files. The start page follows `docs/agents/constitution/handoff-procedure.md` for claims.
 - **2026-11-20.1** — The repeated routing and smoke paragraphs now live once in
   `docs/agents/SENTINEL_BLOCK.md`. The eighteen governance files point at that file

@@ -3,7 +3,7 @@
 **No standing seat.** A Claude session owns the build work assigned to it, and the Merge
 Steward queues eligible pull requests (Matthew, 2026-11-04). The roster names seat holders.
 
-**Sentinel-Version: 2026-11-20.2**
+**Sentinel-Version: 2026-11-20.3**
 
 Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
 Start page (do not restate): docs/agents/START_HERE.md

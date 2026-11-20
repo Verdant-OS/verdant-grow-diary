@@ -2,7 +2,7 @@
 
 **Historical — no current seat.**
 
-**Sentinel-Version: 2026-11-20.2**
+**Sentinel-Version: 2026-11-20.3**
 
 Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
 Start page (do not restate): docs/agents/START_HERE.md

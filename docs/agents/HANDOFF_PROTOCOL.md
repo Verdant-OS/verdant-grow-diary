@@ -1,6 +1,6 @@
 # Verdant Agent Handoff Protocol
 
-**Sentinel-Version: 2026-11-20.2**
+**Sentinel-Version: 2026-11-20.3**
 
 ## Current seats
 

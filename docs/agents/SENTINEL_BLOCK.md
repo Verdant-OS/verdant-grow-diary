@@ -1,6 +1,6 @@
 # Sentinel block
 
-**Sentinel-Version: 2026-11-20.2**
+**Sentinel-Version: 2026-11-20.3**
 
 One copy of the routing and smoke rules that governance files used to repeat.
 The other governance files point here. They do not restate this file.

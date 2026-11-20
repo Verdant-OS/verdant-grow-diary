@@ -16,14 +16,15 @@ Read these, in order, then stop. Do not read `docs/agents/CURRENT_STATE.md` or
 5. The "Start here (agents)" section of `docs/agents/CURRENT_STATE.md` (everything above `# Verdant — Current Operating State`). Search the rest of that file only when that section says to.
 6. `docs/agents/HANDOFF_LOG.md`, then handoff files whose TASK line reads `status: OPEN`.
 
-Return the `SENTINEL_ACK` block from `AGENTS.md` §14 before any other work.
+Those six reads are the pre-acknowledgment sources named in `AGENTS.md` §14. Return the `SENTINEL_ACK` block from that section before any other work.
 
 ## 2. How to find free work
 
-Look in this order:
+With no assignment, take the highest-priority eligible open block: publish gate, then P1, then P2, then everything else. Ties go to the oldest `last_updated`. That order wins over the milestone list on this page.
 
-1. Milestone **M1 Diary truth**, then **M2 EcoWitt light ingest**, then **M3 Proven paid Stripe**. **M4 CI and security floor** runs beside them and does not gate them.
-2. Work `docs/agents/constitution/handoff-procedure.md` says is eligible: no effective claim, or the last activity is older than 24 hours, and no assignment or lock conflicts. `handoff:needed` can still be eligible. `blocked` is not free.
+Inside one priority, prefer milestone **M1 Diary truth**, then **M2 EcoWitt light ingest**, then **M3 Proven paid Stripe**. **M4 CI and security floor** runs beside them and does not gate them.
+
+Eligibility is in `docs/agents/constitution/handoff-procedure.md`: no effective claim, or the last activity is older than 24 hours, and no assignment or lock conflicts. `handoff:needed` can still be eligible. `blocked` is not free.
 
 ## 3. How to claim it
 
@@ -31,7 +32,7 @@ Follow `docs/agents/constitution/handoff-procedure.md`. Post `claimed_by: <agent
 
 ## 4. How to hand it off
 
-The last thing you do before you stop, including when you are running out of tokens, is the stop-anywhere note below. Put it in the task handoff file and on the pull request. Then set `handoff:needed` if nobody is taking the branch, or `status:needs-review` if the work is pushed and waiting on an independent reviewer.
+The note below is extra. It does not replace the task handoff file, and it does not drop the `TASK ... status: OPEN` line. Before you stop, including when you are running out of tokens: push the task changes, update the handoff entry, then post `resume here` on the pull request with the cold-start facts and the exact head SHA. Those steps are in `docs/agents/constitution/handoff-procedure.md`. Put this note in the handoff file and on the pull request as the short form of that receipt. Record a full SHA already seen on the remote, the time it was observed, and the pull request URL. After a later push, refresh that SHA. Then set `handoff:needed` if nobody is taking the branch, or `status:needs-review` if the work is pushed and waiting on an independent reviewer.
 
 ```text
 task: <id and one line>
@@ -69,7 +70,7 @@ Set exactly one of these:
 
 ## Milestones
 
-Find work in this priority order:
+Use this list only after the urgency order in section 2. It does not outrank a publish gate, a P1, or a P2.
 
 1. M1 Diary truth
 2. M2 EcoWitt light ingest

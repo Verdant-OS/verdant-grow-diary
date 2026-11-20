@@ -21,12 +21,11 @@ import { useGrowTargets } from "@/hooks/useGrowTargets";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildAlertsHeaderContext } from "@/lib/alertFreshnessContext";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
-import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 import {
   type AlertStagePlant,
   alertHeaderStageReadsSettled,
-  resolveGrowPlantStages,
 } from "@/lib/alertPlantStageScopeRules";
+import { resolveSnapshotAlertStage } from "@/lib/alertSnapshotStageScopeRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
@@ -69,23 +68,28 @@ export default function AlertsContextHeaderForGrow({
   const targetsState = useGrowTargets(growId);
   const tempUnit = useTemperatureUnitPreference();
   const { now } = useAlertsPresentationClock(sensorState.snapshot, clock);
+  const snapshotReadState = buildSensorSnapshotReadState(sensorState);
+  const confirmedSnapshot = snapshotReadState.confirmedSnapshot;
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
   // stages, most advanced known stage wins on disagreement. Until the tent
   // and plant reads have data the stage is not known, so the header says so
-  // instead of stating the grow/tent stage (Codex review on #1683).
+  // instead of stating the grow/tent stage (Codex review on #1683). The stage
+  // is scoped to the confirmed reading's tent through the same helper the
+  // saved alerts use, so the header never names a different stage from the
+  // one those alerts were judged by (Sour Diesel on #3021).
   const stagePending = !alertHeaderStageReadsSettled({ tents: tentRows, plants });
+  const snapshotTentId = confirmedSnapshot ? (confirmedSnapshot.tent_id ?? null) : null;
   const resolvedStage = useMemo(
     () =>
-      resolveAlertContextStage({
+      resolveSnapshotAlertStage({
+        growId,
         growStage: stage,
-        tentStages: tents.map((t) => t.stage),
-        plantStages: resolveGrowPlantStages(plants, growId, tents) ?? null,
-      }).stage,
-    [stage, tents, plants, growId],
+        tents,
+        plants,
+        snapshotTentId,
+      }),
+    [growId, stage, tents, plants, snapshotTentId],
   );
-
-  const snapshotReadState = buildSensorSnapshotReadState(sensorState);
-  const confirmedSnapshot = snapshotReadState.confirmedSnapshot;
   const headerStatus =
     sensorState.status === "unavailable"
       ? "unavailable"

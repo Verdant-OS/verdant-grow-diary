@@ -637,7 +637,13 @@ export function useGrowDetailData(): UseGrowDetailData {
 
       if (!isCurrentLoad()) return;
       const pending = actionsPending;
-      const { level, reason } = deriveStatus({ pending, highestRisk, lastDiaryAt });
+      const { level, reason } = deriveStatus({
+        pending,
+        highestRisk,
+        lastDiaryAt,
+        alertsOpen,
+        alertsCritical,
+      });
       setStatus({ level, reason, pending, highestRisk, lastDiaryAt });
     } catch {
       if (!isCurrentLoad()) return;

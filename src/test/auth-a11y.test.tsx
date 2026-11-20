@@ -114,12 +114,13 @@ function activateTab(name: RegExp) {
 }
 
 describe("Auth tabs — ARIA & keyboard", () => {
-  it("renders a tablist with three tabs and one selected", () => {
+  it("renders a tablist with two tabs and one selected", () => {
     renderAuth();
     const list = screen.getByRole("tablist");
     expect(list).toBeInTheDocument();
     const tabs = within(list).getAllByRole("tab");
-    expect(tabs).toHaveLength(3);
+    // Friction item 12: Forgot password opens from its link, not a third tab.
+    expect(tabs).toHaveLength(2);
     const selected = tabs.find((t) => t.getAttribute("aria-selected") === "true");
     expect(selected).toBeTruthy();
     expect(selected).toHaveTextContent(/sign in/i);
@@ -139,16 +140,16 @@ describe("Auth tabs — ARIA & keyboard", () => {
   it("ArrowRight / ArrowLeft / Home / End move focus between tabs", async () => {
     renderAuth();
     const tabs = screen.getAllByRole("tab");
+    // Two tabs since friction item 12 (Forgot password is a link, not a tab).
+    expect(tabs).toHaveLength(2);
     tabs[0].focus();
     fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
     await waitFor(() => expect(document.activeElement).toBe(tabs[1]));
-    fireEvent.keyDown(tabs[1], { key: "ArrowRight" });
-    await waitFor(() => expect(document.activeElement).toBe(tabs[2]));
-    fireEvent.keyDown(tabs[2], { key: "ArrowLeft" });
+    fireEvent.keyDown(tabs[1], { key: "ArrowLeft" });
+    await waitFor(() => expect(document.activeElement).toBe(tabs[0]));
+    fireEvent.keyDown(tabs[0], { key: "End" });
     await waitFor(() => expect(document.activeElement).toBe(tabs[1]));
-    fireEvent.keyDown(tabs[1], { key: "End" });
-    await waitFor(() => expect(document.activeElement).toBe(tabs[2]));
-    fireEvent.keyDown(tabs[2], { key: "Home" });
+    fireEvent.keyDown(tabs[1], { key: "Home" });
     await waitFor(() => expect(document.activeElement).toBe(tabs[0]));
   });
 });
@@ -194,7 +195,7 @@ describe("Auth — loading & disabled states", () => {
 
   it("forgot button shows Sending reset link… and disables during request", async () => {
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "grower@verdant.app" },
     });
@@ -228,7 +229,7 @@ describe("Auth — friendly non-enumerating errors", () => {
   it("forgot-password network failure shows generic retry copy", async () => {
     resetForEmailResult = { error: { message: "rate limited" } };
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "grower@verdant.app" },
     });
@@ -241,7 +242,7 @@ describe("Auth — friendly non-enumerating errors", () => {
 
   it("forgot-password success copy is generic (does not reveal account)", async () => {
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "grower@verdant.app" },
     });

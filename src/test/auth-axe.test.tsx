@@ -77,7 +77,7 @@ describe("Axe — /auth", () => {
           <Auth />
         </MemoryRouter>,
       );
-      activateTab(/forgot password/i);
+      fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
       expect((await axe(container)).violations).toEqual([]);
     },
     A11Y_TEST_TIMEOUT_MS,

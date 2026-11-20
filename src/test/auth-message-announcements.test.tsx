@@ -154,7 +154,7 @@ describe("/auth — message announcement coverage", () => {
 
   it("forgot-password blank email shows role=alert near the field", async () => {
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/enter the email/i);
@@ -166,7 +166,7 @@ describe("/auth — message announcement coverage", () => {
   it("forgot-password rate-limit failure shows role=alert with generic retry copy", async () => {
     resetForEmailResult = { error: { message: "rate limited" } };
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "grower@verdant.app" },
     });
@@ -178,7 +178,7 @@ describe("/auth — message announcement coverage", () => {
 
   it("forgot-password success uses role=status / aria-live=polite (non-enumerating)", async () => {
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "grower@verdant.app" },
     });
@@ -294,7 +294,7 @@ describe("/reset-password — focus on submit by error type", () => {
 describe("/auth — announcements do not steal focus during loading/retry", () => {
   it("forgot-password success announcement (role=status) does not steal focus", async () => {
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "grower@verdant.app" },
     });

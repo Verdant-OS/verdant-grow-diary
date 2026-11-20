@@ -124,6 +124,7 @@ import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimeline
 import { useActionEvidenceVerification } from "@/hooks/useActionEvidenceVerification";
 import { useGrows } from "@/store/grows";
 import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
+import { formatStatusTransition } from "@/lib/statusTransitionLabelRules";
 
 /**
  * Narrow cast for `action_queue_transition` (typing may lag generated Database
@@ -1195,7 +1196,7 @@ export default function ActionDetail() {
                     {e.event_type}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {e.previous_status ?? "—"} → {e.new_status ?? "—"}
+                    {formatStatusTransition(e.previous_status, e.new_status)}
                   </span>
                   <span className="ml-auto text-xs text-muted-foreground">
                     {new Date(e.created_at).toLocaleString()}

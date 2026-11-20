@@ -223,3 +223,26 @@ export function deriveDailyGrowCheckOnboarding(input: OnboardingInput): Onboardi
     isReady: true,
   };
 }
+
+function normalizePathOnly(href: string | null | undefined): string | null {
+  if (typeof href !== "string") return null;
+  const path = href.trim().split(/[?#]/)[0] ?? "";
+  if (path === "") return null;
+  const trimmed = path.length > 1 ? path.replace(/\/+$/, "") : path;
+  return trimmed === "" ? "/" : trimmed;
+}
+
+/**
+ * True when a CTA would send the grower to the page they are already on
+ * (field-notebook walk, 2026-11-19: "Start Daily Grow Check" on /daily-check
+ * linked to itself). Query and hash are ignored, so is a trailing slash.
+ * Unknown paths never match.
+ */
+export function isCtaForCurrentPath(
+  ctaHref: string | null | undefined,
+  currentPath: string | null | undefined,
+): boolean {
+  const cta = normalizePathOnly(ctaHref);
+  const current = normalizePathOnly(currentPath);
+  return cta !== null && current !== null && cta === current;
+}

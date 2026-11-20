@@ -8,7 +8,7 @@ branch: cursor/agent-start-page-037e
 base: verdant-grow-diary
 checkout: git fetch origin cursor/agent-start-page-037e verdant-grow-diary && git switch cursor/agent-start-page-037e && git merge --ff-only origin/cursor/agent-start-page-037e
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3046
-head_sha: pending the remote observation recorded in the next commit on this branch
+head_sha: 179c5f174bcd5356eeca09a587632c695e79d535. Observed 2026-11-20T07:18:36Z on origin/cursor/agent-start-page-037e, equal to local HEAD then. PR https://github.com/Verdant-OS/verdant-grow-diary/pull/3046. If origin is a descendant of this SHA, adopt that head (HANDOFF_LOG.md checkout check). Diverged or rewritten: stop.
 state: pushed draft
 current_step: start page now follows the handoff urgency order and the push / entry / resume-here stop. Independent acceptance is still outstanding.
 next_action: independent review of the exact head by a seat that did not write this change (A, D, or C). Do not merge.

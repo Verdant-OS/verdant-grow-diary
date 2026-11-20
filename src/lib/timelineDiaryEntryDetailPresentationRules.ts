@@ -41,6 +41,7 @@ import {
 } from "@/lib/temperatureUnitPreference";
 import { PHENO_EVIDENCE_RECEIPT_KIND } from "@/lib/phenoEvidenceCaptureRules";
 import { readDetailsLoggedAt } from "@/lib/quicklogManualDiagnosticsRules";
+import { formatStoredWaterVolume, type WaterEntryUnit } from "@/lib/quickLogWaterVolumeUnitRules";
 
 /**
  * Top-level detail keys that must never render as a raw "key: value" chip,
@@ -141,6 +142,8 @@ export interface TimelineDiaryDetailPresentationOptions {
   timeZone?: string;
   /** Test seam. When set, it replaces the local timestamp formatter. */
   formatTimestamp?: (iso: string) => string | null;
+  /** Unit for watering volumes (stored ml). Omitted stays ml. Feeding volumes stay ml. */
+  waterUnit?: WaterEntryUnit;
 }
 
 function formatDiaryDetailTimestamp(iso: string, timeZone?: string): string | null {
@@ -198,10 +201,11 @@ function typedActivityScalar(
   key: string,
   value: unknown,
   tempUnit: TemperatureUnitPreference,
+  volumeUnit: WaterEntryUnit,
 ): string | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     if (ML_VOLUME_KEYS.has(key)) {
-      return `${value} ml`;
+      return formatStoredWaterVolume(value, volumeUnit);
     }
     if (key === "water_temp_c") {
       const displayed = tempUnit === "fahrenheit" ? celsiusToFahrenheit(value) : value;
@@ -214,7 +218,11 @@ function typedActivityScalar(
     const trimmed = value.trim();
     if (trimmed === "" || trimmed === "default") return null;
     // Unit-bearing text ("500 ml", "2 L") is kept verbatim.
-    if (ML_VOLUME_KEYS.has(key) && BARE_NUMBER_RE.test(trimmed)) return `${trimmed} ml`;
+    if (ML_VOLUME_KEYS.has(key) && BARE_NUMBER_RE.test(trimmed)) {
+      return volumeUnit === "ml"
+        ? `${trimmed} ml`
+        : formatStoredWaterVolume(Number(trimmed), volumeUnit);
+    }
     return trimmed;
   }
   return null;
@@ -273,6 +281,7 @@ function typedActivityEnvelopeLines(
   envelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number],
   value: unknown,
   tempUnit: TemperatureUnitPreference,
+  volumeUnit: WaterEntryUnit,
 ): QuickLogDetailDisplayLine[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
   const record = value as Record<string, unknown>;
@@ -290,7 +299,7 @@ function typedActivityEnvelopeLines(
     }
     const label =
       key === "volume_ml" ? typedVolumeLabel(envelope) : TYPED_ACTIVITY_FIELD_LABELS[key];
-    const text = typedActivityScalar(key, child, tempUnit);
+    const text = typedActivityScalar(key, child, tempUnit, volumeUnit);
     if (!label || !text) continue;
     lines.push({ key: `${envelope}.${key}`, label, value: text });
   }
@@ -332,8 +341,13 @@ export function presentTimelineDiaryEntryDetails(
     describeQuickLogDetailsFromExtras(details, tempUnit),
     options,
   );
+  const waterUnit = options.waterUnit ?? "ml";
+  const volumeUnitFor = (envelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number]): WaterEntryUnit =>
+    envelope === "watering" ? waterUnit : "ml";
   for (const envelope of TYPED_ACTIVITY_ENVELOPES) {
-    detailLines.push(...typedActivityEnvelopeLines(envelope, record[envelope], tempUnit));
+    detailLines.push(
+      ...typedActivityEnvelopeLines(envelope, record[envelope], tempUnit, volumeUnitFor(envelope)),
+    );
   }
   // snake_case and legacy camelCase type keys, as the diary normalizer accepts.
   const rawEventType =
@@ -355,7 +369,12 @@ export function presentTimelineDiaryEntryDetails(
       "volume_ml",
     ] as const) {
       if (!(flatVolKey in record)) continue;
-      const text = typedActivityScalar(flatVolKey, record[flatVolKey], tempUnit);
+      const text = typedActivityScalar(
+        flatVolKey,
+        record[flatVolKey],
+        tempUnit,
+        volumeUnitFor(flatVolumeEnvelope),
+      );
       if (text) {
         detailLines.push({
           key: `${flatVolumeEnvelope}.volume_ml`,

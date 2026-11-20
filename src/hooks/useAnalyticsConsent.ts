@@ -5,6 +5,11 @@ import {
   writeAnalyticsConsent,
   type AnalyticsConsentDecision,
 } from "@/lib/analyticsConsent";
+import {
+  FIRST_PAID_CONSENT_KEY,
+  readPaidAnalyticsSince,
+  recordPaidAnalyticsChoice,
+} from "@/lib/firstPaidAnalyticsService";
 
 /**
  * Reads the analytics consent decision reactively.
@@ -14,16 +19,35 @@ import {
  */
 export function useAnalyticsConsent() {
   const [decision, setDecision] = useState<AnalyticsConsentDecision>("unset");
+  const [paidSince, setPaidSince] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setDecision(readAnalyticsConsent());
+    const sync = () => {
+      setDecision(readAnalyticsConsent());
+      setPaidSince(readPaidAnalyticsSince());
+    };
+    sync();
     setHydrated(true);
-    return subscribeToAnalyticsConsent(() => setDecision(readAnalyticsConsent()));
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === FIRST_PAID_CONSENT_KEY) sync();
+    };
+    window.addEventListener("storage", onStorage);
+    const unsubscribe = subscribeToAnalyticsConsent(sync);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
-  const accept = useCallback(() => writeAnalyticsConsent("granted"), []);
-  const decline = useCallback(() => writeAnalyticsConsent("denied"), []);
+  const accept = useCallback(() => {
+    recordPaidAnalyticsChoice("granted");
+    writeAnalyticsConsent("granted");
+  }, []);
+  const decline = useCallback(() => {
+    recordPaidAnalyticsChoice("denied");
+    writeAnalyticsConsent("denied");
+  }, []);
 
-  return { decision, hydrated, accept, decline };
+  return { decision, paidSince, hydrated, accept, decline };
 }

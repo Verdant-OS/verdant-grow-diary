@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-11-20.1**
+**Sentinel-Version: 2026-11-20.2**
 
 Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
 Start page (do not restate): docs/agents/START_HERE.md

@@ -23,12 +23,11 @@ Return the `SENTINEL_ACK` block from `AGENTS.md` §14 before any other work.
 Look in this order:
 
 1. Milestone **M1 Diary truth**, then **M2 EcoWitt light ingest**, then **M3 Proven paid Stripe**. **M4 CI and security floor** runs beside them and does not gate them.
-2. An issue or pull request with the label `status:ready` and no current writer.
-3. Skip anything labeled `status:in-progress`, `status:needs-review`, `handoff:needed`, or `blocked`, and skip any branch named in an open handoff as someone else's.
+2. Work `docs/agents/constitution/handoff-procedure.md` says is eligible: no effective claim, or the last activity is older than 24 hours, and no assignment or lock conflicts. `handoff:needed` can still be eligible. `blocked` is not free.
 
 ## 3. How to claim it
 
-One writer, one branch. Put your name in the handoff file (`docs/agents/handoffs/<TASK-ID>.md`) before the first push. Set the status label to `status:in-progress` and clear every other status label. Exactly one status label is set at a time. `blocked` counts as a status label.
+Follow `docs/agents/constitution/handoff-procedure.md`. Post `claimed_by: <agent>, <YYYY-MM-DD HH:MM> UTC` on the pull request, then re-read the comments. If an earlier valid claim exists, stop. A name in the handoff file is not a claim by itself. After the claim holds, set `status:in-progress` and clear every other status label. Exactly one status label is set at a time. `blocked` counts as a status label.
 
 ## 4. How to hand it off
 

@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-11-20.1**
+**Sentinel-Version: 2026-11-20.2**
 
 Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
 Start page (do not restate): docs/agents/START_HERE.md
@@ -424,7 +424,7 @@ An existing block moves to its own file at its next update, and that file wins.
 
 ## 14. Startup gate
 
-Before tools beyond read-only context, or any edit, read this file, the "Start here" section of `docs/agents/CURRENT_STATE.md`
+Before tools beyond read-only context, or any edit, read this file, `docs/agents/START_HERE.md`, `docs/agents/SENTINEL_BLOCK.md`, the "Start here" section of `docs/agents/CURRENT_STATE.md`
 (everything above its `# Verdant — Current Operating State` heading), the handoff log
 as §12 defines it, and the assigned role file. Read the rest of `CURRENT_STATE.md` when
 that section says to. The only action permitted before the gate is read-only acquisition
@@ -569,6 +569,7 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-11-20.2** — The parity check requires the full moved copies in operative prose, and a change to `docs/agents/SENTINEL_BLOCK.md` or `docs/agents/START_HERE.md` requires the same version bump as the eighteen files. `sync-sentinel-mirror.mjs` stamps the block's version. The pre-acknowledgment read list includes those two files. The start page follows `docs/agents/constitution/handoff-procedure.md` for claims.
 - **2026-11-20.1** — The repeated routing and smoke paragraphs now live once in
   `docs/agents/SENTINEL_BLOCK.md`. The eighteen governance files point at that file
   and at `docs/agents/START_HERE.md`. The parity check requires both pointers, and

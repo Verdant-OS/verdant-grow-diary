@@ -8,16 +8,16 @@ branch: cursor/agent-start-page-037e
 base: verdant-grow-diary
 checkout: git fetch origin cursor/agent-start-page-037e verdant-grow-diary && git switch cursor/agent-start-page-037e
 pr: see the open pull request for this branch
-head_sha: 9930d57cfc27ddeca6c3c30a145d850eb59e3da1 is the implementation commit. The commit that records this line is the branch head; read it with git rev-parse HEAD.
+head_sha: the commit that records this line is the branch head; read it with git rev-parse HEAD. It is Sentinel-Version 2026-11-20.2.
 state: pushed draft
-current_step: parity self-test passed locally; pull request not opened yet
+current_step: Copilot review on #3046 was addressed locally. Independent acceptance is still outstanding.
 next_action: independent review of the exact head by a seat that did not write this change (A, D, or C). Do not merge.
-post_merge_check: node scripts/check-sentinel-version-parity.mjs <merge-parent> prints Sentinel-Version OK — 2026-11-20.1 across 18 governance files, and docs/agents/SENTINEL_BLOCK.md still contains each pin in scripts/check-sentinel-version-parity.mjs. Docs only.
+post_merge_check: node scripts/check-sentinel-version-parity.mjs <merge-parent> prints Sentinel-Version OK — 2026-11-20.2 across 18 governance files, and docs/agents/SENTINEL_BLOCK.md still contains each full copy pinned in scripts/check-sentinel-version-parity.mjs. Docs only.
 active_writer: Cursor Grok session on cursor/agent-start-page-037e
 decisions: AGENTS.md stays the shared rule file. The repeated routing paragraphs moved verbatim into docs/agents/SENTINEL_BLOCK.md. The GEMINI.md constitution mirror stayed, because removing it would drop the safeguard that Gemini cannot follow a link. The three contradictions are listed and not resolved.
 tried_and_rejected: replacing the GEMINI.md embed with a pointer. Rejected for this pull request. The parity test fails that shape on purpose.
 commands: node scripts/check-sentinel-version-parity.mjs origin/verdant-grow-diary; node scripts/check-sentinel-version-parity.test.mjs; node scripts/sync-sentinel-mirror.mjs --check; node scripts/assert-docs-safety.mjs
-files_touched: the eighteen governance files; docs/agents/START_HERE.md; docs/agents/SENTINEL_BLOCK.md; docs/agents/RULEBOOK_CONTRADICTIONS.md; scripts/check-sentinel-version-parity.mjs; scripts/check-sentinel-version-parity.test.mjs; this file
+files_touched: the eighteen governance files; docs/agents/START_HERE.md; docs/agents/SENTINEL_BLOCK.md; docs/agents/RULEBOOK_CONTRADICTIONS.md; scripts/check-sentinel-version-parity.mjs; scripts/check-sentinel-version-parity.test.mjs; scripts/sync-sentinel-mirror.mjs; this file
 files_remaining: GEMINI.md still embeds AGENTS.md. CLAUDE.md still carries the codebase orientation. Role files still have their own "read these files" lines. The historical Chemdawg routing block in HANDOFF_PROTOCOL.md stayed in place.
 blockers: independent exact-head review and the founder's per-SHA yes. This session will not merge.
 open_questions: none for this slice

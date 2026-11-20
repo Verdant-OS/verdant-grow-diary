@@ -110,6 +110,14 @@ if (existsSync(BLOCK_PATH)) {
   const blockVersion = /Sentinel-Version:\s*([0-9]{4}-[0-9]{2}-[0-9]{2}\.[0-9]+)/.exec(blockText)?.[1];
   if (agentsVersion && blockVersion !== agentsVersion) {
     const next = blockText.replace(VERSION_RE, `$1${agentsVersion}`);
+    const stamped = new RegExp(`Sentinel-Version:\\s*${agentsVersion.replace(".", "\\.")}`).test(next);
+    if (next === blockText || !stamped) {
+      console.error(
+        `${BLOCK_PATH}: Sentinel-Version stamp is missing or not replaceable, so it was not ` +
+          `set to ${agentsVersion}.`,
+      );
+      process.exit(1);
+    }
     if (!checkOnly) writeFileSync(BLOCK_PATH, next);
     changed.push(`${BLOCK_PATH}: Sentinel-Version → ${agentsVersion}`);
   }

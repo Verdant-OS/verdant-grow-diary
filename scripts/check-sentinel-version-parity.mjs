@@ -369,9 +369,13 @@ if (requiresSharedBlock(canonicalVersion)) {
   for (const path of ALL) {
     const text = head.get(path)?.text.replace(/\r\n/g, "\n") ?? "";
     if (!text) continue;
+    const prose = normalizeWhitespace(operativeProse(text));
     for (const pointer of SHARED_POINTERS) {
-      if (!text.includes(pointer)) {
-        problems.push(`${path}: missing shared pointer ${JSON.stringify(pointer)}`);
+      if (!prose.includes(normalizeWhitespace(pointer))) {
+        problems.push(
+          `${path}: missing shared pointer in operative prose ${JSON.stringify(pointer)}. ` +
+            "A copy inside a comment, fence, or blockquote does not count.",
+        );
       }
     }
   }

@@ -6,7 +6,7 @@ goal: One short start page, one shared sentinel block, a stop-anywhere note, and
 why: Matthew asked for agent instructions that are short, and for work to continue when an agent stops. Issue #2939. #2933 has merged.
 branch: cursor/agent-start-page-037e
 base: verdant-grow-diary
-checkout: git fetch origin cursor/agent-start-page-037e verdant-grow-diary && git switch cursor/agent-start-page-037e && git merge --ff-only origin/cursor/agent-start-page-037e
+checkout: git fetch origin cursor/agent-start-page-037e verdant-grow-diary && git switch cursor/agent-start-page-037e && VERIFIED_SHA=$(git rev-parse origin/cursor/agent-start-page-037e) && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3046
 head_sha: 179c5f174bcd5356eeca09a587632c695e79d535. Observed 2026-11-20T07:18:36Z on origin/cursor/agent-start-page-037e, equal to local HEAD then. PR https://github.com/Verdant-OS/verdant-grow-diary/pull/3046. If origin is a descendant of this SHA, adopt that head (HANDOFF_LOG.md checkout check). Diverged or rewritten: stop.
 state: pushed draft

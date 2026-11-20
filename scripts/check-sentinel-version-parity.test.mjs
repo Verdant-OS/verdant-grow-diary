@@ -751,6 +751,27 @@ test("rejects moved copies that survive only inside a comment", () => {
   assert.match(result.stderr, /moved copy is missing from operative prose/);
 });
 
+test("rejects shared pointers that survive only inside a comment", () => {
+  const root = makeFixture({
+    version: "2026-11-20.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  writeSharedBlockFixture(root, "2026-11-20.2");
+  for (const path of GOVERNANCE_FILES) {
+    replace(root, path, "2026-11-20.1", "2026-11-20.2");
+    const absolute = join(root, path);
+    let text = readFileSync(absolute, "utf8");
+    for (const pointer of SHARED_POINTERS) {
+      text = text.replaceAll(pointer, `<!-- ${pointer} -->`);
+    }
+    writeFileSync(absolute, text, "utf8");
+  }
+  const result = runChecker(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /missing shared pointer in operative prose/);
+});
+
 test("rejects a shared-block edit that does not bump the version", () => {
   const root = makeFixture({
     version: "2026-11-20.1",

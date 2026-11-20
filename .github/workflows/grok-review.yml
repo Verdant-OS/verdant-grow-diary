@@ -181,9 +181,11 @@ jobs:
             echo
             # Neutralize @-mentions and any bracketed review-protocol tag the model might
             # emit ([VERDICT], [ROUTE], [ACK], [CLAIM], [FIX REQUEST], [YES-RECORDED], in
-            # any case), and cap the length.
+            # any case), and cap the length. Defanging lengthens markers about 3x, so cap again
+            # after it; 60000 bytes leaves room for this header and footer under GitHub's 65536.
             head -c 60000 grok/review.md \
-              | sed -E 's/@([A-Za-z0-9_-])/@​\1/g; s/\[(VERDICT|ROUTE|ACK|CLAIM|FIX REQUEST|YES-RECORDED|APPROVE[DS]?|PASS|FAIL)([^]]*)\]/(model note: \1\2)/gI'
+              | sed -E 's/@([A-Za-z0-9_-])/@​\1/g; s/\[(VERDICT|ROUTE|ACK|CLAIM|FIX REQUEST|YES-RECORDED|APPROVE[DS]?|PASS|FAIL)([^]]*)\]/(model note: \1\2)/gI' \
+              | head -c 60000
             echo
             echo "</details>"
           } > comment.md

@@ -233,6 +233,27 @@ describe("grok-review workflow safety contract", () => {
     }
   });
 
+  it("keeps the posted comment under GitHub's 65,536-character limit even when markers expand", () => {
+    // Defanging rewrites "[PASS]" (6 chars) as "(model note: PASS)" (18), so a cap applied only
+    // before the rewrite lets marker-heavy output triple in size and `gh pr comment` fail.
+    const script = runOf(post, "Build comment body").run!;
+    const dir = mkdtempSync(join(tmpdir(), "grok-post-cap-"));
+    try {
+      mkdirSync(join(dir, "grok"));
+      writeFileSync(join(dir, "grok", "review.md"), "[PASS]".repeat(20000));
+      execFileSync("bash", ["-e", "-c", script], {
+        cwd: dir,
+        env: { ...process.env, HEAD_SHA: "abc" },
+      });
+      const out = readFileSync(join(dir, "comment.md"), "utf8");
+      expect(out.length).toBeLessThanOrEqual(65536);
+      expect(out).toContain("</details>");
+      expect(out).toContain("(model note: PASS)");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("never interpolates PR-controlled text into a shell script", () => {
     for (const s of allSteps) {
       expect(s.run ?? "").not.toMatch(

@@ -21,6 +21,7 @@ import {
   downloadSignedStorageObject,
   isAllowedSignedPhotoUrl,
 } from "../_shared/geminiInlineImage.ts";
+import { captureAiGeneration } from "../_shared/posthogAiObservability.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -693,6 +694,32 @@ Rules for diagnosis (structured view, approval-first):
     const text = (body.question ? `QUESTION: ${body.question}\n\n` : "") + context;
     userContent.push({ type: "text", text });
 
+    const aiInput = [
+      { role: "system", content: system },
+      { role: "user", content: userContent },
+    ];
+    const aiSessionId = `ai_coach:${userId}:${growId ?? idempotencyKey}`;
+    const providerStartedAt = performance.now();
+    const captureGeneration = (details: {
+      response?: unknown;
+      httpStatus?: number;
+      error?: string;
+    }) =>
+      captureAiGeneration({
+        distinctId: userId,
+        sessionId: aiSessionId,
+        traceId: idempotencyKey,
+        spanName: FEATURE,
+        model: COACH_MODEL,
+        provider: "gemini",
+        input: aiInput,
+        output: details.response,
+        usage: details.response,
+        requestUrl: GATEWAY_URL,
+        httpStatus: details.httpStatus,
+        error: details.error,
+        startedAt: providerStartedAt,
+      });
     const providerController = new AbortController();
     const providerTimer = setTimeout(
       () => providerController.abort(),
@@ -706,22 +733,22 @@ Rules for diagnosis (structured view, approval-first):
         signal: providerController.signal,
         body: {
           response_format: { type: "json_object" },
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: userContent },
-          ],
+          messages: aiInput,
         },
       });
       const r = await fetch(GATEWAY_URL, providerRequest);
       if (r.status === 429) {
+        await captureGeneration({ httpStatus: r.status, error: "upstream_credit_exhausted" });
         console.log("ai-coach status=upstream_credit_exhausted http=200");
         return failureAfterRefund(spendId, "upstream_429", "upstream_credit_exhausted");
       }
       if (r.status === 402) {
+        await captureGeneration({ httpStatus: r.status, error: "upstream_credit_exhausted" });
         console.log("ai-coach status=upstream_credit_exhausted http=200");
         return failureAfterRefund(spendId, "upstream_402", "upstream_credit_exhausted");
       }
       if (!r.ok) {
+        await captureGeneration({ httpStatus: r.status, error: "upstream_http_error" });
         return failureAfterRefund(spendId, `upstream_${r.status}`, "http");
       }
       const readProviderBody = r.json.bind(r);
@@ -729,16 +756,23 @@ Rules for diagnosis (structured view, approval-first):
       try {
         data = await r.json();
       } catch {
+        await captureGeneration({
+          httpStatus: r.status,
+          error: providerController.signal.aborted ? "timeout" : "invalid_json_response",
+        });
         if (providerController.signal.aborted) {
           return failureAfterRefund(spendId, "upstream_network", "timeout");
         }
         return failureAfterRefund(spendId, "upstream_parse", "parse");
       }
     } catch {
+      await captureGeneration({ error: "network_or_timeout" });
       return failureAfterRefund(spendId, "upstream_network", "timeout");
     } finally {
       clearTimeout(providerTimer);
     }
+
+    await captureGeneration({ response: data, httpStatus: 200 });
 
     const raw = readCoachMessageContent(data);
     if (!raw) return failureAfterRefund(spendId, "upstream_empty", "empty");

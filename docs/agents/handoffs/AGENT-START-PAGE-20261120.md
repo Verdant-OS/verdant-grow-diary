@@ -8,8 +8,8 @@ branch: cursor/agent-start-page-037e
 base: verdant-grow-diary
 checkout: git fetch origin cursor/agent-start-page-037e verdant-grow-diary && git switch cursor/agent-start-page-037e
 pr: see the open pull request for this branch
-head_sha: filled in the stop-anywhere note after the push
-state: local, about to push
+head_sha: 9930d57cfc27ddeca6c3c30a145d850eb59e3da1 is the implementation commit. The commit that records this line is the branch head; read it with git rev-parse HEAD.
+state: pushed draft
 current_step: parity self-test passed locally; pull request not opened yet
 next_action: independent review of the exact head by a seat that did not write this change (A, D, or C). Do not merge.
 post_merge_check: node scripts/check-sentinel-version-parity.mjs <merge-parent> prints Sentinel-Version OK — 2026-11-20.1 across 18 governance files, and docs/agents/SENTINEL_BLOCK.md still contains each pin in scripts/check-sentinel-version-parity.mjs. Docs only.

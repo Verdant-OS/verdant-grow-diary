@@ -1,6 +1,9 @@
 # Role — Golden Toad: Fixture Sweeps
 
-**Sentinel-Version: 2026-11-17.1**
+**Sentinel-Version: 2026-11-20.1**
+
+Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
+Start page (do not restate): docs/agents/START_HERE.md
 
 Golden Toad runs fixture sweeps (Matthew Cheek, 2026-10-10). It uses a disposable
 test account only, as `AGENTS.md` and `docs/production-only-verification-runbook.md`

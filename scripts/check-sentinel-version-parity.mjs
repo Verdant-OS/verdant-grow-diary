@@ -209,6 +209,38 @@ function versionIn(text) {
   return match ? match[1] : null;
 }
 
+/**
+ * From 2026-11-20.1 the routing and smoke paragraphs live once in
+ * docs/agents/SENTINEL_BLOCK.md. Each governance file must point at that file
+ * and at the start page, and the block must still contain every moved copy.
+ * Older versions keep the previous layout. Deleting the block, or a sentence
+ * from it, fails this check. The GEMINI.md constitution mirror is unchanged.
+ */
+function requiresSharedBlock(version) {
+  if (!version) return false;
+  const [date, revision] = version.split(".");
+  return date > "2026-11-20" || (date === "2026-11-20" && BigInt(revision) >= 1n);
+}
+
+const SHARED_POINTERS = [
+  "Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md",
+  "Start page (do not restate): docs/agents/START_HERE.md",
+];
+
+/** Sentences from each removed copy. A missing pin means a copy was dropped. */
+const SENTINEL_BLOCK_PINS = [
+  "Independent acceptance routing: select an **actually available, eligible independent",
+  "Blue Dream and Critical Mass are retired from future routing",
+  "Codex uses normal pushes only: no force-push, merge,",
+  "Independent acceptance routing: the Coordinator selects an actually available Reviewer seat",
+  "**Critical Mass is retired from future routing**",
+  "Builder and Fixer seats use normal pushes only: no force-push, merge,",
+  "The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.",
+  "The Merge Steward has no authority over the PR #1971 hold.\n",
+  "Drafts remain draft.",
+  "No\nPublish, production APPLY, real charge",
+];
+
 /** The coverage field becomes mandatory in the 2026-09-28.3 constitution. */
 function requiresHandoffAck(version) {
   if (!version) return false;
@@ -308,6 +340,45 @@ for (const path of [CANONICAL, ...ROLE_FILES]) {
   const text = head.get(path)?.text.replace(/\r\n/g, "\n") ?? "";
   if (text && !text.includes(requiredStartupGate)) {
     problems.push(`${path}: exact mandatory SENTINEL_ACK startup gate is missing`);
+  }
+}
+
+if (requiresSharedBlock(canonicalVersion)) {
+  const blockPath = "docs/agents/SENTINEL_BLOCK.md";
+  if (!existsSync(blockPath)) {
+    problems.push(
+      `${blockPath}: missing. The routing and smoke rules live in this one file; ` +
+        "governance files only point at it.",
+    );
+  } else {
+    const blockText = readFileSync(blockPath, "utf8").replace(/\r\n/g, "\n");
+    const blockVersion = versionIn(blockText);
+    if (blockVersion !== canonicalVersion) {
+      problems.push(
+        `${blockPath}: Sentinel-Version ${blockVersion ?? "missing"} does not match ` +
+          `${CANONICAL} ${canonicalVersion}`,
+      );
+    }
+    for (const pin of SENTINEL_BLOCK_PINS) {
+      if (!blockText.includes(pin)) {
+        problems.push(
+          `${blockPath}: moved sentence is missing (${JSON.stringify(pin.slice(0, 80))}). ` +
+            "Do not drop a copy that used to live in a governance file.",
+        );
+      }
+    }
+  }
+  if (!existsSync("docs/agents/START_HERE.md")) {
+    problems.push("docs/agents/START_HERE.md: missing start page");
+  }
+  for (const path of ALL) {
+    const text = head.get(path)?.text.replace(/\r\n/g, "\n") ?? "";
+    if (!text) continue;
+    for (const pointer of SHARED_POINTERS) {
+      if (!text.includes(pointer)) {
+        problems.push(`${path}: missing shared pointer ${JSON.stringify(pointer)}`);
+      }
+    }
   }
 }
 

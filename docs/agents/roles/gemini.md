@@ -1,6 +1,9 @@
 # Role — Gemini: QA, Search Integrity, Risk Auditor, and Sentinel
 
-**Sentinel-Version: 2026-11-17.1**
+**Sentinel-Version: 2026-11-20.1**
+
+Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
+Start page (do not restate): docs/agents/START_HERE.md
 **Source:** Cheek authoritative Gemini role packet, 2026-08-20 (replaces the prior
 derived reconstruction).
 

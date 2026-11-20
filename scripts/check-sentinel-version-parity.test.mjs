@@ -646,6 +646,99 @@ test("rejects a Sentinel date downgrade with a higher revision number", () => {
   assert.match(result.stderr, /Sentinel-Version downgrade/);
 });
 
+const SHARED_POINTERS = [
+  "Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md",
+  "Start page (do not restate): docs/agents/START_HERE.md",
+];
+
+const SENTINEL_BLOCK_PINS = [
+  "Independent acceptance routing: select an **actually available, eligible independent",
+  "Blue Dream and Critical Mass are retired from future routing",
+  "Codex uses normal pushes only: no force-push, merge,",
+  "Independent acceptance routing: the Coordinator selects an actually available Reviewer seat",
+  "**Critical Mass is retired from future routing**",
+  "Builder and Fixer seats use normal pushes only: no force-push, merge,",
+  "The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.",
+  "The Merge Steward has no authority over the PR #1971 hold.\n",
+  "Drafts remain draft.",
+  "No\nPublish, production APPLY, real charge",
+];
+
+function writeSharedBlockFixture(root, version) {
+  const pointers = `${SHARED_POINTERS.join("\n")}\n`;
+  for (const path of GOVERNANCE_FILES) {
+    const absolute = join(root, path);
+    if (path === "AGENTS.md") {
+      writeFileSync(absolute, readFileSync(absolute, "utf8") + pointers, "utf8");
+    }
+  }
+  const agents = readFileSync(join(root, "AGENTS.md"), "utf8");
+  const geminiPath = join(root, "GEMINI.md");
+  writeFileSync(
+    geminiPath,
+    readFileSync(geminiPath, "utf8").replace(
+      /<!-- SENTINEL-CORE:BEGIN[^\n]*\n[\s\S]*?\n<!-- SENTINEL-CORE:END -->/,
+      `<!-- SENTINEL-CORE:BEGIN -->\n${agents.trimEnd()}\n<!-- SENTINEL-CORE:END -->`,
+    ),
+    "utf8",
+  );
+  for (const path of GOVERNANCE_FILES) {
+    if (path === "AGENTS.md") continue;
+    const absolute = join(root, path);
+    writeFileSync(absolute, readFileSync(absolute, "utf8") + pointers, "utf8");
+  }
+  writeFileSync(join(root, "docs", "agents", "START_HERE.md"), "# Start\n", "utf8");
+  writeFileSync(
+    join(root, "docs", "agents", "SENTINEL_BLOCK.md"),
+    `Sentinel-Version: ${version}\n${SENTINEL_BLOCK_PINS.join("\n")}\n`,
+    "utf8",
+  );
+}
+
+test("requires the shared sentinel block at 2026-11-20.1", () => {
+  const root = makeFixture({
+    version: "2026-11-20.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  const result = runChecker(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /SENTINEL_BLOCK\.md: missing/);
+});
+
+test("rejects a shared sentinel block that drops a moved sentence", () => {
+  const root = makeFixture({
+    version: "2026-11-20.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  writeSharedBlockFixture(root, "2026-11-20.1");
+  const blockPath = join(root, "docs", "agents", "SENTINEL_BLOCK.md");
+  writeFileSync(
+    blockPath,
+    readFileSync(blockPath, "utf8").replace("Drafts remain draft.", ""),
+    "utf8",
+  );
+  const result = runChecker(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /moved sentence is missing/);
+});
+
+test("accepts 2026-11-20.1 when every governance file points at the shared block", () => {
+  const root = makeFixture({
+    version: "2026-11-20.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  writeSharedBlockFixture(root, "2026-11-20.2");
+  for (const path of GOVERNANCE_FILES) {
+    replace(root, path, "2026-11-20.1", "2026-11-20.2");
+  }
+  const result = runChecker(root);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-11-20\.2 across 18/);
+});
+
 test("allows a same-date revision upgrade from 9 to 10", () => {
   const root = makeFixture({
     version: "2026-09-28.9",

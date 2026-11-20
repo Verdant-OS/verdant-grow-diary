@@ -1,6 +1,9 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-11-17.1**
+**Sentinel-Version: 2026-11-20.1**
+
+Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
+Start page (do not restate): docs/agents/START_HERE.md
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +11,10 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-11-17.1**
+**Sentinel-Version: 2026-11-20.1**
+
+Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
+Start page (do not restate): docs/agents/START_HERE.md
 
 This is the long-running constitution for every agent and every human who changes
 this repository. It states durable principles, then rules, then where the procedures
@@ -574,6 +580,11 @@ snapshots can differ.
 
 ## 17. Changelog
 
+- **2026-11-20.1** — The repeated routing and smoke paragraphs now live once in
+  `docs/agents/SENTINEL_BLOCK.md`. The eighteen governance files point at that file
+  and at `docs/agents/START_HERE.md`. The parity check requires both pointers, and
+  it requires the moved paragraphs to remain in the shared block. The GEMINI.md
+  constitution mirror is unchanged. No ownership, review, or merge rule was rewritten.
 - **2026-11-17.1** — Two lines that disagreed now agree. §13 states the step `docs/agents/OWNERSHIP.md` already had: on a gated pull request a clean review is `COMMENT`, and after Matthew's yes naming the pull request and SHA the reviewer seat posts `APPROVE` at that commit, which is the approval §11 waits for. `docs/agents/roles/claude.md` no longer opens with "Historical — no current seat" while `CLAUDE.md` loads it as the role: it now says Claude has no standing seat and a Claude session owns the build work assigned to it (Matthew, 2026-11-04). No seat, gate or holder changes.
 - **2026-11-12.1** — Live instruction text no longer routes to the retired Chemdawg / Grok 91 name. Mentions that meant a current duty now name the seat (Merge Readiness, the Coordinator or the Merge Steward). The roster gains stable labels (Writer A/B, Reviewer A–D, Grok Lead (Main), Grok Lead (Ultra)) and a rename-history note: Chemdawg was an earlier name, and the bot now holding Grok Lead (Main) once carried it. Roster only: UK Cheese holds the Coordinator seat, and OG Kush is retired. Historical sections stay word for word. No rule changes.
 - **2026-11-11.1** — Startup reads shrink. Agents read only the "Start here" section of `docs/agents/CURRENT_STATE.md` at startup, and the rest when that section says to. The handoff log read is `HANDOFF_LOG.md` plus the open entries in `docs/agents/handoffs/`; closed `HANDOFF_LOG.md` blocks moved byte for byte to `docs/agents/archive/HANDOFF_LOG_ARCHIVE.md`. No other rule changes.

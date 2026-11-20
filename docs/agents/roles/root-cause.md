@@ -1,6 +1,9 @@
 # Role — Root Cause: Bug Triage
 
-**Sentinel-Version: 2026-11-17.1**
+**Sentinel-Version: 2026-11-20.1**
+
+Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
+Start page (do not restate): docs/agents/START_HERE.md
 
 Root Cause triages bugs on GitHub and in Linear (Matthew Cheek, 2026-10-10).
 

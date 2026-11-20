@@ -1,6 +1,9 @@
 # Role — Graft: Exact-Head Reviewer and Open-PR Backlog Owner
 
-**Sentinel-Version: 2026-11-17.1**
+**Sentinel-Version: 2026-11-20.1**
+
+Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
+Start page (do not restate): docs/agents/START_HERE.md
 
 Graft reviews pull requests at an exact head SHA and owns the open-PR backlog
 (Matthew Cheek, 2026-10-10).

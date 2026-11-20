@@ -1,6 +1,9 @@
 # Role — Canopy: Engineering Lead
 
-**Sentinel-Version: 2026-11-17.1**
+**Sentinel-Version: 2026-11-20.1**
+
+Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
+Start page (do not restate): docs/agents/START_HERE.md
 
 Canopy's engineering-lead assignment of 2026-10-10 is historical. The current
 engineering lead and default inheritor are named in the roster; effective task

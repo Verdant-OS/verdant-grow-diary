@@ -14,6 +14,7 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { listRecentDiaryEntriesForOwnedGrow } from "../../operatorAccountReadModels";
+import { asStructuredJson } from "./_json";
 import { supabaseForUser, unauthenticated } from "./_supabase";
 
 export default defineTool({
@@ -59,7 +60,7 @@ export default defineTool({
               : `Found ${rows.length} entry(ies):\n${JSON.stringify(rows, null, 2)}`,
         },
       ],
-      structuredContent: { entries: rows },
+      structuredContent: asStructuredJson({ entries: rows }),
     };
   },
 });

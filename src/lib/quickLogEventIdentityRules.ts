@@ -33,6 +33,7 @@ import {
   formatTemperatureDisplay,
   type TemperatureUnitPreference,
 } from "./temperatureUnitPreference";
+import { formatStoredWaterVolume, type WaterEntryUnit } from "./quickLogWaterVolumeUnitRules";
 
 /**
  * Envelope event-type strings that indicate a Quick Log wrapper row
@@ -143,13 +144,14 @@ function buildSummarySuffix(
   effectiveType: string,
   details: NormalizedDiaryDetails | null | undefined,
   temperatureUnit: TemperatureUnitPreference,
+  waterUnit: WaterEntryUnit,
 ): string {
   if (!details) return "";
   const parts: string[] = [];
   switch (effectiveType) {
     case "watering": {
       if (typeof details.wateringAmountMl === "number") {
-        parts.push(`${details.wateringAmountMl} ml`);
+        parts.push(formatStoredWaterVolume(details.wateringAmountMl, waterUnit));
       }
       if (typeof details.ph === "number") parts.push(`pH ${details.ph}`);
       if (typeof details.runoffPh === "number") {
@@ -257,12 +259,15 @@ function noteOrIssueLabel(
  *     fields; missing values stay empty — never invented. A sensor
  *     temperature (stored in Celsius) is rendered with its unit in
  *     `options.temperatureUnit`, defaulting to the app default (°F).
+ *     A watering volume (stored in ml) is rendered in `options.waterUnit`,
+ *     defaulting to ml. Feeding volumes stay ml.
  */
 export function resolveQuickLogEventIdentity(
   entry: Pick<NormalizedDiaryEntry, "eventType" | "details"> | null | undefined,
-  options?: { temperatureUnit?: TemperatureUnitPreference },
+  options?: { temperatureUnit?: TemperatureUnitPreference; waterUnit?: WaterEntryUnit },
 ): QuickLogEventIdentity {
   const temperatureUnit = options?.temperatureUnit ?? DEFAULT_TEMPERATURE_UNIT;
+  const waterUnit = options?.waterUnit ?? "ml";
   const envelope = normalizeType(entry?.eventType);
   const declared = normalizeType(entry?.details?.declaredEventType ?? null);
   const wrapper = QUICK_LOG_WRAPPER_ENVELOPES.has(envelope);
@@ -288,6 +293,6 @@ export function resolveQuickLogEventIdentity(
     effectiveEventType: effective,
     displayLabel: label,
     fromQuickLog,
-    summarySuffix: buildSummarySuffix(effective, entry?.details, temperatureUnit),
+    summarySuffix: buildSummarySuffix(effective, entry?.details, temperatureUnit, waterUnit),
   };
 }

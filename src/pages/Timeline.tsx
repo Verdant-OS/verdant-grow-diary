@@ -223,6 +223,7 @@ import {
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { useTimelineNameDirectory } from "@/hooks/useTimelineNameDirectory";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { useWaterVolumeEntryUnit } from "@/hooks/useWaterVolumeEntryUnit";
 import { canUseFeature } from "@/lib/featureEntitlements";
 import {
   buildTimelinePhotoLightboxList,
@@ -579,6 +580,7 @@ async function loadLinkedRootSensorSiblings(input: {
 
 export default function Timeline() {
   const temperatureUnit = useTemperatureUnitPreference();
+  const waterUnit = useWaterVolumeEntryUnit();
   const authUser = useAuth().user;
   // Keep the read callback keyed to a stable primitive. Auth providers and
   // test adapters may return an equivalent user object with a new identity on
@@ -3429,7 +3431,7 @@ export default function Timeline() {
                           const { detailLines, extra } = presentTimelineDiaryEntryDetails(
                             e.details,
                             temperatureUnit,
-                            { suppress: isLearningLoopEvent || isReadinessCheckEvent },
+                            { suppress: isLearningLoopEvent || isReadinessCheckEvent, waterUnit },
                           );
                           const loopActionId =
                             isLearningLoopEvent && typeof e.details?.action_queue_id === "string"

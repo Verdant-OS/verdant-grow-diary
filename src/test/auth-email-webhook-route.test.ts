@@ -125,7 +125,7 @@ describe("managed sign-in email webhook handler", () => {
       const [sent, options] = vi.mocked(deps.send).mock.calls[0];
       expect(sent).toMatchObject({
         to: "grower@example.test",
-        from: "verdantgrowdiary-com <noreply@verdantgrowdiary.com>",
+        from: "Verdant Grow Diary <noreply@verdantgrowdiary.com>",
         sender_domain: "notify.verdantgrowdiary.com",
         subject: AUTH_EMAIL_SUBJECTS[action],
         html: "<p>html</p>",

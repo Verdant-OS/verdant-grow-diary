@@ -23,7 +23,7 @@ const validPayload = (overrides: Record<string, unknown> = {}) => ({
 
 describe("auth email webhook rules", () => {
   it("sends from Verdant's own domain through the managed sender", () => {
-    expect(AUTH_EMAIL_FROM).toBe("verdantgrowdiary-com <noreply@verdantgrowdiary.com>");
+    expect(AUTH_EMAIL_FROM).toBe("Verdant Grow Diary <noreply@verdantgrowdiary.com>");
     expect(AUTH_EMAIL_SENDER_DOMAIN).toBe("notify.verdantgrowdiary.com");
   });
 
@@ -105,7 +105,7 @@ describe("auth email webhook rules", () => {
       new_email: null,
     });
     expect(props).toEqual({
-      siteName: "verdantgrowdiary-com",
+      siteName: "Verdant Grow Diary",
       siteUrl: "https://verdantgrowdiary.com",
       recipient: "grower@example.test",
       confirmationUrl: "https://x.test/r",
@@ -125,7 +125,7 @@ describe("auth email webhook rules", () => {
       run_id: "run-123",
       message_id: "msg-1",
       to: "grower@example.test",
-      from: "verdantgrowdiary-com <noreply@verdantgrowdiary.com>",
+      from: "Verdant Grow Diary <noreply@verdantgrowdiary.com>",
       sender_domain: "notify.verdantgrowdiary.com",
       subject: "Reset your password",
       html: "<p>h</p>",

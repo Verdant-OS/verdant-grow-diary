@@ -32,7 +32,7 @@ describe("auth-email-hook runtime: successful send", () => {
     expect(message).toMatchObject({
       run_id: "run_fixture_1",
       to: "grower@example.invalid",
-      from: "verdantgrowdiary-com <noreply@verdantgrowdiary.com>",
+      from: "Verdant Grow Diary <noreply@verdantgrowdiary.com>",
       sender_domain: "notify.verdantgrowdiary.com",
       subject: "Confirm your email",
       html: "<p>fixture html</p>",

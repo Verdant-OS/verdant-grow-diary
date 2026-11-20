@@ -39,6 +39,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   gamification-staging-smoke:
     name: Gamification RLS + award_nugs smoke (staging)

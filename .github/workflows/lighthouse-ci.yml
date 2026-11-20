@@ -16,6 +16,9 @@ on:
     # Nightly at 08:00 UTC. Comment out if not desired.
     - cron: "0 8 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   lighthouse:
     name: Lighthouse (published sitemap, ${{ matrix.shard.label }})

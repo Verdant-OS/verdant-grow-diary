@@ -15,6 +15,9 @@ concurrency:
   group: supabase-migrations-sync-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions:
+  contents: read
+
 jobs:
   verify-migrations-complete:
     name: Verify migrations superset of integration branch

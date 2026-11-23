@@ -61,6 +61,8 @@ export interface MoreItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  /** Match the route exactly, so "/" does not light up on every page. */
+  end?: boolean;
 }
 
 export interface MoreGroup {
@@ -97,6 +99,9 @@ export const moreGroups: MoreGroup[] = [
   {
     heading: "Cultivation",
     items: [
+      // The Tent tab opens the grower's tent once they have one, so this is
+      // the phone's way back to the Dashboard (the desktop sidebar's label).
+      { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
       { to: "/grows", label: "My Grows", icon: Sprout },
       { to: "/tents", label: "Tents", icon: Box },
       { to: "/plants", label: "Plants", icon: Leaf },
@@ -212,6 +217,7 @@ export default function MobileNav() {
                       <NavLink
                         key={m.to}
                         to={m.to}
+                        end={m.end}
                         onClick={() => setOpen(false)}
                         className={({ isActive }) =>
                           cn(

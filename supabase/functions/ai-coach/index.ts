@@ -23,7 +23,6 @@ import {
 } from "../_shared/geminiInlineImage.ts";
 import {
   captureAiGeneration,
-  contentFreeAiSessionId,
   requestGrantsAnalyticsCapture,
 } from "../_shared/posthogAiObservability.ts";
 
@@ -702,7 +701,6 @@ Rules for diagnosis (structured view, approval-first):
       { role: "system", content: system },
       { role: "user", content: userContent },
     ];
-    const aiSessionId = contentFreeAiSessionId(FEATURE);
     const providerStartedAt = performance.now();
     const captureGeneration = (details: {
       response?: unknown;
@@ -711,7 +709,6 @@ Rules for diagnosis (structured view, approval-first):
     }) =>
       captureAiGeneration({
         distinctId: userId,
-        sessionId: aiSessionId,
         traceId: idempotencyKey,
         spanName: FEATURE,
         model: COACH_MODEL,

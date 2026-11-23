@@ -14,6 +14,7 @@ import {
   contentFreeAiProperties,
   countToolCalls,
   extractTokenUsage,
+  scheduleContentFreeAiCapture,
   sendContentFreeAiGeneration,
 } from "@/lib/posthogAiObservabilityRules";
 
@@ -60,7 +61,6 @@ describe("content-free AI observability", () => {
   it("omits prompts, answers, and image bytes from the capture properties", () => {
     const properties = contentFreeAiProperties({
       distinctId: "user-1",
-      sessionId: "session-1",
       traceId: "trace-1",
       spanName: "ai_coach",
       model: "gemini-test",
@@ -77,6 +77,8 @@ describe("content-free AI observability", () => {
     expect(serialized).not.toContain(PHOTO);
     expect(serialized).not.toContain("base64");
     expect(serialized).not.toContain("The leaves look fine");
+    expect(properties.$ai_session_id).toBe("trace-1");
+    expect(properties.$ai_session_id).toBe(properties.$ai_trace_id);
     expect(properties.$ai_model).toBe("gemini-test");
     expect(properties.$ai_input_tokens).toBe(11);
     expect(properties.$ai_output_tokens).toBe(7);
@@ -95,7 +97,6 @@ describe("content-free AI observability", () => {
     const denied = new Request("https://example.test/ai-coach");
     const payload = {
       distinctId: "user-1",
-      sessionId: "session-1",
       traceId: "trace-1",
       spanName: "ai_coach",
       model: "gemini-test",
@@ -152,5 +153,21 @@ describe("content-free AI observability", () => {
     expect(grantedAnalyticsConsentHeaders("verdantgrowdiary.com")).toEqual({
       [ANALYTICS_CONSENT_REQUEST_HEADER]: "granted",
     });
+  });
+
+  it("schedules capture on EdgeRuntime.waitUntil and swallows a rejection", async () => {
+    let scheduled: Promise<unknown> | undefined;
+    scheduleContentFreeAiCapture(Promise.reject(new Error("posthog down")), {
+      waitUntil(promise) {
+        scheduled = promise;
+      },
+    });
+    expect(scheduled).toBeInstanceOf(Promise);
+    await expect(scheduled).resolves.toBeUndefined();
+  });
+
+  it("keeps a capture rejection inside the task when waitUntil is absent", async () => {
+    scheduleContentFreeAiCapture(Promise.reject(new Error("posthog down")), undefined);
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 });

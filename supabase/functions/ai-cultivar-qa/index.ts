@@ -31,14 +31,15 @@ import {
 } from "../_shared/cultivarQaGrounding.ts";
 import {
   captureAiGeneration,
-  contentFreeAiSessionId,
   requestGrantsAnalyticsCapture,
 } from "../_shared/posthogAiObservability.ts";
+
+const CULTIVAR_QA_MODEL = "google/gemini-2.5-flash";
 
 const sharedAllowHeaders = supabaseCorsHeaders["Access-Control-Allow-Headers"] ?? "";
 const corsHeaders = {
   ...supabaseCorsHeaders,
-  "Access-Control-Allow-Headers": `${sharedAllowHeaders}, x-retry-count, x-verdant-analytics-consent`,
+  "Access-Control-Allow-Headers": `${sharedAllowHeaders}, x-verdant-analytics-consent`,
 };
 
 function json(payload: unknown, status = 200): Response {
@@ -111,10 +112,9 @@ Deno.serve(async (req) => {
     }) =>
       captureAiGeneration({
         distinctId: u.user.id,
-        sessionId: contentFreeAiSessionId("ai_cultivar_qa"),
         traceId,
         spanName: "ai_cultivar_qa",
-        model: "google/gemini-2.5-flash",
+        model: CULTIVAR_QA_MODEL,
         provider: "gemini",
         consentGranted: requestGrantsAnalyticsCapture(req),
         providerResponse: details.response,
@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
         signal: providerController.signal,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: CULTIVAR_QA_MODEL,
           max_tokens: CULTIVAR_QA_MAX_OUTPUT_TOKENS,
           messages: aiInput,
         }),

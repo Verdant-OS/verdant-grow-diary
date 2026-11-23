@@ -2,20 +2,8 @@
 
 export const ANALYTICS_CONSENT_REQUEST_HEADER = "x-verdant-analytics-consent";
 
-/** Feature label only. Raw user, grow, and session ids stay off the event. */
-export function contentFreeAiSessionId(feature: string): string {
-  const label =
-    feature
-      .trim()
-      .toLowerCase()
-      .split(":")[0]
-      ?.replace(/[^a-z0-9_]/g, "") ?? "";
-  return label.length > 0 ? label : "ai";
-}
-
 export type AiGenerationCaptureFields = {
   distinctId: string;
-  sessionId: string;
   traceId: string;
   spanName: string;
   model: string;
@@ -94,6 +82,21 @@ export function requestGrantsAnalyticsCapture(req: Request): boolean {
   return analyticsConsentGranted(req.headers.get(ANALYTICS_CONSENT_REQUEST_HEADER));
 }
 
+/** Keeps capture off the response path. A rejection stays inside the scheduled task. */
+export function scheduleContentFreeAiCapture(
+  task: Promise<void>,
+  runtime: { waitUntil?: (promise: Promise<unknown>) => void } | undefined,
+): void {
+  const guarded = task.catch(() => {
+    // Observability must not alter an AI result when PostHog is unavailable.
+  });
+  if (typeof runtime?.waitUntil === "function") {
+    runtime.waitUntil(guarded);
+    return;
+  }
+  void guarded;
+}
+
 export async function sendContentFreeAiGeneration(
   input: AiGenerationCaptureFields & { consentGranted: boolean },
   deps: {
@@ -130,7 +133,7 @@ export function contentFreeAiProperties(input: AiGenerationCaptureFields): Recor
   const properties: Record<string, unknown> = {
     distinct_id: input.distinctId,
     $ai_trace_id: input.traceId,
-    $ai_session_id: input.sessionId,
+    $ai_session_id: input.traceId,
     $ai_span_name: input.spanName,
     $ai_model: input.model,
     $ai_provider: input.provider,

@@ -1,9 +1,20 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { contentFreeAiSessionId } from "@/lib/posthogAiObservabilityRules";
+import {
+  ANALYTICS_CONSENT_STORAGE_KEY,
+  grantedAnalyticsConsentHeaders,
+} from "@/lib/analyticsConsent";
+import {
+  ANALYTICS_CONSENT_REQUEST_HEADER,
+  requestGrantsAnalyticsCapture,
+} from "@/lib/posthogAiObservabilityRules";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 const ROOT = resolve(__dirname, "../..");
 
@@ -11,46 +22,70 @@ function source(path: string): string {
   return readFileSync(resolve(ROOT, path), "utf8");
 }
 
+function consentExpression(path: string): string {
+  const match = source(path).match(/consentGranted:\s*([^,\n]+)/);
+  expect(match, path).not.toBeNull();
+  return match?.[1]?.trim() ?? "";
+}
+
+function headerExpression(path: string): string {
+  const match = source(path).match(/headers:\s*([^,\n]+)/);
+  expect(match, path).not.toBeNull();
+  return match?.[1]?.trim() ?? "";
+}
+
 describe("AI analytics consent stays at the call site", () => {
-  it("does not let an edge function force capture on", () => {
+  afterEach(() => {
+    clearLocalStorageForTest();
+  });
+
+  it("runs the edge consent expression instead of treating a forced true as granted", () => {
     for (const path of [
       "supabase/functions/ai-coach/index.ts",
       "supabase/functions/ai-doctor-review/index.ts",
       "supabase/functions/ai-cultivar-qa/index.ts",
     ]) {
-      const text = source(path);
-      expect(text, path).toContain("consentGranted: requestGrantsAnalyticsCapture(req)");
-      expect(text, path).not.toContain("consentGranted: true");
+      const expression = consentExpression(path);
+      const decide = new Function(
+        "requestGrantsAnalyticsCapture",
+        "req",
+        `return (${expression});`,
+      ) as (gate: typeof requestGrantsAnalyticsCapture, req: Request) => boolean;
+      expect(
+        decide(requestGrantsAnalyticsCapture, new Request("https://example.test/ai")),
+        path,
+      ).toBe(false);
+      expect(
+        decide(
+          requestGrantsAnalyticsCapture,
+          new Request("https://example.test/ai", {
+            headers: { [ANALYTICS_CONSENT_REQUEST_HEADER]: "granted" },
+          }),
+        ),
+        path,
+      ).toBe(true);
     }
   });
 
-  it("does not let the browser callers force the consent header on", () => {
+  it("runs the browser header expression, which stays off without production consent", () => {
     for (const path of [
       "src/pages/Coach.tsx",
       "src/hooks/useCultivarQa.ts",
       "src/hooks/useDoctorGrowNextSteps.ts",
+      "src/hooks/useAiDoctorLiveReview.ts",
     ]) {
-      const text = source(path);
-      expect(text, path).toContain("headers: grantedAnalyticsConsentHeaders()");
-      expect(text, path).not.toContain('"x-verdant-analytics-consent": "granted"');
+      const expression = headerExpression(path);
+      const headersFor = new Function(
+        "grantedAnalyticsConsentHeaders",
+        `return (${expression});`,
+      ) as (
+        headers: typeof grantedAnalyticsConsentHeaders,
+      ) => ReturnType<typeof grantedAnalyticsConsentHeaders>;
+      clearLocalStorageForTest();
+      expect(headersFor(grantedAnalyticsConsentHeaders), path).toBeUndefined();
+      setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+      expect(headersFor(grantedAnalyticsConsentHeaders), path).toBeUndefined();
     }
-  });
-
-  it("keeps session ids as a feature label with no raw id", () => {
-    expect(contentFreeAiSessionId("ai_coach")).toBe("ai_coach");
-    expect(contentFreeAiSessionId("ai_doctor_review:11111111-1111-4111-8111-111111111111")).toBe(
-      "ai_doctor_review",
-    );
-    expect(source("supabase/functions/ai-coach/index.ts")).toContain(
-      "contentFreeAiSessionId(FEATURE)",
-    );
-    expect(source("supabase/functions/ai-doctor-review/index.ts")).toContain(
-      "contentFreeAiSessionId(FEATURE)",
-    );
-    expect(source("supabase/functions/ai-cultivar-qa/index.ts")).toContain(
-      'contentFreeAiSessionId("ai_cultivar_qa")',
-    );
-    expect(source("supabase/functions/ai-coach/index.ts")).not.toContain("ai_coach:${userId}");
   });
 
   it("captures the coach malformed-JSON and body-timeout path", () => {

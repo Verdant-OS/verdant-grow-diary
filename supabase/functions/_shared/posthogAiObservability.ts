@@ -2,8 +2,8 @@
 // Prompts, completions, tool schemas, and image bytes are never sent.
 
 import {
-  contentFreeAiSessionId,
   requestGrantsAnalyticsCapture,
+  scheduleContentFreeAiCapture,
   sendContentFreeAiGeneration,
   type AiGenerationCaptureFields,
 } from "./lib/lib/posthogAiObservabilityRules.ts";
@@ -11,7 +11,7 @@ import {
 const POSTHOG_PROJECT_TOKEN_ENV = "POSTHOG_PROJECT_TOKEN";
 const POSTHOG_HOST_ENV = "POSTHOG_HOST";
 
-export { contentFreeAiSessionId, requestGrantsAnalyticsCapture };
+export { requestGrantsAnalyticsCapture };
 
 type AiGenerationCapture = AiGenerationCaptureFields & {
   consentGranted: boolean;
@@ -49,19 +49,15 @@ function posthogCaptureConfiguration(): { apiKey: string; url: string } | null {
  */
 export function captureAiGeneration(input: AiGenerationCapture): void {
   const configuration = posthogCaptureConfiguration();
-  const task = sendContentFreeAiGeneration(input, {
-    fetch,
-    endpoint: configuration?.url ?? null,
-    apiKey: configuration?.apiKey ?? null,
-  }).catch(() => {
-    // Observability must not alter an AI result when PostHog is unavailable.
-  });
   const runtime = (
     globalThis as { EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void } }
   ).EdgeRuntime;
-  if (typeof runtime?.waitUntil === "function") {
-    runtime.waitUntil(task);
-    return;
-  }
-  void task;
+  scheduleContentFreeAiCapture(
+    sendContentFreeAiGeneration(input, {
+      fetch,
+      endpoint: configuration?.url ?? null,
+      apiKey: configuration?.apiKey ?? null,
+    }),
+    runtime,
+  );
 }

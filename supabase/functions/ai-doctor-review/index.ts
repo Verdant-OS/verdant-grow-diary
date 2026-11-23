@@ -68,7 +68,6 @@ import {
 } from "../_shared/geminiDirectChat.ts";
 import {
   captureAiGeneration,
-  contentFreeAiSessionId,
   requestGrantsAnalyticsCapture,
 } from "../_shared/posthogAiObservability.ts";
 
@@ -606,7 +605,6 @@ export async function handleAiDoctorReviewRequest(
       { role: "system", content: promptMessages.system },
       { role: "user", content: promptMessages.user },
     ];
-    const aiSessionId = contentFreeAiSessionId(FEATURE);
     const providerStartedAt = performance.now();
     const captureGeneration = (details: {
       response?: unknown;
@@ -615,7 +613,6 @@ export async function handleAiDoctorReviewRequest(
     }) =>
       captureAiGeneration({
         distinctId: userId,
-        sessionId: aiSessionId,
         traceId: idempotencyKey,
         spanName: FEATURE,
         model: WIRE_MODEL,

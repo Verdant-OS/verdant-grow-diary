@@ -7,8 +7,8 @@ why: issue #3063 (P3, from a simulated first-use walkthrough). The Dashboard sav
 branch: posthog-self-driving/fixquick-log-show-the-note-text-in-the-5e569c
 base: verdant-grow-diary (started at 9c7339428)
 checkout: git fetch origin posthog-self-driving/fixquick-log-show-the-note-text-in-the-5e569c verdant-grow-diary && git switch posthog-self-driving/fixquick-log-show-the-note-text-in-the-5e569c && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: draft PR from the branch above (number recorded on update)
-head_sha: recorded on the PR; this file is written before the first push
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3067
+head_sha: code commit acd4d6a1d940a608e2a7927c415b10553cf8153a (2026-11-23 15:22 CT); the commit that adds this update is the PR head, so read the exact head from the PR
 state: pushed draft
 current_step: draft PR open; CI running
 next_action: confirm 35/35 required checks at the head, then request an eligible independent review at the exact head
@@ -19,7 +19,7 @@ tried_and_rejected: changing the new-plant Tent default to the only tent. resolv
 commands: bunx vitest run src/test/quick-log-timeline-cta-integration.test.tsx src/test/quick-log-note-save-rules.test.ts src/test/quick-log-failed-save-retry.test.tsx src/test/quick-log-v2-refresh-sheet.test.tsx --reporter=dot
 files_touched: src/components/QuickLogV2Sheet.tsx, src/test/quick-log-timeline-cta-integration.test.tsx
 files_remaining: none planned
-blockers: none
+blockers: none. A `resume here` PR comment was not posted: CURRENT_STATE "Start here" says GitHub comments need Matthew's approval
 open_questions: should a new plant default to the grower's only tent (issue #3063, second item)? Matthew's decision.
 gotchas: 21 QuickLogV2Sheet storage-failure tests fail in the PostHog sandbox on the base commit too (Node 26 runtime); CI is the evidence for those.
 links: https://github.com/Verdant-OS/verdant-grow-diary/issues/3063
@@ -29,5 +29,5 @@ reviewer_sha: none yet
 session_state: PostHog self-driving cloud task; no routines or paused workflows
 claimed_by: PostHog self-driving Claude session, 2026-11-23 15:20 CT
 owner: PostHog self-driving Claude session
-last_updated: 2026-11-23 15:20 CT, by Claude
+last_updated: 2026-11-23 15:25 CT, by Claude
 ```

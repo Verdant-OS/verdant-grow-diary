@@ -31,13 +31,14 @@ import {
 } from "../_shared/cultivarQaGrounding.ts";
 import {
   captureAiGeneration,
+  contentFreeAiSessionId,
   requestGrantsAnalyticsCapture,
 } from "../_shared/posthogAiObservability.ts";
 
+const sharedAllowHeaders = supabaseCorsHeaders["Access-Control-Allow-Headers"] ?? "";
 const corsHeaders = {
   ...supabaseCorsHeaders,
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-verdant-analytics-consent",
+  "Access-Control-Allow-Headers": `${sharedAllowHeaders}, x-retry-count, x-verdant-analytics-consent`,
 };
 
 function json(payload: unknown, status = 200): Response {
@@ -110,7 +111,7 @@ Deno.serve(async (req) => {
     }) =>
       captureAiGeneration({
         distinctId: u.user.id,
-        sessionId: `ai_cultivar_qa:${u.user.id}:${parsedRequest.cultivarSlug}`,
+        sessionId: contentFreeAiSessionId("ai_cultivar_qa"),
         traceId,
         spanName: "ai_cultivar_qa",
         model: "google/gemini-2.5-flash",
@@ -139,14 +140,14 @@ Deno.serve(async (req) => {
       });
 
       if (response.status === 402 || response.status === 429) {
-        await captureGeneration({
+        captureGeneration({
           httpStatus: response.status,
           error: "upstream_credit_exhausted",
         });
         return json({ ok: false, reason: "upstream_credit_exhausted" }, 200);
       }
       if (!response.ok) {
-        await captureGeneration({ httpStatus: response.status, error: "upstream_http_error" });
+        captureGeneration({ httpStatus: response.status, error: "upstream_http_error" });
         console.log(`ai-cultivar-qa status=upstream_error http=${response.status}`);
         return json({ ok: false, reason: "upstream_error" }, 200);
       }
@@ -156,16 +157,16 @@ Deno.serve(async (req) => {
         CULTIVAR_QA_MAX_PROVIDER_RESPONSE_BYTES,
       );
       if (!providerBody.ok) {
-        await captureGeneration({ httpStatus: response.status, error: "invalid_json_response" });
+        captureGeneration({ httpStatus: response.status, error: "invalid_json_response" });
         return json({ ok: false, reason: "invalid_answer" }, 200);
       }
-      await captureGeneration({ httpStatus: response.status, response: providerBody.value });
+      captureGeneration({ httpStatus: response.status, response: providerBody.value });
       const answer = parseCultivarQaAnswer(providerBody.value);
       if (!answer.ok) return json({ ok: false, reason: answer.reason }, 200);
 
       return json({ ok: true, answer: answer.answer });
     } catch {
-      await captureGeneration({
+      captureGeneration({
         error: providerController.signal.aborted ? "timeout" : "network_or_timeout",
       });
       return json({ ok: false, reason: "upstream_unavailable" }, 200);

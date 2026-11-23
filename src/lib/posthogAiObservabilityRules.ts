@@ -2,6 +2,17 @@
 
 export const ANALYTICS_CONSENT_REQUEST_HEADER = "x-verdant-analytics-consent";
 
+/** Feature label only. Raw user, grow, and session ids stay off the event. */
+export function contentFreeAiSessionId(feature: string): string {
+  const label =
+    feature
+      .trim()
+      .toLowerCase()
+      .split(":")[0]
+      ?.replace(/[^a-z0-9_]/g, "") ?? "";
+  return label.length > 0 ? label : "ai";
+}
+
 export type AiGenerationCaptureFields = {
   distinctId: string;
   sessionId: string;

@@ -68,6 +68,7 @@ import {
 } from "../_shared/geminiDirectChat.ts";
 import {
   captureAiGeneration,
+  contentFreeAiSessionId,
   requestGrantsAnalyticsCapture,
 } from "../_shared/posthogAiObservability.ts";
 
@@ -605,7 +606,7 @@ export async function handleAiDoctorReviewRequest(
       { role: "system", content: promptMessages.system },
       { role: "user", content: promptMessages.user },
     ];
-    const aiSessionId = `ai_doctor_review:${userId}:${sessionId ?? growId ?? idempotencyKey}`;
+    const aiSessionId = contentFreeAiSessionId(FEATURE);
     const providerStartedAt = performance.now();
     const captureGeneration = (details: {
       response?: unknown;
@@ -642,7 +643,7 @@ export async function handleAiDoctorReviewRequest(
       });
       upstream = await fetch(GATEWAY_URL, providerRequest);
     } catch {
-      await captureGeneration({ error: "network_or_timeout" });
+      captureGeneration({ error: "network_or_timeout" });
       console.log("ai-doctor-review status=timeout_or_network");
       return failureAfterRefund(spendId, "upstream_timeout", "timeout");
     } finally {
@@ -650,7 +651,7 @@ export async function handleAiDoctorReviewRequest(
     }
 
     if (upstream.status === 402) {
-      await captureGeneration({ httpStatus: upstream.status, error: "upstream_credit_exhausted" });
+      captureGeneration({ httpStatus: upstream.status, error: "upstream_credit_exhausted" });
       console.log("ai-doctor-review status=upstream_credit_exhausted");
       try {
         await upstream.text();
@@ -661,7 +662,7 @@ export async function handleAiDoctorReviewRequest(
     }
 
     if (upstream.status === 429) {
-      await captureGeneration({ httpStatus: upstream.status, error: "upstream_credit_exhausted" });
+      captureGeneration({ httpStatus: upstream.status, error: "upstream_credit_exhausted" });
       console.log("ai-doctor-review status=upstream_credit_exhausted");
       try {
         await upstream.text();
@@ -672,7 +673,7 @@ export async function handleAiDoctorReviewRequest(
     }
 
     if (!upstream.ok) {
-      await captureGeneration({ httpStatus: upstream.status, error: "upstream_http_error" });
+      captureGeneration({ httpStatus: upstream.status, error: "upstream_http_error" });
       console.log(`ai-doctor-review status=http_${upstream.status}`);
       try {
         await upstream.text();
@@ -686,12 +687,12 @@ export async function handleAiDoctorReviewRequest(
     try {
       payload = await upstream.json();
     } catch {
-      await captureGeneration({ httpStatus: upstream.status, error: "invalid_json_response" });
+      captureGeneration({ httpStatus: upstream.status, error: "invalid_json_response" });
       console.log("ai-doctor-review status=parse_error");
       return failureAfterRefund(spendId, "upstream_parse", "parse");
     }
 
-    await captureGeneration({ httpStatus: upstream.status, response: payload });
+    captureGeneration({ httpStatus: upstream.status, response: payload });
 
     // Provider response boundary: attach provider-reported token usage to the
     // in-memory prompt measurement. Pure, immutable; never persisted, never

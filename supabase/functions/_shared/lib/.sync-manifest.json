@@ -78,7 +78,7 @@
     "src/lib/piIngestServerSecretResolverTypes.ts": "3cae9aa30eb1fa4748cb4e84fb7f1eb31478047b6ae00a8dcc6023b2c1111498",
     "src/lib/plantRecentActivityRules.ts": "bcaa46c8afc72f12aa023108b377b2d7bc78ac677019a26bedb792ef01c773bd",
     "src/lib/plantTypeRules.ts": "f0fa64df2cf165e8902b9ed900d1765ffe825ad0333ea3bc9d7813ddb80382bb",
-    "src/lib/posthogAiObservabilityRules.ts": "a833aa65bc4a32a6b67c4914e051d84dbab5f4cd5fd6edd027974cd4ef74693a",
+    "src/lib/posthogAiObservabilityRules.ts": "f3029555334655654186f51aa73702feb8830e184e24f517d8cb9d50c276edfd",
     "src/lib/ppfdRules.ts": "8ac7ead78f3ae9cfe682d37d36c6594cac3ece2c2862fa6edc7ed853dce14261",
     "src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts": "3985ab4ff100d3f10fdbe4b7ad019ee28aab78b4e5c58c17ad58ae46c5afaad7",
     "src/lib/quick-log/quickLogSnapshotMetricNormalizer.ts": "c458e70f476d3d1bb70c5d22b425865eeeb8cce3c4ab1baa9921208b988fe0ce",

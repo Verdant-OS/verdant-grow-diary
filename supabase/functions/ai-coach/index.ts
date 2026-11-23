@@ -23,6 +23,7 @@ import {
 } from "../_shared/geminiInlineImage.ts";
 import {
   captureAiGeneration,
+  contentFreeAiSessionId,
   requestGrantsAnalyticsCapture,
 } from "../_shared/posthogAiObservability.ts";
 
@@ -701,7 +702,7 @@ Rules for diagnosis (structured view, approval-first):
       { role: "system", content: system },
       { role: "user", content: userContent },
     ];
-    const aiSessionId = `ai_coach:${userId}:${growId ?? idempotencyKey}`;
+    const aiSessionId = contentFreeAiSessionId(FEATURE);
     const providerStartedAt = performance.now();
     const captureGeneration = (details: {
       response?: unknown;
@@ -739,37 +740,43 @@ Rules for diagnosis (structured view, approval-first):
       });
       const r = await fetch(GATEWAY_URL, providerRequest);
       if (r.status === 429) {
-        await captureGeneration({ httpStatus: r.status, error: "upstream_credit_exhausted" });
+        captureGeneration({ httpStatus: r.status, error: "upstream_credit_exhausted" });
         console.log("ai-coach status=upstream_credit_exhausted http=200");
         return failureAfterRefund(spendId, "upstream_429", "upstream_credit_exhausted");
       }
       if (r.status === 402) {
-        await captureGeneration({ httpStatus: r.status, error: "upstream_credit_exhausted" });
+        captureGeneration({ httpStatus: r.status, error: "upstream_credit_exhausted" });
         console.log("ai-coach status=upstream_credit_exhausted http=200");
         return failureAfterRefund(spendId, "upstream_402", "upstream_credit_exhausted");
       }
       if (!r.ok) {
-        await captureGeneration({ httpStatus: r.status, error: "upstream_http_error" });
+        captureGeneration({ httpStatus: r.status, error: "upstream_http_error" });
         return failureAfterRefund(spendId, `upstream_${r.status}`, "http");
       }
       const readProviderBody = r.json.bind(r);
       r.json = () => readJsonUntilAbort(r, providerController.signal, readProviderBody);
+      const noteParse = (aborted: boolean) =>
+        captureGeneration({
+          httpStatus: r.status,
+          error: aborted ? "timeout" : "invalid_json_response",
+        });
       try {
         data = await r.json();
       } catch {
+        noteParse(providerController.signal.aborted);
         if (providerController.signal.aborted) {
           return failureAfterRefund(spendId, "upstream_network", "timeout");
         }
         return failureAfterRefund(spendId, "upstream_parse", "parse");
       }
     } catch {
-      await captureGeneration({ error: "network_or_timeout" });
+      captureGeneration({ error: "network_or_timeout" });
       return failureAfterRefund(spendId, "upstream_network", "timeout");
     } finally {
       clearTimeout(providerTimer);
     }
 
-    await captureGeneration({ response: data, httpStatus: 200 });
+    captureGeneration({ response: data, httpStatus: 200 });
 
     const raw = readCoachMessageContent(data);
     if (!raw) return failureAfterRefund(spendId, "upstream_empty", "empty");

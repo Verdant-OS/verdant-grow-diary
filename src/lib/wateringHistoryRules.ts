@@ -125,8 +125,9 @@ function isPlainDetail(value: unknown): boolean {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Same feeding-envelope rule as the timeline card: no type, feeding object, no watering object. */
+/** Millilitres for a typeless or explicit feeding row. An explicit watering type converts. */
 function feedingEnvelopeKeepsMl(entry: NormalizedDiaryEntry): boolean {
+  if (entry.eventType === "watering" || entry.eventType === "water") return false;
   if (entry.eventType === "feeding" || entry.eventType === "feed") return true;
   const extras = entry.details.extras;
   if (!extras) return false;

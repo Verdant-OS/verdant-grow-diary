@@ -64,7 +64,7 @@ describe("consented first paid activation", () => {
       event: "subscription_activated",
       uuid: eventId,
       timestamp: activatedAt,
-      properties: { $geoip_disable: true },
+      properties: { $geoip_disable: true, $raw_user_agent: navigator.userAgent },
     });
     expect(await report()).toBe(true);
     expect(send).toHaveBeenCalledTimes(1);

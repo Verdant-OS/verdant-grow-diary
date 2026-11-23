@@ -110,7 +110,10 @@ describe("first paid upgrade through the app consent and checkout hooks", () => 
       event: "subscription_activated",
       uuid: eventId,
     });
-    expect(event.properties).toEqual({ $geoip_disable: true });
+    expect(event.properties).toEqual({
+      $geoip_disable: true,
+      $raw_user_agent: navigator.userAgent,
+    });
     act(checkoutConfirmed);
     expect(read).toHaveBeenCalledTimes(2);
   });

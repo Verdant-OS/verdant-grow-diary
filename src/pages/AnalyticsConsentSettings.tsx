@@ -124,6 +124,10 @@ export default function AnalyticsConsentSettings() {
               Ahrefs Web Analytics property in use:{" "}
               <code className="break-all font-mono text-xs">{AHREFS_WEB_ANALYTICS_KEY}</code>
             </li>
+            <li>
+              PostHog records when you first activate a paid plan, using your account ID. Diary
+              entries, payment details, and email stay out of that event.
+            </li>
           </ul>
         </CardContent>
       </Card>

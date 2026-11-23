@@ -62,6 +62,12 @@ async function lookupReceipt(signal: AbortSignal): Promise<unknown> {
   return session && isOwnReceipt(data, session.user.id) ? data : null;
 }
 
+function safeRawUserAgent(value: string | undefined): string | undefined {
+  if (!value || value.length > 512 || value !== value.trim()) return undefined;
+  if (value.includes("@") || value.includes("\n") || value.includes("\r")) return undefined;
+  return value;
+}
+
 function collectionConfig() {
   return decidePostHogStartup({
     decision: readAnalyticsConsent(),
@@ -103,7 +109,11 @@ export async function reportFirstPaidActivation(
       return false;
     if (window.localStorage.getItem(SENT_RECEIPT) === receipt.event_id) return true;
 
-    // One fixed Capture API payload. No SDK-enriched properties, cookies, referrer or billing IDs.
+    // Same string checks as the PostHog before_send user-agent copy: 512 characters,
+    // no email-shaped text, no line breaks. Missing that field is classified as Automation.
+    const userAgent = safeRawUserAgent(
+      typeof navigator === "undefined" ? undefined : navigator.userAgent,
+    );
     const response = await (deps.send ?? fetch)(`${config.apiHost}/i/v0/e/`, {
       method: "POST",
       credentials: "omit",
@@ -116,7 +126,10 @@ export async function reportFirstPaidActivation(
         event: "subscription_activated",
         uuid: receipt.event_id,
         timestamp: new Date(at).toISOString(),
-        properties: { $geoip_disable: true },
+        properties: {
+          $geoip_disable: true,
+          ...(userAgent ? { $raw_user_agent: userAgent } : {}),
+        },
       }),
       signal,
     });

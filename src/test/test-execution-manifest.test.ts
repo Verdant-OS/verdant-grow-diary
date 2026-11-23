@@ -211,7 +211,7 @@ function pgTapExemptions(): Record<string, { class: string; reason: string }> {
   out["supabase/tests/posthog_first_paid_activation.sql"] = {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
     reason:
-      "Disposable PGlite harness for the first-paid receipt. No workflow runs it. It is not a supabase start lane.",
+      "No CI job executes this file or the migration. Verification needs a live disposable database. PGlite is not a repository dependency, so this stays NEEDS_LIVE_DATABASE.",
   };
   out["supabase/tests/billing_subscriptions_rls.sql"] = {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,

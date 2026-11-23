@@ -12,7 +12,7 @@ SELECT pg_temp.check_paid(to_regprocedure('public.get_my_first_paid_activation()
 INSERT INTO auth.users (id, email, raw_app_meta_data, raw_user_meta_data, aud, role, created_at, updated_at)
 SELECT md5('paid-test-' || n)::uuid, 'paid-' || n || '@verdant.test', '{}', '{}',
        'authenticated', 'authenticated', now(), now()
-FROM generate_series(1, 20) AS n;
+FROM generate_series(1, 33) AS n;
 
 CREATE FUNCTION pg_temp.add_sub(n integer, plan text, provider text DEFAULT 'stripe',
     env text DEFAULT 'live', state text DEFAULT 'active', period_end timestamptz DEFAULT now() + interval '1 month',
@@ -139,6 +139,74 @@ UPDATE public.subscriptions
 SELECT pg_temp.check_paid((SELECT count(*) = 1 FROM public.first_paid_activation_receipts
                           WHERE user_id = md5('paid-test-20')::uuid),
                           'Sandbox cancel blocked the later live trial conversion');
+
+DO $plans$
+DECLARE
+  plans text[] := ARRAY['pro_monthly', 'pro_annual', 'craft_monthly', 'craft_annual', 'founder_lifetime'];
+  plan text;
+  n int;
+  uid uuid;
+BEGIN
+  FOR n IN 1..5 LOOP
+    plan := plans[n];
+    PERFORM pg_temp.add_sub(20 + n, plan, 'paddle');
+    uid := md5('paid-test-' || (20 + n))::uuid;
+    DELETE FROM public.first_paid_activation_receipts WHERE user_id = uid;
+    DELETE FROM public.paid_return_cohort_memberships WHERE user_id = uid;
+    UPDATE public.subscriptions SET status = 'canceled' WHERE user_id = uid;
+    UPDATE public.subscriptions
+      SET status = 'trialing', current_period_start = now() - interval '14 days',
+          current_period_end = now()
+      WHERE user_id = uid;
+    UPDATE public.subscriptions
+      SET status = 'active',
+          price_id = CASE WHEN plan = 'founder_lifetime' THEN 'craft_annual' ELSE plan END,
+          current_period_start = current_period_end,
+          current_period_end = current_period_end + interval '1 year'
+      WHERE user_id = uid;
+    IF EXISTS (SELECT 1 FROM public.first_paid_activation_receipts WHERE user_id = uid) THEN
+      RAISE EXCEPTION 'Seen-mark replay for % created a receipt', plan;
+    END IF;
+
+    PERFORM pg_temp.add_sub(25 + n, plan, 'paddle', state => 'canceled');
+    PERFORM pg_temp.add_sub(25 + n, 'craft_annual', 'paddle');
+    uid := md5('paid-test-' || (25 + n))::uuid;
+    IF EXISTS (SELECT 1 FROM public.first_paid_activation_receipts WHERE user_id = uid) THEN
+      RAISE EXCEPTION 'Prior % history created a receipt', plan;
+    END IF;
+  END LOOP;
+END
+$plans$;
+
+SELECT pg_temp.add_sub(31, 'craft_annual', 'paddle', state => 'trialing',
+  period_start => now() - interval '14 days', period_end => now());
+UPDATE public.subscriptions
+  SET status = 'active', current_period_start = current_period_end - interval '6 minutes',
+      current_period_end = now() + interval '1 year'
+  WHERE user_id = md5('paid-test-31')::uuid;
+SELECT pg_temp.check_paid(NOT EXISTS (SELECT 1 FROM public.first_paid_activation_receipts
+                          WHERE user_id = md5('paid-test-31')::uuid),
+                          'Paid start six minutes before the trial end created a receipt');
+
+SELECT pg_temp.add_sub(32, 'craft_annual', 'paddle', state => 'trialing',
+  period_start => now() - interval '14 days', period_end => now());
+UPDATE public.subscriptions
+  SET status = 'active', current_period_start = current_period_end - interval '5 minutes',
+      current_period_end = now() + interval '1 year'
+  WHERE user_id = md5('paid-test-32')::uuid;
+SELECT pg_temp.check_paid((SELECT count(*) = 1 FROM public.first_paid_activation_receipts
+                          WHERE user_id = md5('paid-test-32')::uuid),
+                          'Paid start exactly five minutes before the trial end was excluded');
+
+SELECT pg_temp.add_sub(33, 'craft_annual', 'paddle', state => 'trialing',
+  period_start => now() - interval '5 minutes', period_end => now());
+UPDATE public.subscriptions
+  SET status = 'active', current_period_start = current_period_start + interval '5 minutes',
+      current_period_end = now() + interval '1 year'
+  WHERE user_id = md5('paid-test-33')::uuid;
+SELECT pg_temp.check_paid(NOT EXISTS (SELECT 1 FROM public.first_paid_activation_receipts
+                          WHERE user_id = md5('paid-test-33')::uuid),
+                          'Paid start exactly five minutes after the trial start created a receipt');
 
 SELECT pg_temp.check_paid((SELECT count(*) = 4 FROM public.first_paid_activation_receipts
     WHERE user_id IN (SELECT md5('paid-test-' || n)::uuid FROM generate_series(1, 15) n))

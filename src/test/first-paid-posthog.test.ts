@@ -48,7 +48,7 @@ afterEach(() => {
 });
 
 describe("consented first paid activation", () => {
-  it("sends only the authenticated account, server event ID and original time", async () => {
+  it("sends the authenticated account, server event ID, original time, and a safe user agent", async () => {
     consent();
     expect(await report()).toBe(true);
     const [url, init] = send.mock.calls[0];
@@ -68,6 +68,23 @@ describe("consented first paid activation", () => {
     });
     expect(await report()).toBe(true);
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits a user agent the shared transport check rejects", async () => {
+    consent();
+    const prior = navigator.userAgent;
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      value: "Mozilla/5.0 grower@example.com",
+    });
+    try {
+      expect(await report()).toBe(true);
+      expect(JSON.parse(String(send.mock.calls[0][1]?.body)).properties).toEqual({
+        $geoip_disable: true,
+      });
+    } finally {
+      Object.defineProperty(navigator, "userAgent", { configurable: true, value: prior });
+    }
   });
 
   it.each(["unset", "denied", "legacy grant", "excluded route", "preview host", "no project key"])(

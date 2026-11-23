@@ -1,5 +1,10 @@
 import { readAnalyticsConsent, type AnalyticsConsentDecision } from "@/lib/analyticsConsent";
-import { decidePostHogStartup, posthogDistinctId } from "@/lib/posthogAnalyticsRules";
+import {
+  decidePostHogStartup,
+  isSafeSdkTransportString,
+  posthogDistinctId,
+  SDK_USER_AGENT_MAX_LENGTH,
+} from "@/lib/posthogAnalyticsRules";
 
 export const FIRST_PAID_CONSENT_KEY = "verdant.analytics.first-paid-since.v1";
 const SENT_RECEIPT = "verdant.analytics.first-paid-receipt.v1";
@@ -63,8 +68,7 @@ async function lookupReceipt(signal: AbortSignal): Promise<unknown> {
 }
 
 function safeRawUserAgent(value: string | undefined): string | undefined {
-  if (!value || value.length > 512 || value !== value.trim()) return undefined;
-  if (value.includes("@") || value.includes("\n") || value.includes("\r")) return undefined;
+  if (!value || !isSafeSdkTransportString(value, SDK_USER_AGENT_MAX_LENGTH)) return undefined;
   return value;
 }
 

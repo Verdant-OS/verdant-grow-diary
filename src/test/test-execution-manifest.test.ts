@@ -211,7 +211,7 @@ function pgTapExemptions(): Record<string, { class: string; reason: string }> {
   out["supabase/tests/posthog_first_paid_activation.sql"] = {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
     reason:
-      "No CI job executes this file or the migration. Verification needs a live disposable database. PGlite is not a repository dependency, so this stays NEEDS_LIVE_DATABASE.",
+      "Badge pgTAP and test:security-db-local apply this migration on db reset, but neither asserts its logic. Applied but its logic is not tested in CI.",
   };
   out["supabase/tests/billing_subscriptions_rls.sql"] = {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,

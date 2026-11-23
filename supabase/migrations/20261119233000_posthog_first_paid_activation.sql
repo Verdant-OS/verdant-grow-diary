@@ -19,23 +19,33 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
 AS $$
 DECLARE
   same_live_subscription boolean := true;
+  genuine_first_paid boolean := true;
 BEGIN
   IF NEW.environment <> 'live' OR NEW.status <> 'active' THEN
     RETURN NEW;
   END IF;
   IF TG_OP = 'UPDATE' THEN
     IF OLD.status <> 'trialing' THEN RETURN NEW; END IF;
+    -- A delayed trialing upsert keeps created_at and can make an older paid
+    -- row look like a first trial conversion. A genuine trial row is created
+    -- inside that trial window. The operator cohort below is unchanged.
+    IF OLD.current_period_start IS NULL OR NEW.created_at < OLD.current_period_start THEN
+      genuine_first_paid := false;
+    END IF;
     same_live_subscription := OLD.environment = 'live' AND OLD.user_id = NEW.user_id
       AND OLD.billing_provider = NEW.billing_provider
       AND OLD.stripe_subscription_id IS NOT DISTINCT FROM NEW.stripe_subscription_id
       AND OLD.paddle_subscription_id IS NOT DISTINCT FROM NEW.paddle_subscription_id;
   END IF;
 
-  IF same_live_subscription
+  IF genuine_first_paid AND same_live_subscription
      AND NEW.price_id IN ('pro_monthly', 'pro_annual', 'craft_monthly', 'craft_annual')
      AND NEW.current_period_start <= now() AND NEW.current_period_end > now()
      AND ((NEW.billing_provider = 'stripe' AND left(NEW.stripe_subscription_id, 4) = 'sub_')
        OR (NEW.billing_provider = 'paddle' AND left(NEW.paddle_subscription_id, 4) = 'sub_'))
+     AND NOT EXISTS (
+       SELECT 1 FROM public.first_paid_activation_receipts WHERE user_id = NEW.user_id
+     )
      AND NOT EXISTS (
        SELECT 1 FROM public.paid_return_cohort_memberships WHERE user_id = NEW.user_id
      )

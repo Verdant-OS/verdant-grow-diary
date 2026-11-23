@@ -359,7 +359,7 @@ const SDK_USER_AGENT_PROPERTY_KEYS = [
   "$device_type",
 ] as const;
 
-const SDK_USER_AGENT_MAX_LENGTH = 512;
+export const SDK_USER_AGENT_MAX_LENGTH = 512;
 
 function copySdkTransportProperties(
   source: Record<string, unknown>,
@@ -385,7 +385,7 @@ function copySafeSdkProperties(
   }
 }
 
-function isSafeSdkTransportString(value: string, maxLength: number): boolean {
+export function isSafeSdkTransportString(value: string, maxLength: number): boolean {
   if (!value || value.length > maxLength) return false;
   if (value !== value.trim()) return false;
   if (value.includes("@") || value.includes("\n") || value.includes("\r")) return false;

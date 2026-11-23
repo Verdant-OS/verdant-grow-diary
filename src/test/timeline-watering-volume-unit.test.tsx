@@ -12,6 +12,7 @@ import {
 } from "@/lib/waterVolumeEntryUnitPreference";
 import { RecentQuickLogActivityPanel } from "@/components/QuickLogHistoryPanels";
 import { mapGrowEventsToRecentRawEntries } from "@/lib/growEventToDiaryRawEntry";
+import { removeLocalStorageItemForTest } from "@/test/helpers/localStorageTestHelper";
 
 // #3041: Timeline reads a stored ml watering amount back in the grower's Quick Log Water unit.
 
@@ -115,8 +116,8 @@ describe("Timeline card detail lines follow the water unit", () => {
 });
 
 describe("Timeline Recent Quick Logs badge", () => {
-  beforeEach(() => window.localStorage.removeItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY));
-  afterEach(() => window.localStorage.removeItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY));
+  beforeEach(() => removeLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY));
+  afterEach(() => removeLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY));
 
   function renderPanel() {
     const rawEntries = mapGrowEventsToRecentRawEntries([

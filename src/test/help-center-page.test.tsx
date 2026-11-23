@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { STATIC_PUBLIC_SEO_DOCUMENTS } from "@/lib/build/staticPublicSeoDocuments";
 import { describe, expect, it } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { staticRouteHead } from "@/lib/build/staticRouteHead";
@@ -46,8 +47,7 @@ describe("help center pages", () => {
   it.each(HelpCenterContent.sections())("renders the $title hub", (section) => {
     renderHelp(section);
     expect(screen.getByRole("heading", { level: 1, name: section.title })).toBeInTheDocument();
-    expect(screen.getByText(section.covers)).toBeInTheDocument();
-    expect(screen.getByText("Covers")).toBeInTheDocument();
+    expect(screen.getByText(HelpCenterContent.coversClause(section.covers))).toBeInTheDocument();
     expect(document.title).toBe(section.titleTag);
     expect(document.head.querySelector('meta[name="description"]')?.getAttribute("content")).toBe(
       section.covers,
@@ -81,13 +81,44 @@ describe("help center pages", () => {
   it("says Verdant suggests and the grower acts", () => {
     const alerts = HelpCenterContent.sectionBySlug("alerts-action-queue");
     if (!alerts) throw new Error("missing alerts hub");
-    renderHelp(alerts);
-    expect(screen.getByText("Verdant suggests; you decide and act.")).toBeInTheDocument();
+    const hub = renderHelp(alerts);
+    expect(screen.getByText("Covers Verdant suggests; you decide and act.")).toBeInTheDocument();
     expect(document.head.querySelector('meta[name="description"]')?.getAttribute("content")).toBe(
       "Verdant suggests; you decide and act.",
     );
+    hub.unmount();
     renderHelp(null);
-    expect(screen.getByText("Verdant suggests; you decide and act.")).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole("link", { name: "Alerts and Action Queue" })
+        .parentElement?.textContent?.replace(/\s+/g, " ")
+        .trim(),
+    ).toBe("Alerts and Action Queue: Verdant suggests; you decide and act.");
+    expect(screen.getByRole("link", { name: "support@verdantgrowdiary.com" })).toHaveAttribute(
+      "href",
+      "mailto:support@verdantgrowdiary.com",
+    );
+    expect(
+      screen
+        .getByRole("link", { name: "support@verdantgrowdiary.com" })
+        .parentElement?.textContent?.replace(/\s+/g, " ")
+        .trim(),
+    ).toBe(
+      "Need a person? Email support@verdantgrowdiary.com or use the contact form. Typical reply time is 1–2 business days.",
+    );
+  });
+
+  it("keeps hub covers casing identical on the page and the static fallback", () => {
+    for (const section of HelpCenterContent.sections()) {
+      const view = renderHelp(section);
+      expect(screen.getByText(`Covers ${section.covers}`).textContent).toBe(
+        `Covers ${section.covers}`,
+      );
+      view.unmount();
+      const html = STATIC_PUBLIC_SEO_DOCUMENTS.find((doc) => doc.path === section.path)?.metadata
+        .bodyFallbackHtml;
+      expect(html).toContain(`<p>Covers ${section.covers}</p>`);
+    }
   });
 });
 

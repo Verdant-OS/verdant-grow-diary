@@ -37,6 +37,11 @@ describe("help center host redirects", () => {
       status: 308,
       location: "/docs/mcp-api",
     });
+    expect(decision("/help/developers/mcp-tools/")).toMatchObject({
+      kind: "redirect",
+      status: 308,
+      location: "/docs/mcp-api",
+    });
   });
 
   it("does not redirect unknown docs paths or /faq", () => {

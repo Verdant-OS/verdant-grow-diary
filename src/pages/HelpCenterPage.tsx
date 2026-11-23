@@ -143,9 +143,7 @@ function Hub({ section }: { readonly section: HelpSection }) {
   return (
     <>
       <h1 className="font-display text-3xl font-semibold leading-tight">{section.title}</h1>
-      <p className="mt-4 text-base leading-7">
-        <span className="font-semibold">Covers</span> {section.covers}
-      </p>
+      <p className="mt-4 text-base leading-7">{HelpCenterContent.coversClause(section.covers)}</p>
       {section.topics.length > 0 ? (
         <ul className="mt-6 space-y-2">
           {section.topics.map((topic) => (

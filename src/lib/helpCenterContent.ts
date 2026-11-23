@@ -194,6 +194,10 @@ export class HelpCenterContent {
     return [HOME_PATH, ...SECTIONS.map((entry) => entry.path)];
   }
 
+  static coversClause(covers: string): string {
+    return `Covers ${covers}`;
+  }
+
   static sectionBySlug(slug: string | undefined): HelpSection | null {
     if (!slug) return null;
     return SECTIONS.find((entry) => entry.slug === slug) ?? null;

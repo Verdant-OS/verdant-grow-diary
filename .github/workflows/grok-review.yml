@@ -64,7 +64,7 @@ jobs:
 
       - name: Install Grok CLI (pinned)
         # Exact version pin. npm has no install-time integrity flag for a global package;
-        # recorded as a known gap for Matthew's decision. Published npm versions are
+        # a known gap Matthew accepted on 2026-11-23 (#3053). Published npm versions are
         # immutable, and the job stays gated off until a safe sandbox is verified.
         run: npm install -g @xai-official/grok@1.0.89
 

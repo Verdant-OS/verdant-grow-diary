@@ -385,6 +385,26 @@ export function presentTimelineDiaryEntryDetails(
       }
     }
   }
+  const hasRunoffLine = detailLines.some((line) => line.key.endsWith(".runoff_ml"));
+  if (!hasRunoffLine) {
+    for (const flatRunoffKey of ["runoff_ml", "runoffMl"] as const) {
+      if (!(flatRunoffKey in record)) continue;
+      const text = typedActivityScalar(
+        "runoff_ml",
+        record[flatRunoffKey],
+        tempUnit,
+        volumeUnitFor(flatVolumeEnvelope),
+      );
+      if (text) {
+        detailLines.push({
+          key: `${flatVolumeEnvelope}.runoff_ml`,
+          label: "Runoff",
+          value: text,
+        });
+        break;
+      }
+    }
+  }
   const extra = Object.entries(record)
     .filter(
       ([k]) =>
@@ -395,7 +415,9 @@ export function presentTimelineDiaryEntryDetails(
         k !== "wateringAmountMl" &&
         k !== "watering_amount" &&
         k !== "wateringAmount" &&
-        k !== "volume_ml",
+        k !== "volume_ml" &&
+        k !== "runoff_ml" &&
+        k !== "runoffMl",
     )
     .map(([k, v]) => {
       const text = plainDetailValue(v);

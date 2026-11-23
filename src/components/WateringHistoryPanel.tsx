@@ -16,7 +16,9 @@ import QuickLogEntryIntegrityControls, {
   QuickLogEditedBadge,
 } from "@/components/QuickLogEntryIntegrityControls";
 import { buildWateringHistory, type WateringHistoryRow } from "@/lib/wateringHistoryRules";
+import { formatStoredWaterVolume, type WaterEntryUnit } from "@/lib/quickLogWaterVolumeUnitRules";
 import { formatTempDualF } from "@/lib/temperatureDisplay";
+import { useWaterVolumeEntryUnit } from "@/hooks/useWaterVolumeEntryUnit";
 
 interface WateringHistoryPanelProps {
   /**
@@ -38,6 +40,11 @@ function fmtNumber(n: number | null, opts?: { suffix?: string }): string {
   if (n === null) return "—";
   const s = Number.isInteger(n) ? n.toString() : n.toFixed(2);
   return opts?.suffix ? `${s} ${opts.suffix}` : s;
+}
+
+function fmtStoredMl(n: number | null, unit: WaterEntryUnit): string {
+  if (n === null) return "—";
+  return formatStoredWaterVolume(n, unit);
 }
 
 function fmtDate(iso: string | null, fallbackLabel: string): string {
@@ -79,6 +86,7 @@ function Row({
   currentNote?: string | null;
   onEntryChanged?: () => void;
 }) {
+  const waterUnit = useWaterVolumeEntryUnit();
   return (
     <li
       id={row.timelineAnchorId ?? undefined}
@@ -124,13 +132,13 @@ function Row({
       </div>
 
       <div className="flex flex-wrap gap-1.5 mb-2">
-        <MetricChip label="Volume" value={fmtNumber(row.volumeMl, { suffix: "ml" })} />
+        <MetricChip label="Volume" value={fmtStoredMl(row.volumeMl, waterUnit)} />
         <MetricChip label="pH" value={fmtNumber(row.ph)} />
         <MetricChip label="EC" value={fmtNumber(row.ec, { suffix: "mS/cm" })} />
         {row.tds !== null && (
           <MetricChip label="TDS" value={fmtNumber(row.tds, { suffix: "ppm" })} />
         )}
-        <MetricChip label="Runoff" value={fmtNumber(row.runoffMl, { suffix: "ml" })} />
+        <MetricChip label="Runoff" value={fmtStoredMl(row.runoffMl, waterUnit)} />
         <MetricChip label="Runoff pH" value={fmtNumber(row.runoffPh)} />
         <MetricChip label="Runoff EC" value={fmtNumber(row.runoffEc, { suffix: "mS/cm" })} />
         {row.runoffTds !== null && (

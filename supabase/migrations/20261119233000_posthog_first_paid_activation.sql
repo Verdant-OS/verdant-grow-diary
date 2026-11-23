@@ -10,6 +10,17 @@ ALTER TABLE public.first_paid_activation_receipts ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.first_paid_activation_receipts
   FROM PUBLIC, anon, authenticated, service_role;
 
+-- A row that has already been active, past due, or otherwise non-trial cannot
+-- earn a receipt from a later trialing replay, even when that replay lines
+-- the next period up with the old trial end.
+CREATE TABLE public.first_paid_seen_non_trial (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE
+);
+
+ALTER TABLE public.first_paid_seen_non_trial ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.first_paid_seen_non_trial
+  FROM PUBLIC, anon, authenticated, service_role;
+
 -- Reuse the existing AFTER INSERT / trial-to-active tracker so that the old
 -- operator ledger is consulted before this transaction creates a membership.
 -- Its original Pro/Founder criteria remain independent of analytics eligibility.
@@ -21,6 +32,11 @@ DECLARE
   same_live_subscription boolean := true;
   genuine_first_paid boolean := true;
 BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM 'trialing' THEN
+    INSERT INTO public.first_paid_seen_non_trial (user_id)
+      VALUES (NEW.user_id)
+      ON CONFLICT (user_id) DO NOTHING;
+  END IF;
   IF NEW.environment <> 'live' OR NEW.status <> 'active' THEN
     RETURN NEW;
   END IF;
@@ -52,6 +68,9 @@ BEGIN
        OR (NEW.billing_provider = 'paddle' AND left(NEW.paddle_subscription_id, 4) = 'sub_'))
      AND NOT EXISTS (
        SELECT 1 FROM public.first_paid_activation_receipts WHERE user_id = NEW.user_id
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM public.first_paid_seen_non_trial WHERE user_id = NEW.user_id
      )
      AND NOT EXISTS (
        SELECT 1 FROM public.paid_return_cohort_memberships WHERE user_id = NEW.user_id

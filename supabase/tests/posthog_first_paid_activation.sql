@@ -78,12 +78,12 @@ UPDATE public.subscriptions
       current_period_end = created_at + interval '14 days'
   WHERE user_id = md5('paid-test-14')::uuid;
 UPDATE public.subscriptions
-  SET status = 'active', current_period_start = now() - interval '20 days',
+  SET status = 'active', current_period_start = created_at + interval '14 days',
       current_period_end = now() + interval '10 days'
   WHERE user_id = md5('paid-test-14')::uuid;
 SELECT pg_temp.check_paid(NOT EXISTS (SELECT 1 FROM public.first_paid_activation_receipts
                           WHERE user_id = md5('paid-test-14')::uuid),
-                          'Backdated craft replay of active, trialing, then active created a receipt');
+                          'Replay whose paid start equals the restored trial end created a receipt');
 SELECT pg_temp.add_sub(15, 'craft_annual', env => 'sandbox', state => 'trialing');
 UPDATE public.subscriptions SET status = 'active', environment = 'live' WHERE user_id = md5('paid-test-15')::uuid;
 
@@ -99,6 +99,8 @@ SELECT pg_temp.check_paid(EXISTS (SELECT 1 FROM public.paid_return_cohort_member
 SELECT pg_temp.check_paid(NOT has_function_privilege('anon', 'public.get_my_first_paid_activation()', 'EXECUTE')
     AND NOT has_table_privilege('authenticated', 'public.first_paid_activation_receipts', 'SELECT,INSERT,UPDATE,DELETE')
     AND NOT has_table_privilege('anon', 'public.first_paid_activation_receipts', 'SELECT,INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('authenticated', 'public.first_paid_seen_non_trial', 'SELECT,INSERT,UPDATE,DELETE')
+    AND NOT has_table_privilege('anon', 'public.first_paid_seen_non_trial', 'SELECT,INSERT,UPDATE,DELETE')
     AND to_regprocedure('public.get_my_first_paid_activation(uuid)') IS NULL, 'Excess receipt privileges');
 
 SET LOCAL ROLE authenticated;

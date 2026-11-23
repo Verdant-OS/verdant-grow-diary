@@ -7,8 +7,9 @@
  * Dashboard tent card showed an older 77 °F sensor reading from Oct 31 as the
  * tent's latest. The plant page merged Quick Log manual readings; the
  * Dashboard tent card read sensor rows alone. Both now use one merge rule.
+ * The rendered Dashboard wiring is pinned in
+ * dashboard-tent-latest-reading-rendered.test.tsx.
  */
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildTentSnapshotView,
@@ -324,16 +325,5 @@ describe("Dashboard tent card latest reading", () => {
       nowMs: NOW_MS,
     };
     expect(selectDashboardTentSnapshotRows(input)).toEqual(selectDashboardTentSnapshotRows(input));
-  });
-});
-
-describe("Dashboard wiring", () => {
-  const DASHBOARD = readFileSync("src/pages/Dashboard.tsx", "utf8");
-
-  it("builds the tent card snapshot from the shared rows, not sensor rows alone", () => {
-    expect(DASHBOARD).toContain("const snapRows = selectDashboardTentSnapshotRows({");
-    expect(DASHBOARD).toMatch(
-      /const snapView = buildTentSnapshotView\(\s*snapRows as BuildTentSnapshotInput\[\]/,
-    );
   });
 });

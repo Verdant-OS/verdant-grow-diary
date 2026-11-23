@@ -8,7 +8,7 @@ branch: codex/posthog-first-paid-upgrade
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3042
 owner: Codex, assigned the draft PR by Matthew on 2026-11-19
 claimed_by: Codex, 2026-11-19 23:08 UTC
-current_step: Open pull request, not a draft. Seat C P2-3 (eligible navigation must retry an empty receipt lookup) is in the working tree. Hosted required CI for the next head is not measured here.
+current_step: Open pull request, not a draft. Eligible navigation retries an empty or failed receipt lookup, and a later eligible route does not send the same receipt twice. Hosted required CI for this head is not measured here.
 scope: SQL records the first verified live Pro or Craft subscription per account. The original operator cohort preserves its prior membership criteria. The owner-only browser lookup uses auth.uid(). Analytics settings and the consent banner describe the new opt-in.
 measurement: The provider's first observed active period start and a stable event UUID survive retries. Old grants need reconfirmation on this device. Pre-grant upgrades and known returning subscribers are excluded. The browser must visit an eligible route after activation to deliver. A missing or ambiguous billing period yields no event.
 evidence: Prior-head suite counts are withdrawn. Current local checks are named on the pull request for the head that contains them. Hosted required CI is not measured in this file.

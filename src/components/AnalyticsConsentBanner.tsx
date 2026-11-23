@@ -9,10 +9,11 @@ import {
 /**
  * Explicit opt-in gate for analytics. Nothing analytics-related loads until
  * the grower presses Accept; Decline stores a durable refusal so the banner
- * does not reappear. Rendered only after hydration to avoid a mismatch.
+ * does not reappear. The copy names the paid-activation event. Rendered only
+ * after hydration to avoid a mismatch.
  *
  * While visible, the measured height is published as a document offset so
- * page content can sit above the fixed bar. Accept and Decline are unchanged.
+ * page content can sit above the fixed bar.
  */
 export function AnalyticsConsentBanner() {
   const { decision, hydrated, accept, decline } = useAnalyticsConsent();

@@ -115,6 +115,30 @@ describe("first paid upgrade through the app consent and checkout hooks", () => 
     expect(read).toHaveBeenCalledTimes(2);
   });
 
+  it("looks up again after an eligible navigation once the webhook lands", async () => {
+    const view = renderHook(
+      ({ path }: { path: string }) => {
+        const consent = useAnalyticsConsent();
+        useFirstPaidAnalytics(path, consent.paidSince);
+        return consent;
+      },
+      { initialProps: { path: "/" } },
+    );
+    act(() => view.result.current.accept());
+    await waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+    expect(send).not.toHaveBeenCalled();
+    read.mockResolvedValueOnce({
+      data: { account_id: account, event_id: eventId, activated_at: new Date().toISOString() },
+      error: null,
+    });
+    view.rerender({ path: "/grows" });
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    view.rerender({ path: "/tents" });
+    await waitFor(() => expect(read).toHaveBeenCalledTimes(3));
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(send.mock.calls[0][1]?.body)).uuid).toBe(eventId);
+  });
+
   it("drops a receipt after the session signs out during the lookup", async () => {
     read.mockImplementation(async () => ({
       data: { account_id: account, event_id: eventId, activated_at: new Date().toISOString() },

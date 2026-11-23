@@ -7,9 +7,8 @@ import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
 export function useFirstPaidAnalytics(pathname: string, consentSince: number | null): void {
   const { user, loading } = useAuth();
   const accountId = user?.id;
-  const eligible = consentSince !== null && !isExcludedAnalyticsPath(pathname);
   useEffect(() => {
-    if (!eligible || loading || !accountId) return;
+    if (consentSince === null || isExcludedAnalyticsPath(pathname) || loading || !accountId) return;
     const controller = new AbortController();
     let running = false;
     let checkAgain = false;
@@ -41,5 +40,5 @@ export function useFirstPaidAnalytics(pathname: string, consentSince: number | n
       window.removeEventListener(PRICING_ANALYTICS_EVENT, onFunnel);
       window.removeEventListener("focus", check);
     };
-  }, [accountId, loading, eligible, consentSince]);
+  }, [accountId, loading, consentSince, pathname]);
 }

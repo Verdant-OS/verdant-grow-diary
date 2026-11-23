@@ -200,7 +200,6 @@ function pgTapExemptions(): Record<string, { class: string; reason: string }> {
   const out: Record<string, { class: string; reason: string }> = {};
   for (const file of [
     "supabase/tests/paddle_subscription_update_rpc_harness.sql",
-    "supabase/tests/posthog_first_paid_activation.sql",
     "supabase/tests/permissions.sql",
     "supabase/tests/pheno_candidate_number_contract.sql",
     "supabase/tests/pheno_candidate_number_maintenance_paths.sql",
@@ -209,6 +208,11 @@ function pgTapExemptions(): Record<string, { class: string; reason: string }> {
   ]) {
     out[file] = { class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE, reason: blocked };
   }
+  out["supabase/tests/posthog_first_paid_activation.sql"] = {
+    class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
+    reason:
+      "Disposable PGlite harness for the first-paid receipt. No workflow runs it. It is not a supabase start lane.",
+  };
   out["supabase/tests/billing_subscriptions_rls.sql"] = {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
     reason: `${blocked} ADDITIONALLY BROKEN: line 59 calls max(user_id) on a uuid column, and max(uuid) does not exist in PostgreSQL — proven on a throwaway PG 16.13 cluster (0 rows in pg_aggregate; "ERROR: function max(uuid) does not exist", with max(text) as a passing control). Note it is not necessarily the FIRST error: without psql variables the file dies earlier at "syntax error at or near \\":\\"". Wiring this lane will not make this suite pass.`,

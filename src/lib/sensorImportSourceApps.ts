@@ -335,6 +335,7 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
   const rejectionReasons: Record<string, number> = {};
   let accepted = 0;
   let rejected = 0;
+  let humidityHadGap = false;
 
   // Column indices for the active mapping.
   const idx = (h: string | null | undefined): number => (h == null ? -1 : headers.indexOf(h));
@@ -361,6 +362,7 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
     let anyMetric = false;
     for (const m of metricIdx) {
       const v = parseMetricCell(cells[m.col]);
+      if (m.metric === "humidity_pct" && v == null) humidityHadGap = true;
       if (v != null) {
         anyMetric = true;
         if (m.metric === "humidity_pct") {
@@ -404,7 +406,7 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
   if (humSamples.length >= 5) {
     const allZero = humSamples.every((v) => v === 0);
     const allHundred = humSamples.every((v) => v === 100);
-    if (allZero || allHundred) {
+    if (!humidityHadGap && (allZero || allHundred)) {
       humidityWholeColumnStuck = true;
       warnings.push({
         code: "humidity_stuck",
@@ -464,12 +466,16 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
     if (SOIL_MOISTURE_PATTERNS.test(h)) {
       const i = headers.indexOf(h);
       const vals: number[] = [];
+      let soilGap = false;
       for (const cells of parsed.rows) {
         const v = parseMetricCell(cells[i]);
-        if (v != null) vals.push(v);
-        if (vals.length >= 25) break;
+        if (v == null) {
+          soilGap = true;
+          continue;
+        }
+        vals.push(v);
       }
-      if (vals.length >= 5) {
+      if (!soilGap && vals.length >= 5) {
         const allZero = vals.every((v) => v === 0);
         const allHundred = vals.every((v) => v === 100);
         if (allZero || allHundred) {
@@ -495,10 +501,8 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
     if (col < 0) return;
     const samples: SaturatedReadingSample[] = [];
     parsed.rows.forEach((cells, index) => {
-      const value = parseMetricCell(cells[col]);
-      if (value == null) return;
       const at = tsCol >= 0 ? String(cells[tsCol] ?? "").trim() : "";
-      samples.push({ value, at: at || null, index });
+      samples.push({ value: parseMetricCell(cells[col]), at: at || null, index });
     });
     for (const run of SaturatedReadingRunRules.findRuns(metric, samples)) {
       warnings.push({

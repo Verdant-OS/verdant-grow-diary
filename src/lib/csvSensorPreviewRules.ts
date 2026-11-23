@@ -250,6 +250,14 @@ const SATURATED_RUN_FIELD: Record<SaturatedReadingMetric, CanonicalField> = {
   soil_moisture_pct: "vwc",
 };
 
+function parseSaturatedCell(raw: string | undefined): number | null {
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  if (!trimmed || /^(-|--|n\/?a|null|none)$/i.test(trimmed)) return null;
+  const value = Number(trimmed.replace(/[,_]/g, ""));
+  return Number.isFinite(value) ? value : null;
+}
+
 function saturatedSamples(
   headers: string[],
   rows: string[][],
@@ -258,14 +266,10 @@ function saturatedSamples(
 ): SaturatedReadingSample[] {
   const idx = headers.indexOf(header);
   if (idx < 0) return [];
-  const samples: SaturatedReadingSample[] = [];
-  rows.forEach((row, index) => {
-    const value = Number(row[idx]);
-    if (!Number.isFinite(value)) return;
+  return rows.map((row, index) => {
     const rawTime = timestampIndex >= 0 ? (row[timestampIndex] ?? "").trim() : "";
-    samples.push({ value, at: rawTime || null, index });
+    return { value: parseSaturatedCell(row[idx]), at: rawTime || null, index };
   });
-  return samples;
 }
 
 function annotateWholeColumnRun(

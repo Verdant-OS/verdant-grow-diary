@@ -11,7 +11,11 @@
 export type SaturatedReadingMetric = "humidity_pct" | "soil_moisture_pct";
 
 export interface SaturatedReadingSample {
-  value: number;
+  /**
+   * Parsed reading. Null is a missing or invalid cell and ends the current
+   * run. It is not a zero.
+   */
+  value: number | null;
   /** Raw timestamp cell. Null when the row has no captured time. */
   at: string | null;
   /** File order. Breaks ties and orders rows that have no parseable time. */
@@ -74,23 +78,20 @@ export class SaturatedReadingRunRules {
     return `${run.metric} · ${run.length} consecutive readings at ${run.value}% · ${range}`;
   }
 
-  private static rail(value: number): 0 | 100 | null {
+  private static rail(value: number | null): 0 | 100 | null {
     if (value === 0 || value === 100) return value;
     return null;
   }
 
   private static orderByTime(samples: readonly SaturatedReadingSample[]): SaturatedReadingSample[] {
-    return samples
-      .filter((sample) => Number.isFinite(sample.value))
-      .slice()
-      .sort((a, b) => {
-        const aTime = SaturatedReadingRunRules.parseTime(a.at);
-        const bTime = SaturatedReadingRunRules.parseTime(b.at);
-        if (aTime !== null && bTime !== null && aTime !== bTime) return aTime - bTime;
-        if (aTime !== null && bTime === null) return -1;
-        if (aTime === null && bTime !== null) return 1;
-        return a.index - b.index;
-      });
+    return samples.slice().sort((a, b) => {
+      const aTime = SaturatedReadingRunRules.parseTime(a.at);
+      const bTime = SaturatedReadingRunRules.parseTime(b.at);
+      if (aTime !== null && bTime !== null && aTime !== bTime) return aTime - bTime;
+      if (aTime !== null && bTime === null) return -1;
+      if (aTime === null && bTime !== null) return 1;
+      return a.index - b.index;
+    });
   }
 
   private static parseTime(at: string | null): number | null {

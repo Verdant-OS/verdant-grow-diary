@@ -299,6 +299,20 @@ describe("Dashboard tent card latest reading", () => {
     expect(Date.parse(snap?.ts ?? "")).toBe(Date.parse(SENSOR_AT));
   });
 
+  it("never lets an invalid future-dated Quick Log reading replace a valid sensor reading", () => {
+    const future = new Date(NOW_MS + 2 * 24 * 60 * 60 * 1000).toISOString();
+    const reading = quickLog(future, { temperature_c: 30, humidity_pct: 80 });
+    expect(reading.status).toBe("invalid");
+    const sensors = sensorPair(SENSOR_AT, SENSOR_TEMP_C, 55);
+    const snap = dashboardSnapshot(sensors, [reading]);
+    expect(snap?.temp).toBe(SENSOR_TEMP_C);
+    expect(Date.parse(snap?.ts ?? "")).toBe(Date.parse(SENSOR_AT));
+    // A stale (old but valid) Quick Log reading still counts.
+    const stale = quickLog(MANUAL_AT, { temperature_c: MANUAL_TEMP_C, humidity_pct: 52 });
+    expect(stale.status).toBe("stale");
+    expect(dashboardSnapshot(sensors, [reading, stale])?.temp).toBe(MANUAL_TEMP_C);
+  });
+
   it("keeps a zero reading and returns nothing for empty input", () => {
     const rows = selectDashboardTentSnapshotRows({
       sensorRows: [sensorRow({ metric: "ppfd", value: 0 })],

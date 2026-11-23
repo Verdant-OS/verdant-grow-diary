@@ -14,7 +14,11 @@
  *   flagged quality and diagnostic rows never count as the latest reading).
  * - Manual rows are this tent's Quick Log temperature/RH values only
  *   (`tonightRowsFromQuickLogManualReadings`), labelled `manual`, never live.
- *   A manual reading from another tent never contributes.
+ *   A manual reading from another tent never contributes, and neither does
+ *   one the Quick Log projection marked `invalid` (for example a capture
+ *   time in the future): the projection to rows would otherwise drop that
+ *   status and present it as an ok, current reading. A stale one still
+ *   counts and renders Stale.
  * - Ordering is by observation time (`captured_at`, then `ts`), newest first,
  *   with the input order as the tie-breaker; a row with no parseable time
  *   sorts last. At equal times the Quick Log manual row wins, as on the plant
@@ -77,7 +81,11 @@ export function selectDashboardTentSnapshotRows<T extends DashboardSensorEvidenc
   const sensorRows = newestFirst(selectDashboardSensorEvidenceRows(input.sensorRows));
   const manualRows = newestFirst(
     selectDashboardSensorEvidenceRows(
-      tonightRowsFromQuickLogManualReadings(input.quickLogManuals, input.tentId, input.nowMs),
+      tonightRowsFromQuickLogManualReadings(
+        (input.quickLogManuals ?? []).filter((reading) => reading?.status !== "invalid"),
+        input.tentId,
+        input.nowMs,
+      ),
     ),
   );
   const quickLogRows = new Set<DashboardTentSnapshotRow<T>>(manualRows);

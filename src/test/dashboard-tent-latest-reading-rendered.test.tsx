@@ -85,7 +85,7 @@ vi.mock("@/lib/dashboardEnvironmentSnapshotViewModel", async (importOriginal) =>
       H.stripStages.push(args[1]);
       const view = actual.buildTentSnapshotView(...args);
       H.snapCalls.push({
-        rows: [...(args[0] ?? [])] as Array<Record<string, unknown>>,
+        rows: [...(args[0] ?? [])] as unknown as Array<Record<string, unknown>>,
         view: view as unknown as Record<string, unknown>,
       });
       return view;

@@ -809,9 +809,9 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           "This works on the Free plan with no upgrade step. AC Infinity and Spider Farmer files both import into the same account, one CSV per controller, and each import maps to one tent. Free includes 1 tent; Pro adds multi-tent memory.",
         continuations: [
           {
-            heading: "How I run several tents",
+            heading: "Running several tents",
             headingLevel: 3,
-            body: 'I run Spider Farmer GGS tents with one controller per tent, named for the tent (for example "Vegetation Alpha"), plus AC Infinity gear.',
+            body: 'A multi-tent setup can use one Spider Farmer GGS controller per tent, named for the tent (for example "Vegetation Alpha"), plus AC Infinity gear.',
           },
           {
             heading: "How the file is read",
@@ -835,7 +835,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "What Verdant doesn't do",
-        body: "Verdant is not a controller and does not live-sync with AC Infinity or Spider Farmer. It doesn't change fan speeds, light schedules, or vent settings. Approving an item in the Action Queue sends no command to a device. AI Doctor suggests and cites the evidence; you decide. It also doesn't import a diary or spreadsheet, and it has no public diary sharing. Pro reports print or save as PDF. EcoWitt is available as a read-only integration on Pro. TrolMaster import isn't available yet, so those readings can be logged by hand as manual snapshots.",
+        body: "Verdant is not a controller and does not live-sync with AC Infinity or Spider Farmer. It doesn't change fan speeds, light schedules, or vent settings. Approving an item in the Action Queue sends no command to a device. AI Doctor suggests and cites the evidence; you decide. It does not import an existing plant diary or a spreadsheet of notes, and it has no public diary sharing. Pro reports print or save as PDF. EcoWitt is available as a read-only integration on Pro. TrolMaster import isn't available yet, so those readings can be logged by hand as manual snapshots.",
       },
     ],
     faq: [
@@ -906,14 +906,6 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       "grow-diary-app",
       "sensor-truth-grow-room",
     ],
-    howTo: {
-      name: "Import an AC Infinity or Spider Farmer CSV into Verdant",
-      steps: [
-        "Export a CSV from your AC Infinity or Spider Farmer app.",
-        'In Verdant, open Sensors and choose "Import historical data".',
-        "Pick your file, check the preview, and import it.",
-      ],
-    },
     sources: [
       {
         label: "GrowLore",

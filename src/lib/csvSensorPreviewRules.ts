@@ -12,6 +12,12 @@
  * sensor export before any future import.
  */
 
+import {
+  SaturatedReadingRunRules,
+  type SaturatedReadingMetric,
+  type SaturatedReadingSample,
+} from "@/lib/saturatedReadingRunRules";
+
 export const CSV_PREVIEW_SOURCE_LABEL = "csv" as const;
 export const TSV_PREVIEW_SOURCE_LABEL = "tsv" as const;
 export const CSV_PREVIEW_STATUS_LABEL = "Preview only — not saved" as const;
@@ -63,6 +69,7 @@ export interface SuspiciousFlag {
     | "ec_unit_ambiguous"
     | "humidity_stuck"
     | "vwc_stuck"
+    | "saturated_reading_run"
     | "ph_out_of_range"
     | "lux_not_ppfd";
   message: string;
@@ -238,6 +245,39 @@ function colValues(headers: string[], rows: string[][], header: string): number[
   return out;
 }
 
+const SATURATED_RUN_FIELD: Record<SaturatedReadingMetric, CanonicalField> = {
+  humidity_pct: "humidity",
+  soil_moisture_pct: "vwc",
+};
+
+function saturatedSamples(
+  headers: string[],
+  rows: string[][],
+  header: string,
+  timestampIndex: number,
+): SaturatedReadingSample[] {
+  const idx = headers.indexOf(header);
+  if (idx < 0) return [];
+  const samples: SaturatedReadingSample[] = [];
+  rows.forEach((row, index) => {
+    const value = Number(row[idx]);
+    if (!Number.isFinite(value)) return;
+    const rawTime = timestampIndex >= 0 ? (row[timestampIndex] ?? "").trim() : "";
+    samples.push({ value, at: rawTime || null, index });
+  });
+  return samples;
+}
+
+function annotateWholeColumnRun(
+  flag: SuspiciousFlag,
+  metric: SaturatedReadingMetric,
+  samples: readonly SaturatedReadingSample[],
+): void {
+  const runs = SaturatedReadingRunRules.findRuns(metric, samples);
+  if (runs.length !== 1) return;
+  flag.message = `${flag.message} ${SaturatedReadingRunRules.describe(runs[0])}`;
+}
+
 export function detectFlags(
   headers: string[],
   rows: string[][],
@@ -245,6 +285,8 @@ export function detectFlags(
 ): SuspiciousFlag[] {
   const flags: SuspiciousFlag[] = [];
   const headerNorm = (h: string) => norm(h);
+  const timestampHeader = mappings.find((mapping) => mapping.field === "captured_at")?.header;
+  const timestampIndex = timestampHeader == null ? -1 : headers.indexOf(timestampHeader);
 
   for (const m of mappings) {
     const n = headerNorm(m.header);
@@ -309,45 +351,63 @@ export function detectFlags(
       }
     }
 
-    if (m.field === "humidity") {
-      const vals = colValues(headers, rows, m.header);
-      if (vals.length >= 2 && vals.every((v) => v === 0)) {
-        flags.push({
+    if (m.field === "humidity" || m.field === "vwc") {
+      const metric: SaturatedReadingMetric =
+        m.field === "humidity" ? "humidity_pct" : "soil_moisture_pct";
+      const samples = saturatedSamples(headers, rows, m.header, timestampIndex);
+      const vals = samples.map((sample) => sample.value);
+      const wholeZero = vals.length >= 2 && vals.every((value) => value === 0);
+      const wholeHundred = vals.length >= 2 && vals.every((value) => value === 100);
+      if (m.field === "humidity" && wholeZero) {
+        const flag: SuspiciousFlag = {
           header: m.header,
           field: "humidity",
           severity: "error",
           code: "humidity_stuck",
           message: "Humidity is stuck at 0 — sensor likely offline or miswired.",
-        });
-      } else if (vals.length >= 2 && vals.every((v) => v === 100)) {
-        flags.push({
+        };
+        annotateWholeColumnRun(flag, metric, samples);
+        flags.push(flag);
+      } else if (m.field === "humidity" && wholeHundred) {
+        const flag: SuspiciousFlag = {
           header: m.header,
           field: "humidity",
           severity: "error",
           code: "humidity_stuck",
           message: "Humidity is stuck at 100 — sensor likely saturated or faulted.",
-        });
-      }
-    }
-
-    if (m.field === "vwc") {
-      const vals = colValues(headers, rows, m.header);
-      if (vals.length >= 2 && vals.every((v) => v === 0)) {
-        flags.push({
+        };
+        annotateWholeColumnRun(flag, metric, samples);
+        flags.push(flag);
+      } else if (m.field === "vwc" && wholeZero) {
+        const flag: SuspiciousFlag = {
           header: m.header,
           field: "vwc",
           severity: "error",
           code: "vwc_stuck",
           message: "Soil moisture is stuck at 0 — probe likely disconnected.",
-        });
-      } else if (vals.length >= 2 && vals.every((v) => v === 100)) {
-        flags.push({
+        };
+        annotateWholeColumnRun(flag, metric, samples);
+        flags.push(flag);
+      } else if (m.field === "vwc" && wholeHundred) {
+        const flag: SuspiciousFlag = {
           header: m.header,
           field: "vwc",
           severity: "error",
           code: "vwc_stuck",
           message: "Soil moisture is stuck at 100 — probe likely faulted or submerged.",
-        });
+        };
+        annotateWholeColumnRun(flag, metric, samples);
+        flags.push(flag);
+      } else {
+        for (const run of SaturatedReadingRunRules.findRuns(metric, samples)) {
+          flags.push({
+            header: m.header,
+            field: SATURATED_RUN_FIELD[metric],
+            severity: "warn",
+            code: "saturated_reading_run",
+            message: SaturatedReadingRunRules.describe(run),
+          });
+        }
       }
     }
 

@@ -97,8 +97,11 @@ function buildPlanFromPreview(
       const numeric = Number(raw);
       const value = Number.isFinite(numeric) ? numeric : null;
       const flag = flagByHeader.get(m.header);
-      const hardFlags = flag && flag.severity === "error" ? [flag.code] : [];
-      const softFlags = flag && flag.severity === "warn" ? [flag.code] : [];
+      // A saturated run is a review warning. It must not hard-block or
+      // soft-label every row in the column, including the normal readings.
+      const rowFlag = flag && flag.code !== "saturated_reading_run" ? flag : undefined;
+      const hardFlags = rowFlag && rowFlag.severity === "error" ? [rowFlag.code] : [];
+      const softFlags = rowFlag && rowFlag.severity === "warn" ? [rowFlag.code] : [];
       const rawRow: Record<string, unknown> = {};
       result.headers.forEach((h, i) => {
         rawRow[h] = dataRow[i];

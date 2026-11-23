@@ -20,6 +20,11 @@
  */
 
 import { parseCsv } from "@/lib/csvSensorImportRules";
+import {
+  SaturatedReadingRunRules,
+  type SaturatedReadingMetric,
+  type SaturatedReadingSample,
+} from "@/lib/saturatedReadingRunRules";
 
 // ---------- constants ----------
 
@@ -395,10 +400,12 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
 
   // humidity stuck at 0 or 100 across all sampled rows.
   const humSamples = stuckSamples.humidity_pct ?? [];
+  let humidityWholeColumnStuck = false;
   if (humSamples.length >= 5) {
     const allZero = humSamples.every((v) => v === 0);
     const allHundred = humSamples.every((v) => v === 100);
     if (allZero || allHundred) {
+      humidityWholeColumnStuck = true;
       warnings.push({
         code: "humidity_stuck",
         message: `Humidity values are stuck at ${allZero ? 0 : 100}% — likely a faulty sensor or bad export.`,
@@ -473,6 +480,43 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
           });
         }
       }
+      break;
+    }
+  }
+
+  const tsCol = idx(mapping.timestamp);
+  const pushRuns = (
+    metric: SaturatedReadingMetric,
+    column: string | undefined,
+    alreadyWholeColumn: boolean,
+  ) => {
+    if (!column || alreadyWholeColumn) return;
+    const col = idx(column);
+    if (col < 0) return;
+    const samples: SaturatedReadingSample[] = [];
+    parsed.rows.forEach((cells, index) => {
+      const value = parseMetricCell(cells[col]);
+      if (value == null) return;
+      const at = tsCol >= 0 ? String(cells[tsCol] ?? "").trim() : "";
+      samples.push({ value, at: at || null, index });
+    });
+    for (const run of SaturatedReadingRunRules.findRuns(metric, samples)) {
+      warnings.push({
+        code: metric === "humidity_pct" ? "humidity_stuck" : "soil_moisture_stuck",
+        message: SaturatedReadingRunRules.describe(run),
+        metric: metric === "humidity_pct" ? "humidity_pct" : undefined,
+        column,
+      });
+    }
+  };
+
+  pushRuns("humidity_pct", mapping.mapped.humidity_pct, humidityWholeColumnStuck);
+  for (const h of headers) {
+    if (SOIL_MOISTURE_PATTERNS.test(h.replace(/_/g, " "))) {
+      const already = warnings.some(
+        (warning) => warning.code === "soil_moisture_stuck" && warning.column === h,
+      );
+      pushRuns("soil_moisture_pct", h, already);
       break;
     }
   }

@@ -7,23 +7,28 @@ why: issue #3041 / VER-498. Since #3036 Quick Log shows water in the chosen unit
 branch: posthog-self-driving/fixtimeline-show-watering-volume-in-the-bdff48 (name fixed by the PostHog run that opened it)
 base: verdant-grow-diary (started at 73695a5ba09d774b56cbf1852911c92e73ccea8c)
 checkout: git fetch origin posthog-self-driving/fixtimeline-show-watering-volume-in-the-bdff48 verdant-grow-diary && git switch posthog-self-driving/fixtimeline-show-watering-volume-in-the-bdff48 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: see the draft PR from the branch above
-head_sha: recorded on the PR; this file is written before the first push
-state: pushed draft
-current_step: CI on the draft PR
-next_action: confirm 35/35 required checks at the PR head; then request an eligible independent exact-head review
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3044
+head_sha: the commit on this branch that records this handoff update; confirm with git rev-parse HEAD after push. Prior head before the mirror repair was 7db027a0d13ce567f80f36d472658a99e9489581, rebased onto origin/verdant-grow-diary.
+state: pushed
+current_step: edge shared-lib mirror synced for the Quick Log water-unit display change; required CI re-runs on the new head
+next_action: wait for the required checks on the new head, then request an eligible independent exact-head review. This PR is GATED because it touches the edge shared-lib mirror.
 post_merge_check: on https://verdantgrowdiary.com once /version.json reports the merged SHA, with the disposable test account and its fixture plant: log a [smoke <timestamp>] Water of 1.5 L, confirm Timeline Recent Quick Logs reads "Watering · 1.5 L" and the card reads "Water Volume 1.5 L"; NOT_MEASURED until then
 active_writer: PostHog Desktop self-driving Claude session (this run)
 decisions: (1) the visible string comes from quickLogEventIdentityRules.buildSummarySuffix via QuickLogHistoryPanels, and from the card detail line in timelineDiaryEntryDetailPresentationRules; growDiaryTimelineRules.buildSubtitle is not rendered anywhere, so it is unchanged. (2) unit source is the existing per-device loadWaterVolumeEntryUnit (default L); rows do not store their entry unit. (3) waterUnit is an optional option that defaults to ml, so every other caller (plant recent activity, PDF export, calendar, reports) is unchanged. (4) feeding volumes stay ml (the Feed form enters ml). (5) saveWaterVolumeEntryUnit now dispatches a same-tab change event so a mounted Timeline follows a unit change.
 tried_and_rejected: changing buildSubtitle only (the report's suggestion) — it would not change what the grower sees.
 commands: bunx vitest run src/test/timeline-watering-volume-unit.test.tsx; bun run typecheck; bunx eslint <touched files>
-files_touched: src/lib/quickLogWaterVolumeUnitRules.ts, src/lib/waterVolumeEntryUnitPreference.ts, src/hooks/useWaterVolumeEntryUnit.ts, src/lib/quickLogEventIdentityRules.ts, src/lib/quickLogHistoryRules.ts, src/lib/timelineDiaryEntryDetailPresentationRules.ts, src/components/QuickLogHistoryPanels.tsx, src/components/TimelineEvidenceDetailPreview.tsx, src/pages/Timeline.tsx, src/test/timeline-watering-volume-unit.test.tsx
+files_touched: src/lib/quickLogWaterVolumeUnitRules.ts, src/lib/waterVolumeEntryUnitPreference.ts, src/hooks/useWaterVolumeEntryUnit.ts, src/lib/quickLogEventIdentityRules.ts, src/lib/quickLogHistoryRules.ts, src/lib/timelineDiaryEntryDetailPresentationRules.ts, src/components/QuickLogHistoryPanels.tsx, src/components/TimelineEvidenceDetailPreview.tsx, src/pages/Timeline.tsx, src/test/timeline-watering-volume-unit.test.tsx, supabase/functions/_shared/lib/lib/quickLogEventIdentityRules.ts, supabase/functions/_shared/lib/lib/quickLogWaterVolumeUnitRules.ts, supabase/functions/_shared/lib/lib/quickLogWaterVolumeWarningRules.ts, supabase/functions/_shared/lib/.sync-manifest.json
 files_remaining: none planned
 blockers: none. Locally, 26 tests in 7 Quick Log storage-recovery suites fail identically on the base commit (machine-local storage behavior); CI gates.
 open_questions: should Plant Detail recent activity, calendar, range report and PDF export also follow the unit? Left as ml (spec §9 scope).
-gotchas: src/test/setup.ts pins the unit to ml for every test; a test of the L default must remove the key first. No schema, RLS, edge, auth, billing or production change.
-links: https://github.com/Verdant-OS/verdant-grow-diary/issues/3041; related #2168, #3036
-artifacts: PR checks on the draft PR
+gotchas: src/test/setup.ts pins the unit to ml for every test; a test of the L default must remove the key first. No schema, RLS, auth, billing or production change. The edge shared-lib mirror does change: quickLogEventIdentityRules.ts imports quickLogWaterVolumeUnitRules.ts, which imports quickLogWaterVolumeWarningRules.ts, so those three files and .sync-manifest.json are in supabase/functions/_shared/lib. This PR is GATED on that mirror.
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/3041; https://github.com/Verdant-OS/verdant-grow-diary/pull/3044; related #2168, #3036
+artifacts: required CI on https://github.com/Verdant-OS/verdant-grow-diary/pull/3044 at the pushed head
+GATED:
+- supabase/functions/_shared/lib/lib/quickLogEventIdentityRules.ts
+- supabase/functions/_shared/lib/lib/quickLogWaterVolumeUnitRules.ts
+- supabase/functions/_shared/lib/lib/quickLogWaterVolumeWarningRules.ts
+- supabase/functions/_shared/lib/.sync-manifest.json
 reviewer_seat: eligible independent reviewer per the roster, not this session
 reviewer_sha: none yet
 session_state: PostHog Desktop self-driving run; no routines or paused workflows

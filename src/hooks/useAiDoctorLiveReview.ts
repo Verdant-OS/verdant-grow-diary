@@ -22,6 +22,7 @@
  */
 import { useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { grantedAnalyticsConsentHeaders } from "@/lib/analyticsConsent";
 import type { AiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import type { AiDoctorReviewEvidenceAcceptance } from "@/lib/aiDoctorReviewEvidenceReceiptRules";
 import {
@@ -81,7 +82,10 @@ export interface UseAiDoctorLiveReviewOptions {
   /** Override for tests — defaults to supabase.functions.invoke. */
   invoke?: (
     name: string,
-    init: { body: AiDoctorReviewRequestEnvelope<AiDoctorReviewRequestPacket> },
+    init: {
+      body: AiDoctorReviewRequestEnvelope<AiDoctorReviewRequestPacket>;
+      headers?: { "x-verdant-analytics-consent": "granted" };
+    },
   ) => Promise<{ data: unknown; error: unknown }>;
   /** Scope IDs used for the audit-trail row. Optional for back-compat. */
   growId?: string | null;
@@ -354,6 +358,7 @@ export function useAiDoctorLiveReview(
         const { data, error } = await invoke("ai-doctor-review", {
           // Grow scope stays outside the model context packet. The Edge Function
           // validates ownership before spending a Free per-grow credit.
+          headers: grantedAnalyticsConsentHeaders(),
           body: builtRequest.envelope,
         });
         if (error) {

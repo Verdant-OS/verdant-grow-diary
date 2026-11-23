@@ -26,6 +26,7 @@ import {
   buildPostHogInitOptions,
   decidePostHogStartup,
   mapFunnelEventToPostHog,
+  type PostHogProductEvent,
   planPostHogPersistenceRemoval,
   posthogCookieExpiryAssignments,
   posthogDistinctId,
@@ -47,6 +48,9 @@ type PostHogSdk = {
   opt_out_capturing: () => void;
   stopSessionRecording: () => void;
   reset: (resetDeviceId?: boolean) => void;
+  logger?: {
+    info: (message: string, attributes?: Record<string, string | number | boolean>) => void;
+  };
 };
 
 const OPT_IN_WITHOUT_EVENT = { captureEventName: false } as const;
@@ -148,6 +152,7 @@ function beginLoad(key: string, apiHost: string, deps: PostHogClientDeps): void 
       sdk = loaded;
       status = "ready";
       capturing = true;
+      emitPostHogLog(loaded, "posthog browser log capture initialized", { component: "browser" });
       attachSideEffects(loaded, gen, deps);
       emitPageview(loaded);
     })
@@ -229,6 +234,22 @@ function emitPageview(loaded: PostHogSdk): void {
   safe(() => loaded.capture("$pageview", properties));
 }
 
+function emitProductEvent(loaded: PostHogSdk, event: PostHogProductEvent): void {
+  safe(() => loaded.capture(event.name, event.properties));
+  const attributes: Record<string, string | number | boolean> = { product_event: event.name };
+  if (event.properties.source) attributes.source = event.properties.source;
+  if (event.properties.row_count !== undefined) attributes.row_count = event.properties.row_count;
+  emitPostHogLog(loaded, "posthog product event captured", attributes);
+}
+
+function emitPostHogLog(
+  loaded: PostHogSdk,
+  message: string,
+  attributes: Record<string, string | number | boolean>,
+): void {
+  safe(() => loaded.logger?.info(message, attributes));
+}
+
 function attachSideEffects(loaded: PostHogSdk, gen: number, deps: PostHogClientDeps): void {
   detachSideEffects();
   if (typeof window !== "undefined") {
@@ -238,7 +259,7 @@ function attachSideEffects(loaded: PostHogSdk, gen: number, deps: PostHogClientD
         .detail;
       if (!detail?.name) return;
       for (const mapped of mapFunnelEventToPostHog(detail.name, detail.props)) {
-        safe(() => loaded.capture(mapped.name, mapped.properties));
+        emitProductEvent(loaded, mapped);
       }
     };
     window.addEventListener(PRICING_ANALYTICS_EVENT, onFunnel);

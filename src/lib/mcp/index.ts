@@ -26,6 +26,19 @@ import getGrowWalkContextTool from "./tools/get-grow-walk-context";
 
 const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "project-ref-unset";
 
+/**
+ * Browser origins allowed to call this function cross-origin. @lovable.dev/mcp-js 3.x
+ * rejects any other browser Origin with HTTP 403; requests with no Origin (CLI and
+ * server MCP clients) and same-origin requests are unaffected. Matching is exact,
+ * so every host must be listed in full.
+ */
+export const MCP_ALLOWED_ORIGINS = [
+  "https://verdantgrowdiary.com",
+  "https://www.verdantgrowdiary.com",
+  "https://id-preview--66255e7b-892c-4be5-8686-ab1cfc3666db.lovable.app",
+  "https://66255e7b-892c-4be5-8686-ab1cfc3666db.lovableproject.com",
+] as const;
+
 export default defineMcp({
   name: "verdant-grow-os-mcp",
   title: "Verdant Grow OS",
@@ -50,6 +63,7 @@ export default defineMcp({
     "never current or healthy. This server never writes, never starts " +
     "AI Doctor, never spends AI credits, never approves Action Queue " +
     "items, and never controls devices.",
+  allowedOrigins: MCP_ALLOWED_ORIGINS,
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",

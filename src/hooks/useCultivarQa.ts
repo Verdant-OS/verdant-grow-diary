@@ -9,6 +9,7 @@
  */
 import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { grantedAnalyticsConsentHeaders } from "@/lib/analyticsConsent";
 import type { VerdantCultivarProfile } from "@/constants/verdantCultivars";
 import { buildCultivarQaContext, validateCultivarQuestion } from "@/lib/cultivarQaGrounding";
 
@@ -42,6 +43,7 @@ export function useCultivarQa(): UseCultivarQaReturn {
     setState({ status: "loading", answer: null, reason: null });
     try {
       const { data, error } = await supabase.functions.invoke("ai-cultivar-qa", {
+        headers: grantedAnalyticsConsentHeaders(),
         body: {
           cultivarSlug: cultivar.slug,
           question: question.trim(),

@@ -9,6 +9,7 @@ import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 
 import { listGrowWalkTargetsForOwnedGrow } from "../../growWalkTargetReadModels";
+import { asStructuredJson } from "./_json";
 import { supabaseForUser, unauthenticated } from "./_supabase";
 
 export default defineTool({
@@ -68,7 +69,7 @@ export default defineTool({
               : `Found ${targets.length} Grow Walk target(s) in "${grow.name}", ordered for physical inspection${summaryIsPartial ? " with explicit bounded-summary limits" : ""}.`,
         },
       ],
-      structuredContent: { grow, targets, generatedAt, receipt },
+      structuredContent: asStructuredJson({ grow, targets, generatedAt, receipt }),
     };
   },
 });

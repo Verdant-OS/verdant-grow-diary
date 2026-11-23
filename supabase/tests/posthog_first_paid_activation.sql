@@ -12,7 +12,7 @@ SELECT pg_temp.check_paid(to_regprocedure('public.get_my_first_paid_activation()
 INSERT INTO auth.users (id, email, raw_app_meta_data, raw_user_meta_data, aud, role, created_at, updated_at)
 SELECT md5('paid-test-' || n)::uuid, 'paid-' || n || '@verdant.test', '{}', '{}',
        'authenticated', 'authenticated', now(), now()
-FROM generate_series(1, 15) AS n;
+FROM generate_series(1, 20) AS n;
 
 CREATE FUNCTION pg_temp.add_sub(n integer, plan text, provider text DEFAULT 'stripe',
     env text DEFAULT 'live', state text DEFAULT 'active', period_end timestamptz DEFAULT now() + interval '1 month',
@@ -86,6 +86,59 @@ SELECT pg_temp.check_paid(NOT EXISTS (SELECT 1 FROM public.first_paid_activation
                           'Replay whose paid start equals the restored trial end created a receipt');
 SELECT pg_temp.add_sub(15, 'craft_annual', env => 'sandbox', state => 'trialing');
 UPDATE public.subscriptions SET status = 'active', environment = 'live' WHERE user_id = md5('paid-test-15')::uuid;
+
+SELECT pg_temp.add_sub(16, 'pro_monthly', env => 'sandbox');
+UPDATE public.subscriptions SET status = 'canceled' WHERE user_id = md5('paid-test-16')::uuid;
+SELECT pg_temp.add_sub(16, 'pro_monthly');
+SELECT pg_temp.check_paid((SELECT count(*) = 1 FROM public.first_paid_activation_receipts
+                          WHERE user_id = md5('paid-test-16')::uuid),
+                          'Sandbox cancel blocked the later live activation');
+
+SELECT pg_temp.add_sub(17, 'credit_pack');
+UPDATE public.subscriptions SET status = 'canceled' WHERE user_id = md5('paid-test-17')::uuid;
+SELECT pg_temp.add_sub(17, 'pro_monthly');
+SELECT pg_temp.check_paid((SELECT count(*) = 1 FROM public.first_paid_activation_receipts
+                          WHERE user_id = md5('paid-test-17')::uuid),
+                          'Live credit-pack cancel blocked the later live activation');
+
+SELECT pg_temp.add_sub(18, 'craft_annual', 'paddle');
+DELETE FROM public.first_paid_activation_receipts WHERE user_id = md5('paid-test-18')::uuid;
+UPDATE public.subscriptions SET status = 'canceled' WHERE user_id = md5('paid-test-18')::uuid
+  AND price_id = 'craft_annual';
+UPDATE public.subscriptions
+  SET status = 'trialing', current_period_start = now() - interval '14 days',
+      current_period_end = now()
+  WHERE user_id = md5('paid-test-18')::uuid AND price_id = 'craft_annual';
+UPDATE public.subscriptions
+  SET status = 'active', current_period_start = current_period_end,
+      current_period_end = current_period_end + interval '1 year'
+  WHERE user_id = md5('paid-test-18')::uuid AND price_id = 'craft_annual';
+SELECT pg_temp.check_paid(NOT EXISTS (SELECT 1 FROM public.first_paid_activation_receipts
+                          WHERE user_id = md5('paid-test-18')::uuid),
+                          'Live paid cancel then an aligned trial conversion created a receipt');
+
+SELECT pg_temp.add_sub(19, 'craft_annual', 'paddle', state => 'trialing',
+  period_start => now() - interval '14 days', period_end => now() - interval '6 minutes');
+UPDATE public.subscriptions
+  SET status = 'active', current_period_start = current_period_end + interval '6 minutes',
+      current_period_end = now() + interval '1 year'
+  WHERE user_id = md5('paid-test-19')::uuid;
+SELECT pg_temp.check_paid(NOT EXISTS (SELECT 1 FROM public.first_paid_activation_receipts
+                          WHERE user_id = md5('paid-test-19')::uuid),
+                          'Paid start six minutes after the trial end created a receipt');
+
+SELECT pg_temp.add_sub(20, 'pro_monthly', env => 'sandbox');
+UPDATE public.subscriptions SET status = 'canceled' WHERE user_id = md5('paid-test-20')::uuid
+  AND environment = 'sandbox';
+SELECT pg_temp.add_sub(20, 'craft_annual', 'paddle', state => 'trialing',
+  period_start => now() - interval '14 days', period_end => now());
+UPDATE public.subscriptions
+  SET status = 'active', current_period_start = current_period_end,
+      current_period_end = current_period_end + interval '1 year'
+  WHERE user_id = md5('paid-test-20')::uuid AND environment = 'live';
+SELECT pg_temp.check_paid((SELECT count(*) = 1 FROM public.first_paid_activation_receipts
+                          WHERE user_id = md5('paid-test-20')::uuid),
+                          'Sandbox cancel blocked the later live trial conversion');
 
 SELECT pg_temp.check_paid((SELECT count(*) = 4 FROM public.first_paid_activation_receipts
     WHERE user_id IN (SELECT md5('paid-test-' || n)::uuid FROM generate_series(1, 15) n))

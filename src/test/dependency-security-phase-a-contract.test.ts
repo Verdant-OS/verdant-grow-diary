@@ -245,7 +245,7 @@ describe("dependency security Phase A resolution floors", () => {
       "fast-uri": "3.1.9",
       "form-data": "4.0.6",
       "follow-redirects": "1.16.2",
-      "@modelcontextprotocol/sdk": "1.32.0",
+      "@modelcontextprotocol/sdk": "1.32.2",
       "@hono/node-server": "2.1.6",
       "js-yaml": "4.3.2",
       "launch-editor": "2.14.2",

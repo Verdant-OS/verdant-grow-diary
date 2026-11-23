@@ -67,6 +67,7 @@ import {
   type PublicGrowGuideArticle,
 } from "../publicGrowGuideArticles";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "./siteSoftwareApplicationJsonLd";
+import { HelpCenterContent } from "../helpCenterContent";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
 import {
   isGuideCitationHref,
@@ -1051,6 +1052,79 @@ export const STATIC_PUBLIC_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocum
     }),
   ]);
 
+function helpCenterDocuments(): readonly StaticPublicSeoDocument[] {
+  const homeUrl = `${VERDANT_SITE_ORIGIN}${HelpCenterContent.homePath()}`;
+  const home = publicDocument(HelpCenterContent.homePath(), {
+    title: HelpCenterContent.homeTitle(),
+    description: HelpCenterContent.homeDescription(),
+    imageAlt: "Verdant Help",
+    bodyFallbackHtml: helpHomeFallback(),
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: HelpCenterContent.homeTitle(),
+        description: HelpCenterContent.homeDescription(),
+        url: homeUrl,
+      }),
+      buildBreadcrumbListJsonLd({ items: [{ name: "Help", url: homeUrl }] }),
+    ],
+  });
+  const hubs = HelpCenterContent.sections().map((entry) => {
+    const url = `${VERDANT_SITE_ORIGIN}${entry.path}`;
+    return publicDocument(entry.path, {
+      title: entry.titleTag,
+      description: entry.covers,
+      imageAlt: entry.title,
+      bodyFallbackHtml: helpHubFallback(entry.title, entry.covers, entry.topics),
+      jsonLd: [
+        buildStaticWebPageJsonLd({
+          title: entry.titleTag,
+          description: entry.covers,
+          url,
+        }),
+        buildBreadcrumbListJsonLd({
+          items: [
+            { name: "Help", url: homeUrl },
+            { name: entry.title, url },
+          ],
+        }),
+      ],
+    });
+  });
+  return [home, ...hubs];
+}
+
+function helpHomeFallback(): string {
+  const items = HelpCenterContent.sections()
+    .map(
+      (entry) =>
+        `<li><a href="${escapeStaticHtml(entry.path)}">${escapeStaticHtml(entry.title)}</a>: ${escapeStaticHtml(entry.homeOneLiner)}</li>`,
+    )
+    .join("");
+  return [
+    "<h1>Help</h1>",
+    `<p>Need a person? Email <a href="mailto:support@verdantgrowdiary.com">support@verdantgrowdiary.com</a> or use the <a href="/contact">contact form</a>. Typical reply time is 1–2 business days.</p>`,
+    `<p>These pages answer one question at a time. For growing know-how (symptoms, nutrients, lighting), use the <a href="/guides">grower guides</a>.</p>`,
+    `<h2>All sections</h2><ul>${items}</ul>`,
+    `<h2>Sources</h2><p><a href="/contact">Contact</a></p>`,
+  ].join("");
+}
+
+function helpHubFallback(
+  title: string,
+  covers: string,
+  topics: readonly { readonly label: string; readonly href: string }[],
+): string {
+  const links = topics
+    .map(
+      (topic) =>
+        `<li><a href="${escapeStaticHtml(topic.href)}">${escapeStaticHtml(topic.label)}</a></li>`,
+    )
+    .join("");
+  return `<h1>${escapeStaticHtml(title)}</h1><p>Covers ${escapeStaticHtml(covers)}</p>${
+    links ? `<ul>${links}</ul>` : ""
+  }`;
+}
+
 /** All public documents emitted alongside Vite's primary SPA entry. */
 export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = Object.freeze([
   ...CORE_ACQUISITION_DOCUMENTS,
@@ -1058,6 +1132,7 @@ export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument>
   ...GUIDE_DOCUMENTS,
   CULTIVAR_HUB,
   ...INDEXABLE_CULTIVAR_DOCUMENTS,
+  ...helpCenterDocuments(),
 ]);
 
 /**

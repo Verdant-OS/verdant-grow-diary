@@ -63,6 +63,10 @@ const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
   "/privacy-policy": "/privacy",
   // Founder Lifetime is no longer sold (#2028); the retired page is permanent.
   "/founder": "/pricing",
+  // Exact help aliases only. /docs/mcp-api stays a document, and /docs/* is not a prefix.
+  "/docs": "/help",
+  "/support": "/help",
+  "/help/developers/mcp-tools": "/docs/mcp-api",
 };
 
 export type HostHeader = [string, string];

@@ -281,12 +281,37 @@ describe("grok-review workflow safety contract", () => {
   });
 
   it("reports ran=false and posts nothing when Grok returns no review text", () => {
+    // Runs the step's real tail (the jq filter and the ran= branch) against stubbed Grok JSON,
+    // so an empty or whitespace-only "text" can never post a blank comment.
     const run = runOf(review, "Review the diff (read-only)").run!;
-    expect(run).toContain('if [ -s "$RUNNER_TEMP/grok/review.md" ]; then');
-    // ran=true is written only inside the non-empty branch.
-    const afterGrok = run.slice(run.indexOf("jq -r"));
-    expect(afterGrok.indexOf('echo "ran=true"')).toBeGreaterThan(afterGrok.indexOf("if [ -s"));
-    expect(afterGrok).toContain('echo "ran=false" >> "$GITHUB_OUTPUT"');
+    const tail = run.slice(run.indexOf("| jq -r"));
+    const cases: Array<[string, string]> = [
+      ["{}", "ran=false"],
+      ['{"text":""}', "ran=false"],
+      ['{"text":"\\n"}', "ran=false"],
+      ['{"text":"  \\t\\n  "}', "ran=false"],
+      ['{"text":"P2 src/a.ts:1 real finding"}', "ran=true"],
+    ];
+    for (const [json, expected] of cases) {
+      const dir = mkdtempSync(join(tmpdir(), "grok-ran-"));
+      try {
+        mkdirSync(join(dir, "grok"));
+        writeFileSync(join(dir, "in.json"), json);
+        writeFileSync(join(dir, "out"), "");
+        execFileSync("bash", ["-e", "-o", "pipefail", "-c", `cat "$IN" ${tail}`], {
+          cwd: dir,
+          env: {
+            ...process.env,
+            IN: join(dir, "in.json"),
+            RUNNER_TEMP: dir,
+            GITHUB_OUTPUT: join(dir, "out"),
+          },
+        });
+        expect(readFileSync(join(dir, "out"), "utf8").trim(), json).toBe(expected);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
   });
 
   it("never interpolates PR-controlled text into a shell script", () => {

@@ -126,7 +126,7 @@ jobs:
             --sandbox review-locked \
             --max-turns 30 \
             --output-format json \
-            | jq -r '.text // empty' > "$RUNNER_TEMP/grok/review.md"
+            | jq -r '.text // empty | select(test("\\S"))' > "$RUNNER_TEMP/grok/review.md"
           if [ -s "$RUNNER_TEMP/grok/review.md" ]; then
             echo "ran=true" >> "$GITHUB_OUTPUT"
           else

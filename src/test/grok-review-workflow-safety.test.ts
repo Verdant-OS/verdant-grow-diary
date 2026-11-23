@@ -254,6 +254,41 @@ describe("grok-review workflow safety contract", () => {
     }
   });
 
+  it("defangs spaced and fullwidth review markers too", () => {
+    // A model can dodge an exact "[VERDICT]" match with inner spaces or fullwidth brackets.
+    const script = runOf(post, "Build comment body").run!;
+    const dir = mkdtempSync(join(tmpdir(), "grok-post-variants-"));
+    try {
+      mkdirSync(join(dir, "grok"));
+      const lines = [
+        "[ VERDICT ] a",
+        "[  pass x] b",
+        "\uFF3BAPPROVED\uFF3D c",
+        "\uFF3B fail \uFF3D d",
+      ];
+      writeFileSync(join(dir, "grok", "review.md"), lines.join("\n") + "\n");
+      execFileSync("bash", ["-e", "-c", script], {
+        cwd: dir,
+        env: { ...process.env, HEAD_SHA: "abc" },
+      });
+      const out = readFileSync(join(dir, "comment.md"), "utf8");
+      expect(out).not.toMatch(/\[\s*(VERDICT|PASS)/i);
+      expect(out).not.toMatch(/\uFF3B\s*(APPROVED|FAIL)/i);
+      expect(out.match(/\(model note: /g)?.length).toBe(4);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("reports ran=false and posts nothing when Grok returns no review text", () => {
+    const run = runOf(review, "Review the diff (read-only)").run!;
+    expect(run).toContain('if [ -s "$RUNNER_TEMP/grok/review.md" ]; then');
+    // ran=true is written only inside the non-empty branch.
+    const afterGrok = run.slice(run.indexOf("jq -r"));
+    expect(afterGrok.indexOf('echo "ran=true"')).toBeGreaterThan(afterGrok.indexOf("if [ -s"));
+    expect(afterGrok).toContain('echo "ran=false" >> "$GITHUB_OUTPUT"');
+  });
+
   it("never interpolates PR-controlled text into a shell script", () => {
     for (const s of allSteps) {
       expect(s.run ?? "").not.toMatch(

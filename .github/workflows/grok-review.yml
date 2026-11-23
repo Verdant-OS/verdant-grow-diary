@@ -63,6 +63,9 @@ jobs:
           persist-credentials: false
 
       - name: Install Grok CLI (pinned)
+        # Exact version pin. npm has no install-time integrity flag for a global package;
+        # recorded as a known gap for Matthew's decision. Published npm versions are
+        # immutable, and the job stays gated off until a safe sandbox is verified.
         run: npm install -g @xai-official/grok@1.0.89
 
       - name: Write the PR diff
@@ -124,7 +127,12 @@ jobs:
             --max-turns 30 \
             --output-format json \
             | jq -r '.text // empty' > "$RUNNER_TEMP/grok/review.md"
-          echo "ran=true" >> "$GITHUB_OUTPUT"
+          if [ -s "$RUNNER_TEMP/grok/review.md" ]; then
+            echo "ran=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Grok returned no review text; no comment posted."
+            echo "ran=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Withhold credential-like output
         # Last line of defense if a prompt injection gets the model to echo a secret:
@@ -181,10 +189,10 @@ jobs:
             echo
             # Neutralize @-mentions and any bracketed review-protocol tag the model might
             # emit ([VERDICT], [ROUTE], [ACK], [CLAIM], [FIX REQUEST], [YES-RECORDED], in
-            # any case), and cap the length. Defanging lengthens markers about 3x, so cap again
+            # any case, with inner spaces or fullwidth brackets), and cap the length. Defanging lengthens markers about 3x, so cap again
             # after it; 60000 bytes leaves room for this header and footer under GitHub's 65536.
             head -c 60000 grok/review.md \
-              | sed -E 's/@([A-Za-z0-9_-])/@​\1/g; s/\[(VERDICT|ROUTE|ACK|CLAIM|FIX REQUEST|YES-RECORDED|APPROVE[DS]?|PASS|FAIL)([^]]*)\]/(model note: \1\2)/gI' \
+              | sed -E 's/@([A-Za-z0-9_-])/@​\1/g; s/(\[|［)[[:space:]]*(VERDICT|ROUTE|ACK|CLAIM|FIX REQUEST|YES-RECORDED|APPROVE[DS]?|PASS|FAIL)([^]］]*)(\]|］)/(model note: \2\3)/gI' \
               | head -c 60000
             echo
             echo "</details>"

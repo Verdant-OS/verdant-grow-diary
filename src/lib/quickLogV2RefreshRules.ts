@@ -146,7 +146,7 @@ export function resolveQuickLogV2RefreshScope(target: {
   plantId: string | null;
 }): QuickLogV2RefreshScope {
   if (target.plantId) {
-    return { targetType: "plant", targetId: target.plantId, tentId: target.tentId ?? null };
+    return { targetType: "plant", targetId: target.plantId, tentId: target.tentId };
   }
   if (target.tentId) {
     return { targetType: "tent", targetId: target.tentId, tentId: target.tentId };

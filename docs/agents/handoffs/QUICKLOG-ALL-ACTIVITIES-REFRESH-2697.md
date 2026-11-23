@@ -6,7 +6,7 @@ goal: after a confirmed save from the All activity types section, the plant page
 why: QuickLogAllActivitiesSection only sent verdant:entry-created. The plant page and Timeline React Query reads do not listen for that event, so they kept stale cache data. The other Quick Log save paths already call applyQuickLogV2Refresh.
 branch: posthog-self-driving/fixquick-log-refresh-plant-timeline-316954 (name fixed by the PostHog run harness)
 base: verdant-grow-diary (started at 9c7339428)
-pr: draft PR from the branch above (number recorded on the PR)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3066 (draft)
 head_sha: recorded on the PR; this file is written before the first push
 state: pushed draft
 current_step: fix and test committed together; RED proven locally (4 of 9 new tests fail without the component wiring)

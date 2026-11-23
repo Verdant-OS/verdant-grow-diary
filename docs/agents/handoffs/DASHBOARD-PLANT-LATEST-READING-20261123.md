@@ -8,10 +8,10 @@ branch: claude/project-thread-8zmrgw
 base: verdant-grow-diary (started at ab8826ac72220b9da1fcf3ef57b0740812e9561f)
 checkout: git fetch origin claude/project-thread-8zmrgw verdant-grow-diary && git switch claude/project-thread-8zmrgw
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3049 (out of draft since 2026-11-23 02:08 UTC on Matthew's own word; merge not covered)
-head_sha: code checkpoint 311d07ca64daf6615dbf313def4add4479081cf6 (this handoff update is the commit after it). Any later head needs fresh CI and a fresh exact-head review.
-state: ready for review (not draft)
-current_step: required CI at the PR head, then an independent exact-head review
-next_action: read the 35 required checks at the PR head; fix any red check in files_touched only; then route one review to an eligible Reviewer A, D or C seat that did not author or repair this PR.
+head_sha: paperwork commit on parent 0b4f5320e20d75ec14036f71c868362cc95584da. Any later head needs fresh CI and a fresh exact-head review.
+state: ready for review (not draft; out of draft since 2026-11-23 02:08 UTC)
+current_step: required CI at the PR head, then Reviewers A + D + C and the owner's own-words yes at the exact final SHA
+next_action: read the 40 required CI contexts at the PR head; fix any red check in files_touched only; then route review to Reviewers A, D, and C (all three) who did not author or repair this PR. This PR is GATED.
 post_merge_check: on https://verdantgrowdiary.com once /version.json reports the merged SHA, signed in as the disposable fixture account, read only: Fixture Tent A's Dashboard tent card and its plant page Current Environment card show the same temperature, source and capture time. No writes.
 active_writer: Claude thread session (cmsg_01P7pGxx3V5wxVuLXvJUxaGsTAW8dwDELDERFjzgci8Uxg)
 decisions: (1) one merge rule for both surfaces: new pure src/lib/dashboardTentSnapshotRowsRules.ts (evidence filter on sensor rows, this tent's Quick Log temperature/RH rows via tonightRowsFromQuickLogManualReadings, newest observation first with input order as tie-breaker, then the plant page's mergePlantTentReadingsWithManualEvents). (2) only the tent card's snapshot input changes; charts, stability and the canonical VPD input keep sensor rows (the Tents list strip keeps canonical VPD on Tonight's raw rows per Codex P1 on #2437). (3) mergePlantTentReadingsWithManualEvents's type constraint widened to a structural ManualMergeReadingRow; runtime unchanged. (4) staleness stays with buildTentSnapshotView: a 14-day-old manual reading renders Stale, never healthy.
@@ -20,14 +20,14 @@ commands: bunx vitest run src/test/dashboard-tent-latest-reading-matches-plant-p
 files_touched: src/lib/dashboardTentSnapshotRowsRules.ts (new); src/lib/plantManualEnvironmentEventRules.ts (type only); src/pages/Dashboard.tsx; src/test/dashboard-tent-latest-reading-matches-plant-page.test.ts (new); src/test/dashboard-tent-latest-reading-rendered.test.tsx (new, rendered Dashboard wiring, per Codex P2); src/test/dashboard-environment-sensor-truth-states.test.tsx (pin renegotiated: tentRows -> snapRows, scorer unlock declared); this file
 files_remaining: none planned
 blockers: local vitest/typecheck/lint BLOCKED in this container (bun install --frozen-lockfile gets 403 from the pinned registry). The new test and the 8 pure related test files ran under bun's runner with a vitest shim (90 pass); CI is the evidence for the rest.
-open_questions: remaining divergences left as they are: the plant page reads Quick Log entries for this plant or tent-wide, the tent card all of the tent's; the plant page does not apply the Dashboard evidence filter to sensor rows; the /tents list strip shows sensor rows first and Quick Log cards only when no sensor row exists; Tent Detail lets a manual value win per metric only when strictly newer.
+open_questions: remaining divergences left as they are: the plant page reads Quick Log entries for this plant or tent-wide, the tent card all of the tent's; the plant page does not apply the Dashboard evidence filter to sensor rows; the /tents list strip shows sensor rows first and Quick Log cards only when no sensor row exists; Tent Detail lets a manual value win per metric only when strictly newer; Dashboard manuals include diary snapshots (Quick Log environment events limited to 200 and diary snapshots limited to 50 in useSensorsQuickLogManualReadings) versus environment events limited to 50 on the plant page (PLANT_MANUAL_ENV_EVENT_LIMIT).
 gotchas: PR #3021 also edits Dashboard.tsx (alert stage scope, lines ~290-350); no line overlap with latestPerTent. Stay off the Timeline header path (separate task). No schema, RLS, edge, auth, billing or production changes.
 links: walkthrough notes (Nov 20) in the project task notes; PR #3021 (separate workstream).
-artifacts: PR checks on the draft PR
-reviewer_seat: eligible independent reviewer (Reviewer A, D or C), not this session
+artifacts: PR checks on https://github.com/Verdant-OS/verdant-grow-diary/pull/3049 (open, not a draft)
+reviewer_seat: Reviewers A + D + C (all three; this PR is GATED), none of them this session, plus the owner's own-words yes at the exact final SHA (pending)
 reviewer_sha: none yet
 session_state: Claude thread session for task ueefa0ea7bcb46abc9076b59f93389442
 claimed_by: Claude thread session, 2026-11-23 01:55 UTC
 owner: Claude thread session
-last_updated: 2026-11-23 02:24 UTC, by Claude (review fixes: Copilot equal-time tie at c71d59c, Codex P2 rendered test at 80c7d27, tsgo cast at 105c86f, Copilot invalid future Quick Log at 311d07c)
+last_updated: 2026-11-23 05:25 CT, by Grok (review paperwork: 40 required contexts, not a draft, gate is Reviewers A + D + C, diary-snapshot window divergence)
 ```

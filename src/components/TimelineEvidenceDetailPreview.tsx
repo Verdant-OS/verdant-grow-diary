@@ -32,6 +32,12 @@ function OpenEvidenceDetail({
   const waterUnit = useWaterVolumeEntryUnit();
   const readingLines = presentTimelineDiaryEntryDetails(entry.details, temperatureUnit, {
     waterUnit,
+    entryType:
+      typeof entry.details?.event_type === "string"
+        ? entry.details.event_type
+        : typeof entry.details?.entry_type === "string"
+          ? entry.details.entry_type
+          : null,
   }).detailLines;
   return (
     <TimelineEvidenceDetailDrawer

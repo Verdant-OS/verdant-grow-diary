@@ -3431,7 +3431,11 @@ export default function Timeline() {
                           const { detailLines, extra } = presentTimelineDiaryEntryDetails(
                             e.details,
                             temperatureUnit,
-                            { suppress: isLearningLoopEvent || isReadinessCheckEvent, waterUnit },
+                            {
+                              suppress: isLearningLoopEvent || isReadinessCheckEvent,
+                              waterUnit,
+                              entryType: effectiveCareType,
+                            },
                           );
                           const loopActionId =
                             isLearningLoopEvent && typeof e.details?.action_queue_id === "string"

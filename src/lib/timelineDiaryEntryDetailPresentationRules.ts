@@ -144,6 +144,11 @@ export interface TimelineDiaryDetailPresentationOptions {
   formatTimestamp?: (iso: string) => string | null;
   /** Unit for watering volumes (stored ml). Omitted stays ml. Feeding volumes stay ml. */
   waterUnit?: WaterEntryUnit;
+  /**
+   * Row-level activity when `details` has no event/entry type.
+   * A feeding row keeps feeding labels and millilitres.
+   */
+  entryType?: string | null;
 }
 
 function formatDiaryDetailTimestamp(iso: string, timeZone?: string): string | null {
@@ -328,6 +333,38 @@ function withGrowerFacingDetailLines(
   return next;
 }
 
+function namedWaterOrFeed(value: unknown): "feeding" | "watering" | null {
+  if (typeof value !== "string") return null;
+  const kind = value.trim().toLowerCase();
+  if (kind === "feeding" || kind === "feed") return "feeding";
+  if (kind === "watering" || kind === "water") return "watering";
+  return null;
+}
+
+function isDetailObject(value: unknown): boolean {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Flat `watering_amount_ml` / `runoff_ml` keys have no envelope of their own.
+ * An explicit type wins. A feeding object with no type is still a feeding
+ * entry, so those keys stay millilitres instead of inheriting the watering unit.
+ */
+function flatVolumeEnvelopeFor(
+  record: Record<string, unknown>,
+  entryType: string | null | undefined,
+): (typeof TYPED_ACTIVITY_ENVELOPES)[number] {
+  const named =
+    namedWaterOrFeed(entryType) ??
+    namedWaterOrFeed(record.event_type) ??
+    namedWaterOrFeed(record.eventType) ??
+    namedWaterOrFeed(record.entry_type) ??
+    namedWaterOrFeed(record.entryType);
+  if (named) return named;
+  if (isDetailObject(record.feeding) && !isDetailObject(record.watering)) return "feeding";
+  return "watering";
+}
+
 export function presentTimelineDiaryEntryDetails(
   details: unknown,
   tempUnit: TemperatureUnitPreference,
@@ -350,13 +387,7 @@ export function presentTimelineDiaryEntryDetails(
     );
   }
   // snake_case and legacy camelCase type keys, as the diary normalizer accepts.
-  const rawEventType =
-    [record.event_type, record.eventType, record.entry_type, record.entryType]
-      .find((v): v is string => typeof v === "string" && v.trim() !== "")
-      ?.trim()
-      .toLowerCase() ?? "";
-  const flatVolumeEnvelope: (typeof TYPED_ACTIVITY_ENVELOPES)[number] =
-    rawEventType === "feeding" ? "feeding" : "watering";
+  const flatVolumeEnvelope = flatVolumeEnvelopeFor(record, options.entryType);
   const hasVolumeLine = detailLines.some(
     (line) => line.key === "watering.volume_ml" || line.key === "feeding.volume_ml",
   );

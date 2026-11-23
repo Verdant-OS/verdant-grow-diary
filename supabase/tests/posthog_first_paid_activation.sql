@@ -37,11 +37,6 @@ CREATE TEMP TABLE expected_paid AS SELECT * FROM public.first_paid_activation_re
 WHERE user_id = md5('paid-test-1')::uuid;
 SELECT pg_temp.check_paid((SELECT count(*) = 1 AND min(activated_at) = now() - interval '2 minutes'
                           FROM expected_paid), 'Live activation did not preserve the paid period start');
-UPDATE public.subscriptions SET status = 'trialing' WHERE user_id = md5('paid-test-1')::uuid;
-UPDATE public.subscriptions SET status = 'active' WHERE user_id = md5('paid-test-1')::uuid;
-SELECT pg_temp.check_paid((SELECT count(*) = 1 FROM public.first_paid_activation_receipts r
-                          JOIN expected_paid e USING (user_id, activated_at, event_id)),
-                          'Active, then trialing, then active created another receipt');
 UPDATE public.subscriptions SET status = 'active', current_period_end = now() + interval '2 months'
 WHERE user_id = md5('paid-test-1')::uuid;
 UPDATE public.subscriptions SET status = 'canceled' WHERE user_id = md5('paid-test-1')::uuid;
@@ -50,10 +45,14 @@ SELECT pg_temp.check_paid((SELECT count(*) = 1 FROM public.first_paid_activation
                           JOIN expected_paid e USING (user_id, activated_at, event_id)),
                           'Renewal or cross-provider resubscription changed the receipt');
 
-SELECT pg_temp.add_sub(2, 'craft_annual', 'paddle', state => 'trialing');
+SELECT pg_temp.add_sub(2, 'craft_annual', 'paddle', state => 'trialing',
+  period_start => now() - interval '14 days', period_end => now());
 SELECT pg_temp.check_paid(NOT EXISTS (SELECT 1 FROM public.first_paid_activation_receipts
                           WHERE user_id = md5('paid-test-2')::uuid), 'Open trial counted');
-UPDATE public.subscriptions SET status = 'active' WHERE user_id = md5('paid-test-2')::uuid;
+UPDATE public.subscriptions
+  SET status = 'active', current_period_start = current_period_end,
+      current_period_end = current_period_end + interval '1 year'
+  WHERE user_id = md5('paid-test-2')::uuid;
 SELECT pg_temp.add_sub(3, 'craft_monthly');
 SELECT pg_temp.add_sub(4, 'pro_annual', 'paddle');
 SELECT pg_temp.add_sub(5, 'pro_monthly', env => 'sandbox');
@@ -68,19 +67,23 @@ SELECT pg_temp.add_sub(11, 'pro_monthly');
 SELECT pg_temp.add_sub(12, 'pro_monthly', period_start => NULL);
 SELECT pg_temp.add_sub(13, 'craft_annual', state => 'past_due');
 UPDATE public.subscriptions SET status = 'active' WHERE user_id = md5('paid-test-13')::uuid;
-SELECT pg_temp.add_sub(14, 'pro_monthly', 'paddle');
+SELECT pg_temp.add_sub(14, 'craft_annual', 'paddle',
+  period_start => now() - interval '20 days', period_end => now() + interval '10 days');
 DELETE FROM public.first_paid_activation_receipts WHERE user_id = md5('paid-test-14')::uuid;
-UPDATE public.subscriptions
-  SET created_at = now() - interval '40 days', status = 'trialing',
-      current_period_start = now() - interval '1 day', current_period_end = now() + interval '6 days'
+DELETE FROM public.paid_return_cohort_memberships WHERE user_id = md5('paid-test-14')::uuid;
+UPDATE public.subscriptions SET created_at = now() - interval '40 days'
   WHERE user_id = md5('paid-test-14')::uuid;
 UPDATE public.subscriptions
-  SET status = 'active', current_period_start = now() - interval '1 minute',
-      current_period_end = now() + interval '1 month'
+  SET status = 'trialing', current_period_start = created_at,
+      current_period_end = created_at + interval '14 days'
+  WHERE user_id = md5('paid-test-14')::uuid;
+UPDATE public.subscriptions
+  SET status = 'active', current_period_start = now() - interval '20 days',
+      current_period_end = now() + interval '10 days'
   WHERE user_id = md5('paid-test-14')::uuid;
 SELECT pg_temp.check_paid(NOT EXISTS (SELECT 1 FROM public.first_paid_activation_receipts
                           WHERE user_id = md5('paid-test-14')::uuid),
-                          'Replayed trial on an older paid row created a receipt');
+                          'Backdated craft replay of active, trialing, then active created a receipt');
 SELECT pg_temp.add_sub(15, 'craft_annual', env => 'sandbox', state => 'trialing');
 UPDATE public.subscriptions SET status = 'active', environment = 'live' WHERE user_id = md5('paid-test-15')::uuid;
 

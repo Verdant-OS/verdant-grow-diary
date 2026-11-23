@@ -26,10 +26,17 @@ BEGIN
   END IF;
   IF TG_OP = 'UPDATE' THEN
     IF OLD.status <> 'trialing' THEN RETURN NEW; END IF;
-    -- A delayed trialing upsert keeps created_at and can make an older paid
-    -- row look like a first trial conversion. A genuine trial row is created
-    -- inside that trial window. The operator cohort below is unchanged.
-    IF OLD.current_period_start IS NULL OR NEW.created_at < OLD.current_period_start THEN
+    -- A replayed trialing upsert restores an older trial window, so created_at
+    -- is not a signal. A real conversion starts the paid period at that
+    -- window's end. A null or repeated period fails closed.
+    IF OLD.current_period_start IS NULL
+       OR OLD.current_period_end IS NULL
+       OR NEW.current_period_start IS NULL
+       OR NEW.current_period_start < OLD.current_period_start
+       OR NEW.current_period_start <= OLD.current_period_start + interval '5 minutes'
+       OR NEW.current_period_start < OLD.current_period_end - interval '5 minutes'
+       OR NEW.current_period_start > OLD.current_period_end + interval '5 minutes'
+    THEN
       genuine_first_paid := false;
     END IF;
     same_live_subscription := OLD.environment = 'live' AND OLD.user_id = NEW.user_id

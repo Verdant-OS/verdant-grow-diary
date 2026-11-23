@@ -132,13 +132,19 @@ function Row({
       </div>
 
       <div className="flex flex-wrap gap-1.5 mb-2">
-        <MetricChip label="Volume" value={fmtStoredMl(row.volumeMl, waterUnit)} />
+        <MetricChip
+          label="Volume"
+          value={fmtStoredMl(row.volumeMl, row.volumeStaysMl ? "ml" : waterUnit)}
+        />
         <MetricChip label="pH" value={fmtNumber(row.ph)} />
         <MetricChip label="EC" value={fmtNumber(row.ec, { suffix: "mS/cm" })} />
         {row.tds !== null && (
           <MetricChip label="TDS" value={fmtNumber(row.tds, { suffix: "ppm" })} />
         )}
-        <MetricChip label="Runoff" value={fmtStoredMl(row.runoffMl, waterUnit)} />
+        <MetricChip
+          label="Runoff"
+          value={fmtStoredMl(row.runoffMl, row.volumeStaysMl ? "ml" : waterUnit)}
+        />
         <MetricChip label="Runoff pH" value={fmtNumber(row.runoffPh)} />
         <MetricChip label="Runoff EC" value={fmtNumber(row.runoffEc, { suffix: "mS/cm" })} />
         {row.runoffTds !== null && (

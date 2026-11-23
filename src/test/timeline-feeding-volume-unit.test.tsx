@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useWaterVolumeEntryUnit } from "@/hooks/useWaterVolumeEntryUnit";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
+import * as waterUnitPreference from "@/lib/waterVolumeEntryUnitPreference";
 import {
   saveWaterVolumeEntryUnit,
   WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY,
@@ -78,42 +79,54 @@ describe("feeding volumes stay millilitres", () => {
 });
 
 describe("useWaterVolumeEntryUnit storage key", () => {
-  it("reloads when the water key is removed", () => {
+  it("re-reads when the water key is removed", () => {
+    const load = vi.spyOn(waterUnitPreference, "loadWaterVolumeEntryUnit");
     setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "gal");
     const { result } = renderHook(() => useWaterVolumeEntryUnit());
     expect(result.current).toBe("gal");
+    const reads = load.mock.calls.length;
     act(() => {
       removeLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY);
       window.dispatchEvent(
         new StorageEvent("storage", { key: WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY }),
       );
     });
+    expect(load.mock.calls.length).toBe(reads + 1);
     expect(result.current).toBe("L");
+    load.mockRestore();
   });
 
-  it("reloads when the storage key is null", () => {
+  it("re-reads when the storage key is null", () => {
+    const load = vi.spyOn(waterUnitPreference, "loadWaterVolumeEntryUnit");
     const { result } = renderHook(() => useWaterVolumeEntryUnit());
     act(() => {
       saveWaterVolumeEntryUnit("gal");
     });
     expect(result.current).toBe("gal");
+    const reads = load.mock.calls.length;
     act(() => {
       setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "ml");
       window.dispatchEvent(new StorageEvent("storage", { key: null }));
     });
+    expect(load.mock.calls.length).toBe(reads + 1);
     expect(result.current).toBe("ml");
+    load.mockRestore();
   });
 
-  it("ignores an unrelated storage key", () => {
+  it("does not re-read for an unrelated storage key", () => {
+    const load = vi.spyOn(waterUnitPreference, "loadWaterVolumeEntryUnit");
     const { result } = renderHook(() => useWaterVolumeEntryUnit());
     act(() => {
       saveWaterVolumeEntryUnit("gal");
     });
     expect(result.current).toBe("gal");
+    const reads = load.mock.calls.length;
     act(() => {
       setLocalStorageItemForTest(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, "ml");
       window.dispatchEvent(new StorageEvent("storage", { key: "verdant:somethingElse" }));
     });
+    expect(load.mock.calls.length).toBe(reads);
     expect(result.current).toBe("gal");
+    load.mockRestore();
   });
 });

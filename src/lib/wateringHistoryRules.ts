@@ -25,6 +25,8 @@ export interface WateringHistoryRow {
   plantId: string | null;
   tentId: string | null;
   volumeMl: number | null;
+  /** Feeding envelope with no watering envelope: show stored ml, not the water unit. */
+  volumeStaysMl: boolean;
   ph: number | null;
   ec: number | null;
   tds: number | null;
@@ -119,6 +121,18 @@ function rangeWarnings(row: {
   return w;
 }
 
+function isPlainDetail(value: unknown): boolean {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Same feeding-envelope rule as the timeline card: no type, feeding object, no watering object. */
+function feedingEnvelopeKeepsMl(entry: NormalizedDiaryEntry): boolean {
+  if (entry.eventType === "feeding" || entry.eventType === "feed") return true;
+  const extras = entry.details.extras;
+  if (!extras) return false;
+  return isPlainDetail(extras.feeding) && !isPlainDetail(extras.watering);
+}
+
 function isWateringEntry(entry: NormalizedDiaryEntry): boolean {
   if (entry.eventType === "watering") return true;
   // Feeding rows also carry a solution volume. Do not let that shared
@@ -179,6 +193,7 @@ function toRow(entry: NormalizedDiaryEntry): WateringHistoryRow {
     plantId: entry.plantId,
     tentId: entry.tentId,
     volumeMl,
+    volumeStaysMl: feedingEnvelopeKeepsMl(entry),
     ph,
     ec,
     tds,

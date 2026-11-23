@@ -32,7 +32,11 @@ DECLARE
   same_live_subscription boolean := true;
   genuine_first_paid boolean := true;
 BEGIN
-  IF TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM 'trialing' THEN
+  IF TG_OP = 'UPDATE'
+     AND OLD.environment = 'live'
+     AND OLD.price_id IN ('pro_monthly', 'pro_annual', 'craft_monthly',
+                         'craft_annual', 'founder_lifetime')
+     AND OLD.status IS DISTINCT FROM 'trialing' THEN
     INSERT INTO public.first_paid_seen_non_trial (user_id)
       VALUES (NEW.user_id)
       ON CONFLICT (user_id) DO NOTHING;

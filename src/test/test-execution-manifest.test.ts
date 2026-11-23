@@ -208,6 +208,11 @@ function pgTapExemptions(): Record<string, { class: string; reason: string }> {
   ]) {
     out[file] = { class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE, reason: blocked };
   }
+  out["supabase/tests/posthog_first_paid_activation.sql"] = {
+    class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
+    reason:
+      "Badge pgTAP and test:security-db-local apply this migration on db reset, but neither asserts its logic. Applied but its logic is not tested in CI.",
+  };
   out["supabase/tests/billing_subscriptions_rls.sql"] = {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
     reason: `${blocked} ADDITIONALLY BROKEN: line 59 calls max(user_id) on a uuid column, and max(uuid) does not exist in PostgreSQL — proven on a throwaway PG 16.13 cluster (0 rows in pg_aggregate; "ERROR: function max(uuid) does not exist", with max(text) as a passing control). Note it is not necessarily the FIRST error: without psql variables the file dies earlier at "syntax error at or near \\":\\"". Wiring this lane will not make this suite pass.`,
@@ -333,7 +338,7 @@ describe("test execution manifest — every committed test runs, or says why not
       byClass[entry.class] = (byClass[entry.class] ?? 0) + 1;
     }
     expect(byClass).toEqual({
-      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 24,
+      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 25,
       [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
       [EXEMPTION_CLASS.RED_WHEN_RUN]: 2,
       [EXEMPTION_CLASS.AWAITING_DECISION]: 2,

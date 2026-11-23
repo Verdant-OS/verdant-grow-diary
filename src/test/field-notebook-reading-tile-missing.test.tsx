@@ -1,11 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import FieldNotebook from "@/components/FieldNotebook";
-import {
-  FIELD_NOTEBOOK_READING_ABSENT,
-  formatReadingValue,
-  type ReadingSlot,
-} from "@/lib/fieldNotebookViewModel";
+import { formatReadingValue, type ReadingSlot } from "@/lib/fieldNotebookViewModel";
 
 // Live check 2026-11-23 on a fresh Free account: the dashboard tent card showed
 // a bare "—" in all four reading tiles (TEMP, RH, VPD, PPFD) while the tent
@@ -47,7 +43,6 @@ function renderNotebook(readings: ReadingSlot[]) {
 
 describe("field notebook reading tiles with no reading", () => {
   it("names an absent reading Missing, and keeps zero as a real value", () => {
-    expect(FIELD_NOTEBOOK_READING_ABSENT).toBe("Missing");
     expect(formatReadingValue(null)).toBe("Missing");
     expect(formatReadingValue("   ")).toBe("Missing");
     expect(formatReadingValue("0")).toBe("0");

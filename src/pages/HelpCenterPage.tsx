@@ -4,7 +4,7 @@
 import { Link } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
-import { HelpCenterContent, type HelpSection } from "@/lib/helpCenterContent";
+import { HelpCenterContent, type HelpRun, type HelpSection } from "@/lib/helpCenterContent";
 
 const tapLink = "inline-flex min-h-11 items-center text-primary underline-offset-4 hover:underline";
 
@@ -74,30 +74,47 @@ export default function HelpCenterPage({ section }: { readonly section: HelpSect
   );
 }
 
+function HelpRunView({ run }: { readonly run: HelpRun }) {
+  if (run.kind === "text") return run.text;
+  if (run.href.startsWith("/")) {
+    return (
+      <Link to={run.href} className={tapLink}>
+        {run.text}
+      </Link>
+    );
+  }
+  return (
+    <a className={tapLink} href={run.href}>
+      {run.text}
+    </a>
+  );
+}
+
 function Home() {
+  const [title, support, guides, sectionsHeading, sourcesHeading, sources] =
+    HelpCenterContent.homeBlocks();
   return (
     <>
-      <h1 className="font-display text-3xl font-semibold leading-tight">Help</h1>
+      <h1 className="font-display text-3xl font-semibold leading-tight">
+        {title.runs.map((run, index) => (
+          <HelpRunView key={index} run={run} />
+        ))}
+      </h1>
       <p className="mt-4 text-base leading-7">
-        Need a person? Email{" "}
-        <a className={tapLink} href="mailto:support@verdantgrowdiary.com">
-          support@verdantgrowdiary.com
-        </a>{" "}
-        or use the{" "}
-        <Link to="/contact" className={tapLink}>
-          contact form
-        </Link>
-        . Typical reply time is 1–2 business days.
+        {support.runs.map((run, index) => (
+          <HelpRunView key={index} run={run} />
+        ))}
       </p>
       <p className="mt-4 text-base leading-7">
-        These pages answer one question at a time. For growing know-how (symptoms, nutrients,
-        lighting), use the{" "}
-        <Link to="/guides" className={tapLink}>
-          grower guides
-        </Link>
-        .
+        {guides.runs.map((run, index) => (
+          <HelpRunView key={index} run={run} />
+        ))}
       </p>
-      <h2 className="mt-8 text-xl font-semibold">All sections</h2>
+      <h2 className="mt-8 text-xl font-semibold">
+        {sectionsHeading.runs.map((run, index) => (
+          <HelpRunView key={index} run={run} />
+        ))}
+      </h2>
       <ul className="mt-3 space-y-2">
         {HelpCenterContent.sections().map((entry) => (
           <li key={entry.slug} className="text-base leading-7">
@@ -108,11 +125,15 @@ function Home() {
           </li>
         ))}
       </ul>
-      <h2 className="mt-8 text-xl font-semibold">Sources</h2>
+      <h2 className="mt-8 text-xl font-semibold">
+        {sourcesHeading.runs.map((run, index) => (
+          <HelpRunView key={index} run={run} />
+        ))}
+      </h2>
       <p className="mt-2 text-base leading-7">
-        <Link to="/contact" className={tapLink}>
-          Contact
-        </Link>
+        {sources.runs.map((run, index) => (
+          <HelpRunView key={index} run={run} />
+        ))}
       </p>
     </>
   );

@@ -1058,7 +1058,7 @@ function helpCenterDocuments(): readonly StaticPublicSeoDocument[] {
     title: HelpCenterContent.homeTitle(),
     description: HelpCenterContent.homeDescription(),
     imageAlt: "Verdant Help",
-    bodyFallbackHtml: helpHomeFallback(),
+    bodyFallbackHtml: HelpCenterContent.homeFallbackHtml(),
     jsonLd: [
       buildStaticWebPageJsonLd({
         title: HelpCenterContent.homeTitle(),
@@ -1091,22 +1091,6 @@ function helpCenterDocuments(): readonly StaticPublicSeoDocument[] {
     });
   });
   return [home, ...hubs];
-}
-
-function helpHomeFallback(): string {
-  const items = HelpCenterContent.sections()
-    .map(
-      (entry) =>
-        `<li><a href="${escapeStaticHtml(entry.path)}">${escapeStaticHtml(entry.title)}</a>: ${escapeStaticHtml(entry.homeOneLiner)}</li>`,
-    )
-    .join("");
-  return [
-    "<h1>Help</h1>",
-    `<p>Need a person? Email <a href="mailto:support@verdantgrowdiary.com">support@verdantgrowdiary.com</a> or use the <a href="/contact">contact form</a>. Typical reply time is 1–2 business days.</p>`,
-    `<p>These pages answer one question at a time. For growing know-how (symptoms, nutrients, lighting), use the <a href="/guides">grower guides</a>.</p>`,
-    `<h2>All sections</h2><ul>${items}</ul>`,
-    `<h2>Sources</h2><p><a href="/contact">Contact</a></p>`,
-  ].join("");
 }
 
 function helpHubFallback(

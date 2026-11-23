@@ -8,6 +8,15 @@ export interface HelpTopicLink {
   readonly href: string;
 }
 
+export type HelpRun =
+  | { readonly kind: "text"; readonly text: string }
+  | { readonly kind: "link"; readonly text: string; readonly href: string };
+
+export interface HelpBlock {
+  readonly tag: "h1" | "h2" | "p";
+  readonly runs: readonly HelpRun[];
+}
+
 export interface HelpSection {
   readonly slug: string;
   readonly title: string;
@@ -22,6 +31,38 @@ const HOME_PATH = "/help";
 const HOME_TITLE = "Help | Verdant Grow Diary";
 const HOME_DESCRIPTION =
   "Short answers about logging, sensors, AI Doctor, plans, and your account. Contact support from this page.";
+
+const HOME_BLOCKS: readonly HelpBlock[] = [
+  { tag: "h1", runs: [{ kind: "text", text: "Help" }] },
+  {
+    tag: "p",
+    runs: [
+      { kind: "text", text: "Need a person? Email " },
+      {
+        kind: "link",
+        text: "support@verdantgrowdiary.com",
+        href: "mailto:support@verdantgrowdiary.com",
+      },
+      { kind: "text", text: " or use the " },
+      { kind: "link", text: "contact form", href: "/contact" },
+      { kind: "text", text: ". Typical reply time is 1–2 business days." },
+    ],
+  },
+  {
+    tag: "p",
+    runs: [
+      {
+        kind: "text",
+        text: "These pages answer one question at a time. For growing know-how (symptoms, nutrients, lighting), use the ",
+      },
+      { kind: "link", text: "grower guides", href: "/guides" },
+      { kind: "text", text: "." },
+    ],
+  },
+  { tag: "h2", runs: [{ kind: "text", text: "All sections" }] },
+  { tag: "h2", runs: [{ kind: "text", text: "Sources" }] },
+  { tag: "p", runs: [{ kind: "link", text: "Contact", href: "/contact" }] },
+];
 
 const SECTIONS: readonly HelpSection[] = [
   section(
@@ -131,6 +172,20 @@ export class HelpCenterContent {
     return HOME_DESCRIPTION;
   }
 
+  static homeBlocks(): readonly HelpBlock[] {
+    return HOME_BLOCKS;
+  }
+
+  static homeFallbackHtml(): string {
+    const items = SECTIONS.map(
+      (entry) =>
+        `<li><a href="${escapeHelpHtml(entry.path)}">${escapeHelpHtml(entry.title)}</a>: ${escapeHelpHtml(entry.homeOneLiner)}</li>`,
+    ).join("");
+    const before = HOME_BLOCKS.slice(0, 4).map(renderHelpBlock).join("");
+    const after = HOME_BLOCKS.slice(4).map(renderHelpBlock).join("");
+    return `${before}<ul>${items}</ul>${after}`;
+  }
+
   static sections(): readonly HelpSection[] {
     return SECTIONS;
   }
@@ -146,16 +201,10 @@ export class HelpCenterContent {
 
   /** Visible copy plus titles and meta. Used by the public-copy guard. */
   static publicCopyCorpus(): string {
-    const parts: string[] = [
-      HOME_TITLE,
-      HOME_DESCRIPTION,
-      "Help",
-      "Need a person? Email support@verdantgrowdiary.com or use the contact form. Typical reply time is 1–2 business days.",
-      "These pages answer one question at a time. For growing know-how (symptoms, nutrients, lighting), use the grower guides.",
-      "All sections",
-      "Sources",
-      "Contact",
-    ];
+    const parts: string[] = [HOME_TITLE, HOME_DESCRIPTION];
+    for (const block of HOME_BLOCKS) {
+      parts.push(block.runs.map((run) => run.text).join(""));
+    }
     for (const entry of SECTIONS) {
       parts.push(entry.title, entry.covers, entry.homeOneLiner, entry.titleTag, entry.path);
       for (const topic of entry.topics) parts.push(topic.label, topic.href);
@@ -177,4 +226,21 @@ export class HelpCenterContent {
     if (/\bdiagnoses\b/i.test(diagnosisRemainder)) hits.push("diagnoses");
     return hits;
   }
+}
+
+function escapeHelpHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function renderHelpRun(run: HelpRun): string {
+  if (run.kind === "text") return escapeHelpHtml(run.text);
+  return `<a href="${escapeHelpHtml(run.href)}">${escapeHelpHtml(run.text)}</a>`;
+}
+
+function renderHelpBlock(block: HelpBlock): string {
+  return `<${block.tag}>${block.runs.map(renderHelpRun).join("")}</${block.tag}>`;
 }

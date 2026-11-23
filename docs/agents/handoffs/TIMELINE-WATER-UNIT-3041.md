@@ -8,9 +8,9 @@ branch: posthog-self-driving/fixtimeline-show-watering-volume-in-the-bdff48 (nam
 base: verdant-grow-diary (started at 73695a5ba09d774b56cbf1852911c92e73ccea8c)
 checkout: git fetch origin posthog-self-driving/fixtimeline-show-watering-volume-in-the-bdff48 verdant-grow-diary && git switch posthog-self-driving/fixtimeline-show-watering-volume-in-the-bdff48 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3044
-head_sha: e09454682a318347ed4e8a44dfe967065895c9de
+head_sha: 6c4afa52a43b4cc95e74de3c4996baa7ff8694e1
 state: pushed
-current_step: a feeding envelope with no event_type keeps Feed Volume and Runoff in ml. Timeline passes entryType into the detail presentation. Built on e09454682a318347ed4e8a44dfe967065895c9de.
+current_step: a feeding envelope with no event_type keeps Feed Volume and Runoff in ml. Timeline passes entryType into the detail presentation. Code commit 6c4afa52a43b4cc95e74de3c4996baa7ff8694e1.
 next_action: wait for the required checks on the new head, then request an eligible independent exact-head review. This PR is GATED because it touches the edge shared-lib mirror.
 post_merge_check: on https://verdantgrowdiary.com once /version.json reports the merged SHA, with the disposable test account and its fixture plant: log a [smoke <timestamp>] Water of 1.5 L, confirm Timeline Recent Quick Logs reads "Watering · 1.5 L" and the card reads "Water Volume 1.5 L"; NOT_MEASURED until then
 active_writer: PostHog Desktop self-driving Claude session (this run)

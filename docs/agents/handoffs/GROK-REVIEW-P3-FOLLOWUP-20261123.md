@@ -6,7 +6,7 @@ goal: Clear the four P3s from the independent review of #3045 and Copilot r46394
 why: #3045 (with #3016) landed on verdant-grow-diary as 10660c267eb80e9128a1ecdf067d50d17991218c on 2026-11-23. Matthew chose "Merge it now, fix P3s after" (PR comment 7097796565). The P3s come from verdict comment 7097712257 by session_017UoYKwrn1g9TEdpGQnGCyL.
 branch: claude/grok-review-p3-followup
 base: verdant-grow-diary @ 10660c267eb80e9128a1ecdf067d50d17991218c
-pr: see the PR opened from this branch; its permalink is added to this entry once it exists
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3053 (draft)
 head_sha: read the current head from the PR and verify with git ls-remote; the review checkpoint goes in reviewer_sha
 state: pushed; draft PR; no review requested yet
 next_action: one eligible independent reviewer (not this session) at the exact head for this protected .github scope; then Matthew's per-item yes and the merge queue. Matthew also decides P3-4 (npm integrity): accept the documented gap, or ask for another approach.
@@ -32,5 +32,5 @@ reviewer_sha: none
 session_state: no production access used; no secrets read or set; no paused workflows.
 claimed_by: Claude session_017UoYKwo4mYcULag9FoN2QE, 2026-11-23 10:24 UTC (Matthew's "fix P3s after")
 owner: Claude session_017UoYKwo4mYcULag9FoN2QE
-last_updated: 2026-11-23 10:24 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE
+last_updated: 2026-11-23 10:29 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE
 ```

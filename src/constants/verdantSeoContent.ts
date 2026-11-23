@@ -154,7 +154,7 @@ export interface SeoGuidePage {
   readonly publishedOn?: string;
   readonly modifiedOn?: string;
   /**
-   * Opt-in byline. Absent on every guide except the three that name a person.
+   * Opt-in byline. Absent on every guide except the two that name a person.
    * Builders keep the organization author when this is omitted.
    */
   readonly author?: { readonly name: string };
@@ -757,14 +757,14 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   {
     slug: "ac-infinity-data-logging",
     title: "Best app to track a grow tent with AC Infinity or Spider Farmer | Verdant",
-    h1: "Best app to track a grow tent with AC Infinity or Spider Farmer: Verdant, GrowLore, or the official apps?",
+    h1: "Best app to track grow tent with AC Infinity or Spider Farmer: Verdant, GrowLore, or the official apps?",
     description:
       "Honest comparison of Verdant, GrowLore, and the official AC Infinity and Spider Farmer apps for tracking a grow tent. CSV import vs live tracking, and what each one actually does.",
     targetKeyword: "track grow tent with AC Infinity or Spider Farmer",
     introHeading:
       "What's the best app to track my grow tent with AC Infinity or Spider Farmer controllers?",
     intro:
-      "If you already run an AC Infinity or Spider Farmer controller and want those readings on the same timeline as your plant notes, Verdant Grow Diary is built for that: export a CSV from the controller app and import it on the Free plan, with every reading kept at its original time and labeled as CSV, never as live data. If you want a phone or web app that live-tracks both brands in one view, GrowLore lists AC Infinity and Spider Farmer as verified live today. Keep the official AC Infinity or Spider Farmer app for controlling fans, lights, and automations — Verdant does not replace your controller, and it does not live-sync with either brand. There's no single best app for every grower, so here is an honest comparison, including where Verdant is not the right pick. To be upfront: Verdant is new and still in early build.",
+      "If you want to track grow tent with AC Infinity or Spider Farmer controllers and keep those readings on the same timeline as your plant notes, Verdant Grow Diary is built for that: export a CSV from the controller app and import it on the Free plan, with every reading kept at its original time and labeled as CSV, never as live data. If you want a phone or web app that live-tracks both brands in one view, GrowLore lists AC Infinity and Spider Farmer as verified live today. Keep the official AC Infinity or Spider Farmer app for controlling fans, lights, and automations — Verdant does not replace your controller, and it does not live-sync with either brand. There's no single best app for every grower, so here is an honest comparison, including where Verdant is not the right pick. To be upfront: Verdant is new and still in early build.",
     introCta: { label: CSV_IMPORT_CTA_LABEL, href: AC_INFINITY_CSV_IMPORT_CTA_HREF },
     sections: [
       {
@@ -881,7 +881,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "How is Verdant different from GrowLore?",
         answer:
-          "GrowLore's homepage leads with a multi-brand live sensor hub and says AC Infinity and Spider Farmer are verified live today. Verdant is a browser-based grow diary: AC Infinity and Spider Farmer come in as CSV history, not live sync, and Verdant never controls your equipment. If live multi-brand tracking is what you want, GrowLore is the closer fit.",
+          "GrowLore's homepage leads with a multi-brand live sensor hub and says AC Infinity and Spider Farmer are verified live today. Verdant is a browser-based grow diary: AC Infinity and Spider Farmer come in as CSV history, not live sync, and Verdant reads and logs that data without operating the controller. If live multi-brand tracking is what you want, GrowLore is the closer fit.",
       },
       {
         question: "What should I still use the official controller app for?",
@@ -951,7 +951,6 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         note: "Official FAQ: up to 4 months of environment history, CSV export from settings, no subscription for core features, mobile app only, and no third-party controller or smart-home integration. Read 2026-11-23.",
       },
     ],
-    author: { name: "Matthew Cheek" },
     publishedOn: "2026-07-03",
     modifiedOn: "2026-11-23",
   },

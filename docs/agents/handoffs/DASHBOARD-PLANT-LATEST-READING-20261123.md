@@ -8,10 +8,10 @@ branch: claude/project-thread-8zmrgw
 base: verdant-grow-diary (started at ab8826ac72220b9da1fcf3ef57b0740812e9561f)
 checkout: git fetch origin claude/project-thread-8zmrgw verdant-grow-diary && git switch claude/project-thread-8zmrgw
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3049 (out of draft since 2026-11-23 02:08 UTC on Matthew's own word; merge not covered)
-head_sha: paperwork on parent 80cf592fa75cdc4f05b668799d545b7808838084. Code unchanged since 311d07ca64daf6615dbf313def4add4479081cf6. Any later head needs fresh CI and a fresh exact-head review.
+head_sha: paperwork on parent c4136b4507a23b2236685721af970b25f405f5d8. Code unchanged since 311d07ca64daf6615dbf313def4add4479081cf6. Any later head needs fresh CI and a fresh exact-head review.
 state: ready for review (not draft; out of draft since 2026-11-23 02:08 UTC)
-current_step: all 40 required contexts at the PR head, then clean exact-head passes from Seat A (Sour Diesel), Seat D (Maui Wowie) and Seat C (Durban Poison), plus Cheeko's own-words yes at the exact final SHA
-next_action: read all 40 required contexts at the PR head; fix any red check in files_touched only. This is a GATED PR: it needs clean exact-head passes from Seat A (Sour Diesel), Seat D (Maui Wowie) and Seat C (Durban Poison), plus Cheeko's own-words yes at the exact final SHA.
+current_step: required CI at the PR head, then one eligible independent exact-head review (OWNERSHIP.md §4.3) and the owner's own-words yes naming #3049 and the exact final SHA
+next_action: read the 35 required checks in config/required-status-checks.json at the PR head (the live branch rules also require 4 Copilot advisory contexts; a skipped one, such as "Claude locked paths", is NOT_MEASURED, never a pass); fix any red check in files_touched only; then route one eligible independent reviewer who did not author or repair this PR (OWNERSHIP.md §4.3: one reviewer per SHA). Gate set by Matthew on 2026-11-23 12:31 UTC, in his words: "1, one reviewer". Gated (scorer-locked test changed): a clean verdict is COMMENT until Matthew's yes names #3049 and the exact SHA, then APPROVE at that commit (AGENTS.md §13).
 post_merge_check: on https://verdantgrowdiary.com once /version.json reports the merged SHA, signed in as the disposable fixture account, read only: Fixture Tent A's Dashboard tent card and its plant page Current Environment card show the same temperature, source and capture time. No writes.
 active_writer: Claude thread session (cmsg_01P7pGxx3V5wxVuLXvJUxaGsTAW8dwDELDERFjzgci8Uxg)
 decisions: (1) one merge rule for both surfaces: new pure src/lib/dashboardTentSnapshotRowsRules.ts (evidence filter on sensor rows, this tent's Quick Log temperature/RH rows via tonightRowsFromQuickLogManualReadings, newest observation first with input order as tie-breaker, then the plant page's mergePlantTentReadingsWithManualEvents). (2) only the tent card's snapshot input changes; charts, stability and the canonical VPD input keep sensor rows (the Tents list strip keeps canonical VPD on Tonight's raw rows per Codex P1 on #2437). (3) mergePlantTentReadingsWithManualEvents's type constraint widened to a structural ManualMergeReadingRow; runtime unchanged. (4) staleness stays with buildTentSnapshotView: a 14-day-old manual reading renders Stale, never healthy.
@@ -24,10 +24,10 @@ open_questions: remaining divergences left as they are: the plant page reads Qui
 gotchas: PR #3021 also edits Dashboard.tsx (alert stage scope, lines ~290-350); no line overlap with latestPerTent. Stay off the Timeline header path (separate task). No schema, RLS, edge, auth, billing or production changes.
 links: walkthrough notes (Nov 20) in the project task notes; PR #3021 (separate workstream).
 artifacts: PR checks on https://github.com/Verdant-OS/verdant-grow-diary/pull/3049 (open, not a draft)
-reviewer_seat: GATED. Clean exact-head passes from Seat A (Sour Diesel), Seat D (Maui Wowie) and Seat C (Durban Poison), plus Cheeko's own-words yes at the exact final SHA (pending)
+reviewer_seat: one eligible independent reviewer per OWNERSHIP.md §4.3 (Matthew, 2026-11-23 12:31 UTC: "1, one reviewer"), not this session and not the writer of eaebbd17 or c4136b45; gated, so COMMENT until Matthew's yes names #3049 and the exact SHA, then APPROVE. matt816cheek-bit and VReviewer are Matthew's own accounts and do not count.
 reviewer_sha: none yet
 session_state: Claude thread session for task ueefa0ea7bcb46abc9076b59f93389442
 claimed_by: Claude thread session, 2026-11-23 01:55 UTC
 owner: Claude thread session
-last_updated: 2026-11-23 06:25 CT, by Grok: restored the GATED gate (Seats A, D and C plus Cheeko's own-words yes; all 40 required contexts). Removed the one-reviewer and 35-plus-4 wording that 80cf592fa75cdc4f05b668799d545b7808838084 put back. Unlock pending Cheeko's yes.
+last_updated: 2026-11-23 06:50 CT, by Claude (holder): recorded Matthew's 12:31 UTC choice of one reviewer, replacing the three-seat gate that c4136b45 restored. Handoff-only change; src/ is unchanged.
 ```

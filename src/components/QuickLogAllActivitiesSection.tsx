@@ -23,7 +23,16 @@
  *   - No recommendation, no health inference, no "safe to feed / train
  *     / defoliate", no harvest readiness, no diagnosis language.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { QueryClientContext } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +58,10 @@ import {
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
 import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
+import {
+  applyQuickLogV2Refresh,
+  resolveQuickLogV2RefreshScope,
+} from "@/lib/quickLogV2RefreshRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
   buildQuickLogSaveSignature,
@@ -429,6 +442,16 @@ export default function QuickLogAllActivitiesSection({
   const [structuredWaterError, setStructuredWaterError] = useState<string | null>(null);
   const [structuredFeedError, setStructuredFeedError] = useState<string | null>(null);
   const { save, saving } = useQuickLogActivitySave();
+  // The plant page and Timeline read React Query caches that do not listen for
+  // verdant:entry-created. Without a provider there is no cache to refresh.
+  const queryClient = useContext(QueryClientContext);
+  const refreshConfirmedSave = useCallback(
+    (target: QuickLogAllActivitiesSaveTarget) => {
+      if (!queryClient) return;
+      applyQuickLogV2Refresh(queryClient, resolveQuickLogV2RefreshScope(target));
+    },
+    [queryClient],
+  );
   const localSaveInFlightRef = useRef(false);
   const activitySaveKeyRef = useRef<QuickLogSaveKeyState | null>(null);
   const [pendingActivity, setPendingActivity] = useState<PendingQuickLogActivity | null>(null);
@@ -842,6 +865,7 @@ export default function QuickLogAllActivitiesSection({
         tentId: record.input.tentId,
         plantId: record.input.plantId,
       });
+      refreshConfirmedSave(capturedTarget);
       const stillCurrent =
         liveOwnerIdRef.current === record.ownerId &&
         liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget);
@@ -913,7 +937,7 @@ export default function QuickLogAllActivitiesSection({
         // The confirmed write remains successful if parent cleanup fails.
       }
     },
-    [onSaveSuccess],
+    [onSaveSuccess, refreshConfirmedSave],
   );
 
   const handleRetryPendingActivity = useCallback(async () => {
@@ -1362,6 +1386,7 @@ export default function QuickLogAllActivitiesSection({
             source: "quick_log_v2",
             activityId: "photo",
           });
+          refreshConfirmedSave(capturedTarget);
           trackQuickLogSuccess("photo", { reused: false });
         } catch {
           // Any unexpected failure after upload remains unconfirmed. Retain
@@ -1440,6 +1465,7 @@ export default function QuickLogAllActivitiesSection({
           return;
         }
         savedGrowEventId = result.growEventId ?? null;
+        refreshConfirmedSave(capturedTarget);
         if (clearPendingQuickLogActivity(claim.record)) {
           if (stillCurrent) setPendingActivity(null);
         } else {
@@ -1545,6 +1571,7 @@ export default function QuickLogAllActivitiesSection({
     activityPersistenceBlockReason,
     activeEnvCheckTempUnit,
     onSaveSuccess,
+    refreshConfirmedSave,
     guidedSymptomCheck,
     guidedSymptomStage,
     guidedSymptomStageConfirmed,

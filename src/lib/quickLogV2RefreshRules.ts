@@ -137,6 +137,24 @@ export function buildQuickLogV2RefreshQueryKeys(
 }
 
 /**
+ * Map a confirmed save target to its refresh scope. A plant target keeps its
+ * tent; a tent target refreshes the tent. A grow-only target has no id, so
+ * the plan keeps only the broad memory keys and invents no plant or tent.
+ */
+export function resolveQuickLogV2RefreshScope(target: {
+  tentId: string | null;
+  plantId: string | null;
+}): QuickLogV2RefreshScope {
+  if (target.plantId) {
+    return { targetType: "plant", targetId: target.plantId, tentId: target.tentId ?? null };
+  }
+  if (target.tentId) {
+    return { targetType: "tent", targetId: target.tentId, tentId: target.tentId };
+  }
+  return { targetType: "tent", targetId: "", tentId: null };
+}
+
+/**
  * Minimal structural type of the queryClient handle that
  * `applyQuickLogV2Refresh` needs. Defined locally so this file stays
  * free of React/React-Query imports.

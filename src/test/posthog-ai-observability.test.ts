@@ -5,6 +5,10 @@ import {
   grantedAnalyticsConsentHeaders,
 } from "@/lib/analyticsConsent";
 import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
+import {
   ANALYTICS_CONSENT_REQUEST_HEADER,
   analyticsConsentGranted,
   contentFreeAiProperties,
@@ -33,7 +37,7 @@ function responseWithContent() {
 
 describe("content-free AI observability", () => {
   afterEach(() => {
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   });
 
   it("reads nested usage and counts tool calls when message content is null", () => {
@@ -141,9 +145,9 @@ describe("content-free AI observability", () => {
 
   it("adds the consent header only when local analytics consent is granted", () => {
     expect(grantedAnalyticsConsentHeaders()).toBeUndefined();
-    window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "denied");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "denied");
     expect(grantedAnalyticsConsentHeaders()).toBeUndefined();
-    window.localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     expect(grantedAnalyticsConsentHeaders()).toEqual({
       [ANALYTICS_CONSENT_REQUEST_HEADER]: "granted",
     });

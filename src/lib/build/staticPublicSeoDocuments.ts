@@ -1104,7 +1104,9 @@ function helpHubFallback(
         `<li><a href="${escapeStaticHtml(topic.href)}">${escapeStaticHtml(topic.label)}</a></li>`,
     )
     .join("");
-  return `<h1>${escapeStaticHtml(title)}</h1><p>Covers ${escapeStaticHtml(covers)}</p>${
+  const clause =
+    covers.length > 0 ? `${covers.charAt(0).toLowerCase()}${covers.slice(1)}` : covers;
+  return `<h1>${escapeStaticHtml(title)}</h1><p>Covers ${escapeStaticHtml(clause)}</p>${
     links ? `<ul>${links}</ul>` : ""
   }`;
 }

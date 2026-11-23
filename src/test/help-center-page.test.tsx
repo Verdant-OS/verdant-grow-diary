@@ -77,6 +77,18 @@ describe("help center pages", () => {
     );
     expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
+
+  it("says Verdant suggests and the grower acts", () => {
+    const alerts = HelpCenterContent.sectionBySlug("alerts-action-queue");
+    if (!alerts) throw new Error("missing alerts hub");
+    renderHelp(alerts);
+    expect(screen.getByText("Verdant suggests; you decide and act.")).toBeInTheDocument();
+    expect(document.head.querySelector('meta[name="description"]')?.getAttribute("content")).toBe(
+      "Verdant suggests; you decide and act.",
+    );
+    renderHelp(null);
+    expect(screen.getByText("Verdant suggests; you decide and act.")).toBeInTheDocument();
+  });
 });
 
 describe("help copy guard", () => {

@@ -98,8 +98,8 @@ const SECTIONS: readonly HelpSection[] = [
   section(
     "alerts-action-queue",
     "Alerts and Action Queue",
-    "Nothing runs without your approval.",
-    "nothing runs without your approval.",
+    "Verdant suggests; you decide and act.",
+    "Verdant suggests; you decide and act.",
   ),
   section(
     "plans-billing",

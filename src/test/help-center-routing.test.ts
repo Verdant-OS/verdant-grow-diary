@@ -27,6 +27,11 @@ describe("help center host redirects", () => {
       status: 308,
       location: "/help",
     });
+    expect(decision("/support/")).toMatchObject({
+      kind: "redirect",
+      status: 308,
+      location: "/help",
+    });
     expect(decision("/help/developers/mcp-tools")).toMatchObject({
       kind: "redirect",
       status: 308,

@@ -8,8 +8,7 @@ branch: posthog-self-driving/fixtimeline-show-watering-volume-in-the-bdff48 (nam
 base: verdant-grow-diary (started at 73695a5ba09d774b56cbf1852911c92e73ccea8c)
 checkout: git fetch origin posthog-self-driving/fixtimeline-show-watering-volume-in-the-bdff48 verdant-grow-diary && git switch posthog-self-driving/fixtimeline-show-watering-volume-in-the-bdff48 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3044
-code_commit: 6c4afa52a43b4cc95e74de3c4996baa7ff8694e1
-The PR head is whatever docs-only commit sits on top of that code commit. Verify the head with `gh pr view 3044`.
+code_commits: d5561b9ada4b9600771e886b933fbd63c735bb13; 6edcc905bb65ef9e652a698d01943640c75523a2; 1942cd1407e2d3f8af244f838ef9022d64c9e7d7; e09454682a318347ed4e8a44dfe967065895c9de; 6c4afa52a43b4cc95e74de3c4996baa7ff8694e1; 8c75bc890f303edd346440015ec3d3eee997b94e; f96f591a4ad201b96243aa37fd15636ca2598cef
 state: pushed
 current_step: a feeding envelope with no event_type keeps Feed Volume and Runoff in ml. Timeline passes entryType into the detail presentation. Code commit 6c4afa52a43b4cc95e74de3c4996baa7ff8694e1.
 next_action: wait for the required checks on the new head, then request an eligible independent exact-head review. This PR is GATED because it touches the edge shared-lib mirror.

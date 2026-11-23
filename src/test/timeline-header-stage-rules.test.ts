@@ -4,7 +4,11 @@
  * Flower plant in a grow and tent still marked Veg read "Vegetative · day 92".
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { resolveTimelineHeaderStage } from "@/lib/timelineHeaderStageRules";
+import {
+  isTimelineHeaderRecordInGrow,
+  resolveTimelineHeaderPlantGrowId,
+  resolveTimelineHeaderStage,
+} from "@/lib/timelineHeaderStageRules";
 
 const previousTz = process.env.TZ;
 beforeAll(() => {
@@ -119,5 +123,23 @@ describe("resolveTimelineHeaderStage", () => {
       resolveTimelineHeaderStage({ plant: { stage: "flower", started_at: "2026-11-20" } }, now())
         .day,
     ).toBe(0);
+  });
+});
+
+describe("Timeline header grow membership", () => {
+  it("uses the plant's own grow, else a legacy null-grow plant's tent grow", () => {
+    expect(resolveTimelineHeaderPlantGrowId("grow-a", "grow-b")).toBe("grow-a");
+    expect(resolveTimelineHeaderPlantGrowId(null, "grow-a")).toBe("grow-a");
+    expect(resolveTimelineHeaderPlantGrowId(undefined, "grow-a")).toBe("grow-a");
+    expect(resolveTimelineHeaderPlantGrowId(null, null)).toBeNull();
+    expect(resolveTimelineHeaderPlantGrowId(42, "grow-a")).toBeNull();
+  });
+
+  it("accepts a record only in the active grow", () => {
+    expect(isTimelineHeaderRecordInGrow("grow-a", "grow-a")).toBe(true);
+    expect(isTimelineHeaderRecordInGrow("grow-b", "grow-a")).toBe(false);
+    expect(isTimelineHeaderRecordInGrow(null, "grow-a")).toBe(false);
+    expect(isTimelineHeaderRecordInGrow("grow-a", null)).toBe(false);
+    expect(isTimelineHeaderRecordInGrow("", "")).toBe(false);
   });
 });

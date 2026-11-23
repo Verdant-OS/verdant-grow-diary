@@ -99,3 +99,34 @@ export function resolveTimelineHeaderStage(
 
   return { stage, stageSource, startedAt: null, startedAtSource: "none", day: null };
 }
+
+function growIdText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * A plant's effective grow, the same way `buildTimelinePlantTentLookup`
+ * reads it: its own `grow_id`, or for a legacy null-grow plant its current
+ * tent's grow. A malformed (non-null, non-string) `grow_id` resolves to null.
+ */
+export function resolveTimelineHeaderPlantGrowId(
+  plantGrowId: unknown,
+  plantTentGrowId: unknown,
+): string | null {
+  const direct = growIdText(plantGrowId);
+  if (direct) return direct;
+  if (plantGrowId != null) return null;
+  return growIdText(plantTentGrowId);
+}
+
+/** True only when the record's grow is the Timeline's active grow. */
+export function isTimelineHeaderRecordInGrow(
+  recordGrowId: unknown,
+  activeGrowId: unknown,
+): boolean {
+  const record = growIdText(recordGrowId);
+  const active = growIdText(activeGrowId);
+  return Boolean(record && active && record === active);
+}

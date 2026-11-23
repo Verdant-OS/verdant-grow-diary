@@ -819,11 +819,7 @@ export default function PlantDetail() {
               </div>
             ) : null}
             <div className="flex min-w-0 flex-wrap gap-2">
-              <PlantDetailQuickLogButton
-                plantId={plant.id}
-                testId="plant-detail-quick-log-open"
-                onOpen={() => setQuickLogOpen(true)}
-              />
+              <PlantDetailQuickLogButton plantId={plant.id} testId="plant-detail-quick-log-open" />
               <Button asChild variant="outline" size="sm" className="min-h-11 whitespace-normal">
                 <Link to={logsPath()}>Open Logs</Link>
               </Button>

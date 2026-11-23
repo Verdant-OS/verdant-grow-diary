@@ -2,10 +2,20 @@
  * Pure rules + storage access for the in-app analytics consent gate.
  *
  * No analytics code may run until `readAnalyticsConsent()` returns "granted".
- * The decision is stored locally (per browser/profile) and never sent anywhere.
+ * The decision is stored locally. AI edge calls send the header value "granted"
+ * only after that read returns granted.
  */
 
 export const ANALYTICS_CONSENT_STORAGE_KEY = "verdant.analytics-consent.v1";
+
+/** Sent on AI edge calls only after the local decision is granted. */
+export const ANALYTICS_CONSENT_REQUEST_HEADER = "x-verdant-analytics-consent";
+
+export function grantedAnalyticsConsentHeaders():
+  { "x-verdant-analytics-consent": "granted" } | undefined {
+  if (readAnalyticsConsent() !== "granted") return undefined;
+  return { [ANALYTICS_CONSENT_REQUEST_HEADER]: "granted" };
+}
 
 export type AnalyticsConsentDecision = "granted" | "denied" | "unset";
 

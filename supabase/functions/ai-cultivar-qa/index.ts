@@ -15,7 +15,7 @@
 //  - Response is always { ok: true, answer } or { ok: false, reason }.
 //
 // Deploy prerequisites (founder): deploy this function and set LOVABLE_API_KEY.
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { corsHeaders as supabaseCorsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
 import { loadUnionEntitlement } from "../_shared/unionEntitlementLookup.ts";
@@ -29,7 +29,16 @@ import {
   parseCultivarQaRequest,
   readBoundedJsonBody,
 } from "../_shared/cultivarQaGrounding.ts";
-import { captureAiGeneration } from "../_shared/posthogAiObservability.ts";
+import {
+  captureAiGeneration,
+  requestGrantsAnalyticsCapture,
+} from "../_shared/posthogAiObservability.ts";
+
+const corsHeaders = {
+  ...supabaseCorsHeaders,
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-verdant-analytics-consent",
+};
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -106,10 +115,8 @@ Deno.serve(async (req) => {
         spanName: "ai_cultivar_qa",
         model: "google/gemini-2.5-flash",
         provider: "gemini",
-        input: aiInput,
-        output: details.response,
-        usage: details.response,
-        requestUrl: "https://ai.gateway.lovable.dev/v1/chat/completions",
+        consentGranted: requestGrantsAnalyticsCapture(req),
+        providerResponse: details.response,
         httpStatus: details.httpStatus,
         error: details.error,
         startedAt: providerStartedAt,
@@ -132,7 +139,10 @@ Deno.serve(async (req) => {
       });
 
       if (response.status === 402 || response.status === 429) {
-        await captureGeneration({ httpStatus: response.status, error: "upstream_credit_exhausted" });
+        await captureGeneration({
+          httpStatus: response.status,
+          error: "upstream_credit_exhausted",
+        });
         return json({ ok: false, reason: "upstream_credit_exhausted" }, 200);
       }
       if (!response.ok) {

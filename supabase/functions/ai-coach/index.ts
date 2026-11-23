@@ -21,12 +21,15 @@ import {
   downloadSignedStorageObject,
   isAllowedSignedPhotoUrl,
 } from "../_shared/geminiInlineImage.ts";
-import { captureAiGeneration } from "../_shared/posthogAiObservability.ts";
+import {
+  captureAiGeneration,
+  requestGrantsAnalyticsCapture,
+} from "../_shared/posthogAiObservability.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-retry-count",
+    "authorization, x-client-info, apikey, content-type, x-retry-count, x-verdant-analytics-consent",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 };
 
@@ -712,10 +715,8 @@ Rules for diagnosis (structured view, approval-first):
         spanName: FEATURE,
         model: COACH_MODEL,
         provider: "gemini",
-        input: aiInput,
-        output: details.response,
-        usage: details.response,
-        requestUrl: GATEWAY_URL,
+        consentGranted: requestGrantsAnalyticsCapture(req),
+        providerResponse: details.response,
         httpStatus: details.httpStatus,
         error: details.error,
         startedAt: providerStartedAt,
@@ -756,10 +757,6 @@ Rules for diagnosis (structured view, approval-first):
       try {
         data = await r.json();
       } catch {
-        await captureGeneration({
-          httpStatus: r.status,
-          error: providerController.signal.aborted ? "timeout" : "invalid_json_response",
-        });
         if (providerController.signal.aborted) {
           return failureAfterRefund(spendId, "upstream_network", "timeout");
         }

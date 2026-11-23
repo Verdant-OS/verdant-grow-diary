@@ -66,14 +66,17 @@ import {
   readGeminiDirectApiKey,
   resolveGeminiDirectChat,
 } from "../_shared/geminiDirectChat.ts";
-import { captureAiGeneration } from "../_shared/posthogAiObservability.ts";
+import {
+  captureAiGeneration,
+  requestGrantsAnalyticsCapture,
+} from "../_shared/posthogAiObservability.ts";
 
 const SUPABASE_JS_SPECIFIER = "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-retry-count",
+    "authorization, x-client-info, apikey, content-type, x-retry-count, x-verdant-analytics-consent",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 };
 
@@ -616,11 +619,8 @@ export async function handleAiDoctorReviewRequest(
         spanName: FEATURE,
         model: WIRE_MODEL,
         provider: "gemini",
-        input: aiInput,
-        output: details.response,
-        usage: details.response,
-        tools: [TOOL_SCHEMA],
-        requestUrl: GATEWAY_URL,
+        consentGranted: requestGrantsAnalyticsCapture(req),
+        providerResponse: details.response,
         httpStatus: details.httpStatus,
         error: details.error,
         startedAt: providerStartedAt,

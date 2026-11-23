@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ANALYTICS_CONSENT_STORAGE_KEY,
@@ -37,6 +37,7 @@ function headerExpression(path: string): string {
 describe("AI analytics consent stays at the call site", () => {
   afterEach(() => {
     clearLocalStorageForTest();
+    vi.unstubAllGlobals();
   });
 
   it("runs the edge consent expression instead of treating a forced true as granted", () => {
@@ -67,7 +68,8 @@ describe("AI analytics consent stays at the call site", () => {
     }
   });
 
-  it("runs the browser header expression, which stays off without production consent", () => {
+  it("runs the browser header expression on a production host", () => {
+    vi.stubGlobal("location", { hostname: "verdantgrowdiary.com" });
     for (const path of [
       "src/pages/Coach.tsx",
       "src/hooks/useCultivarQa.ts",
@@ -83,8 +85,12 @@ describe("AI analytics consent stays at the call site", () => {
       ) => ReturnType<typeof grantedAnalyticsConsentHeaders>;
       clearLocalStorageForTest();
       expect(headersFor(grantedAnalyticsConsentHeaders), path).toBeUndefined();
-      setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+      setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "denied");
       expect(headersFor(grantedAnalyticsConsentHeaders), path).toBeUndefined();
+      setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+      expect(headersFor(grantedAnalyticsConsentHeaders), path).toEqual({
+        [ANALYTICS_CONSENT_REQUEST_HEADER]: "granted",
+      });
     }
   });
 

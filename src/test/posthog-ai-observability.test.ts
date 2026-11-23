@@ -145,9 +145,9 @@ describe("content-free AI observability", () => {
   });
 
   it("adds the consent header only when local analytics consent is granted", () => {
-    expect(grantedAnalyticsConsentHeaders()).toBeUndefined();
+    expect(grantedAnalyticsConsentHeaders("verdantgrowdiary.com")).toBeUndefined();
     setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "denied");
-    expect(grantedAnalyticsConsentHeaders()).toBeUndefined();
+    expect(grantedAnalyticsConsentHeaders("verdantgrowdiary.com")).toBeUndefined();
     setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     expect(grantedAnalyticsConsentHeaders("localhost")).toBeUndefined();
     expect(grantedAnalyticsConsentHeaders("verdantgrowdiary.com")).toEqual({

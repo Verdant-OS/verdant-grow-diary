@@ -200,6 +200,7 @@ function pgTapExemptions(): Record<string, { class: string; reason: string }> {
   const out: Record<string, { class: string; reason: string }> = {};
   for (const file of [
     "supabase/tests/paddle_subscription_update_rpc_harness.sql",
+    "supabase/tests/posthog_first_paid_activation.sql",
     "supabase/tests/permissions.sql",
     "supabase/tests/pheno_candidate_number_contract.sql",
     "supabase/tests/pheno_candidate_number_maintenance_paths.sql",
@@ -333,7 +334,7 @@ describe("test execution manifest — every committed test runs, or says why not
       byClass[entry.class] = (byClass[entry.class] ?? 0) + 1;
     }
     expect(byClass).toEqual({
-      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 24,
+      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 25,
       [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
       [EXEMPTION_CLASS.RED_WHEN_RUN]: 2,
       [EXEMPTION_CLASS.AWAITING_DECISION]: 2,

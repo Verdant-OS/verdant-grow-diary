@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { writeAnalyticsConsent } from "@/lib/analyticsConsent";
+import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 import {
   recordPaidAnalyticsChoice,
   readPaidAnalyticsSince,
@@ -31,7 +32,7 @@ function report() {
 }
 
 beforeEach(() => {
-  localStorage.clear();
+  clearLocalStorageForTest();
   sessionStorage.clear();
   vi.stubEnv("VITE_POSTHOG_KEY", "fixture-public-project-token");
   vi.stubEnv("VITE_POSTHOG_HOST", "https://us.i.posthog.com");
@@ -131,7 +132,7 @@ describe("consented first paid activation", () => {
   it("sends the same event identity from another independently consenting browser", async () => {
     consent();
     expect(await report()).toBe(true);
-    localStorage.clear();
+    clearLocalStorageForTest();
     consent();
     expect(await report()).toBe(true);
     expect(send.mock.calls[1][1]?.body).toEqual(send.mock.calls[0][1]?.body);

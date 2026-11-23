@@ -4,6 +4,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 import { writeAnalyticsConsent } from "@/lib/analyticsConsent";
 import { FIRST_PAID_CONSENT_KEY } from "@/lib/firstPaidAnalyticsService";
+import { setLocalStorageItemForTest } from "./helpers/localStorageTestHelper";
 import { PRICING_ANALYTICS_EVENT } from "@/lib/pricingAnalytics";
 import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
 import { useFirstPaidAnalytics } from "@/hooks/useFirstPaidAnalytics";
@@ -71,7 +72,7 @@ describe("first paid upgrade through the app consent and checkout hooks", () => 
     writeAnalyticsConsent("granted");
     const view = mount();
     const since = String(Date.now());
-    localStorage.setItem(FIRST_PAID_CONSENT_KEY, since);
+    setLocalStorageItemForTest(FIRST_PAID_CONSENT_KEY, since);
     act(() =>
       window.dispatchEvent(
         new StorageEvent("storage", { key: FIRST_PAID_CONSENT_KEY, newValue: since }),

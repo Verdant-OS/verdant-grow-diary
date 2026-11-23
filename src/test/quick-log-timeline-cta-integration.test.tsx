@@ -269,3 +269,54 @@ describe("Quick Log → Timeline CTA (photo success)", () => {
     expect(rpcMock.mock.calls.length).toBe(rpcBefore);
   });
 });
+
+describe("Quick Log save toast (note text)", () => {
+  function getToastDescription(): unknown {
+    const [, opts] = toastSuccess.mock.calls.at(-1) ?? [];
+    return (opts as { description?: unknown } | undefined)?.description;
+  }
+
+  it("quotes the saved note's first line as the toast description", async () => {
+    rpcMock.mockResolvedValue({
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000046",
+        environment_event_id: null,
+      },
+      error: null,
+    });
+    renderSheet("plant:plant-1");
+    fireEvent.click(screen.getByRole("button", { name: "Note" }));
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "\n  Leaf tips curling  \nsecond line" },
+    });
+    clickSave();
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+
+    expect(getToastAction().message).toBe("Log saved · Plant 1 (Tent 1)");
+    expect(getToastDescription()).toBe("“Leaf tips curling”");
+  });
+
+  it("adds no description when the save has no note text", async () => {
+    rpcMock.mockResolvedValue({
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000047",
+        environment_event_id: null,
+      },
+      error: null,
+    });
+    storageUpload.mockResolvedValue({ data: { path: "p" }, error: null });
+    renderSheet("plant:plant-1");
+    fireEvent.click(screen.getByRole("button", { name: "Note" }));
+    const libInput = screen.getByTestId("qlv2-photo-library-input") as HTMLInputElement;
+    const file = new File(["x"], "x.jpg", { type: "image/jpeg" });
+    Object.defineProperty(libInput, "files", { value: [file] });
+    fireEvent.change(libInput);
+    clickSave();
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+
+    expect(getToastAction().message).toBe("Log and photo saved · Plant 1 (Tent 1)");
+    expect(getToastDescription()).toBeUndefined();
+  });
+});

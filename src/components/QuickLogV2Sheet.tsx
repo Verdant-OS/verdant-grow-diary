@@ -116,6 +116,7 @@ import {
   QUICK_LOG_TIMELINE_CTA_LABEL,
 } from "@/lib/quickLogTimelineNavigationTarget";
 import { resolveQuickLogConfirmedScope } from "@/lib/quickLogConfirmedScopeRules";
+import { buildQuickLogNoteSavedToast } from "@/lib/quickLogNoteSaveRules";
 import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -544,6 +545,7 @@ function QuickLogV2SheetForOwner({
       plantId?: string | null;
       growEventId?: string | null;
     },
+    description: string | null = null,
   ) {
     const nav = buildQuickLogTimelineNavTarget({
       growId: scope.growId,
@@ -554,7 +556,8 @@ function QuickLogV2SheetForOwner({
       growEventId: scope.growEventId ?? null,
     });
     if (!nav) {
-      toast.success(message);
+      if (description) toast.success(message, { description });
+      else toast.success(message);
       onOpenChange(false);
       return;
     }
@@ -575,6 +578,7 @@ function QuickLogV2SheetForOwner({
           )
         : "the selected target";
     toast.success(`${message} · ${targetLabel}`, {
+      ...(description ? { description } : {}),
       action: {
         label: QUICK_LOG_TIMELINE_CTA_LABEL,
         onClick: () => navigateToTimeline(nav.href, nav.hash, nav.path),
@@ -3150,14 +3154,19 @@ function QuickLogV2SheetForOwner({
         "Watering saved. This tab did not attach the photo. Check Timeline before adding it separately.",
       );
     }
-    showTimelineConfirmation(successMessage, {
-      growId: confirmedScope.growId,
-      targetType: confirmedScope.targetType,
-      targetId: confirmedScope.targetId,
-      tentId: confirmedScope.tentId,
-      plantId: confirmedScope.plantId,
-      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
-    });
+    showTimelineConfirmation(
+      successMessage,
+      {
+        growId: confirmedScope.growId,
+        targetType: confirmedScope.targetType,
+        targetId: confirmedScope.targetId,
+        tentId: confirmedScope.tentId,
+        plantId: confirmedScope.plantId,
+        growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+      },
+      // Only a confirmed note save carries persistedNote; Water keeps its fixed message.
+      buildQuickLogNoteSavedToast(res.persistedNote).description,
+    );
     applyQuickLogV2Refresh(queryClient, {
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,

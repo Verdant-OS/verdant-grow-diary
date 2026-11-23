@@ -7,7 +7,7 @@ branch: claude/project-thread-77re4e
 base: verdant-grow-diary
 pr: #3048 https://github.com/Verdant-OS/verdant-grow-diary/pull/3048
 head_sha: 4df94ce19195bf858662dc36dec2d827e70c6896 (final #3048 head)
-final_sha: abc31f05f1a966c84001f3307ab49e5041a87475 (squash merge of #3048 on verdant-grow-diary, 2026-11-23T03:28:12Z)
+final_sha: abc31f05f1a966c84001f3307ab49e5041a87475 (two-parent merge commit of #3048 on verdant-grow-diary, parents ab8826ac and 4df94ce1, 2026-11-23T03:28:12Z)
 state: MERGED via the merge queue on the founder's word ("let it merge", 2026-11-23). 35/35 required checks were green at 4df94ce1. The merge happened BEFORE any independent A/C/D review; that review is still owed as a post-merge review at the merge SHA.
 closed_reason: merged (#3048 -> abc31f05). Live: Cloudflare Workers auto-deployed the merge; at 2026-11-23T03:34Z live /version.json reported commit abc31f05f1a966c84001f3307ab49e5041a87475 (buildTime 2026-11-23T03:28:49Z, dirty false). No manual publish was made.
 decisions:

@@ -199,10 +199,58 @@ describe("Dashboard tent card latest reading", () => {
     // The older-value manual sensor row is dropped, never shown beside the Quick Log one.
     expect(temps).toHaveLength(1);
     expect(temps[0]?.value).toBe(23);
-    // The live humidity at the same time stays, after the Quick Log humidity.
+    // The live humidity the Quick Log humidity shadows is dropped too.
     const rhRows = rows.filter((r) => r.metric === "humidity_pct");
-    expect(rhRows.map((r) => r.value)).toEqual([57, 58]);
+    expect(rhRows.map((r) => r.value)).toEqual([57]);
     expect(snapshotFromReadings(rows as BuildTentSnapshotInput[])?.rh).toBe(57);
+  });
+
+  it("labels a tied, fully Quick Log pair by its real contributors (live/CSV shadowed)", () => {
+    const at = new Date(NOW_MS - 30 * 60 * 1000).toISOString();
+    // Same instant, spelled without milliseconds on the sensor side.
+    const sensorAt = at.replace(".000Z", "Z");
+    for (const source of ["live", "csv"]) {
+      const rows = selectDashboardTentSnapshotRows({
+        sensorRows: sensorPair(sensorAt, 26, 60, { source }),
+        quickLogManuals: [quickLog(at, { temperature_c: 24, humidity_pct: 55 })],
+        tentId: TENT,
+        nowMs: NOW_MS,
+      });
+      expect(rows.map((r) => r.source)).toEqual(["manual", "manual"]);
+      const view = buildTentSnapshotView(rows as BuildTentSnapshotInput[], "flower", NOW_MS);
+      const manualOnly = buildTentSnapshotView(
+        selectDashboardTentSnapshotRows({
+          sensorRows: [],
+          quickLogManuals: [quickLog(at, { temperature_c: 24, humidity_pct: 55 })],
+          tentId: TENT,
+          nowMs: NOW_MS,
+        }) as BuildTentSnapshotInput[],
+        "flower",
+        NOW_MS,
+      );
+      // 30 minutes old is inside the 24h manual window: not stale.
+      expect(view.stale).toBe(false);
+      expect(view.sourceLabel).toBe(manualOnly.sourceLabel);
+      expect(view.provenanceEligible).toBe(manualOnly.provenanceEligible);
+      expect(view.metrics.find((m) => m.key === "temp")?.display).toBe(
+        manualOnly.metrics.find((m) => m.key === "temp")?.display,
+      );
+    }
+  });
+
+  it("keeps a different metric at the same instant as a genuine mixed reading", () => {
+    const at = "2026-11-08T09:00:00.000Z";
+    const rows = selectDashboardTentSnapshotRows({
+      sensorRows: [
+        sensorRow({ metric: "co2_ppm", value: 900, ts: "2026-11-08T09:00:00Z", captured_at: null }),
+      ],
+      quickLogManuals: [quickLog(at, { temperature_c: 23, humidity_pct: 57 })],
+      tentId: TENT,
+      nowMs: NOW_MS,
+    });
+    expect(rows.map((r) => r.metric)).toEqual(["temperature_c", "humidity_pct", "co2_ppm"]);
+    // Equivalent spellings align by epoch, so all three form one cohort.
+    expect(new Set(rows.map((r) => r.captured_at)).size).toBe(1);
   });
 
   it("never lets a row without a usable time win", () => {

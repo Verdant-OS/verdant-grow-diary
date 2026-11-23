@@ -44,17 +44,18 @@ async function waitForReady(locator: ReturnType<Page["getByTestId"]>): Promise<v
 /**
  * Snapshot only once the counters have stopped moving.
  *
- * The saved panel appearing is NOT a completion fence: the Quick Log sheet
+ * Hiding the Quick Log sheet is NOT a completion fence: the sheet
  * (QuickLogV2Sheet, the header form the plant page opens since FA-20261119-M1
- * item 5) shows it as soon as the save resolves, so post-save work could in
- * principle land after it appears and after the receipt was taken —
- * under-counting a write, or worse reporting `paid_ai_requests: 0` while a
- * paid call was in flight.
+ * item 5) closes as soon as the save resolves and before its post-save
+ * refresh and event dispatch run, so post-save work could in principle land
+ * after the sheet is gone and after the receipt was taken — under-counting a
+ * write, or worse reporting `paid_ai_requests: 0` while a paid call was in
+ * flight.
  *
  * Measured, not assumed: PlantDetail (the mount both scenarios drive) passes
  * no save callback to the sheet today, so there is no callback to settle and
- * no explicit post-callback state to wait for. That is a fact about the current mount, not
- * a property of the harness — adding the prop later would silently reopen the
+ * no explicit post-callback state to wait for. That is a fact about the
+ * current mount, not a property of the harness — adding the prop later would silently reopen the
  * hole. So the fence is on the observable class rather than the one instance:
  * wait for the network to go idle, then require the receipt to be byte-stable
  * across a bounded quiet window before recording it.
@@ -129,9 +130,9 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     // The RPC tally increments inside the route handler, BEFORE route.fulfill()
     // and before the app's post-save continuation runs. Snapshotting on that
     // alone could miss a follow-on persistence or paid-AI request and still
-    // call the receipt complete. The saved panel is the app's own definitive
+    // call the receipt complete. The sheet closing is the app's own definitive
     // save-success signal, so wait for it first.
-    await expect(page.getByTestId("qlv2-post-save")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("qlv2-save")).toBeHidden({ timeout: 15_000 });
 
     const receipt = await settledReceipt(page, counter);
 
@@ -191,7 +192,7 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
     console.log(serializeInteractionCountReceipt(receipt));
   });
 
-  test("S7: post-save timeline evidence costs at most two continuation actions", async ({
+  test("S7: post-save timeline evidence costs at most one continuation action", async ({
     page,
   }) => {
     const counter = createInteractionCounter("s7-save-to-timeline");
@@ -213,16 +214,9 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
       .poll(() => counter.snapshot().supabase_writes.rpc["quicklog_save_manual"] ?? 0)
       .toBe(1);
     // Definitive save-success state before continuing (see S1a).
-    await expect(page.getByTestId("qlv2-post-save")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("qlv2-save")).toBeHidden({ timeout: 15_000 });
 
-    // Continuation 1: the header form stays open on its saved panel, and the
-    // sheet covers the sidebar, so the grower closes it first. Matthew accepted
-    // this extra tap on 2026-11-23 when the plant page moved to the header
-    // form (FA-20261119-M1 item 5).
-    await driver.click(page.getByTestId("quick-log-post-save-close"));
-    await expect(page.getByTestId("qlv2-post-save")).toBeHidden({ timeout: 15_000 });
-
-    // Continuation 2: the grower's REAL affordance — the app's own Timeline
+    // Continuation: the grower's REAL affordance — the app's own Timeline
     // navigation. Driving this with page.goto() would measure a scripted URL
     // jump, not a continuation, and would under-count the grower's tap.
     //
@@ -250,16 +244,15 @@ test.describe("One-Tent Loop interaction counter baseline", () => {
 
     const receipt = await settledReceipt(page, counter);
 
-    // The COMPLETE receipt (see S1a). Two deliberate continuation clicks
-    // (Close, then Timeline) beyond the save journey's 3 taps, and exactly one
-    // route transition —
+    // The COMPLETE receipt (see S1a). One deliberate continuation click
+    // beyond the save journey's 3 taps, and exactly one route transition —
     // the timeline navigation that click caused. Arriving on Plant Detail is
     // setup and is not counted.
     expect(receipt).toEqual({
       schema_version: "1",
       scenario: "s7-save-to-timeline",
       status: "measured",
-      clicks: 5,
+      clicks: 4,
       fills: 0,
       keypresses: 0,
       target_reselections: 0,

@@ -538,9 +538,6 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
           plantQuickLog.getByTestId("qlv2-save").click(),
         ]);
         expect(quickLogResponse.ok()).toBe(true);
-        // The header form stays open on its saved panel; close it like a grower.
-        await expect(plantQuickLog.getByTestId("qlv2-post-save")).toBeVisible();
-        await plantQuickLog.getByTestId("quick-log-post-save-close").click();
         await expect(plantQuickLog).toBeHidden();
 
         const { data: diaryRows, error: diaryError } = await authedDb

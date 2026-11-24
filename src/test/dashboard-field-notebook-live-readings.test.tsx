@@ -10,7 +10,7 @@
  * Mock set copied from dashboard-strip-manual-history-read-state.test.tsx;
  * FieldNotebookScope is replaced by a recorder.
  */
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";

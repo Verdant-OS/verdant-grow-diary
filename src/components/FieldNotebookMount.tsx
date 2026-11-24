@@ -31,11 +31,14 @@ export function FieldNotebookScope({
   growsLoading,
   growId,
   tents,
+  readingsByTent,
   reloadRecent,
 }: {
   growsLoading: boolean;
   growId: string | null;
   tents: Array<{ id: string; name: string }>;
+  /** Each tent's latest readings for the card's tiles; absent means empty tiles. */
+  readingsByTent?: Record<string, ReadingSlot[]>;
   reloadRecent?: () => Promise<void>;
 }) {
   // The grow row's saved start date drives the tent card's week and age.
@@ -58,6 +61,7 @@ export function FieldNotebookScope({
     <FieldNotebookMount
       growId={growId}
       tents={tents}
+      readingsByTent={readingsByTent}
       reloadRecent={reloadRecent}
       growStartedAt={growStartedAt}
     />

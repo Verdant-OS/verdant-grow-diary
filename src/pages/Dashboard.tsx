@@ -22,6 +22,10 @@ import { AlertTriangle, Box, Sprout, Sparkles, ArrowRight } from "lucide-react";
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import { FieldNotebookScope } from "@/components/FieldNotebookMount";
+import {
+  buildFieldNotebookReadingsByTent,
+  type FieldNotebookTentSnapshot,
+} from "@/lib/fieldNotebookReadingSlotsRules";
 import KpiCard from "@/components/KpiCard";
 import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
@@ -502,6 +506,55 @@ export default function Dashboard() {
     };
   });
 
+  // One tent snapshot view for the tent panel and the field notebook card, so
+  // the card names the same latest reading, source, staleness and VPD
+  // validity as the panel below it. No new query.
+  const tentPanelSnapshotView = (
+    tentId: string,
+    envStage: (typeof latestPerTent)[number]["envStage"],
+    tentRows: (typeof latestPerTent)[number]["tentRows"],
+  ) => {
+    // Pending/failed reads must not masquerade as established
+    // absence or as data. Non-UUID ids (mock-fallback tents)
+    // are never queried — a uuid column cannot hold them, so
+    // their absence is established (parity with the Tents list).
+    const sensorReadStatus = isUuid(tentId) ? (sensorStatusByTent[tentId] ?? "loading") : "success";
+    return buildTentSnapshotView(tentRows as BuildTentSnapshotInput[], envStage, nowTick, {
+      temperatureUnit,
+      // Same Tonight derivation the tent page and /tents list use,
+      // so a newer manual temperature/RH pair replaces an older CSV VPD.
+      // The home tent reuses Tonight's diary snapshot. Other tents stay
+      // idle here: Dashboard loads that diary snapshot for one tent.
+      canonicalVpd: tentsListCanonicalVpd(
+        tentRows as BuildTentSnapshotInput[],
+        tentId,
+        nowTick,
+        tentId === homeTent?.id
+          ? {
+              status: homeSnapshotState.status,
+              snapshot: homeSnapshotState.snapshot,
+            }
+          : { status: "idle", snapshot: null },
+        sensorReadStatus === "loading" ||
+          sensorReadStatus === "error" ||
+          sensorReadStatus === "refresh_error"
+          ? sensorReadStatus
+          : "success",
+      ),
+    });
+  };
+  const fieldNotebookTentSnapshots: FieldNotebookTentSnapshot[] = [];
+  for (const { tent, envStage, tentRows } of latestPerTent) {
+    fieldNotebookTentSnapshots.push({
+      tentId: tent.id,
+      view: tentPanelSnapshotView(tent.id, envStage, tentRows),
+    });
+  }
+  const fieldNotebookReadingsByTent = buildFieldNotebookReadingsByTent(
+    fieldNotebookTentSnapshots,
+    nowTick,
+  );
+
   // Another scope's rows are not this grow's alerts.
   const recentAlerts =
     openAlertsView.kind === "known" ? persistedAlertsState.alerts.slice(0, 3) : [];
@@ -618,6 +671,7 @@ export default function Dashboard() {
         tents={tents
           .filter((tent) => tent.growId === (scopedGrowId ?? activeGrowId))
           .map((tent) => ({ id: tent.id, name: tent.name }))}
+        readingsByTent={fieldNotebookReadingsByTent}
         reloadRecent={scopedGrowId ? reload : undefined}
       />
       <TonightTentHomeCard
@@ -1007,34 +1061,7 @@ export default function Dashboard() {
                           const sensorReadStatus = isUuid(tent.id)
                             ? (sensorStatusByTent[tent.id] ?? "loading")
                             : "success";
-                          const snapView = buildTentSnapshotView(
-                            tentRows as BuildTentSnapshotInput[],
-                            envStage,
-                            nowTick,
-                            {
-                              temperatureUnit,
-                              // Same Tonight derivation the tent page and /tents list use,
-                              // so a newer manual temperature/RH pair replaces an older CSV VPD.
-                              // The home tent reuses Tonight's diary snapshot. Other tents stay
-                              // idle here: Dashboard loads that diary snapshot for one tent.
-                              canonicalVpd: tentsListCanonicalVpd(
-                                tentRows as BuildTentSnapshotInput[],
-                                tent.id,
-                                nowTick,
-                                tent.id === homeTent?.id
-                                  ? {
-                                      status: homeSnapshotState.status,
-                                      snapshot: homeSnapshotState.snapshot,
-                                    }
-                                  : { status: "idle", snapshot: null },
-                                sensorReadStatus === "loading" ||
-                                  sensorReadStatus === "error" ||
-                                  sensorReadStatus === "refresh_error"
-                                  ? sensorReadStatus
-                                  : "success",
-                              ),
-                            },
-                          );
+                          const snapView = tentPanelSnapshotView(tent.id, envStage, tentRows);
                           const sensorReadStatusLabel =
                             sensorReadStatus === "loading"
                               ? "sensor data loading"

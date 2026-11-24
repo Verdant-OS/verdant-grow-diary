@@ -58,7 +58,10 @@ function fixture() {
       events.set(input.paddle_event_id, { processing_status: "received" });
       return { ok: true as const };
     }),
-    getExistingEvent: vi.fn(async (id: string) => ({ ok: true as const, row: events.get(id) ?? null })),
+    getExistingEvent: vi.fn(async (id: string) => ({
+      ok: true as const,
+      row: events.get(id) ?? null,
+    })),
     upsertSubscription: vi.fn(async (r: unknown) => {
       upserts.push(r);
       return { ok: true as const };
@@ -98,9 +101,17 @@ describe("duplicate webhook delivery", () => {
         items: [{ price: { id: "pri_pack", importMeta: { externalId: "credit_pack_50" } } }],
       },
     };
-    await handleVerifiedEvent(f.deps, pack, "sandbox", NOW, {});
+    const first = await handleVerifiedEvent(f.deps, pack, "sandbox", NOW, {});
+    expect(first.httpStatus).toBe(200);
+    expect(f.packGrants).toHaveLength(1);
+    expect(f.packGrants[0]).toMatchObject({
+      user_id: "user-1",
+      paddle_transaction_id: "txn_pack_1",
+      credits: 50,
+    });
+
     const again = await handleVerifiedEvent(f.deps, pack, "sandbox", NOW, {});
     expect(again.reason).toMatch(/^duplicate_/);
-    expect(f.packGrants.length).toBeLessThanOrEqual(1);
+    expect(f.packGrants).toHaveLength(1);
   });
 });

@@ -12,10 +12,7 @@ export interface BlueprintServerAccess {
   pending: boolean;
 }
 
-export function useBlueprintServerAccess(
-  enabled: boolean,
-  planKey: string,
-): BlueprintServerAccess {
+export function useBlueprintServerAccess(enabled: boolean, planKey: string): BlueprintServerAccess {
   const fetchBlueprintAccess = useServerFn(getBlueprintAccess);
   const query = useQuery({
     queryKey: ["blueprint-access", planKey],

@@ -18,10 +18,7 @@ import {
 } from "@/lib/entitlements/unionEntitlements";
 
 export type BlueprintAccessReason =
-  | "allowed"
-  | "no_blueprint_plan"
-  | "lookup_failed"
-  | "signed_out";
+  "allowed" | "no_blueprint_plan" | "lookup_failed" | "signed_out";
 
 export interface BlueprintAccessDecision {
   allowed: boolean;

@@ -387,6 +387,32 @@ describe("Dashboard field notebook card readings", () => {
     expect(temp?.ageLabel).toBe("20d ago");
   });
 
+  it("never shows a stored VPD the tent panel rejects (Codex P1 on #3069)", () => {
+    // 4 kPa passes the 0–5 kPa intake range but fails the shared 0.2–3.0 kPa
+    // realism check the panel applies through its canonical VPD.
+    const at = new Date(Date.now() - 5 * MINUTE_MS).toISOString();
+    H.perTentRows = [
+      ...liveRows(at, 24, 55),
+      {
+        id: "vpd-1",
+        tent_id: TENT,
+        ts: at,
+        captured_at: at,
+        metric: "vpd_kpa",
+        value: 4,
+        source: "live",
+        quality: "ok",
+        raw_payload: null,
+      },
+    ];
+
+    renderDashboard();
+
+    const slots = lastReadingsByTent()?.[TENT];
+    expect(slot(slots, "TEMP")?.value).not.toBeNull();
+    expect(slot(slots, "VPD")).toBeUndefined();
+  });
+
   it("gives a tent with no sensor no readings, so its tiles stay empty", () => {
     H.secondTent = true;
     H.perTentRows = liveRows(new Date(Date.now() - 5 * MINUTE_MS).toISOString(), 24, 55);

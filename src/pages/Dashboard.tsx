@@ -22,6 +22,7 @@ import { AlertTriangle, Box, Sprout, Sparkles, ArrowRight } from "lucide-react";
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import { FieldNotebookScope } from "@/components/FieldNotebookMount";
+import { buildFieldNotebookReadingsByTent } from "@/lib/fieldNotebookReadingSlotsRules";
 import KpiCard from "@/components/KpiCard";
 import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
@@ -502,6 +503,19 @@ export default function Dashboard() {
     };
   });
 
+  // The field notebook card's tiles read the same rows and the same tent
+  // snapshot view model as the tent panel below it, so the card names the
+  // same latest reading, source and staleness. No new query.
+  const fieldNotebookReadingsByTent = buildFieldNotebookReadingsByTent(
+    latestPerTent.map(({ tent, envStage, tentRows }) => ({
+      tentId: tent.id,
+      view: buildTentSnapshotView(tentRows as BuildTentSnapshotInput[], envStage, nowTick, {
+        temperatureUnit,
+      }),
+    })),
+    nowTick,
+  );
+
   // Another scope's rows are not this grow's alerts.
   const recentAlerts =
     openAlertsView.kind === "known" ? persistedAlertsState.alerts.slice(0, 3) : [];
@@ -618,6 +632,7 @@ export default function Dashboard() {
         tents={tents
           .filter((tent) => tent.growId === (scopedGrowId ?? activeGrowId))
           .map((tent) => ({ id: tent.id, name: tent.name }))}
+        readingsByTent={fieldNotebookReadingsByTent}
         reloadRecent={scopedGrowId ? reload : undefined}
       />
       <TonightTentHomeCard

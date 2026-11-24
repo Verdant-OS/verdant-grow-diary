@@ -75,7 +75,13 @@ describe("fieldNotebookReadingSlotsFromSnapshot", () => {
         sourceLabel: "Stale",
         lastUpdatedIso: at,
         metrics: [
-          metric({ key: "temp", display: "75.0", unit: "°F", status: "stale", statusLabel: "Stale" }),
+          metric({
+            key: "temp",
+            display: "75.0",
+            unit: "°F",
+            status: "stale",
+            statusLabel: "Stale",
+          }),
         ],
       }),
       NOW_MS,
@@ -126,7 +132,13 @@ describe("fieldNotebookReadingSlotsFromSnapshot", () => {
     const slots = fieldNotebookReadingSlotsFromSnapshot(
       view({
         metrics: [
-          metric({ key: "temp", display: "212.0", unit: "°F", status: "invalid", statusLabel: "Invalid" }),
+          metric({
+            key: "temp",
+            display: "212.0",
+            unit: "°F",
+            status: "invalid",
+            statusLabel: "Invalid",
+          }),
           metric({ key: "rh", display: "—", unit: "%", status: "unknown", statusLabel: "Unknown" }),
           metric({ key: "vpd", display: "  ", unit: " kPa" }),
         ],
@@ -151,7 +163,14 @@ describe("fieldNotebookReadingSlotsFromSnapshot", () => {
   it("labels a stale cohort from the real snapshot view model", () => {
     const at = new Date(NOW_MS - 20 * DAY_MS).toISOString();
     const rows: BuildTentSnapshotInput[] = [
-      { ts: at, captured_at: at, metric: "temperature_c", value: 24, source: "live", quality: "ok" },
+      {
+        ts: at,
+        captured_at: at,
+        metric: "temperature_c",
+        value: 24,
+        source: "live",
+        quality: "ok",
+      },
       { ts: at, captured_at: at, metric: "humidity_pct", value: 55, source: "live", quality: "ok" },
     ] as BuildTentSnapshotInput[];
     const slots = fieldNotebookReadingSlotsFromSnapshot(
@@ -171,7 +190,9 @@ describe("buildFieldNotebookReadingsByTent", () => {
       stale: true,
       sourceLabel: "Stale",
       lastUpdatedIso: new Date(NOW_MS - 3 * DAY_MS).toISOString(),
-      metrics: [metric({ key: "rh", display: "60", unit: "%", status: "stale", statusLabel: "Stale" })],
+      metrics: [
+        metric({ key: "rh", display: "60", unit: "%", status: "stale", statusLabel: "Stale" }),
+      ],
     });
     const byTent = buildFieldNotebookReadingsByTent(
       [

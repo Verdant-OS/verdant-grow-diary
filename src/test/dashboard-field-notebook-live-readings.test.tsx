@@ -293,7 +293,6 @@ vi.mock("@/hooks/useSensorsQuickLogManualReadings", () => ({
   },
 }));
 
-
 const F = vi.hoisted(() => ({
   calls: [] as Array<Record<string, unknown>>,
 }));

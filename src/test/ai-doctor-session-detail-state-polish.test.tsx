@@ -96,7 +96,9 @@ describe("AiDoctorSessionDetail — back control focus styles", () => {
   it("Back button uses focus-visible:ring utilities", () => {
     const back = block(
       "back-button",
-      /<Button[\s\S]*?onClick=\{\(\) => navigate\(-1\)\}[\s\S]*?<\/Button>/,
+      // One <Button> element: the Back control, whose onClick resolves its
+      // target (history back, or the saved reviews list for a fresh tab).
+      /<Button(?:(?!<\/Button>)[\s\S])*?resolveSavedReviewBackTarget[\s\S]*?<\/Button>/,
     );
     expect(back).toMatch(/focus-visible:ring-2/);
     expect(back).toMatch(/focus-visible:ring-ring/);

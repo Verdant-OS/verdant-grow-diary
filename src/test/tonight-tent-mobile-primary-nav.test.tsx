@@ -138,10 +138,15 @@ describe("resolveMobilePrimaryHref (pure)", () => {
 });
 
 describe("destinations that left the first row stay under More", () => {
-  it("gives My Grows, Tents and Plants distinct icons", () => {
+  it("gives Dashboard, My Grows, Tents and Plants distinct icons", () => {
     const cultivation = moreGroups.find((group) => group.heading === "Cultivation");
     const icons = cultivation?.items.map((item) => item.icon) ?? [];
-    expect(cultivation?.items.map((item) => item.label)).toEqual(["My Grows", "Tents", "Plants"]);
+    expect(cultivation?.items.map((item) => item.label)).toEqual([
+      "Dashboard",
+      "My Grows",
+      "Tents",
+      "Plants",
+    ]);
     expect(new Set(icons).size).toBe(icons.length);
   });
 

@@ -1,13 +1,15 @@
 /**
  * Reads room ids already stored for one tent. Selects raw_payload only.
- * One probe samples rows that carry a room id. A second probe samples rows
- * whose room id is outside the file, so a later different room is not hidden
- * behind a long run of the file's own room.
+ *
+ * Each file room is confirmed with its own equality probe (limit 1), so a
+ * room that sits past the first page is not treated as missing. Extra stored
+ * rooms are discovered one distinct id at a time, excluding ids already found.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { GgsCsvRoomMismatchRules } from "@/lib/ggsCsvRoomMismatchRules";
 
-const DIFFERENT_ROOM_LIMIT = 20;
+const PROBE_LIMIT = 1;
+const MAX_EXTRA_ROOMS = 20;
 
 type RoomProbeQuery = {
   select(columns: string): RoomProbeQuery;
@@ -28,6 +30,7 @@ export class GgsCsvPriorRoomLookup {
     client: RoomProbeClient,
     tentId: string,
     filter: string,
+    limit: number,
   ): Promise<{ raw_payload: unknown }[] | null> {
     const { data, error } = await client
       .from("sensor_readings")
@@ -35,30 +38,55 @@ export class GgsCsvPriorRoomLookup {
       .eq("tent_id", tentId)
       .eq("source", "csv")
       .or(filter)
-      .limit(DIFFERENT_ROOM_LIMIT);
+      .limit(limit);
     if (error || !data) return null;
     return data;
   }
 
-  /** Stored room ids seen for the tent. Empty when the file has no room or a probe fails. */
+  /**
+   * Stored room ids for the tent. File rooms are included only when an
+   * equality probe finds that exact id. Empty when the file has no safe
+   * room id or a probe fails.
+   */
   static async storedRoomIds(
     tentId: string,
     fileRoomIds: readonly string[],
     client: RoomProbeClient = supabase as unknown as RoomProbeClient,
   ): Promise<string[]> {
     const tent = tentId.trim();
-    const outside = GgsCsvRoomMismatchRules.differentRoomOrFilter(fileRoomIds);
-    if (!tent || !outside) return [];
-    const tagged = await GgsCsvPriorRoomLookup.probe(
-      client,
-      tent,
-      GgsCsvRoomMismatchRules.taggedRoomOrFilter(),
-    );
-    const different = await GgsCsvPriorRoomLookup.probe(client, tent, outside);
-    if (!tagged || !different) return [];
-    return GgsCsvRoomMismatchRules.uniqueStoredRoomIds([
-      ...tagged.map((row) => row.raw_payload),
-      ...different.map((row) => row.raw_payload),
-    ]);
+    if (!tent || !GgsCsvRoomMismatchRules.differentRoomOrFilter(fileRoomIds)) return [];
+    const confirmed: string[] = [];
+    for (const id of fileRoomIds) {
+      const filter = GgsCsvRoomMismatchRules.roomEqualityOrFilter(id);
+      if (!filter) return [];
+      const rows = await GgsCsvPriorRoomLookup.probe(client, tent, filter, PROBE_LIMIT);
+      if (!rows) return [];
+      const seen = GgsCsvRoomMismatchRules.uniqueStoredRoomIds(rows.map((row) => row.raw_payload));
+      if (seen.includes(id)) confirmed.push(id);
+    }
+    const extras: string[] = [];
+    const excluded = new Set<string>(fileRoomIds);
+    for (let n = 0; n < MAX_EXTRA_ROOMS; n += 1) {
+      const filter = GgsCsvRoomMismatchRules.differentRoomOrFilter([...excluded]);
+      if (!filter) break;
+      const rows = await GgsCsvPriorRoomLookup.probe(client, tent, filter, PROBE_LIMIT);
+      if (!rows) return [];
+      if (rows.length === 0) break;
+      const fresh = GgsCsvRoomMismatchRules.uniqueStoredRoomIds(
+        rows.map((row) => row.raw_payload),
+      ).filter((id) => !excluded.has(id));
+      if (fresh.length === 0) break;
+      let stopped = false;
+      for (const id of fresh) {
+        extras.push(id);
+        if (!GgsCsvRoomMismatchRules.roomEqualityOrFilter(id)) {
+          stopped = true;
+          break;
+        }
+        excluded.add(id);
+      }
+      if (stopped) break;
+    }
+    return [...confirmed, ...extras];
   }
 }

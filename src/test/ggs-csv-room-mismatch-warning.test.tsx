@@ -51,7 +51,7 @@ describe("GgsCsvRoomMismatchRules", () => {
       { raw_row: { roomId: "1" }, room_id: "1" },
     ]);
     expect(different).toEqual([]);
-    expect(GgsCsvRoomMismatchRules.warning(file, different)).toBeNull();
+    expect(GgsCsvRoomMismatchRules.warning(file, ["1"])).toBeNull();
   });
 
   it("stays silent when the tent has no room-tagged CSV data", () => {
@@ -86,7 +86,39 @@ describe("GgsCsvRoomMismatchRules", () => {
 });
 
 describe("GgsCsvPriorRoomLookup", () => {
-  it("returns stored rooms from the tagged sample and the outside-file sample", async () => {
+  it("confirms a stored room that would sit past a 20-row sample of the other room", async () => {
+    const client = {
+      from(table: "sensor_readings") {
+        expect(table).toBe("sensor_readings");
+        let filter = "";
+        return {
+          select() {
+            return this;
+          },
+          eq() {
+            return this;
+          },
+          or(filters: string) {
+            filter = filters;
+            return this;
+          },
+          limit(count: number) {
+            expect(count).toBe(1);
+            if (filter.includes("roomId.eq.1") || filter.includes("roomId.eq.2")) {
+              const id = filter.includes("roomId.eq.1") ? "1" : "2";
+              return Promise.resolve({ data: [{ raw_payload: storedPayload(id) }], error: null });
+            }
+            return Promise.resolve({ data: [], error: null });
+          },
+        };
+      },
+    };
+    const ids = await GgsCsvPriorRoomLookup.storedRoomIds("tent-1", ["1", "2"], client);
+    expect(ids).toEqual(["1", "2"]);
+    expect(GgsCsvRoomMismatchRules.warning(["1", "2"], ids)).toBeNull();
+  });
+
+  it("returns stored rooms found by equality and by distinct exclusion", async () => {
     const calls: string[] = [];
     const client = {
       from(table: "sensor_readings") {
@@ -105,19 +137,23 @@ describe("GgsCsvPriorRoomLookup", () => {
             return this;
           },
           limit() {
-            const data = filter.includes("not.is.null")
-              ? [{ raw_payload: storedPayload("1") }]
-              : [{ raw_payload: storedPayload("9") }];
-            return Promise.resolve({ data, error: null });
+            if (filter.includes("roomId.eq.2")) return Promise.resolve({ data: [], error: null });
+            if (filter.includes("neq.2")) {
+              return Promise.resolve({ data: [{ raw_payload: storedPayload("1") }], error: null });
+            }
+            if (filter.includes("not.in.(2,1)") && !filter.includes(",9")) {
+              return Promise.resolve({ data: [{ raw_payload: storedPayload("9") }], error: null });
+            }
+            return Promise.resolve({ data: [], error: null });
           },
         };
       },
     };
     const ids = await GgsCsvPriorRoomLookup.storedRoomIds("tent-1", ["2"], client);
-    expect(calls).toEqual([
-      "raw_payload->raw_row->>roomId.not.is.null,raw_payload->>room_id.not.is.null",
-      "raw_payload->raw_row->>roomId.neq.2,raw_payload->>room_id.neq.2",
-    ]);
+    expect(calls[0]).toBe(
+      "raw_payload->raw_row->>roomId.eq.2,raw_payload->>room_id.eq.2",
+    );
+    expect(calls).toContain("raw_payload->raw_row->>roomId.neq.2,raw_payload->>room_id.neq.2");
     expect(ids).toEqual(["1", "9"]);
 
     const failed = {

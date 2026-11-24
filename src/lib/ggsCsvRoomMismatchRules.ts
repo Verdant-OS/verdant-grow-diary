@@ -96,9 +96,10 @@ export class GgsCsvRoomMismatchRules {
     return `This file is Spider Farmer ${fileLabel}. This tent already has Spider Farmer CSV data from ${storedLabel}. Those rooms do not match. You can still import. The duplicate check only compares tent, source, metric, and time, so a wrong-room file can look like a full set of duplicates.`;
   }
 
-  /** Rows that carry either stored room field. */
-  static taggedRoomOrFilter(): string {
-    return "raw_payload->raw_row->>roomId.not.is.null,raw_payload->>room_id.not.is.null";
+  /** One exact stored room, on either provenance field. Null when the id is not a safe token. */
+  static roomEqualityOrFilter(roomId: string): string | null {
+    if (!ROOM_TOKEN.test(roomId)) return null;
+    return `raw_payload->raw_row->>roomId.eq.${roomId},raw_payload->>room_id.eq.${roomId}`;
   }
 
   /** PostgREST `.or()` fragment. Null when an id is not a safe filter token. */

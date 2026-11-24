@@ -2509,7 +2509,7 @@ export default function Timeline() {
             type="button"
             variant="outline"
             size="sm"
-            className="mt-3"
+            className="mt-3 min-h-11 sm:min-h-9"
             data-testid="timeline-partial-read-retry"
             onClick={() => {
               void load();
@@ -2702,6 +2702,7 @@ export default function Timeline() {
             type="button"
             variant="outline"
             size="sm"
+            className="min-h-11 sm:min-h-9"
             onClick={clearAllTimelineFilters}
             disabled={!anyFilterActive}
             data-testid="timeline-clear-filters"
@@ -2737,6 +2738,7 @@ export default function Timeline() {
             type="button"
             variant="outline"
             size="sm"
+            className="min-h-11 sm:min-h-9"
             onClick={handleFindMissingAction}
             disabled={!advancedTimelineUnlocked}
             data-testid="timeline-next-missing-action"
@@ -2766,6 +2768,7 @@ export default function Timeline() {
               type="button"
               variant="ghost"
               size="sm"
+              className="min-h-11 sm:min-h-9"
               onClick={() => void refetchEntitlement()}
               data-testid="timeline-advanced-filters-retry"
             >
@@ -2803,6 +2806,7 @@ export default function Timeline() {
               type="button"
               variant="ghost"
               size="sm"
+              className="min-h-11 sm:min-h-9"
               onClick={() => setMissingAction(null)}
               data-testid="timeline-missing-action-dismiss"
             >
@@ -2828,7 +2832,7 @@ export default function Timeline() {
                 aria-pressed={active}
                 data-testid={`timeline-sensor-source-toggle-${kind}`}
                 className={cn(
-                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] transition",
+                  "inline-flex min-h-11 items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] transition sm:min-h-0",
                   active
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-secondary/50 text-foreground border-border/50 hover:bg-secondary",
@@ -2894,7 +2898,7 @@ export default function Timeline() {
               type="button"
               variant="outline"
               size="sm"
-              className="mt-2"
+              className="mt-2 min-h-11 sm:min-h-9"
               data-testid="timeline-load-older-activity-retry"
               onClick={() => void loadOlderActivity()}
             >
@@ -2912,7 +2916,7 @@ export default function Timeline() {
             <button
               type="button"
               data-testid="timeline-load-older"
-              className="text-xs underline text-muted-foreground hover:text-foreground disabled:opacity-50"
+              className="min-h-11 text-xs underline text-muted-foreground hover:text-foreground disabled:opacity-50 sm:min-h-0"
               onClick={() => void loadOlder()}
               disabled={loadingOlder}
             >
@@ -2934,7 +2938,7 @@ export default function Timeline() {
               type="button"
               variant="outline"
               size="sm"
-              className="mt-2"
+              className="mt-2 min-h-11 sm:min-h-9"
               data-testid="timeline-load-older-retry"
               onClick={() => void loadOlder()}
             >
@@ -2978,6 +2982,7 @@ export default function Timeline() {
                 {blockers.length > 0 && (
                   <Button
                     size="sm"
+                    className="min-h-11 sm:min-h-9"
                     variant="outline"
                     onClick={handleClear}
                     data-testid={TIMELINE_HIGHLIGHT_CLEAR_FILTERS_TESTID}
@@ -3109,7 +3114,7 @@ export default function Timeline() {
         </Link>
         <Link
           to={buildEnvironmentSummaryReportUrl(defaultEnvironmentSummaryRange())}
-          className="sm:hidden inline-flex items-center gap-1 rounded-full border border-border/50 bg-secondary/40 px-2.5 py-1 text-[11px] font-medium hover:bg-secondary/60"
+          className="sm:hidden inline-flex min-h-11 items-center gap-1 rounded-full border border-border/50 bg-secondary/40 px-2.5 py-1 text-[11px] font-medium hover:bg-secondary/60"
           data-testid="timeline-env-summary-shortcut"
           aria-label="Open environment summary report"
         >
@@ -3644,12 +3649,12 @@ export default function Timeline() {
                               {isLearningLoopEvent && (loopOutcomeStatus || loopDecisionLabel) && (
                                 <div className="mt-1 flex flex-wrap gap-1.5">
                                   {loopOutcomeStatus && (
-                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300">
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-info/10 border border-info/30 text-info">
                                       Grower response: {loopOutcomeStatus.replace(/_/g, " ")}
                                     </span>
                                   )}
                                   {loopDecisionLabel && (
-                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300">
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 border border-primary/30 text-primary">
                                       {loopDecisionLabel}
                                     </span>
                                   )}
@@ -4106,7 +4111,7 @@ function FilterChip({
       disabled={disabled}
       aria-pressed={active}
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition",
+        "inline-flex min-h-11 items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition sm:min-h-0",
         active
           ? "bg-primary text-primary-foreground border-primary"
           : "bg-secondary/50 text-foreground border-border/50 hover:bg-secondary",

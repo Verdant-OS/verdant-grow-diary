@@ -104,6 +104,7 @@ describe("FieldNotebookScope readings", () => {
   it("leaves the tiles empty when no readings are passed", () => {
     renderScope();
     expect(tiles()).toHaveLength(4);
-    expect(screen.queryByText(/ · /)).not.toBeInTheDocument();
+    // No tile carries a source and age line.
+    expect(screen.getByTestId("field-notebook-readings").textContent).not.toContain(" · ");
   });
 });

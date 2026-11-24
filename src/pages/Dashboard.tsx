@@ -22,7 +22,10 @@ import { AlertTriangle, Box, Sprout, Sparkles, ArrowRight } from "lucide-react";
 import type { Stage, SensorReading } from "@/mock";
 import PageHeader from "@/components/PageHeader";
 import { FieldNotebookScope } from "@/components/FieldNotebookMount";
-import { buildFieldNotebookReadingsByTent } from "@/lib/fieldNotebookReadingSlotsRules";
+import {
+  buildFieldNotebookReadingsByTent,
+  type FieldNotebookTentSnapshot,
+} from "@/lib/fieldNotebookReadingSlotsRules";
 import KpiCard from "@/components/KpiCard";
 import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
@@ -540,11 +543,15 @@ export default function Dashboard() {
       ),
     });
   };
-  const fieldNotebookReadingsByTent = buildFieldNotebookReadingsByTent(
-    latestPerTent.map(({ tent, envStage, tentRows }) => ({
+  const fieldNotebookTentSnapshots: FieldNotebookTentSnapshot[] = [];
+  for (const { tent, envStage, tentRows } of latestPerTent) {
+    fieldNotebookTentSnapshots.push({
       tentId: tent.id,
       view: tentPanelSnapshotView(tent.id, envStage, tentRows),
-    })),
+    });
+  }
+  const fieldNotebookReadingsByTent = buildFieldNotebookReadingsByTent(
+    fieldNotebookTentSnapshots,
     nowTick,
   );
 

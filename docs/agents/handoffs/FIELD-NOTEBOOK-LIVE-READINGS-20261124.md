@@ -6,10 +6,10 @@ goal: the Dashboard field notebook card shows each tent's latest TEMP, RH and VP
 why: Cheek, 2026-11-24 07:21 UTC: "wiring readingsByTent into the card is a small fix, and it's the one growers would notice. EXECUTE". FieldNotebookScope had no readingsByTent prop and Dashboard never passed readings, so the card always rendered empty tiles. FIELD-NOTEBOOK-SLICE-1 (closed) listed "live sensor readings on the card" under files_remaining.
 fix: client only. New pure src/lib/fieldNotebookReadingSlotsRules.ts maps the TentSnapshotView the Dashboard tent panel already builds (buildTentSnapshotView over selectDashboardSensorEvidenceRows rows) to ReadingSlot[]; Dashboard builds it per tent from latestPerTent and passes it through FieldNotebookScope to FieldNotebookMount. No new query. Stale, degraded and unverified metrics keep their label; invalid or unknown metrics and a view with no verified capture time give no slot; zero stays a value. PPFD is not in the tent snapshot view, so its tile stays empty.
 branch: claude/project-thread-lchx85
-base: verdant-grow-diary at 41d96bf194ca6db7790bf2a9a9d1763a5d98dc54
+base: verdant-grow-diary at 3344a02 (merged in at c7b1ed7 after the queue dropped #3069 on a conflict with #3049; first base 41d96bf194ca6db7790bf2a9a9d1763a5d98dc54)
 pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3069 (marked ready for review at 07:38 UTC by the shared cheekhimself account, not by this session; merge not covered)
-state: 35/35 required checks green at f2cb3748e7eb98e5e4fe5b11124f87f6736fef90 (CI run 45351888705); the handoff-only commit after it changes no code
-next_action: required checks at the handoff head, then one eligible Reviewer A, C or D exact-head review, relayed by Cheek as a copy-paste block (his rule, 2026-11-23); then Cheek's own yes naming #3069 and the exact SHA; UK Cheese merges
+state: 35/35 green at 7472d468 before the merge; the merge resolves Dashboard.tsx so tentPanelSnapshotView takes #3049 snapRows for the snapshot and tentRows for canonical VPD, so the card still follows the panel; required checks owed at the new head
+next_action: required checks green at the new head, then Cheek re-queues #3069 (his queue actions, confirmed 2026-11-24); after it is live, read Fixture Tent A card against its panel
 post_merge_check: once live /version.json reports the merged SHA, read only, signed in as the disposable fixture account: Fixture Tent A's field notebook card shows TEMP/RH with a source and age line matching the tent panel under it (Stale when the panel says Stale). No writes. NOT_MEASURED until then.
 decisions: (1) Reuse buildTentSnapshotView, not a new latest-reading rule, so the card and the panel cannot disagree on source or staleness. (2) One Dashboard helper, tentPanelSnapshotView, builds the view (with the panel's canonical VPD) for both the panel and the card (Codex P1 at 50b20af4: without canonicalVpd a 4 kPa stored VPD showed as usable). (3) A VPD from another capture (Tonight's canonical value, labeled like "Manual · 2m ago" in the view) gives no card slot, because the card labels VPD with the TEMP/RH capture's source. (4) Invalid hides the value; the panel still says Invalid. (5) The card's tent snapshots are collected with a for...of loop because dashboard-environment-stability-chip.test.ts anchors on the first "latestPerTent.map(".
 coordination: PR #3049 changes the panel's snapshot input from tentRows to snapRows (adds Quick Log manuals). Whichever of #3049 and this PR merges second points the notebook's buildTentSnapshotView call at the same rows as the panel. PR #3055 changes formatReadingValue copy only ("Missing" for an empty tile); no overlap in logic.
@@ -26,5 +26,5 @@ reviewer_sha: none yet
 session_state: no routines, no paused workflows. Pending human decision: none until review.
 claimed_by: Claude thread session (task uba068dca25e9be198e01be19385631c4), 2026-11-24 07:40 UTC
 owner: Claude thread session (task uba068dca25e9be198e01be19385631c4)
-last_updated: 2026-11-24 08:02 UTC, by Claude thread session (holder)
+last_updated: 2026-11-24 16:55 UTC, by Claude thread session (holder)
 ```

@@ -82,6 +82,18 @@ export interface PlantManualEnvReadingRow {
   device_id?: string | null;
 }
 
+/**
+ * The fields the newest-first merge reads. Sensor rows from any surface (the
+ * plant page's tent read, the Dashboard's evidence rows) and Quick Log manual
+ * rows both satisfy it, so every surface merges with the same rule.
+ */
+export interface ManualMergeReadingRow {
+  ts: string;
+  captured_at?: string | null;
+  metric: string;
+  source?: string | null;
+}
+
 export type PlantManualLatestReadings = Record<ManualSensorMetric, LatestManualReading | null>;
 
 function finiteOrNull(raw: NumericLike): number | null {
@@ -178,7 +190,7 @@ export function manualEnvironmentEventsToTentReadingRows(
   return out;
 }
 
-function rowObservedMs(row: PlantManualEnvReadingRow): number | null {
+function rowObservedMs(row: ManualMergeReadingRow): number | null {
   return observedMs(row.captured_at) ?? observedMs(row.ts);
 }
 
@@ -197,9 +209,9 @@ function rowObservedMs(row: PlantManualEnvReadingRow): number | null {
  * mergeSensorsSeriesWithQuickLogManuals on the Sensors page. With no manual
  * rows the input array is returned unchanged.
  */
-export function mergePlantTentReadingsWithManualEvents<T extends PlantManualEnvReadingRow>(
+export function mergePlantTentReadingsWithManualEvents<T extends ManualMergeReadingRow>(
   sensorRows: ReadonlyArray<T>,
-  manualRows: ReadonlyArray<PlantManualEnvReadingRow>,
+  manualRows: ReadonlyArray<ManualMergeReadingRow>,
 ): T[] {
   if (manualRows.length === 0) return sensorRows as T[];
   const quickLogKeys = new Set(manualRows.map((r) => `${r.metric}|${rowObservedMs(r)}`));

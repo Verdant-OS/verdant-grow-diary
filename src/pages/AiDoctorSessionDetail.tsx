@@ -48,6 +48,7 @@ import {
   useMarkAiDoctorSessionReview,
 } from "@/hooks/useMarkAiDoctorSessionReview";
 import { alertDetailPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
+import { readBrowserHistoryState, resolveSavedReviewBackTarget } from "@/lib/savedReviewBackRules";
 import { AiDoctorSessionActionQueueButton } from "@/components/AiDoctorSessionActionQueueButton";
 import type { AiDoctorSessionLike } from "@/lib/aiDoctorSessionToActionQueueRules";
 import { useAiDoctorSessionLinkedActionQueueItems } from "@/hooks/useAiDoctorSessionLinkedActionQueueItems";
@@ -1095,7 +1096,13 @@ export default function AiDoctorSessionDetail() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  // Opened from a copied link or a fresh tab, history back
+                  // would leave Verdant; open the saved reviews list instead.
+                  const back = resolveSavedReviewBackTarget(readBrowserHistoryState());
+                  if (back.kind === "history") navigate(-1);
+                  else navigate(back.to);
+                }}
                 className="min-w-0 flex-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:flex-none"
               >
                 <ArrowLeft className="h-4 w-4" /> Back

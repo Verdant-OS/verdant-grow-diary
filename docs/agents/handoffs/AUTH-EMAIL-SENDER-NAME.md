@@ -1,7 +1,8 @@
 # AUTH-EMAIL-SENDER-NAME
 
 ```text
-TASK AUTH-EMAIL-SENDER-NAME  priority: P3  status: OPEN
+TASK AUTH-EMAIL-SENDER-NAME  priority: P3  status: CLOSED
+closed: 2026-11-23, merged. Landed on verdant-grow-diary as c64a1cc58050e985cf33cb68305d2f286afb1973 (#3043, 2026-11-23 13:13 UTC) through the merge queue, after Reviewer E (VReviewer) approved head 557d268751c7857cd7f9b4c8a1f1f9d8e1b2f1a9 and Matthew gave his merge yes at that head. Production /version.json served fa3f084cc963 (which contains c64a1cc5) at 2026-11-23 14:37 UTC. Post-merge check: one reset to the test login at 15:01:53 UTC, email_send_log recovery status sent with no error, and Matthew reported the inbox sender name reads "Verdant Grow Diary" (his report, 15:03 UTC). Whether that email went through the app route or the auth-email-hook edge function is not recorded; the hook's deployed code was NOT_MEASURED (read permission denied). Closed by the Claude thread session that authored the change.
 goal: Sign-in emails (signup, invite, magic link, recovery, email change, reauthentication) show the sender name "Verdant Grow Diary" instead of "verdantgrowdiary-com", in the From line and in the email text that names the site.
 why: The sender name growers see in their inbox was the Lovable project slug. Cheek pressed "Open the PR" on 2026-11-19 23:39 UTC for this rename after the 2026-11-18 test reset proved sign-in emails now arrive from noreply@verdantgrowdiary.com (AUTH-EMAIL-MANAGED-ROUTE, #2981).
 branch: claude/project-thread-do02zz (restarted from verdant-grow-diary at c47a44d7d after #2981 merged)
@@ -29,5 +30,5 @@ reviewer_sha: none
 session_state: no routines, no paused workflows; pending human decisions: mark ready, reviewer routing, merge, publish, edge redeploy
 claimed_by: Claude thread session, 2026-11-19 23:40 UTC
 owner: Claude thread session for this task
-last_updated: 2026-11-19, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsDb2mPjWBxVLtwJZkM4i1Cw
+last_updated: 2026-11-23, by Claude thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsDb2mPjWBxVLtwJZkM4i1Cw
 ```

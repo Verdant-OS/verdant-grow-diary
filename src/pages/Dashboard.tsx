@@ -174,6 +174,7 @@ import {
   resolveTonightTentSelection,
 } from "@/lib/tonightTentHomeViewModel";
 import { tonightRowsFromQuickLogManualReadings } from "@/lib/tentManualEnvironmentSnapshotRules";
+import { selectDashboardTentSnapshotRows } from "@/lib/dashboardTentSnapshotRowsRules";
 import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
@@ -497,12 +498,23 @@ export default function Dashboard() {
       plants: plantsForStage,
     });
     const stability = computeEnvironmentStability(stabilityReadings, { stage: envStage });
+    // The tent card's latest reading uses the plant page's rule: the newest
+    // observation wins, including this tent's Quick Log manual readings, so
+    // the two pages name the same latest reading. Charts and stability keep
+    // the sensor rows above.
+    const snapRows = selectDashboardTentSnapshotRows({
+      sensorRows: readingsByTent[t.id] ?? [],
+      quickLogManuals: quickLogManualReadings,
+      tentId: t.id,
+      nowMs: nowTick,
+    });
     return {
       tent: t,
       envStage,
       last: chartRows[chartRows.length - 1],
       stability,
       tentRows,
+      snapRows,
     };
   });
 
@@ -512,6 +524,7 @@ export default function Dashboard() {
   const tentPanelSnapshotView = (
     tentId: string,
     envStage: (typeof latestPerTent)[number]["envStage"],
+    snapRows: (typeof latestPerTent)[number]["snapRows"],
     tentRows: (typeof latestPerTent)[number]["tentRows"],
   ) => {
     // Pending/failed reads must not masquerade as established
@@ -519,7 +532,7 @@ export default function Dashboard() {
     // are never queried — a uuid column cannot hold them, so
     // their absence is established (parity with the Tents list).
     const sensorReadStatus = isUuid(tentId) ? (sensorStatusByTent[tentId] ?? "loading") : "success";
-    return buildTentSnapshotView(tentRows as BuildTentSnapshotInput[], envStage, nowTick, {
+    return buildTentSnapshotView(snapRows as BuildTentSnapshotInput[], envStage, nowTick, {
       temperatureUnit,
       // Same Tonight derivation the tent page and /tents list use,
       // so a newer manual temperature/RH pair replaces an older CSV VPD.
@@ -544,10 +557,10 @@ export default function Dashboard() {
     });
   };
   const fieldNotebookTentSnapshots: FieldNotebookTentSnapshot[] = [];
-  for (const { tent, envStage, tentRows } of latestPerTent) {
+  for (const { tent, envStage, snapRows, tentRows } of latestPerTent) {
     fieldNotebookTentSnapshots.push({
       tentId: tent.id,
-      view: tentPanelSnapshotView(tent.id, envStage, tentRows),
+      view: tentPanelSnapshotView(tent.id, envStage, snapRows, tentRows),
     });
   }
   const fieldNotebookReadingsByTent = buildFieldNotebookReadingsByTent(
@@ -1052,7 +1065,7 @@ export default function Dashboard() {
                         className="mb-2"
                       />
                       <div className="space-y-2.5">
-                        {latestPerTent.map(({ tent, envStage, stability, tentRows }) => {
+                        {latestPerTent.map(({ tent, envStage, stability, tentRows, snapRows }) => {
                           const stabilityView = formatStabilityChipView(stability);
                           // Pending/failed reads must not masquerade as established
                           // absence or as data. Non-UUID ids (mock-fallback tents)
@@ -1061,7 +1074,12 @@ export default function Dashboard() {
                           const sensorReadStatus = isUuid(tent.id)
                             ? (sensorStatusByTent[tent.id] ?? "loading")
                             : "success";
-                          const snapView = tentPanelSnapshotView(tent.id, envStage, tentRows);
+                          const snapView = tentPanelSnapshotView(
+                            tent.id,
+                            envStage,
+                            snapRows,
+                            tentRows,
+                          );
                           const sensorReadStatusLabel =
                             sensorReadStatus === "loading"
                               ? "sensor data loading"

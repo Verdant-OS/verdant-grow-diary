@@ -179,6 +179,53 @@ describe("MobileNav More sheet — Slice 4 grouping", () => {
   });
 });
 
+describe("MobileNav More sheet — a way back to the Dashboard", () => {
+  // Once a grower has a tent, the Tent tab opens that tent, so the phone had
+  // no route back to the Dashboard ("/"). More now lists it first.
+  function renderAt(path: string) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={[path]}>
+          <MobileNav />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  async function openMore() {
+    await act(async () => {
+      screen.getByText("More").click();
+    });
+    return screen.findByRole("region", { name: "More navigation destinations" });
+  }
+
+  it("lists Dashboard first, linking to /", async () => {
+    renderAt("/plants");
+    const region = await openMore();
+    const links = within(region).getAllByRole("link");
+    expect(links[0]).toHaveTextContent("Dashboard");
+    expect(links[0]).toHaveAttribute("href", "/");
+  });
+
+  it("marks Dashboard current only on the Dashboard itself", async () => {
+    renderAt("/plants");
+    const region = await openMore();
+    expect(within(region).getByRole("link", { name: "Dashboard" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("marks Dashboard current on /", async () => {
+    renderAt("/");
+    const region = await openMore();
+    expect(within(region).getByRole("link", { name: "Dashboard" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+});
+
 describe("MobileNav safety language", () => {
   it("does not expose automation or device-control language", () => {
     const { container } = render(wrap(<MobileNav />));

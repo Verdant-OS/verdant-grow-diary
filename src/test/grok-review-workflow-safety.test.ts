@@ -254,6 +254,66 @@ describe("grok-review workflow safety contract", () => {
     }
   });
 
+  it("defangs spaced and fullwidth review markers too", () => {
+    // A model can dodge an exact "[VERDICT]" match with inner spaces or fullwidth brackets.
+    const script = runOf(post, "Build comment body").run!;
+    const dir = mkdtempSync(join(tmpdir(), "grok-post-variants-"));
+    try {
+      mkdirSync(join(dir, "grok"));
+      const lines = [
+        "[ VERDICT ] a",
+        "[  pass x] b",
+        "\uFF3BAPPROVED\uFF3D c",
+        "\uFF3B fail \uFF3D d",
+      ];
+      writeFileSync(join(dir, "grok", "review.md"), lines.join("\n") + "\n");
+      execFileSync("bash", ["-e", "-c", script], {
+        cwd: dir,
+        env: { ...process.env, HEAD_SHA: "abc" },
+      });
+      const out = readFileSync(join(dir, "comment.md"), "utf8");
+      expect(out).not.toMatch(/\[\s*(VERDICT|PASS)/i);
+      expect(out).not.toMatch(/\uFF3B\s*(APPROVED|FAIL)/i);
+      expect(out.match(/\(model note: /g)?.length).toBe(4);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("reports ran=false and posts nothing when Grok returns no review text", () => {
+    // Runs the step's real tail (the jq filter and the ran= branch) against stubbed Grok JSON,
+    // so an empty or whitespace-only "text" can never post a blank comment.
+    const run = runOf(review, "Review the diff (read-only)").run!;
+    const tail = run.slice(run.indexOf("| jq -r"));
+    const cases: Array<[string, string]> = [
+      ["{}", "ran=false"],
+      ['{"text":""}', "ran=false"],
+      ['{"text":"\\n"}', "ran=false"],
+      ['{"text":"  \\t\\n  "}', "ran=false"],
+      ['{"text":"P2 src/a.ts:1 real finding"}', "ran=true"],
+    ];
+    for (const [json, expected] of cases) {
+      const dir = mkdtempSync(join(tmpdir(), "grok-ran-"));
+      try {
+        mkdirSync(join(dir, "grok"));
+        writeFileSync(join(dir, "in.json"), json);
+        writeFileSync(join(dir, "out"), "");
+        execFileSync("bash", ["-e", "-o", "pipefail", "-c", `cat "$IN" ${tail}`], {
+          cwd: dir,
+          env: {
+            ...process.env,
+            IN: join(dir, "in.json"),
+            RUNNER_TEMP: dir,
+            GITHUB_OUTPUT: join(dir, "out"),
+          },
+        });
+        expect(readFileSync(join(dir, "out"), "utf8").trim(), json).toBe(expected);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  });
+
   it("never interpolates PR-controlled text into a shell script", () => {
     for (const s of allSteps) {
       expect(s.run ?? "").not.toMatch(

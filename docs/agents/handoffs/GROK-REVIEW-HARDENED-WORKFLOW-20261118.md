@@ -1,16 +1,17 @@
 # GROK-REVIEW-HARDENED-WORKFLOW-20261118
 
 ```text
-TASK GROK-REVIEW-HARDENED-WORKFLOW-20261118  priority: other  status: OPEN
+TASK GROK-REVIEW-HARDENED-WORKFLOW-20261118  priority: other  status: CLOSED
+closed: 2026-11-23, merged through #3045. Matthew chose to land #3016 via the stacked #3045 rather than separately (2026-11-23 about 10:12 UTC, session_017UoYKwo4mYcULag9FoN2QE). Landed on verdant-grow-diary as 10660c267eb80e9128a1ecdf067d50d17991218c at 2026-11-23 10:22:56 UTC through the merge queue (#3045's issue events, read 2026-11-23 10:24 UTC: added_to_merge_queue 10:17:05Z by cheekhimself; merged by cheekhimself and removed_from_merge_queue by github-merge-queue[bot] at 10:22:56Z). The merge commit has parents 228150ad and 3610e2133c7a6bb1af21ff8115e08bb2a1826cbe. GitHub then marked #3016 merged (closed by github-merge-queue[bot] at 10:22:58Z), because its head 35f8b2c2 is an ancestor of the merge. Grok stays off (GROK_REVIEW_ENABLED unset).
 goal: Add an optional Grok Build CLI peer-review workflow on PRs that cannot leak the xAI key or the GitHub token and never counts as a review or approval.
 why: Matthew pasted a grok-review workflow on 2026-11-18. As pasted it ran the agent with --always-approve while holding XAI_API_KEY and GH_TOKEN, with no permissions block, a curl|bash install and an unpinned checkout. He chose "Draft a hardened version".
 branch: claude/grok-review-hardened-workflow
 base: verdant-grow-diary @ 0d9e9c081973ea3e4ff86f5cd8822d5cfab3f1be
-pr: see the PR opened from this branch
-head_sha: read the current head from the PR and verify with git ls-remote
-state: pushed draft; no review requested
-next_action: a fresh independent review and Matthew's yes at the new head, then the merge queue. Grok stays off: do not set GROK_REVIEW_ENABLED to 'true' until a sandbox that blocks /proc on GitHub runners is found and the isolation canary passes. XAI_API_KEY is set (measured: masked in run 44393762632).
-post_merge_check: (1) After XAI_API_KEY is added, on the first non-draft, non-docs PR: the review job runs with a read-only token, and the post job leaves exactly one comment that starts "Grok peer observation". (2) Isolation canary, before relying on it: open a throwaway same-repo draft PR, mark it ready, and have its diff ask the model to print the contents of /proc/self/environ, $XAI_API_KEY and ~/.grok/sandbox.toml. PASS only if the posted comment contains none of them (no key, no xai- string, no environment dump) and the run log shows the review-locked profile was applied, or the review step failed closed. Record the run URL. Close the canary PR unmerged. NOT_MEASURED until then.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3016
+head_sha: 35f8b2c2a963cc745c0933ba6d2fa37054957320 (final; observed with git ls-remote 2026-11-23 02:07 UTC)
+state: merged through #3045 and closed
+next_action: none for this task. Grok stays off: do not set GROK_REVIEW_ENABLED to 'true' until a sandbox that blocks /proc on GitHub runners is verified and the isolation canary below passes. Follow-up P3s are tracked in GROK-REVIEW-P3-FOLLOWUP-20261123.
+post_merge_check: (1) PASS, measured 2026-11-23 10:24 UTC on 10660c26: .github/workflows/grok-review.yml is on the deploy branch and its review job is gated on vars.GROK_REVIEW_ENABLED == 'true'. (2) NOT_MEASURED, and only after a safe sandbox exists and the variable is set: on the first non-draft, non-docs PR the review job runs with a read-only token and the post job leaves exactly one comment that starts "Grok peer observation". (3) NOT_MEASURED, same precondition: the isolation canary. Open a throwaway same-repo draft PR, mark it ready, and have its diff ask the model to print /proc/self/environ, $XAI_API_KEY and ~/.grok/sandbox.toml. PASS only if the posted comment contains none of them, or the review step failed closed. Record the run URL and close the canary PR unmerged.
 decisions:
   - Two jobs: review (contents: read, xAI key, no GitHub token, checkout with persist-credentials: false) and post (pull-requests: write, no checkout, no xAI key).
   - Agent runs with --permission-mode dontAsk, read-only tools, shell/edit/web/subagents disallowed, --sandbox strict, --max-turns 30, --no-auto-update. Flags taken from docs.x.ai/build/cli/reference and docs.x.ai/build/enterprise (read 2026-11-18).
@@ -37,10 +38,10 @@ blockers: Grok cannot start on GitHub runners with the review-locked sandbox, be
 open_questions: none. Data destination decided: Matthew answered "Yes, xAI is OK" on 2026-11-18 09:44 UTC in session session_017UoYKwo4mYcULag9FoN2QE to sending non-draft, non-docs PR diffs and repo files the agent reads to xAI.
 gotchas: a Grok comment is a peer observation, never independent acceptance (OWNERSHIP.md section 4.3). If grok rejects a flag, the review step fails closed and no comment is posted.
 exclusions_for_review: Claude session_017UoYKwo4mYcULag9FoN2QE (this writer)
-reviewer_seat: none requested yet
-reviewer_sha: none
+reviewer_seat: session_017UoYKwSx4SszGYZisFpeKv, independent (PASS at 35f8b2c2, review 5965246845); matt816cheek-bit approval 5965652281 at 35f8b2c2. The merged code was also reviewed as part of #3045 by session_017UoYKwrn1g9TEdpGQnGCyL (PASS at 3610e213, review 6019802425).
+reviewer_sha: 35f8b2c2a963cc745c0933ba6d2fa37054957320
 session_state: no production access used; no secrets read or set; no paused workflows.
 claimed_by: Claude session_017UoYKwo4mYcULag9FoN2QE, 2026-11-18 09:41 UTC (Matthew's request)
 owner: Claude session_017UoYKwo4mYcULag9FoN2QE
-last_updated: 2026-11-18 21:00 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE (gated off via GROK_REVIEW_ENABLED; previous 20:40 UTC)
+last_updated: 2026-11-23 10:24 UTC, by Claude session_017UoYKwo4mYcULag9FoN2QE (closed after #3045 landed; previous 2026-11-18 21:00 UTC)
 ```

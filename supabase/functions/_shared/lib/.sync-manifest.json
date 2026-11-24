@@ -1,6 +1,6 @@
 {
   "generator": "scripts/sync-edge-shared.mjs",
-  "sourceCount": 109,
+  "sourceCount": 111,
   "sourceHashes": {
     "src/constants/aiDoctorContextReadiness.ts": "81dfe93461a52551335030fbce39402df17009043af8498d95cbb98d2869e55b",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
@@ -82,10 +82,12 @@
     "src/lib/ppfdRules.ts": "8ac7ead78f3ae9cfe682d37d36c6594cac3ece2c2862fa6edc7ed853dce14261",
     "src/lib/quick-log/quickLogSensorSnapshotAcquisitionRules.ts": "3985ab4ff100d3f10fdbe4b7ad019ee28aab78b4e5c58c17ad58ae46c5afaad7",
     "src/lib/quick-log/quickLogSnapshotMetricNormalizer.ts": "c458e70f476d3d1bb70c5d22b425865eeeb8cce3c4ab1baa9921208b988fe0ce",
-    "src/lib/quickLogEventIdentityRules.ts": "cc6c5e98ed097101d3b3ebfb1c7c960d512d3261123235d6c4fdb8cf75750262",
+    "src/lib/quickLogEventIdentityRules.ts": "d4ea07f607fcf4c9c5a6d0b921707825948f248dea786d540732c54f6271d577",
     "src/lib/quickLogHardwareReadingsDisplayRules.ts": "57b3a026337bbc98f6dd1eac3b217a61a0cd4595fe1db1c810b05662dd6ef9fe",
     "src/lib/quickLogHardwareReadingsRules.ts": "8b42d620e5acf4c7bfb38c0a7cbb29b5967dd067d63fd4457ce96965af9ce80d",
     "src/lib/quickLogNoteMarkerRules.ts": "32f5b989d27d84b5f425909a38c5fc2423143c42e81449d2a569dda1bdefadce",
+    "src/lib/quickLogWaterVolumeUnitRules.ts": "72a590613406ed6f75c3e6a9e6c273578f99e7b9897694a372ecfb6dc72a2a35",
+    "src/lib/quickLogWaterVolumeWarningRules.ts": "870720612b1891d73c6b8adde5600290020a875e56cc2650c7cf4073a76663a6",
     "src/lib/rootZoneManualObservationRules.ts": "c594853f2ee05f9aff3ee4b5492544c2f693e06e57b47f6c75679eb4469d4b69",
     "src/lib/rootZoneObservationRules.ts": "9b8e24c016a2b39b66ee7b94f54fcf8e577e128184d5c5fcb1e631f9e3305532",
     "src/lib/routes.ts": "c3f3797a82dfe162738ecf66b13480a80e0dd536d4dc2d112b4c2a9b7d67e83e",

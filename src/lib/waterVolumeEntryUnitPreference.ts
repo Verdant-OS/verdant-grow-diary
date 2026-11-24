@@ -14,6 +14,8 @@ import {
 } from "./quickLogWaterVolumeUnitRules";
 
 export const WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY = "verdant:waterVolumeEntryUnit" as const;
+/** Same-document change signal; `storage` events only reach other tabs. */
+export const WATER_VOLUME_ENTRY_UNIT_CHANGE_EVENT = "verdant:waterVolumeEntryUnitChange" as const;
 
 function safeStorage(): Storage | null {
   try {
@@ -41,7 +43,9 @@ export function saveWaterVolumeEntryUnit(unit: WaterEntryUnit): boolean {
   if (!storage || !isWaterEntryUnit(unit)) return false;
   try {
     storage.setItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY, unit);
-    return storage.getItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY) === unit;
+    const saved = storage.getItem(WATER_VOLUME_ENTRY_UNIT_STORAGE_KEY) === unit;
+    if (saved) window.dispatchEvent(new Event(WATER_VOLUME_ENTRY_UNIT_CHANGE_EVENT));
+    return saved;
   } catch {
     return false;
   }

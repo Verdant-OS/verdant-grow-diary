@@ -25,7 +25,7 @@ export interface EnvironmentCsvSaturatedRunRow {
 const METRICS: readonly SaturatedReadingMetric[] = ["humidity_pct", "soil_moisture_pct"];
 
 export class EnvironmentCsvSaturatedRunRules {
-  static samples(
+  private static samples(
     metric: SaturatedReadingMetric,
     rows: readonly EnvironmentCsvSaturatedRunRow[],
   ): SaturatedReadingSample[] {

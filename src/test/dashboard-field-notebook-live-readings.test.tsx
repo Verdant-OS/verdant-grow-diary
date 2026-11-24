@@ -382,7 +382,7 @@ describe("Dashboard field notebook card readings", () => {
     renderDashboard();
 
     const temp = slot(lastReadingsByTent()?.[TENT], "TEMP");
-    expect(temp?.value).not.toBeNull();
+    expect(temp?.value).toMatch(/°F$/);
     expect(temp?.source).toBe("Stale");
     expect(temp?.ageLabel).toBe("20d ago");
   });
@@ -409,7 +409,7 @@ describe("Dashboard field notebook card readings", () => {
     renderDashboard();
 
     const slots = lastReadingsByTent()?.[TENT];
-    expect(slot(slots, "TEMP")?.value).not.toBeNull();
+    expect(slot(slots, "TEMP")?.value).toMatch(/°F$/);
     expect(slot(slots, "VPD")).toBeUndefined();
   });
 
@@ -421,6 +421,6 @@ describe("Dashboard field notebook card readings", () => {
 
     const byTent = lastReadingsByTent();
     expect(byTent?.[TENT_B] ?? []).toEqual([]);
-    expect(slot(byTent?.[TENT], "TEMP")?.value).not.toBeNull();
+    expect(slot(byTent?.[TENT], "TEMP")?.value).toMatch(/°F$/);
   });
 });

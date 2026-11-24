@@ -119,6 +119,25 @@ describe("fieldNotebookReadingSlotsFromSnapshot", () => {
     ]);
   });
 
+  it("leaves off a VPD that comes from another capture, with its own source and age", () => {
+    for (const vpd of [
+      metric({ key: "vpd", display: "0.90", unit: " kPa", statusLabel: "Manual · 2m ago" }),
+      metric({
+        key: "vpd",
+        display: "0.90",
+        unit: " kPa",
+        status: "stale",
+        statusLabel: "Stale · Manual · 3h ago",
+      }),
+    ]) {
+      const slots = fieldNotebookReadingSlotsFromSnapshot(
+        view({ metrics: [metric({ key: "temp", display: "75.2", unit: "°F" }), vpd] }),
+        NOW_MS,
+      );
+      expect(slots.map((s) => s.label)).toEqual(["TEMP"]);
+    }
+  });
+
   it("keeps zero as a real reading", () => {
     const slots = fieldNotebookReadingSlotsFromSnapshot(
       view({ metrics: [metric({ key: "temp", display: "0", unit: "°C" })] }),

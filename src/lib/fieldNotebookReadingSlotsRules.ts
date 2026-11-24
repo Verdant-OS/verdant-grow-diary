@@ -15,6 +15,11 @@
  * - An invalid or unknown metric, a blank display, a view with no reading,
  *   or a view with no parseable capture time gives no slot: the tile stays
  *   empty rather than show an unverified number as healthy.
+ * - A VPD from another capture (Tonight's canonical value the panel shows
+ *   with its own source and age) gives no slot: the card pairs VPD with the
+ *   TEMP and RH of one capture and labels it with that capture's source.
+ *   The snapshot view names such a VPD's own source in its status label
+ *   ("Manual · 2m ago"); a cohort metric's label is one plain word or null.
  * - PPFD is not part of the tent snapshot view, so it never has a slot here.
  * - Sensors are receive-only; this reads a view model and writes nothing.
  */
@@ -38,6 +43,14 @@ function capturedMs(view: TentSnapshotView): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
+const OTHER_CAPTURE_SEPARATOR = " · ";
+
+function isOtherCaptureVpd(metric: MetricView): boolean {
+  const label = metric.statusLabel;
+  if (label === null || label === undefined) return false;
+  return metric.status === "ok" || label.includes(OTHER_CAPTURE_SEPARATOR);
+}
+
 function slotFromMetric(
   metric: MetricView,
   view: TentSnapshotView,
@@ -45,6 +58,7 @@ function slotFromMetric(
   ageLabel: string | null,
 ): ReadingSlot | null {
   if (metric.status === "invalid" || metric.status === "unknown") return null;
+  if (metric.key === "vpd" && isOtherCaptureVpd(metric)) return null;
   const display = (metric.display ?? "").trim();
   if (display === "" || display === UNSHOWN) return null;
   const source = metric.status === "ok" ? view.sourceLabel : (metric.statusLabel ?? null);

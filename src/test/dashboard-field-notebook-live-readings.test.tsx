@@ -183,25 +183,15 @@ vi.mock("@/hooks/useOneTentActivationEvidence", () => ({
     summary: { count: 0, latestAt: null, latestSource: null },
   }),
 }));
+const HOME = vi.hoisted(() => ({
+  // Tonight's diary snapshot for the home tent. Idle unless a test sets it,
+  // so the card's VPD comes from the tent's own rows.
+  snapshot: null as Record<string, unknown> | null,
+}));
+
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
-  useLatestSensorSnapshot: () => ({
-    status: "ok",
-    snapshot: {
-      source: "manual",
-      ts: new Date().toISOString(),
-      temp: 24,
-      rh: 70,
-      vpd: 0.9,
-      co2: null,
-      soil: null,
-      soil_ec: null,
-      soil_temp: null,
-      ppfd: null,
-      device_id: null,
-      csvVendor: null,
-      tent_id: TENT,
-    },
-  }),
+  useLatestSensorSnapshot: () =>
+    HOME.snapshot ? { status: "ok", snapshot: HOME.snapshot } : { status: "idle", snapshot: null },
 }));
 vi.mock("@/hooks/useEnvironmentTrends", () => ({
   useEnvironmentTrends: () => ({
@@ -355,6 +345,7 @@ beforeEach(() => {
   M.error = false;
   M.refetch.mockClear();
   F.calls.length = 0;
+  HOME.snapshot = null;
 });
 
 describe("Dashboard field notebook card readings", () => {
@@ -405,6 +396,35 @@ describe("Dashboard field notebook card readings", () => {
         raw_payload: null,
       },
     ];
+
+    renderDashboard();
+
+    const slots = lastReadingsByTent()?.[TENT];
+    expect(slot(slots, "TEMP")?.value).toMatch(/°F$/);
+    // The panel's realism check rejects the stored 4 kPa; the card never shows it.
+    expect(String(slot(slots, "VPD")?.value ?? "")).not.toMatch(/^4(\.0+)? kPa$/);
+  });
+
+  it("leaves VPD off the card when it comes from another capture", () => {
+    // Tonight's newer diary snapshot supplies the panel's VPD with its own
+    // source and age; the card pairs VPD with TEMP/RH of one capture only.
+    const at = new Date(Date.now() - 5 * MINUTE_MS).toISOString();
+    H.perTentRows = liveRows(at, 24, 55);
+    HOME.snapshot = {
+      source: "manual",
+      ts: new Date().toISOString(),
+      temp: 24,
+      rh: 70,
+      vpd: 0.9,
+      co2: null,
+      soil: null,
+      soil_ec: null,
+      soil_temp: null,
+      ppfd: null,
+      device_id: null,
+      csvVendor: null,
+      tent_id: TENT,
+    };
 
     renderDashboard();
 

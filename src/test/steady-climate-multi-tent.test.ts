@@ -40,6 +40,15 @@ describe("steady climate multi-tent sections", () => {
     expect(text).not.toMatch(/tent-vs-tent/);
     expect(text).not.toMatch(/\bprice\b/);
     expect(text).not.toMatch(/built-in/);
+    const guideText = [
+      ...STEADY_CLIMATE_GUIDE.sections.flatMap((section) => [
+        section.heading,
+        ...section.paragraphs,
+        ...(section.bullets ?? []),
+      ]),
+      ...STEADY_CLIMATE_GUIDE.faq.flatMap((entry) => [entry.question, entry.answer]),
+    ].join("\n");
+    expect(guideText.toLowerCase()).not.toContain("side by side");
   });
 
   it("does not treat CSV import as Pro-only", () => {

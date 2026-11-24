@@ -388,7 +388,7 @@ export const STEADY_CLIMATE_GUIDE: PublicGrowGuideArticle = {
       id: "measure-each-tent",
       heading: "Measure each tent on its own",
       paragraphs: [
-        "Put a sensor in each tent at canopy height, away from direct light and fans. Before you compare tents, put the sensors side by side for a while to see how far apart they read. A gap you never checked can look like a climate difference that isn't there.",
+        "Put a sensor in each tent at canopy height, away from direct light and fans. Before you compare tents, put the sensors next to each other for a while to see how far apart they read. A gap you never checked can look like a climate difference that isn't there.",
         "Label each reading with its tent and its source: live, manual, or CSV import. A reading with no tent label can't tell you which tent to fix.",
       ],
       links: [{ label: "Sensor truth in the grow room", to: "/guides/sensor-truth-grow-room" }],
@@ -436,7 +436,7 @@ export const STEADY_CLIMATE_GUIDE: PublicGrowGuideArticle = {
       id: "compare-vpd-each-tent",
       heading: "Compare VPD for each tent",
       paragraphs: [
-        "Work out air VPD for each tent from its canopy-height temperature and humidity, using the VPD calculator. Record the same hours for each tent, lights-on and lights-off, and judge each tent against the range for the stage of its plants. Label the result air VPD unless you measured leaf temperature. Log each tent's VPD in its own diary entries so the two tents' history sits side by side in the timeline.",
+        "Work out air VPD for each tent from its canopy-height temperature and humidity, using the VPD calculator. Record the same hours for each tent, lights-on and lights-off, and judge each tent against the range for the stage of its plants. Label the result air VPD unless you measured leaf temperature. Log each tent's VPD in its own diary entries, so each tent keeps its own record and you can filter the Timeline by tent.",
       ],
       links: [{ label: "VPD calculator", to: "/tools/vpd-calculator" }],
     },
@@ -467,7 +467,7 @@ export const STEADY_CLIMATE_GUIDE: PublicGrowGuideArticle = {
     {
       question: "How do I know if my sensors agree?",
       answer:
-        "Put them side by side in the same spot for a while and compare the readings. Note any steady gap before comparing tents, so a sensor difference isn't mistaken for a climate difference.",
+        "Put them next to each other in the same spot for a while and compare the readings. Note any steady gap before comparing tents, so a sensor difference isn't mistaken for a climate difference.",
     },
     {
       question: "How do I keep a grow diary for more than one tent?",

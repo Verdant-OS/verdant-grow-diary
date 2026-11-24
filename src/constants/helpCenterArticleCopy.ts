@@ -29,7 +29,7 @@ const FAQ: HelpArticleCopy = {
       runs: [
         {
           kind: "text",
-          text: "No. Quick Log works by hand: you can log a watering, a feeding or a note without a sensor. A watering needs only the amount of water.",
+          text: "No. Quick Log works by hand: you can log a watering, a feeding or a note without a sensor. A watering needs a chosen tent or plant and the amount of water.",
         },
       ],
     },
@@ -88,7 +88,7 @@ const LOG_WATERING: HelpArticleCopy = {
   sectionSlug: "quick-log-timeline",
   title: "How do I log a watering?",
   description:
-    "Log a watering with Quick Log in ml, L or gal. Only the amount is required; pH, EC, runoff and water temperature are optional.",
+    "Log a watering in Quick Log (ml, L or gal). Choose a tent or plant and an amount. pH, EC, runoff and temperature are optional.",
   blocks: [
     { tag: "h1", runs: [{ kind: "text", text: "How do I log a watering?" }] },
     {
@@ -96,7 +96,7 @@ const LOG_WATERING: HelpArticleCopy = {
       runs: [
         {
           kind: "text",
-          text: "Sign in, then use Quick Log. Only the amount of water is required.",
+          text: "Sign in, then use Quick Log. Choose a tent or plant and the amount of water. Other measurements are optional.",
         },
       ],
     },
@@ -122,7 +122,7 @@ const LOG_WATERING: HelpArticleCopy = {
         [
           {
             kind: "text",
-            text: "Pick a unit (ml, L or gal) and type the amount in Volume. In liters or gallons, the form shows what it saves in milliliters.",
+            text: "Check the selected unit (ml, L or gal). Volume starts in liters when this device has no saved choice, then type the amount in Volume. In liters or gallons, the form shows what it saves in milliliters.",
           },
         ],
         [

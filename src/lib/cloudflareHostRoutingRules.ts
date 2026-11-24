@@ -52,7 +52,7 @@ export const ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
 export const SEO_SNAPSHOT_HEADER = "x-verdant-seo-snapshot";
 export const SEO_SNAPSHOT_HEADER_VALUE = "1";
 
-const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
+export const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
   "/strains": "/cultivars",
   "/welcome": "/",
   "/features": "/",

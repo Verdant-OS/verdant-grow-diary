@@ -8,6 +8,7 @@ import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
 import { PHENO_GOALS_REVIEW_REQUIRED_REASON } from "@/lib/phenoHuntOnboardingViewModel";
+import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
 
 const NOW = new Date("2026-08-01T00:00:00Z");
 
@@ -104,7 +105,7 @@ describe("PhenoHuntNew footer blocking reasons", () => {
   beforeEach(() => {
     cleanup();
     createPhenoHuntMock.mockClear();
-    window.localStorage.clear();
+    clearLocalStorageForTest();
   });
 
   it("shows blocking reasons on step 1 and does not present Create as actionable", async () => {

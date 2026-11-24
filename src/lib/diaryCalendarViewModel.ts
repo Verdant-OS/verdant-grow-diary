@@ -31,6 +31,7 @@ import {
   loadTemperatureUnitPreference,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+import { formatStoredWaterVolume, type WaterEntryUnit } from "@/lib/quickLogWaterVolumeUnitRules";
 
 export type DiaryCalendarEventKind =
   "watering" | "feeding" | "training" | "diagnosis" | "environment";
@@ -323,17 +324,34 @@ function normalizeEcUnit(raw: unknown): EcUnit | null {
   return null;
 }
 
-function buildWateringFields(d: Record<string, unknown>): DiaryCalendarEventDisplayField[] {
-  const fields: DiaryCalendarEventDisplayField[] = [];
+/**
+ * Watering "Amount" text in the grower's water unit ("1.5 L" for 1500 ml in L).
+ * Display only. A row that stores litres converts to ml first, so it follows
+ * the same unit. Null when the row has no amount.
+ */
+export function formatDiaryCalendarWateringAmount(
+  d: Record<string, unknown>,
+  waterUnit: WaterEntryUnit,
+): string | null {
   const ml = pickFirstFiniteNumber(d, [
     "watering_amount_ml",
     "wateringAmountMl",
     "volume_ml",
     "amount_ml",
   ]);
+  if (ml != null) return formatStoredWaterVolume(ml, waterUnit);
   const l = pickFirstFiniteNumber(d, ["watering_amount_l", "wateringAmountL", "amount_l"]);
-  if (ml != null) fields.push({ label: "Amount", value: `${ml} ml` });
-  else if (l != null) fields.push({ label: "Amount", value: `${l} L` });
+  if (l != null) return formatStoredWaterVolume(Math.round(l * 1_000_000) / 1000, waterUnit);
+  return null;
+}
+
+function buildWateringFields(
+  d: Record<string, unknown>,
+  waterUnit: WaterEntryUnit,
+): DiaryCalendarEventDisplayField[] {
+  const fields: DiaryCalendarEventDisplayField[] = [];
+  const amount = formatDiaryCalendarWateringAmount(d, waterUnit);
+  if (amount) fields.push({ label: "Amount", value: amount });
 
   const method = pickFirstString(d, ["method", "watering_method", "wateringMethod"]);
   if (method) fields.push({ label: "Method", value: method });
@@ -495,6 +513,7 @@ function buildEventDetails(
   rawEntry: DiaryCalendarRawEntry,
   noteSnippet: string | null,
   tempUnit: TemperatureUnitPreference,
+  waterUnit: WaterEntryUnit,
 ): DiaryCalendarEventDetails {
   const d = pickRecord(rawEntry.details);
   let fields: DiaryCalendarEventDisplayField[] = [];
@@ -507,7 +526,7 @@ function buildEventDetails(
     subtitle = ENVIRONMENT_CHECK_NOT_LIVE_SUBTITLE;
     if (fields.length === 0) fallback = ENVIRONMENT_CHECK_NO_VALUES_COPY;
   } else if (d) {
-    if (kind === "watering") fields = buildWateringFields(d);
+    if (kind === "watering") fields = buildWateringFields(d, waterUnit);
     else if (kind === "feeding") {
       fields = buildFeedingFields(d, tempUnit);
       const ec = pickFirstFiniteNumber(d, ["ec", "ec_value", "ecValue"]);
@@ -562,6 +581,8 @@ export interface DiaryCalendarViewModelOptions {
    * name keep a blank plant label instead of "Deleted plant".
    */
   plantNamesById?: ReadonlyMap<string, string> | null;
+  /** Display unit of the watering amount (useWaterVolumeEntryUnit). Default ml. */
+  waterUnit?: WaterEntryUnit;
 }
 
 /**
@@ -582,6 +603,7 @@ export function buildDiaryCalendarViewModel(
   options: DiaryCalendarViewModelOptions = {},
 ): DiaryCalendarDayGroup[] {
   const plantNamesById = options.plantNamesById ?? null;
+  const waterUnit = options.waterUnit ?? "ml";
   const list = Array.isArray(rawEntries) ? rawEntries : [];
   const events: DiaryCalendarEvent[] = [];
 
@@ -602,7 +624,7 @@ export function buildDiaryCalendarViewModel(
       plantName: resolveCalendarPlantName(raw.plant_id, raw.details, plantNamesById),
       stage: safeCalendarStage(raw.stage),
       noteSnippet,
-      details: buildEventDetails(kind, raw, noteSnippet, tempUnit),
+      details: buildEventDetails(kind, raw, noteSnippet, tempUnit, waterUnit),
     });
   }
 

@@ -7,8 +7,8 @@ why: issue #3072, a follow-up to #3044. After #3044 the Timeline chip and histor
 branch: posthog-self-driving/fixtimeline-show-water-amount-in-the-b483d9 (name fixed by the PostHog run that opened it)
 base: verdant-grow-diary (started at 9c844347c691090eb56ecfa1b6eb63398d03e742)
 checkout: git fetch origin posthog-self-driving/fixtimeline-show-water-amount-in-the-b483d9 verdant-grow-diary && git switch posthog-self-driving/fixtimeline-show-water-amount-in-the-b483d9 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: NOT_MEASURED until the draft PR opens; see the PR for this branch
-head_sha: read it from the PR; this file is in the first commit
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3077
+head_sha: code commit 37cd914c2cd90690e2bcec2778d75fc6ff6848b5 (2026-11-24); the PR head is this entry's update commit on top of it
 state: pushed draft
 current_step: fix and tests in the first commit
 next_action: required CI at the PR head, then an eligible independent exact-head review (not this session)
@@ -22,7 +22,7 @@ files_remaining: none planned
 blockers: none
 open_questions: Plant Detail recent activity, range report and PDF export still show ml (out of #3072 scope).
 gotchas: src/test/setup.ts pins the water unit to ml for every test; a test of the L default must remove the key first. No schema, RLS, auth, edge or storage change; the calendar modules are not in the edge shared-lib mirror.
-links: https://github.com/Verdant-OS/verdant-grow-diary/issues/3072; https://github.com/Verdant-OS/verdant-grow-diary/pull/3044
+links: https://github.com/Verdant-OS/verdant-grow-diary/issues/3072; https://github.com/Verdant-OS/verdant-grow-diary/pull/3077; https://github.com/Verdant-OS/verdant-grow-diary/pull/3044
 artifacts: required CI on the PR for this branch
 reviewer_seat: eligible independent reviewer per the roster, not this session
 reviewer_sha: none yet

@@ -7,8 +7,8 @@ why: Issue #3071. #3059 added the warning only to /sensors/csv-preview. The real
 branch: posthog-self-driving/fixsensors-show-saturated-run-warning-b7e557
 base: verdant-grow-diary
 checkout: git fetch origin posthog-self-driving/fixsensors-show-saturated-run-warning-b7e557 verdant-grow-diary && git switch posthog-self-driving/fixsensors-show-saturated-run-warning-b7e557
-pr: see the draft pull request opened from this branch (it closes #3071)
-head_sha: 98179640757bac2e0e11483184742b7764f6a442 (code commit, 2026-11-24); the commit that adds this file is paperwork only
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3076 (draft; closes #3071)
+head_sha: 505fe0d91d009ddc1a65be1da60214ae51d3f977 (last code commit, 2026-11-24); later commits on this branch change only this file
 state: pushed draft
 current_step: draft PR open; required CI runs on the PR
 next_action: read the PR Checks tab; if 35/35 required checks are green, request one independent exact-head review under docs/agents/OWNERSHIP.md section 4.3
@@ -26,8 +26,8 @@ links: https://github.com/Verdant-OS/verdant-grow-diary/issues/3071 https://gith
 artifacts: PR Checks tab
 reviewer_seat: none requested yet
 reviewer_sha: none
-session_state: PostHog Desktop cloud task; no routines, no paused workflows; no pending human decision beyond the normal merge gate
+session_state: PostHog Desktop cloud task; no routines, no paused workflows; no PR comment posted (GitHub comments need founder approval), so resume-here facts are in this file and the PR body
 claimed_by: Claude (PostHog Desktop), 2026-11-24
 owner: Claude (PostHog Desktop)
-last_updated: 2026-11-24 03:20 CT, by Claude
+last_updated: 2026-11-24 03:35 CT, by Claude
 ```

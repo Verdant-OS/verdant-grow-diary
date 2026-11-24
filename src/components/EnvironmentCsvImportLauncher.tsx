@@ -45,6 +45,7 @@ import { IMPORTED_SENSOR_HISTORY_ANCHOR_ID } from "@/lib/importedSensorHistoryVi
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { useCsvHistoryWindow } from "@/hooks/useCsvHistoryWindow";
+import { GgsCsvPriorRoomLookup } from "@/lib/ggsCsvPriorRoomLookup";
 
 export interface EnvironmentCsvImportLauncherProps {
   growId: string | null | undefined;
@@ -265,6 +266,12 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
     [importSession, qc],
   );
 
+  const lookupDifferentGgsRoomIds = useCallback(
+    (fileRoomIds: readonly string[]) =>
+      GgsCsvPriorRoomLookup.storedRoomIds(importScope?.tent_id ?? "", fileRoomIds),
+    [importScope?.tent_id],
+  );
+
   const handleUndoImport = useCallback(async () => {
     if (!importSession) return { error: "Import session unavailable." };
     const importBatchId = (importSession.scope.import_batch_id ?? "").trim();
@@ -329,6 +336,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
           onRetryHistoryWindow={() => {
             void historyAccess.refetch();
           }}
+          lookupDifferentGgsRoomIds={lookupDifferentGgsRoomIds}
         />
       </>
     );
@@ -366,6 +374,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         onRetryHistoryWindow={() => {
           void historyAccess.refetch();
         }}
+        lookupDifferentGgsRoomIds={lookupDifferentGgsRoomIds}
       />
     </section>
   );

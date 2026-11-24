@@ -69,6 +69,21 @@ interface PhenoHuntSetupDraft {
   currentStep: PhenoOnboardingStepId;
   /** Evidence goals step opened in this draft (#573). Absent → false. */
   goalsReviewed: boolean;
+  /** Step-6 confirm box. Absent → false. Local draft only. */
+  setupConfirmed?: boolean;
+}
+
+/** Footer Create control. Gating stays in the view model; this only presents it. */
+export class PhenoHuntCreateButtonPresentation {
+  static isActionable(canSave: boolean): boolean {
+    return canSave;
+  }
+
+  static className(canSave: boolean): string {
+    const width = "w-full sm:w-auto";
+    if (canSave) return `${width} gradient-leaf text-primary-foreground`;
+    return `${width} border border-dashed border-muted-foreground/60 bg-muted text-muted-foreground shadow-none hover:bg-muted disabled:opacity-100`;
+  }
 }
 
 function huntDraftKey(userId: string, growId: string, tentId: string | null): string {
@@ -105,6 +120,7 @@ function readHuntDraft(key: string): PhenoHuntSetupDraft | null {
         parsed.goalsReviewed === true &&
         !evidenceGoalsMalformed &&
         !storedEvidenceGoalsRequireFreshReview(parsed.evidenceGoals),
+      setupConfirmed: parsed.setupConfirmed === true,
     };
   } catch {
     return null;
@@ -153,6 +169,7 @@ export default function PhenoHuntNew() {
   // #573: Confirmation/Create unlock only after the grower has opened the
   // Evidence goals step, so the pre-selected defaults are never accepted unseen.
   const [goalsReviewed, setGoalsReviewed] = useState(false);
+  const [setupConfirmed, setSetupConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
 
@@ -182,6 +199,7 @@ export default function PhenoHuntNew() {
     setGoalsReviewed(goalsReviewedForResume);
     // A draft saved on a locked confirmation step reopens on Goals instead.
     setCurrentStep(resolvePhenoOnboardingResumeStep(draft.currentStep, goalsReviewedForResume));
+    setSetupConfirmed(draft.setupConfirmed === true);
     setDraftRestored(true);
   }, [draftKey]);
 
@@ -198,12 +216,13 @@ export default function PhenoHuntNew() {
         evidenceGoals,
         currentStep,
         goalsReviewed,
+        setupConfirmed,
       };
       window.localStorage.setItem(draftKey, JSON.stringify(draft));
     } catch {
       // Storage unavailable (private mode, quota) — the form still works.
     }
-  }, [draftKey, name, notes, selected, evidenceGoals, currentStep, goalsReviewed]);
+  }, [draftKey, name, notes, selected, evidenceGoals, currentStep, goalsReviewed, setupConfirmed]);
 
   useEffect(() => {
     if (currentStep === "goals") setGoalsReviewed(true);
@@ -292,7 +311,6 @@ export default function PhenoHuntNew() {
     };
   }, [growId, tentId, reloadTick]);
 
-  const [setupConfirmed, setSetupConfirmed] = useState(false);
   const candidateIds = useMemo(() => Array.from(selected), [selected]);
 
   const vm = useMemo(
@@ -629,16 +647,6 @@ export default function PhenoHuntNew() {
         >
           <h2 className="text-sm font-semibold">Comparison-ready checklist</h2>
           <PhenoComparisonReadyChecklist vm={vm} />
-          {vm.blockingReasons.length > 0 ? (
-            <ul
-              className="mt-3 space-y-1 text-xs text-muted-foreground"
-              data-testid="pheno-blocking-reasons"
-            >
-              {vm.blockingReasons.map((r) => (
-                <li key={r}>• {r}</li>
-              ))}
-            </ul>
-          ) : null}
         </section>
       )}
 
@@ -670,66 +678,73 @@ export default function PhenoHuntNew() {
             />
             <span>I've reviewed setup and I'm ready to start the hunt.</span>
           </label>
-          {vm.blockingReasons.length > 0 ? (
-            <ul
-              className="mt-3 space-y-1 text-xs text-muted-foreground"
-              data-testid="pheno-confirmation-blocking"
-            >
-              {vm.blockingReasons.map((r) => (
-                <li key={r}>• {r}</li>
-              ))}
-            </ul>
-          ) : null}
         </section>
       )}
 
-      <div className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card/65 p-3 shadow-card backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 gap-2 sm:flex-none">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-1 sm:flex-none"
-            onClick={() => goStep(-1)}
-            disabled={stepIndex === 0}
-            data-testid="pheno-step-prev"
+      <div className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card/65 p-3 shadow-card backdrop-blur-xl">
+        {vm.blockingReasons.length > 0 ? (
+          <ul
+            id="pheno-footer-blocking-reasons"
+            className="space-y-1 text-xs text-foreground"
+            data-testid="pheno-footer-blocking-reasons"
           >
-            <ArrowLeft className="h-4 w-4 mr-1" /> Back
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-1 sm:flex-none"
-            onClick={() => goStep(1)}
-            disabled={!nextStep || isStepLocked(nextStep)}
-            data-testid="pheno-step-next"
-          >
-            Next <ArrowRight className="h-4 w-4 ml-1" />
-          </Button>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button variant="ghost" asChild className="w-full sm:w-auto">
-            <Link to="/pheno-hunts" data-testid="ph-back-to-hunts">
-              Back to Pheno Hunts
-            </Link>
-          </Button>
-          <Button variant="ghost" asChild className="w-full sm:w-auto">
-            <Link to={`/grows/${growId}`}>Cancel</Link>
-          </Button>
-          <Button
-            onClick={onSave}
-            disabled={!canSave}
-            className="w-full gradient-leaf text-primary-foreground sm:w-auto"
-            data-testid="ph-save-btn"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                Saving…
-              </>
-            ) : (
-              "Create Pheno Hunt"
-            )}
-          </Button>
+            {vm.blockingReasons.map((reason) => (
+              <li key={reason}>• {reason}</li>
+            ))}
+          </ul>
+        ) : null}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-1 gap-2 sm:flex-none">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 sm:flex-none"
+              onClick={() => goStep(-1)}
+              disabled={stepIndex === 0}
+              data-testid="pheno-step-prev"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 sm:flex-none"
+              onClick={() => goStep(1)}
+              disabled={!nextStep || isStepLocked(nextStep)}
+              data-testid="pheno-step-next"
+            >
+              Next <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button variant="ghost" asChild className="w-full sm:w-auto">
+              <Link to="/pheno-hunts" data-testid="ph-back-to-hunts">
+                Back to Pheno Hunts
+              </Link>
+            </Button>
+            <Button variant="ghost" asChild className="w-full sm:w-auto">
+              <Link to={`/grows/${growId}`}>Cancel</Link>
+            </Button>
+            <Button
+              onClick={onSave}
+              disabled={!PhenoHuntCreateButtonPresentation.isActionable(canSave)}
+              aria-disabled={!PhenoHuntCreateButtonPresentation.isActionable(canSave)}
+              aria-describedby={
+                vm.blockingReasons.length > 0 ? "pheno-footer-blocking-reasons" : undefined
+              }
+              className={PhenoHuntCreateButtonPresentation.className(canSave)}
+              data-testid="ph-save-btn"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Create Pheno Hunt"
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

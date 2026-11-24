@@ -66,6 +66,7 @@ const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
   // Exact help aliases only. /docs/mcp-api stays a document, and /docs/* is not a prefix.
   "/docs": "/help",
   "/support": "/help",
+  "/faq": "/help/faq",
   "/help/developers/mcp-tools": "/docs/mcp-api",
 };
 

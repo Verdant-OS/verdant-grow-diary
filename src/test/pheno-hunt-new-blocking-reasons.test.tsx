@@ -8,7 +8,11 @@ import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { resolveEntitlements } from "@/lib/entitlements/resolveEntitlements";
 import type { BillingSubscriptionRow } from "@/lib/entitlements/types";
 import { PHENO_GOALS_REVIEW_REQUIRED_REASON } from "@/lib/phenoHuntOnboardingViewModel";
-import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 const NOW = new Date("2026-08-01T00:00:00Z");
 
@@ -101,6 +105,13 @@ function renderPage() {
   );
 }
 
+const DRAFT_KEY = "verdant:pheno-hunt-draft:u1:grow-1:all";
+
+function readStoredDraft(): { setupConfirmed?: boolean } | null {
+  const raw = getLocalStorageItemForTest(DRAFT_KEY);
+  return raw ? (JSON.parse(raw) as { setupConfirmed?: boolean }) : null;
+}
+
 describe("PhenoHuntNew footer blocking reasons", () => {
   beforeEach(() => {
     cleanup();
@@ -143,5 +154,105 @@ describe("PhenoHuntNew footer blocking reasons", () => {
     expect(save.className).toContain("gradient-leaf");
     fireEvent.click(save);
     await waitFor(() => expect(createPhenoHuntMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getLocalStorageItemForTest(DRAFT_KEY)).toBeNull());
+  });
+
+  it("persists setupConfirmed, restores it, and leaves an old draft unchecked", async () => {
+    renderPage();
+    await waitFor(() => screen.getByTestId("pheno-onboarding-stepper"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
+    fireEvent.click(screen.getByTestId("ph-toggle-p1"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
+    fireEvent.click(screen.getByTestId("pheno-setup-confirm-toggle"));
+    await waitFor(() => expect(readStoredDraft()?.setupConfirmed).toBe(true));
+    cleanup();
+
+    renderPage();
+    await waitFor(() => screen.getByTestId("pheno-step-confirmation"));
+    expect(screen.getByTestId("pheno-setup-confirm-toggle").getAttribute("data-state")).toBe(
+      "checked",
+    );
+    cleanup();
+    clearLocalStorageForTest();
+
+    setLocalStorageItemForTest(
+      DRAFT_KEY,
+      JSON.stringify({
+        name: "Old hunt",
+        notes: "",
+        selected: ["p1"],
+        currentStep: "confirmation",
+        goalsReviewed: true,
+      }),
+    );
+    renderPage();
+    await waitFor(() => screen.getByTestId("pheno-step-confirmation"));
+    expect(screen.getByTestId("pheno-setup-confirm-toggle").getAttribute("data-state")).toBe(
+      "unchecked",
+    );
+  });
+
+  it("resets setupConfirmed when the draft is discarded and when create clears it", async () => {
+    setLocalStorageItemForTest(
+      DRAFT_KEY,
+      JSON.stringify({
+        name: "Confirmed hunt",
+        notes: "",
+        selected: ["p1", "p2"],
+        currentStep: "confirmation",
+        goalsReviewed: true,
+        setupConfirmed: true,
+      }),
+    );
+    renderPage();
+    await waitFor(() => screen.getByTestId("ph-draft-discard"));
+    expect(screen.getByTestId("pheno-setup-confirm-toggle").getAttribute("data-state")).toBe(
+      "checked",
+    );
+    fireEvent.click(screen.getByTestId("ph-draft-discard"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
+    expect(screen.getByTestId("pheno-setup-confirm-toggle").getAttribute("data-state")).toBe(
+      "unchecked",
+    );
+    await waitFor(() => expect(readStoredDraft()?.setupConfirmed).not.toBe(true));
+
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
+    fireEvent.click(screen.getByTestId("ph-toggle-p1"));
+    fireEvent.click(screen.getByTestId("ph-toggle-p2"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
+    fireEvent.click(screen.getByTestId("pheno-setup-confirm-toggle"));
+    const save = screen.getByTestId("ph-save-btn") as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
+    await waitFor(() => expect(createPhenoHuntMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getLocalStorageItemForTest(DRAFT_KEY)).toBeNull());
+  });
+
+  it("shows footer blockers on intermediate steps and drops each one as it clears", async () => {
+    renderPage();
+    await waitFor(() => screen.getByTestId("pheno-step-basics"));
+    expect(screen.getByTestId("pheno-footer-blocking-reasons").textContent).toContain(
+      "Select at least one candidate plant",
+    );
+
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
+    fireEvent.click(screen.getByTestId("ph-toggle-p1"));
+    const afterCandidate = screen.getByTestId("pheno-footer-blocking-reasons").textContent ?? "";
+    expect(afterCandidate).not.toContain("Select at least one candidate plant");
+    expect(afterCandidate).toContain(PHENO_GOALS_REVIEW_REQUIRED_REASON);
+    expect(afterCandidate).toContain("Confirm setup to enter the workspace");
+
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-goals"));
+    const afterGoals = screen.getByTestId("pheno-footer-blocking-reasons").textContent ?? "";
+    expect(afterGoals).not.toContain(PHENO_GOALS_REVIEW_REQUIRED_REASON);
+    expect(afterGoals).toContain("Confirm setup to enter the workspace");
+
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-checklist"));
+    expect(screen.getByTestId("pheno-footer-blocking-reasons").textContent).toContain(
+      "Confirm setup to enter the workspace",
+    );
   });
 });

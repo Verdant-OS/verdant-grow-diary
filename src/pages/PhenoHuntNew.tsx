@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { ArrowLeft, ArrowRight, Loader2, Sprout } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -171,6 +171,7 @@ export default function PhenoHuntNew() {
   const [goalsReviewed, setGoalsReviewed] = useState(false);
   const [setupConfirmed, setSetupConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
+  const skipDraftPersist = useRef(false);
   const [draftRestored, setDraftRestored] = useState(false);
 
   const draftKey = user?.id && growId ? huntDraftKey(user.id, growId, tentId ?? null) : null;
@@ -205,7 +206,7 @@ export default function PhenoHuntNew() {
 
   // Persist the draft as the grower types (a reload must not lose setup).
   useEffect(() => {
-    if (!draftKey) return;
+    if (!draftKey || skipDraftPersist.current) return;
     const hasContent = name.trim() !== "" || notes.trim() !== "" || selected.size > 0;
     try {
       if (!hasContent) return;
@@ -241,6 +242,7 @@ export default function PhenoHuntNew() {
     setEvidenceGoals(defaultEvidenceGoalSelection());
     // Starting over means the default goals must be reviewed again (#573).
     setGoalsReviewed(false);
+    setSetupConfirmed(false);
     setCurrentStep("basics");
   };
 
@@ -401,6 +403,8 @@ export default function PhenoHuntNew() {
       } catch {
         // best-effort
       }
+      skipDraftPersist.current = true;
+      setSetupConfirmed(false);
       toast.success("Pheno hunt created");
       // Enter the workspace — grower can continue setup from there.
       navigate(`/pheno-hunts/${res.huntId}/workspace`);

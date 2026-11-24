@@ -41,4 +41,18 @@ describe("steady climate multi-tent sections", () => {
     expect(text).not.toMatch(/\bprice\b/);
     expect(text).not.toMatch(/built-in/);
   });
+
+  it("does not treat CSV import as Pro-only", () => {
+    const section = STEADY_CLIMATE_GUIDE.sections.find((entry) => entry.id === "bring-in-readings");
+    const paragraphs = section?.paragraphs ?? [];
+    const text = paragraphs.join(" ");
+    expect(text).toMatch(
+      /CSV exports from AC Infinity or Spider Farmer on any plan, including Free/,
+    );
+    for (const sentence of text.split(/(?<=\.)\s+/)) {
+      if (/CSV/i.test(sentence)) {
+        expect(sentence).not.toMatch(/\bPro\b/);
+      }
+    }
+  });
 });

@@ -444,7 +444,7 @@ export const STEADY_CLIMATE_GUIDE: PublicGrowGuideArticle = {
       id: "bring-in-readings",
       heading: "Bring in readings",
       paragraphs: [
-        "On Pro, import CSV exports from AC Infinity or Spider Farmer, and read EcoWitt sensors (read-only). Each reading keeps its tent and source (CSV import or live EcoWitt, read-only), so tent comparisons use the same labels as the rest of your diary. Verdant doesn't control your equipment.",
+        "Import CSV exports from AC Infinity or Spider Farmer on any plan, including Free. Pro adds read-only EcoWitt sensor readings and history across more than one tent. Each reading keeps its tent and source (CSV import or live EcoWitt, read-only), so tent comparisons use the same labels as the rest of your diary. Verdant doesn't control your equipment.",
       ],
     },
   ],

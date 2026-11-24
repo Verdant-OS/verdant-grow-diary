@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
-import { Outlet, useLocation, useNavigate } from "@/lib/react-router-compat";
+import { Link, Outlet, useLocation, useNavigate } from "@/lib/react-router-compat";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -415,7 +415,16 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                 <SidebarTrigger />
               </div>
               <div className="md:hidden">
-                <BrandLogo size="md" showText />
+                {/* On phones the Tent tab opens the grower's tent, so the logo
+                    is the one-tap way home to the Dashboard. */}
+                <Link
+                  to="/"
+                  aria-label="Dashboard"
+                  data-testid="app-shell-home-link"
+                  className="inline-flex rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <BrandLogo size="md" showText />
+                </Link>
               </div>
 
               <div className="ml-auto flex items-center gap-1 md:gap-2">

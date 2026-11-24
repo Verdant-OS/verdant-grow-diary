@@ -411,6 +411,19 @@ export const STEADY_CLIMATE_GUIDE: PublicGrowGuideArticle = {
       ],
       links: [{ label: "Identify and isolate a male cannabis plant", to: `/guides/${MALE_SLUG}` }],
     },
+    {
+      id: "compare-vpd-each-tent",
+      heading: "Compare VPD for each tent",
+      paragraphs: [
+        "Work out air VPD for each tent from its own canopy-height temperature and humidity, using the VPD calculator. Use the same hours for every tent, and check lights-on and lights-off separately, because a tent can sit in range at midday and drift after lights-off. Judge each tent against the common range for the stage of the plants in it, and let your own readings and plants decide. A veg tent and a flower tent should not match. The VPD chart by growth stage lists common ranges with sources.",
+        "Label each result air VPD unless you measured leaf temperature. Check that your sensors agree first, so a sensor gap isn't read as a climate gap.",
+        "In Verdant, readings you add by hand or import from a CSV are charted per tent, with a score for how steady VPD has been over the period. You can pin a reading to a Quick Log entry, and it shows with its source label (manual, CSV or live). Open each tent's chart in turn and compare the same date range.",
+      ],
+      links: [
+        { label: "VPD calculator", to: "/tools/vpd-calculator" },
+        { label: "VPD chart by growth stage", to: "/vpd-chart" },
+      ],
+    },
   ],
   faq: [
     {
@@ -432,6 +445,11 @@ export const STEADY_CLIMATE_GUIDE: PublicGrowGuideArticle = {
       question: "How do I know if my sensors agree?",
       answer:
         "Put them side by side in the same spot for a while and compare the readings. Note any steady gap before comparing tents, so a sensor difference isn't mistaken for a climate difference.",
+    },
+    {
+      question: "How can I compare VPD between two grow tents?",
+      answer:
+        "Calculate air VPD for each tent from its own canopy-height temperature and humidity, then compare the same hours for both, lights-on and lights-off. Judge each tent against the common range for its plants' stage, not against the other tent. Check that your sensors agree first.",
     },
   ],
   sources: [],

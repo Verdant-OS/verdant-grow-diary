@@ -6,16 +6,24 @@ Key every step on the tent id `78f51773-c576-4891-a9aa-240ed532337a`. Some notes
 
 This replaces the Nov 6 Flower-only target `eec6f7b3-b745-44ad-bab2-ed4ad79f88f5`. Do not write that Flower row as part of this forward.
 
-Channels unconfirmed until read from the gateway. Do not copy channel numbers from the Nov 6 or Nov 2 receipts.
+Do not copy channel numbers from the Nov 6 or Nov 2 receipts.
 
-## 1. Confirm channels
+## 1. Channels from the 2026-11-24 ecowitt.net screen
 
-In the WS View / EcoWitt app, open this gateway's sensor list and read the channel number next to each display name:
+The earlier confirmation path was the WS View / EcoWitt app sensor list. The reading below is from the ecowitt.net dashboard for the same gateway.
 
-- Vegetation Alpha (air, temp/RH) → integer 1–8
-- Soil Alpha (soil moisture) → integer 1–8
+On the owner's ecowitt.net dashboard for gateway "Verdant", the tile names and the page's own anchor ids were:
 
-Record those two numbers with the date and the screen they came from. Stop if either name is missing.
+- Vegetation Alpha air: CH5, anchor `ch_temp_humidity5`.
+- Soil Alpha: CH1, anchor `ch_soil_ec1` (moisture %, EC in µS/cm, and soil temperature).
+
+`routeEcoWittPayloadToTents` in `supabase/functions/_shared/ecowittChannelTentRouter.ts` is what both `ecowitt-ingest` and `ecowitt-custom-upload` use. It stores soil only from keys `soilmoisture1`–`soilmoisture8`. It does not read `soil_ec_humN`, `soil_ecN`, or `soil_ec_tempN`.
+
+Those `soil_ec_*` names are the customized-upload keys reported for a WH52 (Home Assistant core issue 162782, captured gateway body `soil_ec_hum1`, `soil_ec_temp1`, `soil_ec1`, plus AD and battery fields). They are a different namespace from WH51 `soilmoistureN`. `soil_ec_hum1` is not `soilmoisture1`. A `soil_channels` value of 1 would attach a WH51 `soilmoisture1` reading if one were present, and it would still ignore Soil Alpha.
+
+Soil Alpha moisture is dropped today: the router skips unrecognized keys, so nothing is inserted for `soil_ec_hum1`. Do not pass `--soil 1` for this tent until a follow-up maps `soil_ec_humN` to `soil_moisture_pct`. The smallest follow-up is that mapping in `routeEcoWittPayloadToTents` only, with a test that `soil_ec_hum1` and `soilmoisture1` stay distinct.
+
+Air CH5 is the family this parser already accepts (`temp5f`, `humidity5`). The script still requires both flags and has no defaults. After the soil follow-up, the air value to type is `--air 5`. Until then, do not write `soil_channels`.
 
 ## 2. `hardware_config.ecowitt` (Matthew applies SQL)
 

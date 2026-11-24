@@ -8,10 +8,10 @@ why: Ahrefs site audit (2026-11-23) flagged 16 indexable pages with descriptions
 branch: claude/seo-meta-descriptions-160
 base: verdant-grow-diary @ 9c7339428d125d035a220cf3c0ca16bcb37099f1
 checkout: git fetch origin claude/seo-meta-descriptions-160 verdant-grow-diary && git switch claude/seo-meta-descriptions-160
-pr: see the draft PR for this branch
-head_sha: see the PR
-state: Draft PR. 10 guide descriptions and 7 static page descriptions shortened (17 pages: Ahrefs' 16 plus /breeder-beta at 199, which the new test would otherwise fail on). Client usePageSeo copies updated to match the static text. New test src/test/indexable-meta-description-length.test.ts.
-current_step: Waiting on CI and an independent exact-head review.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3064
+head_sha: see PR #3064 (live head; not pinned here)
+state: Open PR under review. 10 guide descriptions and 7 static page descriptions shortened (17 pages: Ahrefs' 16 plus /breeder-beta at 199, which the new test would otherwise fail on). Client usePageSeo copy matches the static text for every changed page except /tools/vpd-calculator, whose pre-existing client (156) vs static (151) split is documented below. New test src/test/indexable-meta-description-length.test.ts.
+current_step: In independent exact-head review. Any new head needs a new exact-head review.
 next_action: Reviewer seat reviews the exact head for meaning and honesty of the new copy. Merge only through the Merge Steward with Matthew's per-item yes.
 post_merge_check: View source on /guides/how-to-start-a-grow-journal and /breeder-beta after deploy; the meta description matches the new text and is 160 characters or fewer. NOT_MEASURED until done.
 active_writer: Claude (Taproot thread)

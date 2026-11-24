@@ -268,7 +268,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
 
   const lookupDifferentGgsRoomIds = useCallback(
     (fileRoomIds: readonly string[]) =>
-      GgsCsvPriorRoomLookup.differentStoredRoomIds(importScope?.tent_id ?? "", fileRoomIds),
+      GgsCsvPriorRoomLookup.storedRoomIds(importScope?.tent_id ?? "", fileRoomIds),
     [importScope?.tent_id],
   );
 

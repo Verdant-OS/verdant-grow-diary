@@ -37,6 +37,13 @@ describe("GgsCsvRoomMismatchRules", () => {
     expect(warning).toContain("room 1");
   });
 
+  it("warns when the file keeps the tent's room and adds another", () => {
+    const warning = GgsCsvRoomMismatchRules.warning(["1", "2"], ["1"]);
+    expect(warning).toContain("room 1 and room 2");
+    expect(warning).toContain("from room 1");
+    expect(GgsCsvRoomMismatchRules.fileRoomsMissingFromStored(["1", "2"], ["1"])).toEqual(["2"]);
+  });
+
   it("stays silent when the stored room matches the file", () => {
     const file = GgsCsvRoomMismatchRules.fileRoomIds(parseEnvironmentCSVText(ROOM_1).validRows);
     const different = GgsCsvRoomMismatchRules.differentStoredRoomIds(file, [
@@ -79,11 +86,12 @@ describe("GgsCsvRoomMismatchRules", () => {
 });
 
 describe("GgsCsvPriorRoomLookup", () => {
-  it("returns only stored rooms that differ, and nothing when the probe errors", async () => {
+  it("returns stored rooms from the tagged sample and the outside-file sample", async () => {
     const calls: string[] = [];
     const client = {
       from(table: "sensor_readings") {
         expect(table).toBe("sensor_readings");
+        let filter = "";
         return {
           select() {
             return this;
@@ -92,21 +100,25 @@ describe("GgsCsvPriorRoomLookup", () => {
             return this;
           },
           or(filters: string) {
+            filter = filters;
             calls.push(filters);
             return this;
           },
           limit() {
-            return Promise.resolve({
-              data: [{ raw_payload: storedPayload("1") }, { raw_payload: storedPayload("2") }],
-              error: null,
-            });
+            const data = filter.includes("not.is.null")
+              ? [{ raw_payload: storedPayload("1") }]
+              : [{ raw_payload: storedPayload("9") }];
+            return Promise.resolve({ data, error: null });
           },
         };
       },
     };
-    const ids = await GgsCsvPriorRoomLookup.differentStoredRoomIds("tent-1", ["2"], client);
-    expect(calls).toEqual(["raw_payload->raw_row->>roomId.neq.2,raw_payload->>room_id.neq.2"]);
-    expect(ids).toEqual(["1"]);
+    const ids = await GgsCsvPriorRoomLookup.storedRoomIds("tent-1", ["2"], client);
+    expect(calls).toEqual([
+      "raw_payload->raw_row->>roomId.not.is.null,raw_payload->>room_id.not.is.null",
+      "raw_payload->raw_row->>roomId.neq.2,raw_payload->>room_id.neq.2",
+    ]);
+    expect(ids).toEqual(["1", "9"]);
 
     const failed = {
       from() {
@@ -126,7 +138,7 @@ describe("GgsCsvPriorRoomLookup", () => {
         };
       },
     };
-    expect(await GgsCsvPriorRoomLookup.differentStoredRoomIds("tent-1", ["2"], failed)).toEqual(
+    expect(await GgsCsvPriorRoomLookup.storedRoomIds("tent-1", ["2"], failed)).toEqual(
       [],
     );
   });
@@ -165,7 +177,7 @@ describe("import review room warning", () => {
   });
 
   it("shows no warning for the same room, no prior room, or a file without roomId", async () => {
-    const same = vi.fn().mockResolvedValue([]);
+    const same = vi.fn().mockResolvedValue(["1"]);
     await openFile(ROOM_1, "spider_farmer_ggs_room_1_synthetic.csv", same);
     await waitFor(() => expect(same).toHaveBeenCalled());
     expect(screen.queryByTestId("csv-import-room-mismatch")).toBeNull();

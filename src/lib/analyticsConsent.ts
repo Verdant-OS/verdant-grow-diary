@@ -123,14 +123,3 @@ export function subscribeToAnalyticsConsent(listener: () => void): () => void {
     window.removeEventListener("storage", onStorage);
   };
 }
-
-/**
- * True when reloading this document would not turn analytics back on: either no
- * stale grant is left in storage, or the session-scoped denial written after a
- * failed revoke is readable (a fresh document then reads "denied").
- */
-export function revocationSurvivesReload(): boolean {
-  if (typeof window === "undefined") return false;
-  if (!persistedGrantWouldSurviveReload()) return true;
-  return readSessionDenial();
-}

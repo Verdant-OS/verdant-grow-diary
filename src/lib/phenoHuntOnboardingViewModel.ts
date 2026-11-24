@@ -128,6 +128,9 @@ export interface PhenoOnboardingViewModel {
 export const PHENO_GOALS_REVIEW_REQUIRED_REASON =
   "Review the evidence goals step before confirming setup";
 
+/** Heading above the blocking reasons next to the disabled Create button (#3083). */
+export const PHENO_CREATE_BLOCKED_HEADING = "To create this hunt:";
+
 const STEP_LABEL: Record<PhenoOnboardingStepId, string> = {
   basics: "Hunt basics",
   candidates: "Candidate plants",

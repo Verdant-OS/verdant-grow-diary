@@ -21,6 +21,7 @@ import { buildGrowScopedPlantsOrFilter } from "@/lib/growAttributionRules";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { canWriteFeatureData } from "@/lib/featureEntitlements";
 import {
+  PHENO_CREATE_BLOCKED_HEADING,
   PHENO_ONBOARDING_STEP_ORDER,
   computePhenoHuntOnboardingViewModel,
   defaultEvidenceGoalSelection,
@@ -341,6 +342,10 @@ export default function PhenoHuntNew() {
     if (next) selectStep(next);
   };
   const nextStep = PHENO_ONBOARDING_STEP_ORDER[stepIndex + 1];
+  // #3083: Create sits in the footer on every step, so its blocking reasons must
+  // show there too. Checklist and confirmation already list them in-section.
+  const showFooterBlockingReasons =
+    !vm.canCreate && currentStep !== "checklist" && currentStep !== "confirmation";
 
   const selectedCandidates = useMemo(
     () => plants.filter((p) => selected.has(p.id)),
@@ -683,7 +688,7 @@ export default function PhenoHuntNew() {
         </section>
       )}
 
-      <div className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card/65 p-3 shadow-card backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card/65 p-3 shadow-card backdrop-blur-xl sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-1 gap-2 sm:flex-none">
           <Button
             variant="ghost"
@@ -718,7 +723,13 @@ export default function PhenoHuntNew() {
           <Button
             onClick={onSave}
             disabled={!canSave}
-            className="w-full gradient-leaf text-primary-foreground sm:w-auto"
+            variant={vm.canCreate ? "default" : "outline"}
+            className={
+              vm.canCreate
+                ? "w-full gradient-leaf text-primary-foreground sm:w-auto"
+                : "w-full sm:w-auto"
+            }
+            aria-describedby={showFooterBlockingReasons ? "ph-save-blocking-reasons" : undefined}
             data-testid="ph-save-btn"
           >
             {saving ? (
@@ -731,6 +742,20 @@ export default function PhenoHuntNew() {
             )}
           </Button>
         </div>
+        {showFooterBlockingReasons ? (
+          <div
+            id="ph-save-blocking-reasons"
+            className="text-xs text-muted-foreground sm:basis-full"
+            data-testid="ph-save-blocking-reasons"
+          >
+            <p className="font-medium">{PHENO_CREATE_BLOCKED_HEADING}</p>
+            <ul className="mt-1 space-y-1">
+              {vm.blockingReasons.map((r) => (
+                <li key={r}>• {r}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </div>
   );

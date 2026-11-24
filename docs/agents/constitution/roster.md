@@ -41,7 +41,7 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 - PR #1971: the records below and in `docs/agents/OWNERSHIP.md` name OG Kush as its merge actor. That founder assignment is not moved to another seat by inference. Matthew names the new #1971 merge actor; the hold stays with the Coordinator.
 - `verdant-ultra-bot` is retired (Matthew, 2026-11-17). Ultra seats open and push pull requests as `cheekhimself` (shared). GitHub does not let an account approve its own pull request, so a `cheekhimself` (shared) seat cannot post the GitHub approval on them.
 - Ultra's open pull-request cap is 10.
-- Reviewer C, Reviewer D, Reviewer E, Reviewer F, and QA are active. Matthew set Reviewer E and Reviewer F on 2026-11-17: they are non-author Main Reviewer seats, never write product code, and never merge.
+- Reviewer C, Reviewer D, Reviewer E, Reviewer F, and QA are active. Matthew set Reviewer E and Reviewer F on 2026-11-17: they are non-author Main Reviewer seats, never write product code, and never merge. Matthew holds Reviewer E and Reviewer F directly (2026-11-24); an approval from either account is Matthew's own approval at that SHA, not the independent session PASS, which still comes from a non-contributing reviewer session.
 
 **Projects Manager has no Verdant delivery seat** (Matthew, 2026-11-05): it does not build, relay yeses, keep handoff files or route work; Ultra Relay (Roots) keeps handoff continuity.
 

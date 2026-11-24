@@ -13,14 +13,14 @@ not_in_scope: editing #3065's hubs or home copy; billing, credits, AI Doctor, sc
 tests: new src/test/help-center-articles.test.tsx; src/test/help-center-exactness.test.ts; src/test/help-center-routing.test.ts renegotiated: #3065 pinned /faq as not redirected because no FAQ existed; it now 308s to /help/faq.
 gate: GATED. (a) the scorer-locked src/test/help-center-routing.test.ts renegotiation (/faq continue changed to an exact 308 to /help/faq), (b) the route manifest /help/:section description change, (c) the new /faq to /help/faq 308 redirect. Merge gate: Clean Seat A and Seat C verdicts at the exact head, plus Cheek's own-words yes in UK Cheese's chat at that SHA; #3065 merges first.
 head_sha: the live head of PR #3068 (do not treat a SHA written in this file as the review head).
-commands: bunx vitest run src/test/help-center-articles.test.tsx src/test/help-center-routing.test.ts src/test/help-center-page.test.tsx src/test/help-section-unknown-slug.test.ts src/test/route-indexation-matrix.test.ts --reporter=dot ; bun run typecheck ; bun run lint
-files_touched: src/constants/helpCenterArticleCopy.ts; src/lib/helpCenterContent.ts; src/pages/HelpCenterPage.tsx; src/routes/help.$section.tsx; src/lib/build/staticPublicSeoDocuments.ts; src/lib/cloudflareHostRoutingRules.ts; src/lib/appRouteManifest.ts (description only); public/sitemap.xml; docs/seo/route-indexation-matrix.md; src/test/help-center-articles.test.tsx; src/test/help-center-routing.test.ts; this file
-gotchas: `bun install --frozen-lockfile` 403s on the lovable-core-prod mirror in this cloud box (depd@2.0.0), so local vitest, typecheck, lint and build are BLOCKED; CI is the evidence. Pure-logic checks ran under bun directly (paths, redirects, held-claim guard, unit/limit pins). Do not regenerate bun.lock.
-blockers: local test/typecheck/lint/build BLOCKED as above; merge waits on #3065.
+commands: bun install --frozen-lockfile --ignore-scripts ; bunx vitest run src/test/help-center-exactness.test.ts src/test/help-center-articles.test.tsx src/test/help-center-routing.test.ts src/test/help-center-page.test.tsx src/test/help-section-unknown-slug.test.ts src/test/route-indexation-matrix.test.ts --reporter=dot ; bunx eslint src/test/help-center-exactness.test.ts src/constants/helpCenterArticleCopy.ts src/lib/cloudflareHostRoutingRules.ts
+files_touched: src/constants/helpCenterArticleCopy.ts; src/lib/helpCenterContent.ts; src/pages/HelpCenterPage.tsx; src/routes/help.$section.tsx; src/lib/build/staticPublicSeoDocuments.ts; src/lib/cloudflareHostRoutingRules.ts; src/lib/appRouteManifest.ts (description only); public/sitemap.xml; docs/seo/route-indexation-matrix.md; src/test/help-center-articles.test.tsx; src/test/help-center-exactness.test.ts; src/test/help-center-routing.test.ts; this file
+gotchas: `bun install --frozen-lockfile --ignore-scripts` succeeded in the 2026-11-24 repair session (exit 0). Vitest on the help-center files and eslint on the touched TypeScript files ran in that session. `bun run typecheck` and `bun run build` were not run in that session. Do not regenerate bun.lock.
+blockers: merge waits on #3065 and on the gated review. Local vitest and eslint are not blocked. Typecheck and build were not run locally in the repair session.
 reviewer_seat: any eligible session that did not author or repair this change (and did not write #3065's head for the stacked part)
 reviewer_sha: none yet; verdicts bind to the live head of PR #3068, not a SHA copied into this file
 session_state: no routines, no paused workflows. Pending human decisions: Cheek's merge yes after review; order relative to #3065.
 claimed_by: Claude thread session (help center slice 1), 2026-11-24 04:45 UTC
 owner: Claude thread session (help center slice 1)
-last_updated: 2026-11-24 04:45 UTC, by Claude thread session (help center slice 1)
+last_updated: 2026-11-24 06:05 UTC, by Grok repair session on PR #3068
 ```

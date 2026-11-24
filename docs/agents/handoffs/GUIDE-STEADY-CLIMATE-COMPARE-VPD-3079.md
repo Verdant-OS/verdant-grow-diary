@@ -7,7 +7,7 @@ why: the guide says to measure each tent on its own but gives no method to compa
 fix: STEADY_CLIMATE_GUIDE in src/lib/publicGrowGuideArticles.ts gets a fifth section (id compare-vpd-each-tent) at the end of sections[] and a fifth FAQ entry. The shared presenter renders "Keep the record in Verdant" after all sections, so the new H2 sits directly before it. FAQPage JSON-LD and the crawlable fallback read the same object. Presenter unchanged.
 branch: posthog-self-driving/docsguides-add-per-tent-vpd-comparison-fd9047
 base: verdant-grow-diary at 9c844347c691090eb56ecfa1b6eb63398d03e742
-pr: draft PR from the branch above; its body carries the head SHA.
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3086 (draft). Its body carries the gate checklist.
 state: committed and pushed; draft PR open
 next_action: (1) 35/35 required checks at the PR head; (2) one independent exact-head review by a session that did not write this; (3) Cheek's own [YES] as cheekhimself at the exact head SHA; (4) Merge Steward queues. Cheek decides what happens to PR #3074, which overlaps this section.
 post_merge_check: once live /version.json reports the merge SHA, open /guides/steady-climate-multiple-grow-tents signed out; expect the H2 "Compare VPD for each tent" directly before "Keep the record in Verdant", links to /tools/vpd-calculator and /vpd-chart, and the new FAQ in the FAQ list and the FAQPage JSON-LD.

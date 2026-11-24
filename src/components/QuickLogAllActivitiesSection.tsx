@@ -442,8 +442,8 @@ export default function QuickLogAllActivitiesSection({
   const [structuredWaterError, setStructuredWaterError] = useState<string | null>(null);
   const [structuredFeedError, setStructuredFeedError] = useState<string | null>(null);
   const { save, saving } = useQuickLogActivitySave();
-  // The plant page and Timeline read React Query caches that do not listen for
-  // verdant:entry-created. Without a provider there is no cache to refresh.
+  // The plant-page React Query reads have no listener for verdant:entry-created
+  // (Timeline already refreshes itself). Without a provider there is no cache to refresh.
   const queryClient = useContext(QueryClientContext);
   const refreshConfirmedSave = useCallback(
     (target: QuickLogAllActivitiesSaveTarget) => {

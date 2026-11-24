@@ -58,8 +58,6 @@ async function main(): Promise<void> {
     }
     process.stderr.write(`${message}\n`);
     process.exitCode = 2;
-  } finally {
-    passkey = "";
   }
 }
 

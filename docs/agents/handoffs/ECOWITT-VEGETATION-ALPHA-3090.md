@@ -5,9 +5,9 @@ why: Issue #3090 replaces the Nov 6 Flower-only target eec6f7b3-b745-44ad-bab2-e
 branch: cursor/ecowitt-vegetation-alpha-forward-c184
 base: verdant-grow-diary
 checkout: git fetch origin cursor/ecowitt-vegetation-alpha-forward-c184 verdant-grow-diary && git switch cursor/ecowitt-vegetation-alpha-forward-c184
-pr: NOT_MEASURED until the draft PR exists
-head_sha: local until pushed
-state: local only
+pr: draft, see GitHub after open
+head_sha: commit that adds this handoff update on cursor/ecowitt-vegetation-alpha-forward-c184; confirm with git rev-parse HEAD
+state: pushed draft
 current_step: script, tests, and runbook
 next_action: Matthew confirms Vegetation Alpha and Soil Alpha channel numbers from WS View, then runs the script and applies SQL himself
 post_merge_check: NOT_APPLICABLE until Matthew runs a step; the doc does not ship behavior by itself

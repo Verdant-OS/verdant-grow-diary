@@ -50,6 +50,11 @@ import {
   GgsCsvRoomMismatchRules,
 } from "@/lib/ggsCsvRoomMismatchRules";
 import {
+  ENVIRONMENT_CSV_SATURATED_RUN_TEST_ID,
+  EnvironmentCsvSaturatedRunRules,
+} from "@/lib/environmentCsvSaturatedRunRules";
+import { CSV_PREVIEW_WARNING_COPY } from "@/lib/csvSensorPreviewWarningCopy";
+import {
   UNKNOWN_CSV_HISTORY_WINDOW,
   buildCsvHistoryWindowPreview,
   csvHistoryWindowNotice,
@@ -328,6 +333,10 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
     parsedRows.some((r) => r.soil_moisture_pct != null),
     parsedRows.some((r) => r.soil_ec != null),
   );
+  const saturatedRunWarnings = useMemo(
+    () => EnvironmentCsvSaturatedRunRules.warnings(state.parsed?.validRows ?? []),
+    [state.parsed],
+  );
   const windowPreview = buildCsvHistoryWindowPreview(
     state.parsed?.validRows ?? [],
     historyWindow,
@@ -597,6 +606,22 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
               >
                 {roomMismatchWarning}
               </p>
+            ) : null}
+            {saturatedRunWarnings.length > 0 ? (
+              <div
+                role="status"
+                data-testid={ENVIRONMENT_CSV_SATURATED_RUN_TEST_ID}
+                className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100"
+              >
+                <ul className="space-y-0.5">
+                  {saturatedRunWarnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+                <p className="text-xs">
+                  {CSV_PREVIEW_WARNING_COPY.saturated_reading_run.whyItMatters}
+                </p>
+              </div>
             ) : null}
             <ul
               data-testid="csv-import-row-preview"

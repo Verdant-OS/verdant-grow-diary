@@ -20,8 +20,8 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 | Reviewer B      | Main  | Jack Herer                               | `cheekhimself` (shared) |
 | Reviewer C      | Main  | Durban Poison · Reviewer (Main)          | `cheekhimself` (shared) |
 | Reviewer D      | Main  | Maui Wowie · Reviewer (Main)             | `cheekhimself` (shared) |
-| Reviewer E      | Main  | VReviewer · Reviewer (Main)              | `VReviewer`             |
-| Reviewer F      | Main  | matt816cheek-bit · Reviewer (Main)       | `matt816cheek-bit`      |
+| Reviewer E      | Main  | Matthew (direct) · Reviewer (Main)       | `VReviewer`             |
+| Reviewer F      | Main  | Matthew (direct) · Reviewer (Main)       | `matt816cheek-bit`      |
 | QA              | Main  | Blue Dream · QA (Main)                   |                         |
 | New-User Smoke  | Main  | Toad Venom                               |                         |
 | Bug Sweep       | Main  | White Widow                              |                         |

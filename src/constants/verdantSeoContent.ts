@@ -759,7 +759,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "Best app to track a grow tent with AC Infinity or Spider Farmer | Verdant",
     h1: "Best app to track grow tent with AC Infinity or Spider Farmer: Verdant, GrowLore, or the official apps?",
     description:
-      "Honest comparison of Verdant, GrowLore, and the official AC Infinity and Spider Farmer apps for tracking a grow tent. CSV import vs live tracking, and what each one actually does.",
+      "Honest comparison of Verdant, GrowLore, and the AC Infinity and Spider Farmer apps for tracking a grow tent: CSV import vs live tracking, and what each does.",
     targetKeyword: "track grow tent with AC Infinity or Spider Farmer",
     introHeading:
       "What's the best app to track my grow tent with AC Infinity or Spider Farmer controllers?",

@@ -27,17 +27,20 @@ function headFn() {
   return head;
 }
 
+type HelpHeadMeta = { title?: string; name?: string; content?: string };
+type HelpHeadLink = { rel?: string; href?: string };
+
 class HelpSectionHeadRead {
-  static title(head: { meta?: ReadonlyArray<Record<string, string>> }): string | undefined {
-    return head.meta?.find((entry) => typeof entry.title === "string")?.title;
+  static title(head: { meta?: ReadonlyArray<HelpHeadMeta | undefined> }): string | undefined {
+    return head.meta?.find((entry) => typeof entry?.title === "string")?.title;
   }
 
-  static robots(head: { meta?: ReadonlyArray<Record<string, string>> }): string | undefined {
-    return head.meta?.find((entry) => entry.name === "robots")?.content;
+  static robots(head: { meta?: ReadonlyArray<HelpHeadMeta | undefined> }): string | undefined {
+    return head.meta?.find((entry) => entry?.name === "robots")?.content;
   }
 
-  static canonical(head: { links?: ReadonlyArray<Record<string, string>> }): string | undefined {
-    return head.links?.find((entry) => entry.rel === "canonical")?.href;
+  static canonical(head: { links?: ReadonlyArray<HelpHeadLink | undefined> }): string | undefined {
+    return head.links?.find((entry) => entry?.rel === "canonical")?.href;
   }
 }
 

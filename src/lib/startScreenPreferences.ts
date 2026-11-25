@@ -21,17 +21,28 @@ export const DEFAULT_START_SCREEN: StartScreenChoice = "quickLog";
 
 export const QUICK_LOG_START_ROUTE = "/dashboard?open=quick-log" as const;
 
+/**
+ * Quick Log option copy (first-use friction item 9, FA-20261119-M1). Saved as
+ * the start screen, Quick Log opens once from onboarding; later sign-ins land
+ * on the dashboard with Quick Log closed (quickLogStartScreenTargetRules).
+ */
+export const QUICK_LOG_START_SCREEN_SIGN_IN_COPY =
+  "Diary-first. Recommended — Verdant works best when logs come first, then sensors, then AI.";
+export const QUICK_LOG_START_SCREEN_ONBOARDING_COPY = QUICK_LOG_START_SCREEN_SIGN_IN_COPY;
+
 export const START_SCREEN_OPTIONS: ReadonlyArray<{
   key: StartScreenChoice;
   label: string;
+  /** What the choice does at sign-in. Settings shows this. */
   description: string;
+  /** Onboarding only, where Continue also opens the choice now. */
+  onboardingDescription?: string;
   recommended?: boolean;
 }> = [
   {
     key: "quickLog",
     label: "Quick Log",
-    description:
-      "Diary-first. Recommended — Verdant works best when logs come first, then sensors, then AI.",
+    description: QUICK_LOG_START_SCREEN_SIGN_IN_COPY,
     recommended: true,
   },
   { key: "timeline", label: "Timeline", description: "Open the diary timeline first." },

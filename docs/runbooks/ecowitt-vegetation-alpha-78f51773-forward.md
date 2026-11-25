@@ -17,24 +17,20 @@ On the owner's ecowitt.net dashboard for gateway "Verdant", the tile names and t
 - Vegetation Alpha air: CH5, anchor `ch_temp_humidity5`.
 - Soil Alpha: CH1, anchor `ch_soil_ec1` (moisture %, EC in µS/cm, and soil temperature).
 
-`routeEcoWittPayloadToTents` in `supabase/functions/_shared/ecowittChannelTentRouter.ts` is what both `ecowitt-ingest` and `ecowitt-custom-upload` use. It stores soil only from keys `soilmoisture1`–`soilmoisture8`. It does not read `soil_ec_humN`, `soil_ecN`, or `soil_ec_tempN`.
+Soil Alpha is a WH52 on CH1 (`ch_soil_ec1`): moisture %, EC in µS/cm, and soil temperature. Its customized-upload moisture key is `soil_ec_hum1`, which is a different namespace from WH51 `soilmoisture1` (Home Assistant core issue 162782). PR #3093 maps `soil_ec_humN` to `soil_moisture_pct` and merges first. Once #3093 has landed, Soil Alpha moisture is ingested on soil channel 1. This pull request does not change that router.
 
-Those `soil_ec_*` names are the customized-upload keys reported for a WH52 (Home Assistant core issue 162782, captured gateway body `soil_ec_hum1`, `soil_ec_temp1`, `soil_ec1`, plus AD and battery fields). They are a different namespace from WH51 `soilmoistureN`. `soil_ec_hum1` is not `soilmoisture1`. A `soil_channels` value of 1 would attach a WH51 `soilmoisture1` reading if one were present, and it would still ignore Soil Alpha.
-
-Soil Alpha moisture is dropped today: the router skips unrecognized keys, so nothing is inserted for `soil_ec_hum1`. Do not pass `--soil 1` for this tent until a follow-up maps `soil_ec_humN` to `soil_moisture_pct`. The smallest follow-up is that mapping in `routeEcoWittPayloadToTents` only, with a test that `soil_ec_hum1` and `soilmoisture1` stay distinct.
-
-Air CH5 is the family this parser already accepts (`temp5f`, `humidity5`). The script still requires both flags and has no defaults. After the soil follow-up, the air value to type is `--air 5`. Until then, do not write `soil_channels`.
+The script still requires `--air` and `--soil`. It has no defaults. The values from this screen are `--air 5` and `--soil 1`. Air CH5 is `temp5f` / `humidity5`.
 
 ## 2. `hardware_config.ecowitt` (Matthew applies SQL)
 
 The shape consumed by `parseEligibleTents` in `supabase/functions/ecowitt-ingest/index.ts` and `tentChannels` in `supabase/functions/ecowitt-custom-upload/index.ts` is `air_channels`, `soil_channels`, and `passkey_fingerprint` (`ewfp_` + 24 hex).
 
-On a machine that is not logging the shell history you care about, pass the raw passkey only through `ECOWITT_PASSKEY` or stdin. The script has no channel defaults.
+On a machine that is not logging the shell history you care about, pass the raw passkey as the only line on stdin. It must be 32 hex characters. The script lowercases it before hashing and rejects `--passkey`. `--air` and `--soil` stay required.
 
 ```bash
-ECOWITT_PASSKEY="$(cat)" bun scripts/prepare-ecowitt-vegetation-alpha-forward.ts \
-  --air <air-channel> \
-  --soil <soil-channel>
+bun scripts/prepare-ecowitt-vegetation-alpha-forward.ts --air 5 --soil 1 <<'EOF'
+<32-hex passkey>
+EOF
 ```
 
 Stdout is JSON: tent id, channel arrays, `passkey_fingerprint`, and one `UPDATE` scoped with `WHERE id = '78f51773-c576-4891-a9aa-240ed532337a'`. The raw passkey is not in that output. Review the statement. It merges those three keys onto `hardware_config.ecowitt` for that id only, so running it again with the same values is idempotent.
@@ -73,4 +69,4 @@ After the gateway posts, read `sensor_readings` for both ids. New rows should us
 2. Revoke the claim with `revoke_ecowitt_custom_upload_claim`.
 3. If the config write should be undone, restore the previous `hardware_config` value for `78f51773-c576-4891-a9aa-240ed532337a` from the backup taken before the `UPDATE`. Do not edit the Flower row as a substitute.
 
-Gate: no production writes until Matthew approves each step (config, token, device). Channels unconfirmed until read from gateway.
+Gate: no production writes until Matthew approves each step (config, token, device). Air CH5 and Soil Alpha WH52 CH1 were read from ecowitt.net on 2026-11-24. Soil moisture ingest waits until #3093 has merged.

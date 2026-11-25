@@ -2,9 +2,11 @@
  * Print a reviewed, idempotent hardware_config update for tent
  * 78f51773-c576-4891-a9aa-240ed532337a. Does not connect to a database.
  *
- *   ECOWITT_PASSKEY=... bun scripts/prepare-ecowitt-vegetation-alpha-forward.ts --air 3 --soil 5
+ *   bun scripts/prepare-ecowitt-vegetation-alpha-forward.ts --air 5 --soil 1 < passkey.txt
  *
- * The passkey may also be the sole line on stdin. It is never printed.
+ * The passkey is 32 hex characters on stdin, or in ECOWITT_PASSKEY when stdin
+ * is empty. It is lowercased before hashing and is never printed. --passkey
+ * is rejected.
  */
 import { computeEcoWittPasskeyFingerprint } from "../src/lib/ecowittPasskeyFingerprint";
 import {
@@ -27,18 +29,35 @@ async function readPasskey(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8").trim();
 }
 
+function safeFailure(message: string, passkey: string): string {
+  if (passkey === "") return message;
+  try {
+    EcowittVegetationAlphaForward.assertSecretAbsent(message, passkey);
+    EcowittVegetationAlphaForward.assertSecretAbsent(message, passkey.toLowerCase());
+  } catch {
+    return "Refusing to emit the raw passkey.";
+  }
+  return message;
+}
+
 async function main(): Promise<void> {
   const air = argValue("--air");
   const soil = argValue("--soil");
   let passkey = "";
   try {
+    if (process.argv.includes("--passkey")) {
+      throw new EcowittVegetationAlphaForwardError(
+        "Passkey must not be passed as --passkey. Use stdin or ECOWITT_PASSKEY.",
+      );
+    }
     passkey = await readPasskey();
     if (passkey === "") {
       throw new EcowittVegetationAlphaForwardError(
         "Passkey is required via ECOWITT_PASSKEY or stdin.",
       );
     }
-    const fingerprint = await computeEcoWittPasskeyFingerprint(passkey);
+    const normalized = EcowittVegetationAlphaForward.acceptedPasskey(passkey);
+    const fingerprint = await computeEcoWittPasskeyFingerprint(normalized);
     if (fingerprint === null) {
       throw new EcowittVegetationAlphaForwardError("Passkey did not produce a fingerprint.");
     }
@@ -53,10 +72,7 @@ async function main(): Promise<void> {
     process.stdout.write(`${text}\n`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "forward planner failed";
-    if (passkey !== "") {
-      EcowittVegetationAlphaForward.assertSecretAbsent(message, passkey);
-    }
-    process.stderr.write(`${message}\n`);
+    process.stderr.write(`${safeFailure(message, passkey)}\n`);
     process.exitCode = 2;
   }
 }

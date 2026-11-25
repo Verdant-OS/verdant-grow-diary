@@ -53,12 +53,12 @@ export class EcowittVegetationAlphaForward {
   /**
    * Accept a 32-hex EcoWitt passkey and return the lowercase form that
    * `ecowitt-custom-upload` hashes (`trim().toLowerCase()` before SHA-256).
-   * The thrown message includes the raw value so the caller can redact it.
+   * The thrown message is fixed and never includes the input.
    */
   static acceptedPasskey(raw: string): string {
     const trimmed = raw.trim();
     if (!EcowittVegetationAlphaForward.passkeyPattern.test(trimmed)) {
-      throw new EcowittVegetationAlphaForwardError(`Passkey rejected: ${trimmed}`);
+      throw new EcowittVegetationAlphaForwardError("Passkey rejected.");
     }
     return trimmed.toLowerCase();
   }
@@ -104,10 +104,6 @@ export class EcowittVegetationAlphaForward {
       `WHERE id = ${tent}::uuid`,
       "RETURNING id, hardware_config->'ecowitt' AS ecowitt;",
     ].join("\n");
-  }
-
-  static liveWhereClause(): string {
-    return `WHERE id = '${EcowittVegetationAlphaForward.targetTentId}'::uuid`;
   }
 
   static publicText(config: EcowittVegetationAlphaConfig, sql: string): string {

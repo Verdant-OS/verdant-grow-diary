@@ -25,12 +25,10 @@ The script still requires `--air` and `--soil`. It has no defaults. The values f
 
 The shape consumed by `parseEligibleTents` in `supabase/functions/ecowitt-ingest/index.ts` and `tentChannels` in `supabase/functions/ecowitt-custom-upload/index.ts` is `air_channels`, `soil_channels`, and `passkey_fingerprint` (`ewfp_` + 24 hex).
 
-On a machine that is not logging the shell history you care about, pass the raw passkey as the only line on stdin. It must be 32 hex characters. The script lowercases it before hashing and rejects `--passkey`. `--air` and `--soil` stay required.
+Read the raw passkey from stdin into `ECOWITT_PASSKEY` so the value is not typed on the command line and does not land in shell history. It must be 32 hex characters. The script lowercases it before hashing and rejects `--passkey` and `--passkey=<value>`. `--air` and `--soil` stay required.
 
 ```bash
-bun scripts/prepare-ecowitt-vegetation-alpha-forward.ts --air 5 --soil 1 <<'EOF'
-<32-hex passkey>
-EOF
+ECOWITT_PASSKEY="$(cat)" bun scripts/prepare-ecowitt-vegetation-alpha-forward.ts --air 5 --soil 1
 ```
 
 Stdout is JSON: tent id, channel arrays, `passkey_fingerprint`, and one `UPDATE` scoped with `WHERE id = '78f51773-c576-4891-a9aa-240ed532337a'`. The raw passkey is not in that output. Review the statement. It merges those three keys onto `hardware_config.ecowitt` for that id only, so running it again with the same values is idempotent.

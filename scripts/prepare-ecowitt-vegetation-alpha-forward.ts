@@ -5,8 +5,8 @@
  *   bun scripts/prepare-ecowitt-vegetation-alpha-forward.ts --air 5 --soil 1 < passkey.txt
  *
  * The passkey is 32 hex characters on stdin, or in ECOWITT_PASSKEY when stdin
- * is empty. It is lowercased before hashing and is never printed. --passkey
- * is rejected.
+ * is empty. It is lowercased before hashing and is never printed.
+ * `--passkey` and `--passkey=<value>` are rejected.
  */
 import { computeEcoWittPasskeyFingerprint } from "../src/lib/ecowittPasskeyFingerprint";
 import {
@@ -45,7 +45,7 @@ async function main(): Promise<void> {
   const soil = argValue("--soil");
   let passkey = "";
   try {
-    if (process.argv.includes("--passkey")) {
+    if (process.argv.some((arg) => arg === "--passkey" || arg.startsWith("--passkey="))) {
       throw new EcowittVegetationAlphaForwardError(
         "Passkey must not be passed as --passkey. Use stdin or ECOWITT_PASSKEY.",
       );

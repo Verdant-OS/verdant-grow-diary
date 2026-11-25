@@ -9,6 +9,7 @@ import {
 } from "@/lib/ecowittVegetationAlphaForwardRules";
 
 const SECRET = "a".repeat(32);
+const SECRET_UPPER = "A".repeat(32);
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const WHERE = `WHERE id = '${EcowittVegetationAlphaForward.targetTentId}'::uuid`;
 
@@ -46,13 +47,19 @@ describe("EcowittVegetationAlphaForward", () => {
   });
 
   it("requires a 32-hex passkey and lowercases it before the fingerprint", async () => {
-    expect(() => EcowittVegetationAlphaForward.acceptedPasskey("not-hex")).toThrow(
-      /Passkey rejected/,
-    );
-    expect(() => EcowittVegetationAlphaForward.acceptedPasskey("ab")).toThrow(/Passkey rejected/);
-    expect(EcowittVegetationAlphaForward.acceptedPasskey(SECRET)).toBe(SECRET.toLowerCase());
-    const upper = await configFor("5", "1", SECRET);
-    const lower = await configFor("5", "1", SECRET.toLowerCase());
+    for (const sample of ["not-hex", "ab", `  ${"b".repeat(31)}`]) {
+      let message = "";
+      try {
+        EcowittVegetationAlphaForward.acceptedPasskey(sample);
+      } catch (error) {
+        message = error instanceof Error ? error.message : "";
+      }
+      expect(message).toBe("Passkey rejected.");
+      expect(message.includes(sample.trim())).toBe(false);
+    }
+    expect(EcowittVegetationAlphaForward.acceptedPasskey(SECRET_UPPER)).toBe(SECRET);
+    const upper = await configFor("5", "1", SECRET_UPPER);
+    const lower = await configFor("5", "1", SECRET);
     expect(upper.passkeyFingerprint).toBe(lower.passkeyFingerprint);
   });
 
@@ -125,13 +132,20 @@ describe("prepare-ecowitt-vegetation-alpha-forward script", () => {
   });
 
   it("rejects --passkey and keeps the secret out of stdout and stderr", () => {
-    const result = run(["--passkey", SECRET, "--air", "5", "--soil", "1"], {
+    const spaced = run(["--passkey", SECRET, "--air", "5", "--soil", "1"], {
       ECOWITT_PASSKEY: "",
     });
-    expect(result.status).toBe(2);
-    expect(result.stderr).toMatch(/must not be passed as --passkey/);
-    expect(`${result.stdout}${result.stderr}`).not.toContain(SECRET);
-    expect(`${result.stdout}${result.stderr}`).not.toContain(SECRET.toLowerCase());
+    expect(spaced.status).toBe(2);
+    expect(spaced.stderr).toMatch(/must not be passed as --passkey/);
+    expect(`${spaced.stdout}${spaced.stderr}`).not.toContain(SECRET);
+
+    const joined = run([`--passkey=${SECRET_UPPER}`, "--air", "5", "--soil", "1"], {
+      ECOWITT_PASSKEY: "",
+    });
+    expect(joined.status).toBe(2);
+    expect(joined.stderr).toMatch(/must not be passed as --passkey/);
+    expect(`${joined.stdout}${joined.stderr}`).not.toContain(SECRET);
+    expect(`${joined.stdout}${joined.stderr}`).not.toContain(SECRET_UPPER);
   });
 
   it("reads the passkey from stdin when ECOWITT_PASSKEY is unset", () => {
@@ -145,10 +159,11 @@ describe("prepare-ecowitt-vegetation-alpha-forward script", () => {
   });
 
   it("redacts the passkey on the error path", () => {
-    const result = run(["--air", "5"], { ECOWITT_PASSKEY: "not-a-passkey" });
+    const bad = "not-a-passkey";
+    const result = run(["--air", "5"], { ECOWITT_PASSKEY: bad });
     expect(result.status).toBe(2);
-    expect(result.stderr).toMatch(/Refusing to emit the raw passkey/);
-    expect(`${result.stdout}${result.stderr}`).not.toContain("not-a-passkey");
+    expect(result.stderr.trim()).toBe("Passkey rejected.");
+    expect(`${result.stdout}${result.stderr}`).not.toContain(bad);
   });
 
   it("prints the fingerprint and tent-scoped SQL only", () => {
@@ -180,6 +195,8 @@ describe("vegetation alpha forward runbook", () => {
     expect(runbook).toContain("#3093");
     expect(runbook).toContain("--air 5");
     expect(runbook).toContain("--soil 1");
+    expect(runbook).toContain('ECOWITT_PASSKEY="$(cat)"');
+    expect(runbook).not.toContain("<<'EOF'");
     expect(runbook).not.toMatch(/air_channels"\s*:\s*\[/);
     expect(runbook).toContain("claim token");
     expect(runbook).toContain("ew/<claim token>");

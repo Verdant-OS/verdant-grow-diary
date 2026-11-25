@@ -1608,14 +1608,6 @@ export default function QuickLog({
         note,
         panelSavedNote: panelSavedNoteForTarget,
         eventType: saveEventType,
-      }) ||
-      QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
-        note,
-        plantId: savePlant.id,
-        eventType: saveEventType,
-        recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(recentDiaryRef.current),
-        now: new Date(),
-        sameSaveRetry: lastFailedSaveSigRef.current !== null,
       })
     ) {
       toast.message(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
@@ -1792,6 +1784,22 @@ export default function QuickLog({
       if (lastFailedSaveSigRef.current !== null && lastFailedSaveSigRef.current !== attemptSig) {
         saveIdempotencyKeyRef.current = newQuickLogSaveKey();
         built.payload.p_idempotency_key = saveIdempotencyKeyRef.current;
+      }
+      const persistedNote = typeof built.payload.p_note === "string" ? built.payload.p_note : note;
+      if (
+        QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
+          note: persistedNote,
+          plantId: savePlant.id,
+          eventType: saveEventType,
+          recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(
+            recentDiaryRef.current,
+          ),
+          now: new Date(),
+          sameSaveRetry: lastFailedSaveSigRef.current === attemptSig,
+        })
+      ) {
+        toast.message(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
+        return;
       }
 
       let waterRecord: PendingStarterWater | null = null;

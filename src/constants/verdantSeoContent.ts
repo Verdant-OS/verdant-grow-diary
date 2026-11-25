@@ -287,7 +287,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           rows: [
             [
               "Verdant Grow Diary",
-              "Growers with controllers or sensors who want logs and conditions on one timeline. Runs in the browser; no native iOS or Android app yet. AC Infinity and Spider Farmer CSV import on Free, EcoWitt read-only on Pro. No reminder notifications or public diaries yet. Free; Pro $99/year or $12/month; Craft $249/year or $29/month.",
+              "Growers with controllers or sensors who want logs and conditions on one timeline. Runs in the browser; no native iOS or Android app yet. AC Infinity and Spider Farmer CSV import on Free. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). No reminder notifications or public diaries yet. Free; Pro $99/year or $12/month; Craft $249/year or $29/month.",
             ],
             [
               "Grow with Jane",
@@ -326,7 +326,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
             },
           },
           {
-            text: "EcoWitt, read-only: on Pro, EcoWitt readings can come in through a read-only integration, and Verdant never sends commands back. ESP32, MQTT, webhook, and Raspberry Pi bridge paths are read-only too, and any reading can still be logged by hand, including from a TrolMaster. See hardware integrations.",
+            text: "EcoWitt, read-only: readings are built but not confirmed live yet (you run a bridge on your own computer), and Verdant never controls anything. ESP32, MQTT, webhook, and Raspberry Pi bridge paths are read-only too, and any reading can still be logged by hand, including from a TrolMaster. See hardware integrations.",
             link: {
               label: "hardware integrations",
               href: "/hardware-integrations",
@@ -431,7 +431,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Does Verdant work with TrolMaster or EcoWitt?",
         answer:
-          "EcoWitt, yes: a read-only EcoWitt integration is available on Pro. Verdant reads the data and never sends commands back. TrolMaster import isn't available yet, so for now you can log TrolMaster readings by hand as manual snapshots.",
+          "EcoWitt, not yet confirmed: read-only EcoWitt readings are built but not confirmed live (you run a bridge on your own computer). Verdant never controls anything. TrolMaster import isn't available yet, so for now you can log TrolMaster readings by hand as manual snapshots.",
       },
       {
         question: "Will Verdant control my lights, fans, or humidifier?",
@@ -776,7 +776,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           rows: [
             [
               "Verdant Grow Diary",
-              "Growers who want plant notes, photos, and controller history on one timeline. Runs in the browser; no native iOS or Android app yet. AC Infinity and Spider Farmer CSV import on Free, not live sync. EcoWitt read-only on Pro. No equipment control and no diary sharing; Pro reports print or save as PDF. Free; Pro $99/year or $12/month; Craft $249/year or $29/month.",
+              "Growers who want plant notes, photos, and controller history on one timeline. Runs in the browser; no native iOS or Android app yet. AC Infinity and Spider Farmer CSV import on Free, not live sync. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). No equipment control and no diary sharing; Pro reports print or save as PDF. Free; Pro $99/year or $12/month; Craft $249/year or $29/month.",
             ],
             [
               "GrowLore",
@@ -835,7 +835,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "What Verdant doesn't do",
-        body: "Verdant is not a controller and does not live-sync with AC Infinity or Spider Farmer. It doesn't change fan speeds, light schedules, or vent settings. Approving an item in the Action Queue sends no command to a device. AI Doctor suggests and cites the evidence; you decide. It does not import an existing plant diary or a spreadsheet of notes, and it has no public diary sharing. Pro reports print or save as PDF. EcoWitt is available as a read-only integration on Pro. TrolMaster import isn't available yet, so those readings can be logged by hand as manual snapshots.",
+        body: "Verdant is not a controller and does not live-sync with AC Infinity or Spider Farmer. It doesn't change fan speeds, light schedules, or vent settings. Approving an item in the Action Queue sends no command to a device. AI Doctor suggests and cites the evidence; you decide. It does not import an existing plant diary or a spreadsheet of notes, and it has no public diary sharing. Pro reports print or save as PDF. EcoWitt read-only readings are built but not confirmed live; you run a bridge on your own computer. TrolMaster import isn't available yet, so those readings can be logged by hand as manual snapshots.",
       },
     ],
     faq: [
@@ -2843,7 +2843,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
                 text: "Photos attach to the entry, so they land on the plant's timeline at the right date.",
               },
               {
-                text: "Sensor snapshots come from the gear you already own. AC Infinity and Spider Farmer exports import as CSV history on Free, and EcoWitt connects through a read-only integration on Pro. Any reading, including from a TrolMaster, can be typed in by hand. Every reading is labeled live, manual, csv, demo, stale, or invalid, so old numbers never pass as current.",
+                text: "Sensor snapshots come from the gear you already own. AC Infinity and Spider Farmer exports import as CSV history on Free. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). Any reading, including from a TrolMaster, can be typed in by hand. Every reading is labeled live, manual, csv, demo, stale, or invalid, so old numbers never pass as current.",
               },
               {
                 text: "Reminder entries let you put a date and time on the plant's timeline for the next feed or check. Verdant doesn't send reminder notifications yet.",
@@ -2862,7 +2862,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           "Make a copy of your sheet and keep it. It stays the record of your past runs.",
           "Set up the current run. Create a free account, then add the grow, tent, and plants you're running now.",
           "Carry over what you'll actually look back at. Add one note per plant with the strain, start date, and the last feed, EC, and pH you used. A link to the old sheet in that note keeps the history one tap away.",
-          "Bring in your controller history. Sensor readings from AC Infinity or Spider Farmer go in from Sensors with Import historical data, free on every plan. EcoWitt connects read-only on Pro.",
+          "Bring in your controller history. Sensor readings from AC Infinity or Spider Farmer go in from Sensors with Import historical data, free on every plan. EcoWitt read-only readings are built but not confirmed live yet.",
           "Log new entries in Verdant from today. Stop adding rows to the sheet so there's one place to look.",
         ],
         closing:
@@ -2917,7 +2917,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           },
         ],
         closing:
-          "Where Verdant is different: Verdant is an account-based diary. Your entries are saved to your account, not only to one browser, and it runs in the browser on any device. What it adds is the sensor side: controller CSV import, a read-only EcoWitt integration, source-labeled readings, and an AI Doctor that cites the evidence it used, shows its confidence, names what's missing, and never touches your equipment. If you don't run a controller and want everything kept offline on one device, OG Grow Journal or Verdiario may suit you better.",
+          "Where Verdant is different: Verdant is an account-based diary. Your entries are saved to your account, not only to one browser, and it runs in the browser on any device. What it adds is the sensor side: controller CSV import, source-labeled readings, and an AI Doctor that cites the evidence it used, shows its confidence, names what's missing, and never touches your equipment. If you don't run a controller and want everything kept offline on one device, OG Grow Journal or Verdiario may suit you better.",
       },
     ],
     faq: [
@@ -2944,7 +2944,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Does Verdant work with my sensors?",
         answer:
-          "AC Infinity and Spider Farmer come in as CSV imports on Free. EcoWitt connects through a read-only integration on Pro. Verdant reads data and never sends commands to your equipment. You can also type readings in by hand, including from a TrolMaster.",
+          "AC Infinity and Spider Farmer come in as CSV imports on Free. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). Verdant reads data and never sends commands to your equipment. You can also type readings in by hand, including from a TrolMaster.",
       },
       {
         question: "Is Verdant free?",

@@ -8,7 +8,7 @@ branch: claude/project-thread-uapqkb (restarted from verdant-grow-diary @ 8c7a96
 base: verdant-grow-diary @ 8c7a96ab49c3af9b6dc497535f7ea8cebe6238e6
 pr: #3104 (merged 2026-11-25 10:10:48 UTC as 3903e71222c3966db8c90cef38d43172dd3e16b9)
 head_sha: d218d912dbd79cd52962b98c852d03e89e99fa0a (final PR head); merged to verdant-grow-diary as 3903e71222c3966db8c90cef38d43172dd3e16b9
-state: CLOSED 2026-11-25: merged by the merge queue. RED at 326ea4c602e2f5bdffe9a9362170dd49c028bc44 (CI run 45576019956, shard 15/32: 2 failed / 2 passed in the new test); GREEN at d218d912dbd79cd52962b98c852d03e89e99fa0a (CI run 45576062938: 35/35 required success). Matthew asked to pull it from the queue (09:57 UTC); auto-merge was turned off and the PR converted to draft at 09:58 UTC, but the queue merged it at 10:10:48 UTC. Nothing was undone. Local vitest/typecheck BLOCKED (node_modules partial, bun install 403).
+state: CLOSED 2026-11-25: merged by the merge queue. RED at 326ea4c602e2f5bdffe9a9362170dd49c028bc44 (CI run 45576019956, shard 15/32: 2 failed / 2 passed in the new test); GREEN at d218d912dbd79cd52962b98c852d03e89e99fa0a: CI run 45576062938 is a workflow_dispatch run, not the PR's required-check rollup, with 36/36 jobs success. Required checks at that commit, read 2026-11-25 10:30 UTC from its check runs against the live verdant-grow-diary ruleset (39 contexts): 38 success, "Claude locked paths" skipped (NOT_MEASURED). An earlier "35/35 required" count used config/required-status-checks.json, whose pinned list has 35 contexts and lacks four the live ruleset requires. Matthew asked to pull it from the queue (09:57 UTC); auto-merge was turned off and the PR converted to draft at 09:58 UTC, but the queue merged it at 10:10:48 UTC. Nothing was undone. Local vitest/typecheck BLOCKED (node_modules partial, bun install 403).
 next_action: post-merge check only (below), once /version.json reports 3903e71222c3966db8c90cef38d43172dd3e16b9 or later. A failed check reopens this task with the same owner.
 post_merge_check: once /version.json reports the merged SHA, /onboarding (fresh Free account, 393x852) shows "Opens Quick Log now. Later sign-ins open your dashboard, one tap from Quick Log." under Quick Log; /settings Start screen shows "Diary-first. Sign-ins open your dashboard, one tap from Quick Log."
 decisions:
@@ -29,5 +29,5 @@ reviewer_sha: d218d912dbd79cd52962b98c852d03e89e99fa0a (VReviewer approval only)
 session_state: no production access used; no paused workflows; no scheduled routines; app not run locally.
 claimed_by: the Claude thread session for the first-use friction P3 task, 2026-11-25 08:30 UTC
 owner: the Claude thread session for the first-use friction P3 task
-last_updated: 2026-11-25 10:15 UTC, by the Claude thread session for the first-use friction P3 task
+last_updated: 2026-11-25 10:31 UTC, by the Claude thread session for the first-use friction P3 task
 ```

@@ -26,8 +26,8 @@ files_remaining: none for this slice
 blockers: local dependency install (see not_measured)
 open_questions: tighten the credit-pack replay test to assert exactly one grant (separate slice).
 links: 04f3de340117026ab3454d844d400747dfc0e38b
-reviewer_seat: not yet requested
-reviewer_sha: none
+reviewer_seat: Seat C reviewed 0101a32977ffb0559993b742d0522354d58d796f: PASS with P2 (4 fixes, relayed by Matthew 2026-11-24 9:24 PM CT), fixed in 6a39e77adb4be3f070ce940172ec19f4dade8423 (its commit message says "Seat A" in error; the findings were Seat C's) and the unlock record in 3a2e669c69615f99aefb82a3f0d7f50a9b0ab745. Next: Seats A (Sour Diesel) and C re-pass at the new head, routed by UK Cheese.
+reviewer_sha: 0101a32977ffb0559993b742d0522354d58d796f (superseded; re-pass owed at the current head)
 session_state: this thread is subscribed to the PR. No routines, no paused workflows. Pending human decisions: merge yes; Craft price IDs.
 claimed_by: Claude (this thread), 2026-11-25
 owner: Claude (this thread)

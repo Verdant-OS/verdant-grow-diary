@@ -105,11 +105,13 @@ export class EcoWittWh52SoilProbe {
     return `soilmoisture${channel}`;
   }
 
+  /**
+   * True when any key equals `soilmoistureN`, ignoring case. Callers may
+   * pass the raw payload or the lowercased copy.
+   */
   static legacyMoisturePresent(payload: Record<string, unknown>, channel: number): boolean {
-    return Object.prototype.hasOwnProperty.call(
-      payload,
-      EcoWittWh52SoilProbe.legacyMoistureKey(channel),
-    );
+    const wanted = EcoWittWh52SoilProbe.legacyMoistureKey(channel);
+    return Object.keys(payload).some((key) => key.toLowerCase() === wanted);
   }
 }
 
@@ -122,8 +124,12 @@ const PCT_MIN = 0;
 const PCT_MAX = 100;
 
 function coerceFinite(v: unknown): number | null {
-  if (v === null || v === undefined || v === "") return null;
-  const n = typeof v === "number" ? v : Number(v);
+  if (typeof v === "boolean" || v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  if (trimmed === "" || trimmed === "true" || trimmed === "false") return null;
+  const n = Number(trimmed);
   return Number.isFinite(n) ? n : null;
 }
 
@@ -195,10 +201,7 @@ export function routeEcoWittPayloadToTents(input: EcoWittRouterInput): EcoWittRo
     const humMatch = HUMIDITY_RE.exec(rawKey);
     const soilMatch = SOIL_RE.exec(rawKey);
     const wh52Channel = EcoWittWh52SoilProbe.moistureChannel(rawKey);
-    if (
-      wh52Channel !== null &&
-      EcoWittWh52SoilProbe.legacyMoisturePresent(lower, wh52Channel)
-    ) {
+    if (wh52Channel !== null && EcoWittWh52SoilProbe.legacyMoisturePresent(lower, wh52Channel)) {
       continue;
     }
 

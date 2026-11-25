@@ -112,6 +112,7 @@ import {
 import { QueryClientContext, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
+  QuickLogNoteRepeatPersistence,
   QuickLogNoteRepeatSaveRules,
 } from "@/lib/quickLogNoteSaveRules";
 import { useInRouterContext, useNavigate } from "@/lib/react-router-compat";
@@ -2256,6 +2257,11 @@ function QuickLogV2SheetForOwner({
         eventType: "note",
         recentEntries: [
           ...sessionNotesRef.current,
+          ...QuickLogNoteRepeatPersistence.read(
+            QuickLogNoteRepeatPersistence.browser(),
+            user?.id,
+            new Date(),
+          ),
           ...QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(
             diaryClient?.getQueryData(["diary_entries"]),
           ),
@@ -2999,15 +3005,23 @@ function QuickLogV2SheetForOwner({
     }
 
     if (submissionAction === "note" && resolved.plantId && submissionNote.trim()) {
+      const savedAt = new Date().toISOString();
       sessionNotesRef.current = [
         {
           plantId: resolved.plantId,
           note: submissionNote,
           eventType: "note",
-          savedAt: new Date().toISOString(),
+          savedAt,
         },
         ...sessionNotesRef.current,
       ];
+      QuickLogNoteRepeatPersistence.remember(QuickLogNoteRepeatPersistence.browser(), {
+        accountId: user?.id,
+        plantId: resolved.plantId,
+        note: submissionNote,
+        savedAt,
+        now: new Date(savedAt),
+      });
     }
 
     setExactRetryPending(false);
@@ -3398,7 +3412,6 @@ function QuickLogV2SheetForOwner({
 
   function handleLogAnother() {
     if (recoveryStorageFence) return;
-    sessionNotesRef.current = [];
     setRestoredMediaPending(false);
     idempotencyKeyRef.current = rotateQuickLogIdempotencyKey(idempotencyKeyRef.current);
     setPostSave(null);

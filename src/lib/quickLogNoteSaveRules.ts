@@ -205,6 +205,97 @@ export class QuickLogNoteRepeatSaveRules {
   }
 }
 
+export interface QuickLogNoteRepeatStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+/**
+ * Confirmed note saves that must still block after a reload. Client storage
+ * only. A failed save is never written. Expired rows are dropped on every
+ * read and write.
+ */
+export class QuickLogNoteRepeatPersistence {
+  static browser(): QuickLogNoteRepeatStorage | null {
+    if (typeof window === "undefined") return null;
+    try {
+      return window.localStorage;
+    } catch {
+      return null;
+    }
+  }
+
+  static storageKey(accountId: string): string {
+    return `verdant.quickLogNoteRepeat.v1.${accountId}`;
+  }
+
+  static read(
+    storage: QuickLogNoteRepeatStorage | null | undefined,
+    accountId: unknown,
+    now: Date,
+  ): RecentSavedNoteEntry[] {
+    if (!storage || typeof accountId !== "string" || accountId.length === 0) return [];
+    if (!(now instanceof Date) || !Number.isFinite(now.getTime())) return [];
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(storage.getItem(this.storageKey(accountId)) ?? "[]");
+    } catch {
+      return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    const windowMs = QUICK_LOG_NOTE_REPEAT_WINDOW_MINUTES * 60_000;
+    const nowMs = now.getTime();
+    const kept: RecentSavedNoteEntry[] = [];
+    for (const row of parsed) {
+      if (!row || typeof row !== "object") continue;
+      const record = row as Record<string, unknown>;
+      const plantId = typeof record.plantId === "string" ? record.plantId : "";
+      const note = normalizeQuickLogNoteText(record.note);
+      const savedAt = typeof record.savedAt === "string" ? record.savedAt : "";
+      const savedMs = savedAtMillis(savedAt);
+      if (!plantId || !note || savedMs === null) continue;
+      if (Math.abs(nowMs - savedMs) > windowMs) continue;
+      kept.push({ plantId, note, eventType: "note", savedAt });
+    }
+    return kept;
+  }
+
+  static remember(
+    storage: QuickLogNoteRepeatStorage | null | undefined,
+    input: {
+      accountId: unknown;
+      plantId: unknown;
+      note: unknown;
+      savedAt: string;
+      now: Date;
+    },
+  ): void {
+    if (!storage || typeof input.accountId !== "string" || input.accountId.length === 0) return;
+    if (typeof input.plantId !== "string" || input.plantId.length === 0) return;
+    const note = normalizeQuickLogNoteText(input.note);
+    if (!note) return;
+    const savedMs = savedAtMillis(input.savedAt);
+    if (savedMs === null || !(input.now instanceof Date) || !Number.isFinite(input.now.getTime())) {
+      return;
+    }
+    const current = this.read(storage, input.accountId, input.now).filter(
+      (entry) =>
+        !(entry.plantId === input.plantId && normalizeQuickLogNoteText(entry.note) === note),
+    );
+    current.unshift({
+      plantId: input.plantId,
+      note,
+      eventType: "note",
+      savedAt: input.savedAt,
+    });
+    try {
+      storage.setItem(this.storageKey(input.accountId), JSON.stringify(current));
+    } catch {
+      // Storage can be unavailable. The in-memory check still covers this mount.
+    }
+  }
+}
+
 /** Title of the toast shown when the All activity types Note panel saves. */
 export const QUICK_LOG_NOTE_SAVED_TOAST_TITLE = "Note saved";
 

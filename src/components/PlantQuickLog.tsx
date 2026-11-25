@@ -31,6 +31,11 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
+import {
+  QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
+  QuickLogNoteRepeatPersistence,
+  QuickLogNoteRepeatSaveRules,
+} from "@/lib/quickLogNoteSaveRules";
 import { QUICK_LOG_MANUAL_READINGS_NOTE } from "@/constants/quickLogGeneratedNoteCopy";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import {
@@ -505,6 +510,33 @@ export default function PlantQuickLog({
       return;
     }
 
+    const savedAt = new Date().toISOString();
+    if (
+      QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
+        note: timelineNote,
+        plantId,
+        eventType: "note",
+        recentEntries: QuickLogNoteRepeatPersistence.read(
+          QuickLogNoteRepeatPersistence.browser(),
+          user?.id,
+          new Date(savedAt),
+        ),
+        now: new Date(savedAt),
+      })
+    ) {
+      setError(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
+      return;
+    }
+    const rememberConfirmedPlantNote = () => {
+      QuickLogNoteRepeatPersistence.remember(QuickLogNoteRepeatPersistence.browser(), {
+        accountId: user?.id,
+        plantId,
+        note: timelineNote,
+        savedAt,
+        now: new Date(savedAt),
+      });
+    };
+
     // #2159: the inline EC error names the field; never save a negative EC.
     if (ecError) return;
 
@@ -629,6 +661,7 @@ export default function PlantQuickLog({
           },
           canContinue,
         );
+        rememberConfirmedPlantNote();
         return;
       }
 
@@ -695,6 +728,7 @@ export default function PlantQuickLog({
         return;
       }
       saveConfirmed = true;
+      rememberConfirmedPlantNote();
 
       const photoAttachmentFailed = !!uploadedPath && !result.growEventId;
       if (uploadedPath && result.growEventId) {

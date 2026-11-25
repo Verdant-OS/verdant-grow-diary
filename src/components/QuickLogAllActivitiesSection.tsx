@@ -138,6 +138,7 @@ import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTy
 import type { CanonicalQuickLogStage } from "@/lib/grow";
 import {
   QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
+  QuickLogNoteRepeatPersistence,
   QuickLogNoteRepeatSaveRules,
   buildQuickLogSavedNoteExcerpt,
 } from "@/lib/quickLogNoteSaveRules";
@@ -1192,7 +1193,14 @@ export default function QuickLogAllActivitiesSection({
         note,
         plantId: currentTarget.plantId,
         eventType: "note",
-        recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(recentDiaryRef.current),
+        recentEntries: [
+          ...QuickLogNoteRepeatPersistence.read(
+            QuickLogNoteRepeatPersistence.browser(),
+            user?.id,
+            new Date(),
+          ),
+          ...QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(recentDiaryRef.current),
+        ],
         now: new Date(),
       })
     ) {
@@ -1528,6 +1536,16 @@ export default function QuickLogAllActivitiesSection({
             ]);
           }
         }
+      }
+      if (selected.id === "note" && activityInput.note && capturedTarget.plantId) {
+        const savedAt = new Date().toISOString();
+        QuickLogNoteRepeatPersistence.remember(QuickLogNoteRepeatPersistence.browser(), {
+          accountId: user?.id,
+          plantId: capturedTarget.plantId,
+          note: activityInput.note,
+          savedAt,
+          now: new Date(savedAt),
+        });
       }
       try {
         onSaveSuccess?.({

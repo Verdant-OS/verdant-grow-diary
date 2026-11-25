@@ -46,9 +46,10 @@ describe("decideBlueprintAccess", () => {
     });
   });
   it("denies when the lookup failed and no paid row is proven", () => {
-    expect(decideBlueprintAccess({ ...base, liveRows: null, lookupFailed: true }).reason).toBe(
-      "lookup_failed",
-    );
+    expect(decideBlueprintAccess({ ...base, liveRows: null, lookupFailed: true })).toEqual({
+      allowed: false,
+      reason: "lookup_failed",
+    });
   });
   it("ignores a sandbox Craft row unless the server resolved sandbox", () => {
     const input = { ...base, liveRows: [], sandboxRows: [row("craft_monthly", "sandbox")] };

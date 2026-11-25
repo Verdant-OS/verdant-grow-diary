@@ -9,7 +9,7 @@ base: verdant-grow-diary at d4bf3acbb (#3081)
 checkout: git fetch origin claude/project-thread-l98mix && git switch claude/project-thread-l98mix
 pr: see the draft PR for this branch
 head_sha: read from the PR
-state: draft PR open; CI is the first evidence
+state: PR #3094 out of draft (Matthew said yes, 2026-11-24 8:34 PM CT); CI is the first evidence. First ready run failed shard 15: src/test/blueprint-evidence-truth.test.tsx rendered the section without a query client after the server gate landed; fixed by mocking useBlueprintServerAccess there (commit 274e2e55b).
 current_step: waiting on CI and review
 next_action: (1) 35/35 required checks at the head; (2) one independent exact-head review from an eligible reviewer (exclude this Claude session, the porter; exclude Lovable/gpt-engineer-app, the original author); (3) Matthew says to take it out of draft; (4) Matthew's per-item yes naming the PR and full SHA; the Merge Steward queues it.
 post_merge_check: after live /version.json reports the merge SHA, a Free or Pro account sees the locked Blueprint teaser on a plant page and the getBlueprintAccess server function answers allowed:false; a Craft or Founder account sees the overlay.
@@ -28,7 +28,7 @@ open_questions: tighten the credit-pack replay test to assert exactly one grant 
 links: 04f3de340117026ab3454d844d400747dfc0e38b
 reviewer_seat: not yet requested
 reviewer_sha: none
-session_state: this thread is subscribed to the PR. No routines, no paused workflows. Pending human decisions: take out of draft; merge yes; Craft price IDs.
+session_state: this thread is subscribed to the PR. No routines, no paused workflows. Pending human decisions: merge yes; Craft price IDs.
 claimed_by: Claude (this thread), 2026-11-25
 owner: Claude (this thread)
 last_updated: 2026-11-25, by Claude (this thread)

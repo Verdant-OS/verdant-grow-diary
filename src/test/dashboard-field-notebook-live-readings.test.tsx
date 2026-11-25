@@ -360,8 +360,10 @@ describe("Dashboard field notebook card readings", () => {
     const rh = slot(slots, "RH");
     expect(temp?.value).toMatch(/°F$/);
     expect(rh?.value).toMatch(/^55(\.0)?%$/);
-    expect(temp?.source).not.toBe("Stale");
+    expect(temp?.source).toBe("Live");
+    expect(rh?.source).toBe("Live");
     expect(temp?.ageLabel).toBe("5m ago");
+    expect(rh?.ageLabel).toBe("5m ago");
     expect(temp?.capturedAtMs).toBe(Date.parse(at));
     expect(rh?.capturedAtMs).toBe(Date.parse(at));
   });

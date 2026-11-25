@@ -244,7 +244,7 @@ export default function CreatePlantDialog({
     tentsLoaded,
   });
 
-  // Opened outside a tent: start on the setup's only tent, never a guess between several.
+  // Opened outside a tent: start on the only tent in the setup, never a guess between several.
   const currentTentId = resolveCreatePlantCurrentTentId({
     suppliedTentId: defaultTentId,
     targetGrowId,
@@ -309,7 +309,7 @@ export default function CreatePlantDialog({
   useEffect(() => {
     if (!open || explicitCompatiblePick) return;
     // Without a supplied tent, only ever apply the current-tent default. Never
-    // retract it to "No tent": a later refetch or read error must not turn a
+    // retract it to No tent: a later refetch or read error must not turn a
     // tent the grower can see into a silent tentless write.
     if (!defaultTentId && (tentFieldTouched || !currentTentId)) return;
     const nextTentId = defaultTentId

@@ -7,7 +7,7 @@
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 
 export const CSV_IMPORT_DESCRIPTION =
-  "Bring in your Spider Farmer, AC Infinity, or other environment CSV. Verdant will source-tag it as historical CSV context.";
+  "Bring in your Spider Farmer or other environment CSV. Verdant will source-tag it as historical CSV context. AC Infinity app exports are not confirmed yet.";
 
 export const CSV_IMPORT_READING_COPY = "Reading your environment export…";
 

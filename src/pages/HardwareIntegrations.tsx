@@ -169,8 +169,9 @@ export default function HardwareIntegrations() {
             Your grow history should not stay trapped in another app
           </h2>
           <p className="mt-4 max-w-3xl text-muted-foreground leading-relaxed">
-            Create a free account, set up one grow and tent, then import an AC Infinity export or
-            another environment CSV from Sensor Data. CSV import and basic logging are free.
+            Create a free account, set up one grow and tent, then import a Spider Farmer export or
+            another environment CSV from Sensor Data. AC Infinity app exports are not confirmed yet
+            on a real file. CSV import and basic logging are free.
           </p>
           <p className="mt-3 max-w-3xl text-muted-foreground leading-relaxed">
             Verdant keeps every imported reading source-labeled as CSV history — never live

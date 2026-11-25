@@ -195,7 +195,7 @@ export const VERDANT_GROWER_GUIDE_FAQ: ReadonlyArray<FaqEntry> = [
   {
     question: "Can I use Verdant without live sensors?",
     answer:
-      "Yes. You can log everything manually, upload CSV history from AC Infinity, Spider Farmer, or any gear whose export includes timestamp, temperature, and humidity columns, or start with photos and diary entries alone. Live integrations are always read-only and always optional.",
+      "Yes. You can log everything manually, upload CSV history from Spider Farmer (tested on real GGS exports) or other gear whose export includes timestamp, temperature, and humidity columns (AC Infinity app exports are not confirmed yet), or start with photos and diary entries alone. Live integrations are always read-only and always optional.",
   },
   {
     question: "What does source-labeled sensor data mean?",
@@ -287,7 +287,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           rows: [
             [
               "Verdant Grow Diary",
-              "Growers with controllers or sensors who want logs and conditions on one timeline. Runs in the browser; no native iOS or Android app yet. AC Infinity and Spider Farmer CSV import on Free. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). No reminder notifications or public diaries yet. Free; Pro $99/year or $12/month; Craft $249/year or $29/month.",
+              "Growers with controllers or sensors who want logs and conditions on one timeline. Runs in the browser; no native iOS or Android app yet. Spider Farmer CSV import on Free, tested on real GGS exports; AC Infinity app exports are not confirmed yet. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). No reminder notifications or public diaries yet. Free; Pro $99/year or $12/month; Craft $249/year or $29/month.",
             ],
             [
               "Grow with Jane",
@@ -319,7 +319,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
             },
           },
           {
-            text: "Controller data, imported honestly: export a CSV from the AC Infinity or Spider Farmer app and import it from Sensors with Import historical data. Each reading stays labeled as CSV, so it's never passed off as live. This is included on Free. See the AC Infinity data logging guide.",
+            text: "Controller data, imported honestly: export a CSV from the Spider Farmer app and import it from Sensors with Import historical data. That path is tested on real Spider Farmer GGS exports. AC Infinity app exports are not confirmed yet on a real file, so if you have one, send it through Contact and we'll check it. Each reading stays labeled as CSV, so it's never passed off as live. This is included on Free. See the AC Infinity data logging guide.",
             link: {
               label: "AC Infinity data logging guide",
               href: "/guides/ac-infinity-data-logging",
@@ -426,7 +426,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Does Verdant work with AC Infinity and Spider Farmer?",
         answer:
-          "Yes, through CSV. Export from the AC Infinity or Spider Farmer app and import it into Verdant from Sensors, using Import historical data. CSV import is included on Free. Readings stay labeled as CSV, not live.",
+          "For Spider Farmer, yes, through CSV: export from the Spider Farmer app and import it into Verdant from Sensors, using Import historical data. That's tested on real Spider Farmer GGS exports. AC Infinity app exports are not confirmed yet on a real file; if you have one, send it through Contact and we'll check it. CSV import is included on Free. Readings stay labeled as CSV, not live.",
       },
       {
         question: "Does Verdant work with TrolMaster or EcoWitt?",
@@ -759,12 +759,12 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
     title: "Best app to track a grow tent with AC Infinity or Spider Farmer | Verdant",
     h1: "Best app to track grow tent with AC Infinity or Spider Farmer: Verdant, GrowLore, or the official apps?",
     description:
-      "Honest comparison of Verdant, GrowLore, and the AC Infinity and Spider Farmer apps for tracking a grow tent: CSV import vs live tracking, and what each does.",
+      "Honest comparison of Verdant, GrowLore, and the AC Infinity and Spider Farmer apps for tracking a grow tent: CSV history vs live tracking, and what each does.",
     targetKeyword: "track grow tent with AC Infinity or Spider Farmer",
     introHeading:
       "What's the best app to track my grow tent with AC Infinity or Spider Farmer controllers?",
     intro:
-      "If you want to track grow tent with AC Infinity or Spider Farmer controllers and keep those readings on the same timeline as your plant notes, Verdant Grow Diary is built for that: export a CSV from the controller app and import it on the Free plan, with every reading kept at its original time and labeled as CSV, never as live data. If you want a phone or web app that live-tracks both brands in one view, GrowLore lists AC Infinity and Spider Farmer as verified live today. Keep the official AC Infinity or Spider Farmer app for controlling fans, lights, and automations — Verdant does not replace your controller, and it does not live-sync with either brand. There's no single best app for every grower, so here is an honest comparison, including where Verdant is not the right pick. To be upfront: Verdant is new and still in early build.",
+      "If you want to track grow tent with AC Infinity or Spider Farmer controllers and keep those readings on the same timeline as your plant notes, Verdant Grow Diary is built for that: export a CSV from the controller app and import it on the Free plan (tested on real Spider Farmer GGS exports; AC Infinity app exports are not confirmed yet), with every reading kept at its original time and labeled as CSV, never as live data. If you want a phone or web app that live-tracks both brands in one view, GrowLore lists AC Infinity and Spider Farmer as verified live today. Keep the official AC Infinity or Spider Farmer app for controlling fans, lights, and automations — Verdant does not replace your controller, and it does not live-sync with either brand. There's no single best app for every grower, so here is an honest comparison, including where Verdant is not the right pick. To be upfront: Verdant is new and still in early build.",
     introCta: { label: CSV_IMPORT_CTA_LABEL, href: AC_INFINITY_CSV_IMPORT_CTA_HREF },
     sections: [
       {
@@ -776,7 +776,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           rows: [
             [
               "Verdant Grow Diary",
-              "Growers who want plant notes, photos, and controller history on one timeline. Runs in the browser; no native iOS or Android app yet. AC Infinity and Spider Farmer CSV import on Free, not live sync. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). No equipment control and no diary sharing; Pro reports print or save as PDF. Free; Pro $99/year or $12/month; Craft $249/year or $29/month.",
+              "Growers who want plant notes, photos, and controller history on one timeline. Runs in the browser; no native iOS or Android app yet. Spider Farmer CSV import on Free, tested on real GGS exports; AC Infinity app exports are not confirmed yet. Not live sync. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). No equipment control and no diary sharing; Pro reports print or save as PDF. Free; Pro $99/year or $12/month; Craft $249/year or $29/month.",
             ],
             [
               "GrowLore",
@@ -795,18 +795,18 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "When to pick which",
-        body: "Pick Verdant if you already own the controller and want a grow diary that puts AC Infinity or Spider Farmer history next to notes, photos, and later runs. Import is CSV, on Free, and Verdant never sends a command to your gear. Pick GrowLore if you want one phone or web view that live-tracks AC Infinity and Spider Farmer in the same place, or you care about local weather context around the tent. Pick the official AC Infinity or Spider Farmer app if you need to change fan speeds, light schedules, or automations, watch live readings from that brand's own hardware, or export the CSV in the first place. Spider Farmer history in the app only goes back as far as four months, so export if you want to keep it longer. You will still want the official app even if you use Verdant or GrowLore. You can use more than one. A common setup is the official app for control and export, and Verdant for the plant timeline.",
+        body: "Pick Verdant if you already own the controller and want a grow diary that puts controller history next to notes, photos, and later runs. Import is CSV, on Free, tested on real Spider Farmer GGS exports (AC Infinity app exports are not confirmed yet), and Verdant never sends a command to your gear. Pick GrowLore if you want one phone or web view that live-tracks AC Infinity and Spider Farmer in the same place, or you care about local weather context around the tent. Pick the official AC Infinity or Spider Farmer app if you need to change fan speeds, light schedules, or automations, watch live readings from that brand's own hardware, or export the CSV in the first place. Spider Farmer history in the app only goes back as far as four months, so export if you want to keep it longer. You will still want the official app even if you use Verdant or GrowLore. You can use more than one. A common setup is the official app for control and export, and Verdant for the plant timeline.",
       },
       {
         heading: "Import your CSV into Verdant",
         body: "",
         steps: [
-          "Export a CSV from your AC Infinity or Spider Farmer app.",
+          "Export a CSV from your Spider Farmer app or other controller (AC Infinity app exports are not confirmed yet).",
           'In Verdant, open Sensors and choose "Import historical data".',
           "Pick your file, check the preview, and import it.",
         ],
         closing:
-          "This works on the Free plan with no upgrade step. AC Infinity and Spider Farmer files both import into the same account, one CSV per controller, and each import maps to one tent. Free includes 1 tent; Pro adds multi-tent memory.",
+          "This works on the Free plan with no upgrade step. It's tested on real Spider Farmer GGS exports; AC Infinity app exports are not confirmed yet on a real file, so if you have one, send it through Contact and we'll check it. Import one CSV per controller; each import maps to one tent. Free includes 1 tent; Pro adds multi-tent memory.",
         continuations: [
           {
             heading: "Running several tents",
@@ -842,17 +842,17 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "What's the best app to track a grow tent with AC Infinity or Spider Farmer?",
         answer:
-          'It depends what "track" means. If you want a plant diary that imports both brands\' CSV history onto one timeline, Verdant is built for that and does it on the Free plan. If you want one phone or web app that live-tracks both brands in a single view, GrowLore lists AC Infinity and Spider Farmer as verified live today. If you need to control the equipment, use the official AC Infinity or Spider Farmer app.',
+          'It depends what "track" means. If you want a plant diary that imports controller CSV history onto one timeline, Verdant is built for that and does it on the Free plan; it\'s tested on real Spider Farmer GGS exports, and AC Infinity app exports are not confirmed yet. If you want one phone or web app that live-tracks both brands in a single view, GrowLore lists AC Infinity and Spider Farmer as verified live today. If you need to control the equipment, use the official AC Infinity or Spider Farmer app.',
       },
       {
         question: "Does Verdant live-sync my AC Infinity or Spider Farmer controller?",
         answer:
-          "No. Support for those brands is CSV import, included on Free. Each reading stays labeled as CSV, not live.",
+          "No. Verdant takes controller data as CSV import, included on Free. It's tested on real Spider Farmer GGS exports; AC Infinity app exports are not confirmed yet. Each reading stays labeled as CSV, not live.",
       },
       {
         question: "Can I mix AC Infinity and Spider Farmer data in one Verdant account?",
         answer:
-          "Yes. Both import into the same account, one CSV per controller. Each import maps to one tent. Free includes 1 tent; Pro adds multi-tent memory.",
+          "Not confirmed yet. Spider Farmer GGS exports import and are tested on real files, but AC Infinity app exports are not confirmed yet on a real file. Import one CSV per controller; each import maps to one tent. Free includes 1 tent; Pro adds multi-tent memory.",
       },
       {
         question: "Will imported readings look like live data?",
@@ -881,7 +881,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "How is Verdant different from GrowLore?",
         answer:
-          "GrowLore's homepage leads with a multi-brand live sensor hub and says AC Infinity and Spider Farmer are verified live today. Verdant is a browser-based grow diary: AC Infinity and Spider Farmer come in as CSV history, not live sync, and Verdant reads and logs that data without operating the controller. If live multi-brand tracking is what you want, GrowLore is the closer fit.",
+          "GrowLore's homepage leads with a multi-brand live sensor hub and says AC Infinity and Spider Farmer are verified live today. Verdant is a browser-based grow diary: controller data comes in as CSV history, not live sync (tested on real Spider Farmer GGS exports; AC Infinity app exports are not confirmed yet), and Verdant reads and logs that data without operating the controller. If live multi-brand tracking is what you want, GrowLore is the closer fit.",
       },
       {
         question: "What should I still use the official controller app for?",
@@ -968,9 +968,10 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
               'In Verdant, open Sensors and choose "Import historical data". It\'s included on Free.',
               "Find the readings in your tent's sensor history, source-labeled as CSV with their original times.",
             ],
-            closing: "Full guide for both brands: AC Infinity and Spider Farmer CSV import",
+            closing:
+              "Full guide, including where AC Infinity stands: tracking a grow tent with AC Infinity or Spider Farmer",
             closingLink: {
-              label: "AC Infinity and Spider Farmer CSV import",
+              label: "tracking a grow tent with AC Infinity or Spider Farmer",
               href: "/guides/ac-infinity-data-logging",
             },
             cta: { label: CSV_IMPORT_CTA_LABEL, href: SPIDER_FARMER_CSV_IMPORT_CTA_HREF },
@@ -1003,19 +1004,19 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
   },
   {
     slug: "import-grow-sensor-csv",
-    title: "Import AC Infinity & Spider Farmer CSV Logs Free | Verdant",
+    title: "Import Spider Farmer & Controller CSV Logs Free | Verdant",
     h1: "Is there an app that imports AC Infinity or Spider Farmer CSV sensor logs?",
     description:
       "Import your grow controller's CSV sensor history into a free grow diary. Which columns map, °F handling, VPD, file limits and fixes for skipped rows.",
     targetKeyword: "import grow controller csv",
     introHeading: "Quick answer",
     intro:
-      "Yes. Verdant imports the CSV you export from your AC Infinity or Spider Farmer app, free. Open Sensors → Import historical data, pick the file, check the preview and import. Verdant reads the time, temperature, humidity, VPD, CO₂, and PPFD/PAR columns. The temperature unit comes from the column header. If the header doesn't name it, Verdant asks This is °F or This is °C only when every sampled temperature is from 0 to 45. A sample above 45 is treated as °F with no question. Any other range is treated as °C with no question. Every reading stays at its original time, labeled as CSV, never as live data.",
+      "For Spider Farmer, yes. Verdant imports the CSV you export from the Spider Farmer app, free, and that's tested on real GGS exports. AC Infinity app exports are not confirmed yet on a real file, so they may not import cleanly yet; if you have one, send it through Contact and we'll check it. Open Sensors → Import historical data, pick the file, check the preview and import. Verdant reads the time, temperature, humidity, VPD, CO₂, and PPFD/PAR columns. The temperature unit comes from the column header. If the header doesn't name it, Verdant asks This is °F or This is °C only when every sampled temperature is from 0 to 45. A sample above 45 is treated as °F with no question. Any other range is treated as °C with no question. Every reading stays at its original time, labeled as CSV, never as live data.",
     modifiedOn: "2026-11-02",
     howTo: {
       name: "How to import a grow controller CSV",
       steps: [
-        "Export a CSV from your AC Infinity or Spider Farmer app.",
+        "Export a CSV from your Spider Farmer app or other controller (AC Infinity app exports are not confirmed yet).",
         "In Verdant, open Sensors and choose Import historical data (it's on mobile too).",
         "Choose your CSV, confirm the temperature unit if asked, check the preview, then import.",
       ],
@@ -1047,7 +1048,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
         heading: "How to import it",
         body: "",
         steps: [
-          "Export a CSV from your AC Infinity or Spider Farmer app.",
+          "Export a CSV from your Spider Farmer app or other controller (AC Infinity app exports are not confirmed yet).",
           "In Verdant, open Sensors and choose Import historical data (it's on mobile too).",
           "Choose your CSV, confirm the temperature unit if asked, check the preview, then import.",
         ],
@@ -1140,7 +1141,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Which CSV files can Verdant import?",
         answer:
-          "CSV exports from AC Infinity and Spider Farmer apps, and other environment CSVs with time plus temperature, humidity, VPD, CO₂, or PPFD/PAR columns. A PPFD, PAR, or photosynthetic header is read as PPFD. Files can be up to 25 MB.",
+          "CSV exports from the Spider Farmer app (tested on real GGS exports) and other environment CSVs with time plus temperature, humidity, VPD, CO₂, or PPFD/PAR columns. A PPFD, PAR, or photosynthetic header is read as PPFD. Files can be up to 25 MB. AC Infinity app exports are not confirmed yet on a real file.",
       },
       {
         question: "Where is CSV import in Verdant?",
@@ -1158,7 +1159,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Can I import data from more than one controller?",
         answer:
-          "Yes. Import one CSV per controller; each import maps to one tent, and AC Infinity and Spider Farmer files can live in the same account.",
+          "Yes. Import one CSV per controller; each import maps to one tent. Spider Farmer GGS files are tested on real exports; AC Infinity app exports are not confirmed yet.",
       },
     ],
     faqFooter: {
@@ -1590,7 +1591,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Growing past the template",
-        body: "When a template stops being enough — you want photos on entries, source-labeled sensor snapshots, CSV imports from AC Infinity or Spider Farmer gear, or a cautious AI review of a problem — Verdant's full Quick Log picks up where the starter leaves off. Nothing transfers on its own: your draft stays on your device until you review and save it yourself, with every extra strictly optional.",
+        body: "When a template stops being enough — you want photos on entries, source-labeled sensor snapshots, CSV imports from Spider Farmer and other controllers, or a cautious AI review of a problem — Verdant's full Quick Log picks up where the starter leaves off. Nothing transfers on its own: your draft stays on your device until you review and save it yourself, with every extra strictly optional.",
       },
     ],
     faq: [
@@ -2101,7 +2102,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       },
       {
         heading: "Use humidity and VPD history to identify high-risk periods",
-        body: "Open the plant timeline and scan the days before the first symptom. Look for humidity readings that stayed high for hours, temperature drops after lights-off that pushed humidity even higher, and VPD values that spent long stretches below your late-flower target. Every reading in Verdant carries a source label — live, manual, csv, demo, stale, or invalid — so a week-old or invalid number is flagged, not treated as current truth. CSV history imported from AC Infinity or Spider Farmer exports works the same way: read-only, source-labeled, and reviewable next to the photo you took.",
+        body: "Open the plant timeline and scan the days before the first symptom. Look for humidity readings that stayed high for hours, temperature drops after lights-off that pushed humidity even higher, and VPD values that spent long stretches below your late-flower target. Every reading in Verdant carries a source label — live, manual, csv, demo, stale, or invalid — so a week-old or invalid number is flagged, not treated as current truth. CSV history imported from Spider Farmer or other controller exports works the same way: read-only, source-labeled, and reviewable next to the photo you took.",
         links: [
           { label: "Sensor truth in the grow room", to: "/guides/sensor-truth-grow-room" },
           { label: "Review humidity & VPD history (Environment Check)", to: "/quick-log" },
@@ -2843,7 +2844,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
                 text: "Photos attach to the entry, so they land on the plant's timeline at the right date.",
               },
               {
-                text: "Sensor snapshots come from the gear you already own. AC Infinity and Spider Farmer exports import as CSV history on Free. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). Any reading, including from a TrolMaster, can be typed in by hand. Every reading is labeled live, manual, csv, demo, stale, or invalid, so old numbers never pass as current.",
+                text: "Sensor snapshots come from the gear you already own. Spider Farmer exports import as CSV history on Free, tested on real GGS exports; AC Infinity app exports are not confirmed yet. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). Any reading, including from a TrolMaster, can be typed in by hand. Every reading is labeled live, manual, csv, demo, stale, or invalid, so old numbers never pass as current.",
               },
               {
                 text: "Reminder entries let you put a date and time on the plant's timeline for the next feed or check. Verdant doesn't send reminder notifications yet.",
@@ -2862,7 +2863,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
           "Make a copy of your sheet and keep it. It stays the record of your past runs.",
           "Set up the current run. Create a free account, then add the grow, tent, and plants you're running now.",
           "Carry over what you'll actually look back at. Add one note per plant with the strain, start date, and the last feed, EC, and pH you used. A link to the old sheet in that note keeps the history one tap away.",
-          "Bring in your controller history. Sensor readings from AC Infinity or Spider Farmer go in from Sensors with Import historical data, free on every plan. EcoWitt read-only readings are built but not confirmed live yet.",
+          "Bring in your controller history. Spider Farmer readings go in from Sensors with Import historical data, free on every plan; AC Infinity app exports are not confirmed yet. EcoWitt read-only readings are built but not confirmed live yet.",
           "Log new entries in Verdant from today. Stop adding rows to the sheet so there's one place to look.",
         ],
         closing:
@@ -2924,7 +2925,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Can I import my Google Sheets or Excel grow diary into Verdant?",
         answer:
-          "Not yet. Verdant doesn't import spreadsheet grow diaries today. Keep your sheet as the archive for past runs and start your current run in Verdant. Controller sensor CSVs from AC Infinity and Spider Farmer can be imported.",
+          "Not yet. Verdant doesn't import spreadsheet grow diaries today. Keep your sheet as the archive for past runs and start your current run in Verdant. Controller sensor CSVs from Spider Farmer can be imported; AC Infinity app exports are not confirmed yet.",
       },
       {
         question: "Is importing AC Infinity or Spider Farmer CSVs the same thing?",
@@ -2944,7 +2945,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Does Verdant work with my sensors?",
         answer:
-          "AC Infinity and Spider Farmer come in as CSV imports on Free. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). Verdant reads data and never sends commands to your equipment. You can also type readings in by hand, including from a TrolMaster.",
+          "Spider Farmer comes in as CSV imports on Free, tested on real GGS exports; AC Infinity app exports are not confirmed yet. EcoWitt read-only readings are built but not confirmed live (you run a bridge on your own computer). Verdant reads data and never sends commands to your equipment. You can also type readings in by hand, including from a TrolMaster.",
       },
       {
         question: "Is Verdant free?",

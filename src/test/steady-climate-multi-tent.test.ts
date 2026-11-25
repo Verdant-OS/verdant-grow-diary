@@ -55,9 +55,7 @@ describe("steady climate multi-tent sections", () => {
     const section = STEADY_CLIMATE_GUIDE.sections.find((entry) => entry.id === "bring-in-readings");
     const paragraphs = section?.paragraphs ?? [];
     const text = paragraphs.join(" ");
-    expect(text).toMatch(
-      /CSV exports from AC Infinity or Spider Farmer on any plan, including Free/,
-    );
+    expect(text).toMatch(/CSV exports from Spider Farmer on any plan, including Free/);
     for (const sentence of text.split(/(?<=\.)\s+/)) {
       if (/CSV/i.test(sentence)) {
         expect(sentence).not.toMatch(/\bPro\b/);

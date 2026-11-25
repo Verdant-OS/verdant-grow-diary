@@ -8,7 +8,7 @@ branch: claude/project-thread-uapqkb (restarted from verdant-grow-diary @ 8c7a96
 base: verdant-grow-diary @ 8c7a96ab49c3af9b6dc497535f7ea8cebe6238e6
 pr: the draft PR opened from this branch
 head_sha: read the PR's current full head; a commit cannot name itself.
-state: RED commit pushed (test + copy scaffold with the old strings). Fix commit next. Local vitest/typecheck BLOCKED (node_modules partial, bun install 403); CI is the evidence.
+state: RED at 326ea4c602e2f5bdffe9a9362170dd49c028bc44; fix pushed in the next commit. Local vitest/typecheck BLOCKED (node_modules partial, bun install 403); CI is the evidence.
 next_action: Push the fix, get the 35 required checks green at the head, route one independent Seat A review through UK Cheese. Stays draft. No merge without Matthew's yes naming the PR and full SHA.
 post_merge_check: once /version.json reports the merged SHA, /onboarding (fresh Free account, 393x852) shows "Opens Quick Log now. Later sign-ins open your dashboard, one tap from Quick Log." under Quick Log; /settings Start screen shows "Diary-first. Sign-ins open your dashboard, one tap from Quick Log."
 decisions:

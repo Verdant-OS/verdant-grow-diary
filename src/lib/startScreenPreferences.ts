@@ -27,8 +27,9 @@ export const QUICK_LOG_START_ROUTE = "/dashboard?open=quick-log" as const;
  * on the dashboard with Quick Log closed (quickLogStartScreenTargetRules).
  */
 export const QUICK_LOG_START_SCREEN_SIGN_IN_COPY =
-  "Diary-first. Recommended — Verdant works best when logs come first, then sensors, then AI.";
-export const QUICK_LOG_START_SCREEN_ONBOARDING_COPY = QUICK_LOG_START_SCREEN_SIGN_IN_COPY;
+  "Diary-first. Sign-ins open your dashboard, one tap from Quick Log.";
+export const QUICK_LOG_START_SCREEN_ONBOARDING_COPY =
+  "Opens Quick Log now. Later sign-ins open your dashboard, one tap from Quick Log.";
 
 export const START_SCREEN_OPTIONS: ReadonlyArray<{
   key: StartScreenChoice;
@@ -43,6 +44,7 @@ export const START_SCREEN_OPTIONS: ReadonlyArray<{
     key: "quickLog",
     label: "Quick Log",
     description: QUICK_LOG_START_SCREEN_SIGN_IN_COPY,
+    onboardingDescription: QUICK_LOG_START_SCREEN_ONBOARDING_COPY,
     recommended: true,
   },
   { key: "timeline", label: "Timeline", description: "Open the diary timeline first." },

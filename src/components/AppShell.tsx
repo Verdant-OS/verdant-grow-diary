@@ -36,7 +36,8 @@ import {
   resolveMobileQuickLogTarget,
   resolvePlantQuickLogRouteTarget,
 } from "@/lib/quickLogRouteTargetRules";
-import { QuickLogLaunchTarget } from "@/lib/quickLogV2Rules";
+import { QuickLogLaunchTarget, type QuickLogV2Action } from "@/lib/quickLogV2Rules";
+import { AppShellQuickLogV2Entry } from "@/lib/appShellQuickLogV2Entry";
 import {
   buildRecentTargetStorageKey,
   parseRecentTargetRecord,
@@ -94,6 +95,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     protectedLocationRef.current = observedLocation;
   const location = protectedLocationRef.current;
   const previousNavigationKeyRef = useRef(location.key);
+  // Stripping ?open=quick-log navigates once. That navigation must not close
+  // the V2 sheet the intent just opened.
+  const keepScopedLogOpenRef = useRef(false);
   // Protected-route boundary: re-validate session against the auth server.
   // Keep both session checks on the same signed-out destination. Sending the
   // server revalidation and cached-session misses to /auth preserves the
@@ -138,6 +142,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const [structuredOpenIntent, setStructuredOpenIntent] = useState<
     QuickLogV2OpenIntent | QuickLogV2FeedOpenIntent | null
   >(null);
+  const [v2DefaultAction, setV2DefaultAction] = useState<QuickLogV2Action>("note");
   const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   // Set only by Start your room's one-shot hand-off: when this legacy Quick
@@ -181,6 +186,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     setDashboardAfterLegacyLog(false);
     setLegacyQuickLogSession((session) => session + 1);
     setStructuredOpenIntent(null);
+    setV2DefaultAction("note");
     setMobileLaunchTargetKey(launchTargetKey);
     setOpenScopedLog(true);
   }, [location.pathname, mobileQuickLogTarget, user?.id]);
@@ -238,12 +244,21 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   useEffect(() => {
     function onOpen(e: Event) {
       const detail = (e as CustomEvent<QuickLogPrefill>).detail ?? null;
-      setOpenScopedLog(false);
-      setMobileLaunchTargetKey(null);
-      setStructuredOpenIntent(null);
-      setDashboardAfterLegacyLog(false);
+      setOpenLog(false);
       setPrefill(detail);
-      setOpenLog(true);
+      setDashboardAfterLegacyLog(false);
+      setLegacyQuickLogSession((session) => session + 1);
+      setStructuredOpenIntent(null);
+      setV2DefaultAction(
+        AppShellQuickLogV2Entry.actionForEventType(
+          AppShellQuickLogV2Entry.eventTypeFromDetail(detail),
+        ),
+      );
+      setMobileLaunchTargetKey(
+        AppShellQuickLogV2Entry.plantTargetKey(AppShellQuickLogV2Entry.plantIdFromDetail(detail)),
+      );
+      keepScopedLogOpenRef.current = true;
+      setOpenScopedLog(true);
     }
     window.addEventListener(PLANT_QUICKLOG_PREFILL_EVENT, onOpen as EventListener);
     return () => window.removeEventListener(PLANT_QUICKLOG_PREFILL_EVENT, onOpen as EventListener);
@@ -267,21 +282,24 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     const startPrefill: QuickLogPrefill | null = startEventType
       ? { ...(routePrefill ?? {}), eventType: startEventType }
       : routePrefill;
-    setOpenScopedLog(false);
-    setMobileLaunchTargetKey(null);
+    setOpenLog(false);
+    setLegacyQuickLogSession((session) => session + 1);
     setStructuredOpenIntent(null);
     // An explicit open=quick-log marker reached this effect. Keep the guide
-    // prompt or activity, open Quick Log once, then drop the marker so a
+    // prompt or activity, open Quick Log V2 once, then drop the marker so a
     // refresh does not open it again. A saved preference with no marker
     // returned above and does not open Quick Log.
     setPrefill(guidePrefill ?? startPrefill);
+    setV2DefaultAction(AppShellQuickLogV2Entry.actionForEventType(startEventType));
+    setMobileLaunchTargetKey(AppShellQuickLogV2Entry.plantTargetKey(routePlantId));
     // Start your room's hand-off names this plant: the first close of this
     // Quick Log lands on the dashboard. Set only, never cleared here, so a
     // repeated effect run cannot drop a hand-off it already took.
     if (takeStartRoomDashboardHandoff(startRoomHandoffMemory, routePlantId)) {
       setDashboardAfterLegacyLog(true);
     }
-    setOpenLog(true);
+    keepScopedLogOpenRef.current = true;
+    setOpenScopedLog(true);
     nav(
       {
         pathname: location.pathname,
@@ -307,6 +325,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     if (previousNavigationKeyRef.current === location.key) return;
 
     previousNavigationKeyRef.current = location.key;
+    if (keepScopedLogOpenRef.current) {
+      keepScopedLogOpenRef.current = false;
+      return;
+    }
     setOpenScopedLog(false);
     setMobileLaunchTargetKey(null);
     setStructuredOpenIntent(null);
@@ -453,7 +475,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   className="md:hidden h-auto w-auto min-h-11 min-w-10 flex-col gap-0.5 px-0.5 py-1"
                 >
                   <Search className="h-4 w-4" aria-hidden="true" />
-                  <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">Search</span>
+                  <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">
+                    Search
+                  </span>
                 </Button>
                 {/* Quick Log is the single grower-facing logging entry
                     point on desktop. Opens QuickLogV2Sheet (Field Edition
@@ -477,7 +501,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   className="relative h-auto w-auto min-h-11 min-w-10 flex-col gap-0.5 px-0.5 py-1"
                 >
                   <Bell className="h-4 w-4" aria-hidden="true" />
-                  <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">Alerts</span>
+                  <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">
+                    Alerts
+                  </span>
                   {unread > 0 && (
                     <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
                   )}
@@ -492,7 +518,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                       className="h-auto w-auto min-h-11 min-w-10 flex-col gap-0.5 px-0.5 py-1"
                     >
                       <LogOut className="h-4 w-4" aria-hidden="true" />
-                      <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">Sign out</span>
+                      <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">
+                        Sign out
+                      </span>
                     </Button>
                   }
                 />
@@ -573,10 +601,15 @@ export default function AppShell({ children }: { children?: ReactNode }) {
             if (!nextOpen) {
               setMobileLaunchTargetKey(null);
               setStructuredOpenIntent(null);
+              setV2DefaultAction("note");
+              if (dashboardAfterLegacyLog) {
+                setDashboardAfterLegacyLog(false);
+                nav(START_ROOM_DASHBOARD_HREF);
+              }
             }
           }}
           defaultTargetKey={structuredOpenIntent?.targetKey ?? mobileLaunchTargetKey}
-          defaultAction={structuredOpenIntent?.action ?? "note"}
+          defaultAction={structuredOpenIntent?.action ?? v2DefaultAction}
           growContextId={readQuickLogRouteGrowContextId(location.search)}
         />
 

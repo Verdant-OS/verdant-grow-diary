@@ -20,6 +20,9 @@
  *   TEMP and RH of one capture and labels it with that capture's source.
  *   The snapshot view names such a VPD's own source in its status label
  *   ("Manual · 2m ago"); a cohort metric's label is one plain word or null.
+ *   An ok VPD the view marks `cohortInstant` (same capture instant and source
+ *   as TEMP and RH, for example a Quick Log reading read back from its diary
+ *   snapshot) is the same reading and keeps its slot, as the panel shows it.
  * - PPFD is not part of the tent snapshot view, so it never has a slot here.
  * - Sensors are receive-only; this reads a view model and writes nothing.
  */
@@ -48,6 +51,7 @@ const OTHER_CAPTURE_SEPARATOR = " · ";
 function isOtherCaptureVpd(metric: MetricView): boolean {
   const label = metric.statusLabel;
   if (label === null || label === undefined) return false;
+  if (metric.cohortInstant === true && metric.status === "ok") return false;
   return metric.status === "ok" || label.includes(OTHER_CAPTURE_SEPARATOR);
 }
 

@@ -14,7 +14,12 @@
  *
  * No I/O, no React, no automation, no device control.
  */
-import { captureRefIn, captureRefsKnown, rowCaptureRef } from "@/lib/sensorCaptureRefRules";
+import {
+  captureRefIn,
+  captureRefsKnown,
+  captureRefsMatch,
+  rowCaptureRef,
+} from "@/lib/sensorCaptureRefRules";
 import { format } from "date-fns";
 import { calculateVPD } from "@/lib/sensors/calculateVPD";
 import { isStale, snapshotFromReadings, type SensorReadingLike } from "@/lib/sensorSnapshot";
@@ -58,6 +63,14 @@ export interface MetricView {
    * (core-loop walk, 2026-11-18). Omitted when unknown or not a VPD.
    */
   origin?: VpdOrigin;
+  /**
+   * VPD only: set when a VPD from another record (it keeps its own source and
+   * age) has the latest cohort's capture instant and source, and the cohort is
+   * one capture. A Quick Log reading is such a case: Tonight reads it from the
+   * diary snapshot, but the cohort rows carry no diary identity. Omitted
+   * otherwise.
+   */
+  cohortInstant?: true;
 }
 
 /** Where a shown VPD number came from. */
@@ -604,7 +617,15 @@ export function buildTentSnapshotView(
   // its own source and age.
   let vpdReplaced = false;
   if (canonical !== null && !canonicalRejected && !useCanonicalVpd && canonical.kpa !== null) {
-    metrics[2] = ownCaptureVpdMetric({ ...canonical, kpa: canonical.kpa }, stage, now);
+    const cohortInstant =
+      sameInstant(canonical.capturedAt, snap.ts) &&
+      canonical.source === provenance &&
+      captureRefsKnown(cohortRefs) &&
+      cohortRefs.every((ref) => captureRefsMatch(ref, cohortRefs[0]));
+    metrics[2] = {
+      ...ownCaptureVpdMetric({ ...canonical, kpa: canonical.kpa }, stage, now),
+      ...(cohortInstant ? { cohortInstant: true as const } : {}),
+    };
     vpdReplaced = true;
   }
   // A rejected canonical VPD from a capture no older than the cohort is the

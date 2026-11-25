@@ -26,7 +26,6 @@ function loadWorkflow(name: string): Workflow {
 // Jobs that still inherit the repository default token. This list may only
 // shrink: scope a job and delete its entry here in the same change.
 const KNOWN_UNSCOPED_JOBS: ReadonlyArray<readonly [string, string]> = [
-  ["ci.yml", "test"],
   ["irrigation-pgtap-rls-gate.yml", "harness-typecheck"],
   ["irrigation-pgtap-rls-gate.yml", "pgtap-irrigation"],
 ];
@@ -100,8 +99,11 @@ describe("workflow GITHUB_TOKEN scoping", () => {
   it.each(READ_ONLY_WORKFLOWS)("%s grants only read access to contents", (name) => {
     const workflow = loadWorkflow(name);
     expect(workflow.permissions).toEqual({ contents: "read" });
+    // A job may repeat the same read-only scope; it may never widen it.
     for (const job of Object.values(workflow.jobs ?? {})) {
-      expect(job?.permissions).toBeUndefined();
+      if (job?.permissions !== undefined) {
+        expect(job.permissions).toEqual({ contents: "read" });
+      }
     }
   });
 });

@@ -28,6 +28,13 @@ export interface AiDoctorSessionActionQueueButtonProps {
   action: AiDoctorSuggestedActionLike;
   /** Optional override for the Action Queue list/detail route. */
   actionQueueHref?: string;
+  /**
+   * Id of an open Action Queue item the page already matched to this
+   * suggestion. When set, the button renders as already added instead of
+   * offering an add that the dedupe probe would only skip. The page owns the
+   * link to that item, so the button renders none of its own.
+   */
+  existingActionQueueId?: string | null;
 }
 
 type LocalState =
@@ -45,8 +52,16 @@ export function AiDoctorSessionActionQueueButton({
   session,
   action,
   actionQueueHref = DEFAULT_ACTION_QUEUE_HREF,
+  existingActionQueueId = null,
 }: AiDoctorSessionActionQueueButtonProps) {
-  const [state, setState] = useState<LocalState>({ kind: "idle" });
+  const [localState, setState] = useState<LocalState>({ kind: "idle" });
+  // A click result (loading / inserted / duplicate) outranks the page's match;
+  // otherwise a known linked item means there is nothing left to add.
+  const knownExisting =
+    existingActionQueueId && (localState.kind === "idle" || localState.kind === "error");
+  const state: LocalState = knownExisting
+    ? { kind: "duplicate", id: existingActionQueueId }
+    : localState;
   const mutation = useAddAiDoctorSessionSuggestionToActionQueue();
 
   if (!isSessionSuggestionEligibleForActionQueue(session, action)) {
@@ -99,7 +114,8 @@ export function AiDoctorSessionActionQueueButton({
       label = "Add to Action Queue";
   }
 
-  const linkId = state.kind === "inserted" || state.kind === "duplicate" ? state.id : null;
+  const linkId =
+    !knownExisting && (state.kind === "inserted" || state.kind === "duplicate") ? state.id : null;
 
   return (
     <div

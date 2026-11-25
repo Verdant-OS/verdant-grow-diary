@@ -351,7 +351,11 @@ function ReviewSummarySection({
                     </div>
                   ) : null}
                   {session ? (
-                    <AiDoctorSessionActionQueueButton session={session} action={a} />
+                    <AiDoctorSessionActionQueueButton
+                      session={session}
+                      action={a}
+                      existingActionQueueId={linkedMatch?.id ?? null}
+                    />
                   ) : null}
                 </li>
               );

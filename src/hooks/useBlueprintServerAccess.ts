@@ -24,8 +24,10 @@ export function useBlueprintServerAccess(
     staleTime: 60_000,
     retry: false,
   });
+  // A failed recheck keeps the last data in the cache, so require a successful
+  // query state too: an expired token or outage after an earlier allow locks.
   return {
-    allowed: enabled && query.data?.allowed === true,
+    allowed: enabled && query.isSuccess && query.data?.allowed === true,
     pending: enabled && query.isPending,
   };
 }

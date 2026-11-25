@@ -68,7 +68,7 @@ import {
   MANUAL_SENSOR_TRUTH_LINES,
   MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE,
 } from "@/constants/manualSensorTruthCopy";
-import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import { useOptionalDiaryEntries } from "@/hooks/useOptionalDiaryEntries";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
@@ -454,7 +454,7 @@ export default function QuickLog({
   const plants = useMemo(() => plantsQuery.data ?? [], [plantsQuery.data]);
   const activeTents = useMemo(() => tentsQuery.data ?? [], [tentsQuery.data]);
   const queryClient = useQueryClient();
-  const diaryEntries = useDiaryEntries();
+  const diaryEntries = useOptionalDiaryEntries();
   const recentDiaryRef = useRef(diaryEntries.data);
   recentDiaryRef.current = diaryEntries.data;
   const { save: saveViaRpc } = useQuickLogV2Save();
@@ -2364,7 +2364,9 @@ export default function QuickLog({
   }
 
   return (
-    <Dialog
+    <>
+      {diaryEntries.source}
+      <Dialog
       open={open}
       onOpenChange={(o) => {
         if (!o) {
@@ -4277,5 +4279,6 @@ export default function QuickLog({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

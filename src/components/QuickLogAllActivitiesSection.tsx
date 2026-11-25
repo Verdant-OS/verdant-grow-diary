@@ -141,7 +141,7 @@ import {
   QuickLogNoteRepeatSaveRules,
   buildQuickLogSavedNoteExcerpt,
 } from "@/lib/quickLogNoteSaveRules";
-import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import { useOptionalDiaryEntries } from "@/hooks/useOptionalDiaryEntries";
 import {
   buildSymptomTimelineHref,
   hasGuidedSymptomPlant,
@@ -324,7 +324,7 @@ export default function QuickLogAllActivitiesSection({
   onSaveSuccess,
   onPendingPhotoChange,
 }: QuickLogAllActivitiesSectionProps) {
-  const diaryEntries = useDiaryEntries();
+  const diaryEntries = useOptionalDiaryEntries();
   const recentDiaryRef = useRef(diaryEntries.data);
   recentDiaryRef.current = diaryEntries.data;
   const currentTarget = useMemo(
@@ -1614,6 +1614,7 @@ export default function QuickLogAllActivitiesSection({
       data-testid={testIdPrefix}
       className="rounded-2xl border border-border/60 bg-background/40 p-3 sm:p-4 space-y-3"
     >
+      {diaryEntries.source}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-semibold">{heading}</h3>
         <p

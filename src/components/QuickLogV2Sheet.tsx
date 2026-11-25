@@ -110,7 +110,7 @@ import {
   QuickLogReadingTime,
 } from "@/lib/quickLogReadingTime";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import { useOptionalDiaryEntries } from "@/hooks/useOptionalDiaryEntries";
 import {
   QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
   QuickLogNoteRepeatSaveRules,
@@ -519,7 +519,7 @@ function QuickLogV2SheetForOwner({
     [tentsQ.data],
   );
   const queryClient = useQueryClient();
-  const diaryEntries = useDiaryEntries();
+  const diaryEntries = useOptionalDiaryEntries();
   const recentDiaryRef = useRef(diaryEntries.data);
   recentDiaryRef.current = diaryEntries.data;
   const temperatureUnit = useTemperatureUnitPreference();
@@ -3392,6 +3392,17 @@ function QuickLogV2SheetForOwner({
 
   function handleLogAnother() {
     if (recoveryStorageFence) return;
+    // "Log another" is a deliberate new entry. Drop only the optimistic note
+    // this sheet just remembered so that action can write again. A note that
+    // came back from diary history still blocks a repeat inside the window.
+    queryClient.setQueryData(["diary_entries"], (current) => {
+      if (!Array.isArray(current)) return current;
+      return current.filter((row) => {
+        if (!row || typeof row !== "object") return true;
+        const id = (row as { id?: unknown }).id;
+        return typeof id !== "string" || !id.startsWith("quick-log-note-");
+      });
+    });
     setRestoredMediaPending(false);
     idempotencyKeyRef.current = rotateQuickLogIdempotencyKey(idempotencyKeyRef.current);
     setPostSave(null);
@@ -3500,6 +3511,7 @@ function QuickLogV2SheetForOwner({
 
   return (
     <Sheet open={open} onOpenChange={handleSheetOpenChange}>
+      {diaryEntries.source}
       <SheetContent
         side="bottom"
         className="max-h-[92vh] overflow-y-auto text-base"

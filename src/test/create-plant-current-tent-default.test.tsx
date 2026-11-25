@@ -7,6 +7,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { cloneElement, isValidElement } from "react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveCreatePlantCurrentTentId } from "@/lib/createPlantCurrentTentDefaultRules";
@@ -193,9 +194,11 @@ import CreatePlantDialog from "@/components/CreatePlantDialog";
 
 function renderDialog(node: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // A fresh element on every render, so a rerender re-reads the mocked hooks.
+  // Reusing the same element lets React skip the dialog entirely.
   const wrap = () => (
     <QueryClientProvider client={client}>
-      <MemoryRouter>{node}</MemoryRouter>
+      <MemoryRouter>{isValidElement(node) ? cloneElement(node) : node}</MemoryRouter>
     </QueryClientProvider>
   );
   const result = render(wrap());

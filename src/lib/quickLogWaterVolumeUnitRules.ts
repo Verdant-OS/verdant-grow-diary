@@ -70,6 +70,16 @@ export function mlToWaterEntryDisplay(ml: number, unit: WaterEntryUnit): string 
   return shown === "0" && ml > 0 ? String(Number(value.toPrecision(2))) : shown;
 }
 
+/**
+ * Readback text for a stored ml amount, with the unit symbol: "1.5 L", "0.4 gal", "1500 ml".
+ * Display only. `ml` keeps today's "<n> ml" text, and a value the unit display rejects
+ * (negative) falls back to it, so no stored value disappears.
+ */
+export function formatStoredWaterVolume(ml: number, unit: WaterEntryUnit): string {
+  const shown = unit === "ml" ? "" : mlToWaterEntryDisplay(ml, unit);
+  return shown === "" ? `${ml} ml` : `${shown} ${unit}`;
+}
+
 /** The text a field shows: the grower's typed text, else the canonical ml in `unit`. */
 export function waterEntryDisplayText(
   enteredText: string | undefined,

@@ -16,6 +16,21 @@ export function waterVolumeFieldLabel(unit: WaterEntryUnit): string {
   return `Volume (${WATER_ENTRY_UNIT_LABELS[unit]})`;
 }
 
+/**
+ * Example amount shown in the empty Volume field, in the entry unit, so the
+ * hint never reads as an amount in another unit ("e.g. 500" in liters is
+ * 500 L). Display only; nothing is converted or saved from it.
+ */
+const WATER_VOLUME_PLACEHOLDER_AMOUNTS: Readonly<Record<WaterEntryUnit, string>> = Object.freeze({
+  ml: "500",
+  L: "1.5",
+  gal: "0.5",
+});
+
+export function waterVolumePlaceholder(unit: WaterEntryUnit): string {
+  return `e.g. ${WATER_VOLUME_PLACEHOLDER_AMOUNTS[unit]}`;
+}
+
 export function runoffFieldLabel(unit: WaterEntryUnit): string {
   return `Runoff (${WATER_ENTRY_UNIT_LABELS[unit]})`;
 }

@@ -43,6 +43,7 @@ import {
   type McpSensorQueryRow,
   type McpSensorReading,
 } from "../../operatorAccountReadModels";
+import { asStructuredJson } from "./_json";
 import { supabaseForUser, unauthenticated } from "./_supabase";
 
 export { selectLatestMcpSensorReadings };
@@ -107,7 +108,7 @@ export default defineTool({
           text: `Latest readings for tent "${result.data.tent.name}":\n${summary}`,
         },
       ],
-      structuredContent: { snapshot: result.data.snapshot },
+      structuredContent: asStructuredJson({ snapshot: result.data.snapshot }),
     };
   },
 });

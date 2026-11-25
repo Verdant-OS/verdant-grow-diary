@@ -47,6 +47,12 @@ jobs:
     name: Gamification RLS + award_nugs smoke (staging)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The database admin key lives only in this protected environment, never as a
+    # repository secret, so branch code cannot read it. A run waits for a
+    # required reviewer before the secret is released.
+    environment: supabase-admin
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

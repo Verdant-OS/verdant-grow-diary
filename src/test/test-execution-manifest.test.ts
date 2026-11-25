@@ -208,6 +208,11 @@ function pgTapExemptions(): Record<string, { class: string; reason: string }> {
   ]) {
     out[file] = { class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE, reason: blocked };
   }
+  out["supabase/tests/posthog_first_paid_activation.sql"] = {
+    class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
+    reason:
+      "Badge pgTAP and test:security-db-local apply this migration on db reset, but neither asserts its logic. Applied but its logic is not tested in CI.",
+  };
   out["supabase/tests/billing_subscriptions_rls.sql"] = {
     class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE,
     reason: `${blocked} ADDITIONALLY BROKEN: line 59 calls max(user_id) on a uuid column, and max(uuid) does not exist in PostgreSQL — proven on a throwaway PG 16.13 cluster (0 rows in pg_aggregate; "ERROR: function max(uuid) does not exist", with max(text) as a passing control). Note it is not necessarily the FIRST error: without psql variables the file dies earlier at "syntax error at or near \\":\\"". Wiring this lane will not make this suite pass.`,
@@ -255,6 +260,23 @@ function harnessExemptions(): Record<string, { class: string; reason: string }> 
     "scripts/run-quicklog-typed-payloads-harness.ts",
   ]) {
     out[file] = { class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE, reason: onlyMentioned };
+  }
+  // #3025 removed the only workflow line naming these: a ci.yml step that passed the
+  // repository's database admin key to a pull-request job. That step's `if` read env set
+  // only in its own env block, so it never ran (workflow-branch-filter-liveness.test.ts
+  // records the same broken gate in gamification-staging-smoke.yml). The save-event and
+  // save-manual harnesses create users and write rows with the admin key and have no host
+  // check of their own; the runner now refuses a non-loopback host before spawning any of
+  // them (quicklog-rpc-orchestrator-loopback-guard.test.ts), as dual-timestamp already did.
+  // They need a local Supabase lane, not a CI secret.
+  const localOnlyQuickLogRpc =
+    "Runtime harness that writes with the service-role key; run it only against a local disposable Supabase. run-quicklog-rpc-rls-harnesses.ts refuses a non-loopback host before running save-event, save-manual and dual-timestamp; run directly, save-event and save-manual have no host check. Its only CI caller was a ci.yml step that never ran and handed the admin key to pull-request code; #3025 removed it. Wire into a local-Supabase lane like community-v1-db-proof.yml.";
+  for (const file of [
+    "scripts/run-quicklog-rpc-rls-harnesses.ts",
+    "scripts/run-quicklog-save-event-rls-harness.ts",
+    "scripts/run-quicklog-save-manual-rls-harness.ts",
+  ]) {
+    out[file] = { class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE, reason: localOnlyQuickLogRpc };
   }
   return out;
 }
@@ -316,7 +338,7 @@ describe("test execution manifest — every committed test runs, or says why not
       byClass[entry.class] = (byClass[entry.class] ?? 0) + 1;
     }
     expect(byClass).toEqual({
-      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 21,
+      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 25,
       [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
       [EXEMPTION_CLASS.RED_WHEN_RUN]: 2,
       [EXEMPTION_CLASS.AWAITING_DECISION]: 2,

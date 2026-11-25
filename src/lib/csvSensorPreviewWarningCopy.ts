@@ -16,6 +16,14 @@ export interface WarningExplanation {
 }
 
 export const CSV_PREVIEW_WARNING_COPY: Record<FlagCode, WarningExplanation> = {
+  saturated_reading_run: {
+    title: "Saturated reading run",
+    whyItMatters:
+      "A long run of identical 0% or 100% readings is usually a saturated, disconnected, or faulted probe. The other rows in the file are unchanged.",
+    suggestedFix:
+      "Compare the run length and time range with the room. Keep the rows if the medium was actually saturated.",
+    severity: "warn",
+  },
   humidity_stuck: {
     title: "Humidity reading looks stuck",
     whyItMatters:

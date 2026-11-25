@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
-import { Outlet, useLocation, useNavigate } from "@/lib/react-router-compat";
+import { Link, Outlet, useLocation, useNavigate } from "@/lib/react-router-compat";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -53,6 +53,11 @@ function readLastUsedQuickLogKey(userId: string | null): string | null {
   }
 }
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
+import {
+  START_ROOM_DASHBOARD_HREF,
+  startRoomHandoffMemory,
+  takeStartRoomDashboardHandoff,
+} from "@/lib/startRoomDashboardHandoff";
 import {
   QUICK_LOG_FAB_CONTENT_CLEARANCE_CLASS,
   QUICK_LOG_FAB_PAGE_BODY_CLEARANCE_CLASS,
@@ -135,6 +140,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   >(null);
   const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
+  // Set only by Start your room's one-shot hand-off: when this legacy Quick
+  // Log next closes (saved or dismissed), land on the dashboard.
+  const [dashboardAfterLegacyLog, setDashboardAfterLegacyLog] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const registerTentQuickLogTarget = useCallback((registration: TentQuickLogTargetRegistration) => {
     setTentQuickLogTargetEvidence((current) => {
@@ -170,6 +178,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     // before opening V2, so two modal focus locks can never remain active.
     setOpenLog(false);
     setPrefill(null);
+    setDashboardAfterLegacyLog(false);
     setLegacyQuickLogSession((session) => session + 1);
     setStructuredOpenIntent(null);
     setMobileLaunchTargetKey(launchTargetKey);
@@ -201,6 +210,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       // before opening V2, so two modal focus locks can never remain active.
       setOpenLog(false);
       setPrefill(null);
+      setDashboardAfterLegacyLog(false);
       setLegacyQuickLogSession((session) => session + 1);
       setMobileLaunchTargetKey(null);
       setStructuredOpenIntent(detail);
@@ -212,6 +222,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       if (!isQuickLogV2FeedOpenIntent(detail)) return;
       setOpenLog(false);
       setPrefill(null);
+      setDashboardAfterLegacyLog(false);
       setLegacyQuickLogSession((session) => session + 1);
       setMobileLaunchTargetKey(null);
       setStructuredOpenIntent(detail);
@@ -230,6 +241,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       setOpenScopedLog(false);
       setMobileLaunchTargetKey(null);
       setStructuredOpenIntent(null);
+      setDashboardAfterLegacyLog(false);
       setPrefill(detail);
       setOpenLog(true);
     }
@@ -263,6 +275,12 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     // refresh does not open it again. A saved preference with no marker
     // returned above and does not open Quick Log.
     setPrefill(guidePrefill ?? startPrefill);
+    // Start your room's hand-off names this plant: the first close of this
+    // Quick Log lands on the dashboard. Set only, never cleared here, so a
+    // repeated effect run cannot drop a hand-off it already took.
+    if (takeStartRoomDashboardHandoff(startRoomHandoffMemory, routePlantId)) {
+      setDashboardAfterLegacyLog(true);
+    }
     setOpenLog(true);
     nav(
       {
@@ -397,10 +415,19 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                 <SidebarTrigger />
               </div>
               <div className="md:hidden">
-                <BrandLogo size="md" showText />
+                {/* On phones the Tent tab opens the grower's tent, so the logo
+                    is the one-tap way home to the Dashboard. */}
+                <Link
+                  to="/"
+                  aria-label="Dashboard"
+                  data-testid="app-shell-home-link"
+                  className="inline-flex rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <BrandLogo size="md" showText />
+                </Link>
               </div>
 
-              <div className="ml-auto flex items-center gap-2">
+              <div className="ml-auto flex items-center gap-1 md:gap-2">
                 <button
                   type="button"
                   onClick={() => setSearchOpen(true)}
@@ -423,9 +450,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   onClick={() => setSearchOpen(true)}
                   aria-label="Search"
                   data-testid="mobile-global-search-trigger"
-                  className="md:hidden"
+                  className="md:hidden h-auto w-auto min-h-11 min-w-10 flex-col gap-0.5 px-0.5 py-1"
                 >
-                  <Search className="h-4 w-4" />
+                  <Search className="h-4 w-4" aria-hidden="true" />
+                  <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">Search</span>
                 </Button>
                 {/* Quick Log is the single grower-facing logging entry
                     point on desktop. Opens QuickLogV2Sheet (Field Edition
@@ -446,9 +474,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   size="icon"
                   onClick={() => nav("/alerts")}
                   aria-label="Alerts"
-                  className="relative"
+                  className="relative h-auto w-auto min-h-11 min-w-10 flex-col gap-0.5 px-0.5 py-1"
                 >
-                  <Bell className="h-4 w-4" />
+                  <Bell className="h-4 w-4" aria-hidden="true" />
+                  <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">Alerts</span>
                   {unread > 0 && (
                     <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-background" />
                   )}
@@ -456,8 +485,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                 <AuthStatusIndicator className="hidden sm:inline-flex" />
                 <SignOutConfirmDialog
                   trigger={
-                    <Button variant="ghost" size="icon" aria-label="Sign out">
-                      <LogOut className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Sign out"
+                      className="h-auto w-auto min-h-11 min-w-10 flex-col gap-0.5 px-0.5 py-1"
+                    >
+                      <LogOut className="h-4 w-4" aria-hidden="true" />
+                      <span className="whitespace-nowrap text-[10px] font-medium leading-none tracking-tight">Sign out</span>
                     </Button>
                   }
                 />
@@ -521,6 +556,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
             if (!o) {
               setPrefill(null);
               setLegacyQuickLogSession((session) => session + 1);
+              if (dashboardAfterLegacyLog) {
+                setDashboardAfterLegacyLog(false);
+                nav(START_ROOM_DASHBOARD_HREF);
+              }
             }
           }}
           prefill={prefill}

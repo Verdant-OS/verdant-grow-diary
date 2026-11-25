@@ -44,7 +44,7 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 };
 
 // Configuration
-const SITE_NAME = "verdantgrowdiary-com";
+const SITE_NAME = "Verdant Grow Diary";
 const SENDER_DOMAIN = "notify.verdantgrowdiary.com";
 const ROOT_DOMAIN = "verdantgrowdiary.com";
 const FROM_DOMAIN = "verdantgrowdiary.com"; // Domain shown in From address (may be root or sender subdomain)

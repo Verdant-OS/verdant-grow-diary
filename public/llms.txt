@@ -1,15 +1,15 @@
 # Verdant Grow Diary
 
-> Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators. Verdant is plant memory, sensor truth, and grower-approved action — not a device controller.
+> Grow logs, sensor-aware insights, environment alerts, and cautious AI coaching for serious cultivators. Verdant is plant memory, sensor truth, and grower-approved action - not a device controller.
 
 Verdant Grow Diary helps cultivators keep a structured plant memory across grows: diary entries, photos, source-labeled sensor snapshots (live, manual, CSV), cautious AI diagnostics, and an approval-required Action Queue. Hardware-neutral. Never blindly automates or controls equipment.
 
 ## Pages
 
-- [Home](/): Product overview — plant memory, sensor truth, cautious AI, grower-approved actions.
-- [Pricing](/pricing): Free, Pro (monthly/annual), and Craft tiers, feature comparison, and FAQ.
-- [Hardware integrations](/hardware-integrations): Supported ways to bring sensor data in — manual entry, CSV import, webhook, MQTT, ESP32, Raspberry Pi bridge. Read-only.
-- [30-second Quick Log starter](/quick-log): Try a first grow-diary note without an account — the draft stays on your device until you sign up.
+- [Home](/): Product overview - plant memory, sensor truth, cautious AI, grower-approved actions.
+- [Pricing](/pricing): Free plan ($0); Pro $12/month or $99/year; Craft $29/month or $249/year; one-time AI Doctor credit packs (50 for $9, 150 for $19). Feature comparison and FAQ.
+- [Hardware integrations](/hardware-integrations): Supported ways to bring sensor data in - manual entry, CSV import, webhook, MQTT, ESP32, Raspberry Pi bridge. Read-only.
+- [30-second Quick Log starter](/quick-log): Try a first grow-diary note without an account - the draft stays on your device until you sign up.
 - [Best grow diary app for cannabis](/guides/grow-diary-app): An honest comparison of Verdant, Grow with Jane, GrowDiaries, and spreadsheets for home cannabis growers.
 - [How to log your grow without spreadsheets](/guides/grow-log-without-spreadsheets): What to log per plant, what to do with an existing Google Sheets or Excel grow log, and offline grow journal options.
 - [Cronk Nutrients grow diary guide](/guides/cronk-nutrients-grow-diary): Track the official chart step, actual feed, pH/EC, runoff trends, environment, photos, and plant response without copying or replacing the manufacturer's chart.

@@ -2,10 +2,26 @@
  * Pure rules + storage access for the in-app analytics consent gate.
  *
  * No analytics code may run until `readAnalyticsConsent()` returns "granted".
- * The decision is stored locally (per browser/profile) and never sent anywhere.
+ * The decision is stored locally. AI edge calls send the header value "granted"
+ * only after that read returns granted and the page is an exact production host.
  */
 
+import { isAnalyticsCollectionHost } from "@/lib/posthogAnalyticsRules";
+
 export const ANALYTICS_CONSENT_STORAGE_KEY = "verdant.analytics-consent.v1";
+
+/** Sent on AI edge calls only after consent on an exact production host. */
+export const ANALYTICS_CONSENT_REQUEST_HEADER = "x-verdant-analytics-consent";
+
+export function grantedAnalyticsConsentHeaders(
+  hostname: string | null | undefined = typeof window === "undefined"
+    ? null
+    : window.location.hostname,
+): { "x-verdant-analytics-consent": "granted" } | undefined {
+  if (readAnalyticsConsent() !== "granted") return undefined;
+  if (!isAnalyticsCollectionHost(hostname)) return undefined;
+  return { [ANALYTICS_CONSENT_REQUEST_HEADER]: "granted" };
+}
 
 export type AnalyticsConsentDecision = "granted" | "denied" | "unset";
 
@@ -106,15 +122,4 @@ export function subscribeToAnalyticsConsent(listener: () => void): () => void {
     window.removeEventListener(CONSENT_CHANGE_EVENT, listener);
     window.removeEventListener("storage", onStorage);
   };
-}
-
-/**
- * True when reloading this document would not turn analytics back on: either no
- * stale grant is left in storage, or the session-scoped denial written after a
- * failed revoke is readable (a fresh document then reads "denied").
- */
-export function revocationSurvivesReload(): boolean {
-  if (typeof window === "undefined") return false;
-  if (!persistedGrantWouldSurviveReload()) return true;
-  return readSessionDenial();
 }

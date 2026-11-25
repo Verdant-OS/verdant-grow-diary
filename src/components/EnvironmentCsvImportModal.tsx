@@ -10,7 +10,7 @@
  *  - Never renders a "Live" badge for CSV. Never derives Live VPD anywhere.
  *  - Cancel never inserts.
  */
-import { useCallback, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useInRouterContext } from "@/lib/react-router-compat";
 import {
   Dialog,
@@ -45,6 +45,15 @@ import {
   parseEnvironmentCSV,
   type ParsedEnvironmentRow,
 } from "@/lib/csvParser";
+import {
+  GGS_CSV_ROOM_MISMATCH_TEST_ID,
+  GgsCsvRoomMismatchRules,
+} from "@/lib/ggsCsvRoomMismatchRules";
+import {
+  ENVIRONMENT_CSV_SATURATED_RUN_TEST_ID,
+  EnvironmentCsvSaturatedRunRules,
+} from "@/lib/environmentCsvSaturatedRunRules";
+import { CSV_PREVIEW_WARNING_COPY } from "@/lib/csvSensorPreviewWarningCopy";
 import {
   UNKNOWN_CSV_HISTORY_WINDOW,
   buildCsvHistoryWindowPreview,
@@ -111,6 +120,12 @@ export interface EnvironmentCsvImportModalProps {
   addCurrentReadingHref?: string | null;
   historyWindow?: CsvHistoryWindow;
   onRetryHistoryWindow?: () => void;
+  /**
+   * Optional tent lookup for Spider Farmer room ids already stored as CSV
+   * provenance. Omitted lookups show no room warning. A failure shows no
+   * warning and does not block confirm.
+   */
+  lookupDifferentGgsRoomIds?: (fileRoomIds: readonly string[]) => Promise<readonly string[]>;
 }
 
 const ERROR_COPY: Record<string, string> = {
@@ -150,6 +165,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
     addCurrentReadingHref = null,
     historyWindow = UNKNOWN_CSV_HISTORY_WINDOW,
     onRetryHistoryWindow,
+    lookupDifferentGgsRoomIds,
   } = props;
   // The handoff CTA is a router Link; render it only when a Router is
   // actually mounted so bare mounts (tests, storybook-style harnesses)
@@ -162,6 +178,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
   const parseGenRef = useRef(0);
   const [zoneChoice, setZoneChoice] = useState("");
   const [undoing, setUndoing] = useState(false);
+  const [roomMismatchWarning, setRoomMismatchWarning] = useState<string | null>(null);
   const zoneSelectId = useId();
   const { deviceZone, zones } = useMemo(listTimeZones, []);
 
@@ -281,6 +298,30 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
     }
   }, [handleClose, onUndoImport, undoing]);
 
+  const fileRoomIds = useMemo(
+    () => GgsCsvRoomMismatchRules.fileRoomIds(state.parsed?.validRows ?? []),
+    [state.parsed],
+  );
+  const fileRoomKey = fileRoomIds.join("\u0000");
+  useEffect(() => {
+    if (!lookupDifferentGgsRoomIds || fileRoomIds.length === 0 || state.phase !== "preview") {
+      setRoomMismatchWarning(null);
+      return;
+    }
+    let cancelled = false;
+    void lookupDifferentGgsRoomIds(fileRoomIds)
+      .then((stored) => {
+        if (cancelled) return;
+        setRoomMismatchWarning(GgsCsvRoomMismatchRules.warning(fileRoomIds, stored));
+      })
+      .catch(() => {
+        if (!cancelled) setRoomMismatchWarning(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fileRoomKey, fileRoomIds, lookupDifferentGgsRoomIds, state.phase]);
+
   const coverage = buildCoveragePreview(state.parsed);
   const timePreview = buildTimePreview(state.parsed);
   const timeUnresolved = hasUnresolvedTime(state.parsed);
@@ -291,6 +332,10 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
   const soilNote = csvSoilMeaningNote(
     parsedRows.some((r) => r.soil_moisture_pct != null),
     parsedRows.some((r) => r.soil_ec != null),
+  );
+  const saturatedRunWarnings = useMemo(
+    () => EnvironmentCsvSaturatedRunRules.warnings(state.parsed?.validRows ?? []),
+    [state.parsed],
   );
   const windowPreview = buildCsvHistoryWindowPreview(
     state.parsed?.validRows ?? [],
@@ -551,6 +596,31 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
                 >
                   Undo
                 </Button>
+              </div>
+            ) : null}
+            {roomMismatchWarning ? (
+              <p
+                role="status"
+                data-testid={GGS_CSV_ROOM_MISMATCH_TEST_ID}
+                className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100"
+              >
+                {roomMismatchWarning}
+              </p>
+            ) : null}
+            {saturatedRunWarnings.length > 0 ? (
+              <div
+                role="status"
+                data-testid={ENVIRONMENT_CSV_SATURATED_RUN_TEST_ID}
+                className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100"
+              >
+                <ul className="space-y-0.5">
+                  {saturatedRunWarnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+                <p className="text-xs">
+                  {CSV_PREVIEW_WARNING_COPY.saturated_reading_run.whyItMatters}
+                </p>
               </div>
             ) : null}
             <ul

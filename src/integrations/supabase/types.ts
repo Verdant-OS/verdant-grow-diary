@@ -1526,6 +1526,24 @@ export type Database = {
           },
         ]
       }
+      first_paid_activation_receipts: {
+        Row: {
+          activated_at: string
+          event_id: string
+          user_id: string
+        }
+        Insert: {
+          activated_at: string
+          event_id?: string
+          user_id: string
+        }
+        Update: {
+          activated_at?: string
+          event_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       feeding_events: {
         Row: {
           created_at: string
@@ -5346,6 +5364,7 @@ export type Database = {
         Args: { _tent_id: string }
         Returns: Json
       }
+      get_my_first_paid_activation: { Args: never; Returns: Json }
       grant_lovable_credit_pack: {
         Args: {
           p_credits: number

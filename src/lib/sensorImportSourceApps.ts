@@ -20,6 +20,11 @@
  */
 
 import { parseCsv } from "@/lib/csvSensorImportRules";
+import {
+  SaturatedReadingRunRules,
+  type SaturatedReadingMetric,
+  type SaturatedReadingSample,
+} from "@/lib/saturatedReadingRunRules";
 
 // ---------- constants ----------
 
@@ -330,6 +335,7 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
   const rejectionReasons: Record<string, number> = {};
   let accepted = 0;
   let rejected = 0;
+  let humidityHadGap = false;
 
   // Column indices for the active mapping.
   const idx = (h: string | null | undefined): number => (h == null ? -1 : headers.indexOf(h));
@@ -356,6 +362,7 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
     let anyMetric = false;
     for (const m of metricIdx) {
       const v = parseMetricCell(cells[m.col]);
+      if (m.metric === "humidity_pct" && v == null) humidityHadGap = true;
       if (v != null) {
         anyMetric = true;
         if (m.metric === "humidity_pct") {
@@ -395,10 +402,12 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
 
   // humidity stuck at 0 or 100 across all sampled rows.
   const humSamples = stuckSamples.humidity_pct ?? [];
+  let humidityWholeColumnStuck = false;
   if (humSamples.length >= 5) {
     const allZero = humSamples.every((v) => v === 0);
     const allHundred = humSamples.every((v) => v === 100);
-    if (allZero || allHundred) {
+    if (!humidityHadGap && (allZero || allHundred)) {
+      humidityWholeColumnStuck = true;
       warnings.push({
         code: "humidity_stuck",
         message: `Humidity values are stuck at ${allZero ? 0 : 100}% — likely a faulty sensor or bad export.`,
@@ -457,12 +466,16 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
     if (SOIL_MOISTURE_PATTERNS.test(h)) {
       const i = headers.indexOf(h);
       const vals: number[] = [];
+      let soilGap = false;
       for (const cells of parsed.rows) {
         const v = parseMetricCell(cells[i]);
-        if (v != null) vals.push(v);
-        if (vals.length >= 25) break;
+        if (v == null) {
+          soilGap = true;
+          continue;
+        }
+        vals.push(v);
       }
-      if (vals.length >= 5) {
+      if (!soilGap && vals.length >= 5) {
         const allZero = vals.every((v) => v === 0);
         const allHundred = vals.every((v) => v === 100);
         if (allZero || allHundred) {
@@ -473,6 +486,41 @@ export function summarizeImportPreview(csvText: string, hint?: SourceAppId): Sou
           });
         }
       }
+      break;
+    }
+  }
+
+  const tsCol = idx(mapping.timestamp);
+  const pushRuns = (
+    metric: SaturatedReadingMetric,
+    column: string | undefined,
+    alreadyWholeColumn: boolean,
+  ) => {
+    if (!column || alreadyWholeColumn) return;
+    const col = idx(column);
+    if (col < 0) return;
+    const samples: SaturatedReadingSample[] = [];
+    parsed.rows.forEach((cells, index) => {
+      const at = tsCol >= 0 ? String(cells[tsCol] ?? "").trim() : "";
+      samples.push({ value: parseMetricCell(cells[col]), at: at || null, index });
+    });
+    for (const run of SaturatedReadingRunRules.findRuns(metric, samples)) {
+      warnings.push({
+        code: metric === "humidity_pct" ? "humidity_stuck" : "soil_moisture_stuck",
+        message: SaturatedReadingRunRules.describe(run),
+        metric: metric === "humidity_pct" ? "humidity_pct" : undefined,
+        column,
+      });
+    }
+  };
+
+  pushRuns("humidity_pct", mapping.mapped.humidity_pct, humidityWholeColumnStuck);
+  for (const h of headers) {
+    if (SOIL_MOISTURE_PATTERNS.test(h.replace(/_/g, " "))) {
+      const already = warnings.some(
+        (warning) => warning.code === "soil_moisture_stuck" && warning.column === h,
+      );
+      pushRuns("soil_moisture_pct", h, already);
       break;
     }
   }

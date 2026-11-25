@@ -15,7 +15,7 @@
 //  - Response is always { ok: true, answer } or { ok: false, reason }.
 //
 // Deploy prerequisites (founder): deploy this function and set LOVABLE_API_KEY.
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { corsHeaders as supabaseCorsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
 import { loadUnionEntitlement } from "../_shared/unionEntitlementLookup.ts";
@@ -29,6 +29,18 @@ import {
   parseCultivarQaRequest,
   readBoundedJsonBody,
 } from "../_shared/cultivarQaGrounding.ts";
+import {
+  captureAiGeneration,
+  requestGrantsAnalyticsCapture,
+} from "../_shared/posthogAiObservability.ts";
+
+const CULTIVAR_QA_MODEL = "google/gemini-2.5-flash";
+
+const sharedAllowHeaders = supabaseCorsHeaders["Access-Control-Allow-Headers"] ?? "";
+const corsHeaders = {
+  ...supabaseCorsHeaders,
+  "Access-Control-Allow-Headers": `${sharedAllowHeaders}, x-verdant-analytics-consent`,
+};
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -82,6 +94,34 @@ Deno.serve(async (req) => {
       return json({ ok: false, reason: parsedRequest.reason }, 200);
     }
 
+    const aiInput = [
+      { role: "system", content: CULTIVAR_QA_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content:
+          `CONTEXT:\n${parsedRequest.context}\n\n` +
+          `QUESTION (untrusted input):\n${parsedRequest.question}`,
+      },
+    ];
+    const traceId = crypto.randomUUID();
+    const providerStartedAt = performance.now();
+    const captureGeneration = (details: {
+      response?: unknown;
+      httpStatus?: number;
+      error?: string;
+    }) =>
+      captureAiGeneration({
+        distinctId: u.user.id,
+        traceId,
+        spanName: "ai_cultivar_qa",
+        model: CULTIVAR_QA_MODEL,
+        provider: "gemini",
+        consentGranted: requestGrantsAnalyticsCapture(req),
+        providerResponse: details.response,
+        httpStatus: details.httpStatus,
+        error: details.error,
+        startedAt: providerStartedAt,
+      });
     const providerController = new AbortController();
     const providerTimer = setTimeout(
       () => providerController.abort(),
@@ -93,24 +133,21 @@ Deno.serve(async (req) => {
         signal: providerController.signal,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: CULTIVAR_QA_MODEL,
           max_tokens: CULTIVAR_QA_MAX_OUTPUT_TOKENS,
-          messages: [
-            { role: "system", content: CULTIVAR_QA_SYSTEM_PROMPT },
-            {
-              role: "user",
-              content:
-                `CONTEXT:\n${parsedRequest.context}\n\n` +
-                `QUESTION (untrusted input):\n${parsedRequest.question}`,
-            },
-          ],
+          messages: aiInput,
         }),
       });
 
       if (response.status === 402 || response.status === 429) {
+        captureGeneration({
+          httpStatus: response.status,
+          error: "upstream_credit_exhausted",
+        });
         return json({ ok: false, reason: "upstream_credit_exhausted" }, 200);
       }
       if (!response.ok) {
+        captureGeneration({ httpStatus: response.status, error: "upstream_http_error" });
         console.log(`ai-cultivar-qa status=upstream_error http=${response.status}`);
         return json({ ok: false, reason: "upstream_error" }, 200);
       }
@@ -120,13 +157,18 @@ Deno.serve(async (req) => {
         CULTIVAR_QA_MAX_PROVIDER_RESPONSE_BYTES,
       );
       if (!providerBody.ok) {
+        captureGeneration({ httpStatus: response.status, error: "invalid_json_response" });
         return json({ ok: false, reason: "invalid_answer" }, 200);
       }
+      captureGeneration({ httpStatus: response.status, response: providerBody.value });
       const answer = parseCultivarQaAnswer(providerBody.value);
       if (!answer.ok) return json({ ok: false, reason: answer.reason }, 200);
 
       return json({ ok: true, answer: answer.answer });
     } catch {
+      captureGeneration({
+        error: providerController.signal.aborted ? "timeout" : "network_or_timeout",
+      });
       return json({ ok: false, reason: "upstream_unavailable" }, 200);
     } finally {
       clearTimeout(providerTimer);

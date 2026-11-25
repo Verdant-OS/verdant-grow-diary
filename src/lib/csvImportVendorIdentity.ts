@@ -32,7 +32,24 @@ export class CsvImportVendorIdentity {
     if (mentionsAcInfinity(haystack)) return "ac_infinity";
     if (/spider[\s._-]*farmer/.test(haystack)) return "spider_farmer";
     if (/\bvivosun\b/.test(haystack)) return "vivosun";
+    if (CsvImportVendorIdentity.matchesGgsAppExport(headers)) return "spider_farmer";
     return null;
+  }
+
+  /**
+   * Spider Farmer GGS app export: short headers and a `Time` column that
+   * holds the datetime. Filenames from the app are hashes, so the header
+   * signature is the identity. `humidity_soil` / `Timestamp` exports are a
+   * different dialect and are not this signature.
+   */
+  static matchesGgsAppExport(headers: readonly string[]): boolean {
+    const keys = new Set(
+      headers.map((header) => header.replace(/^\uFEFF/, "").trim().toLowerCase()),
+    );
+    const hasTime = keys.has("time");
+    const hasTemp = keys.has("temp(f)") || keys.has("tempsoil(f)");
+    const hasMoisture = keys.has("humi") || keys.has("humisoil");
+    return hasTime && hasTemp && hasMoisture;
   }
 
   static vpdSource(row: { vpd_source?: unknown; raw_payload?: unknown }): "derived" | "csv" | null {

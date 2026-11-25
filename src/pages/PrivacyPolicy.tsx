@@ -85,7 +85,9 @@ export default function PrivacyPolicy() {
         </li>
         <li>
           <strong>Analytics</strong> — consent-gated Google Analytics and Ahrefs Web Analytics used
-          to understand aggregate usage. See "Cookies" below.
+          to understand aggregate usage. PostHog records when you first activate a paid plan, using
+          your account ID. Diary entries, payment details, and email stay out of that event. See
+          "Cookies" below.
         </li>
         <li>
           <strong>Error reporting — Sentry (Functional Software, Inc.)</strong> — on our production

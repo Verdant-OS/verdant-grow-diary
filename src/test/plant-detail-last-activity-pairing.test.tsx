@@ -170,6 +170,13 @@ describe("Plant Detail last activity", () => {
   it.each([
     ["an untyped entry", {}, "Note: Checked the jars"],
     ["a cure check", { event_type: "cure_check" }, "Cure check: Checked the jars"],
+    // FA-20261119-M1 item 2: a Quick Log Note persists as an observation with
+    // the note marker. The Timeline calls it "Note"; Last activity must too.
+    [
+      "a Quick Log note",
+      { event_type: "observation", quick_log_activity: "note" },
+      "Note: Checked the jars",
+    ],
   ])(
     "labels %s by its own type, not Observation (Codex review on #1683)",
     async (_s, details, text) => {

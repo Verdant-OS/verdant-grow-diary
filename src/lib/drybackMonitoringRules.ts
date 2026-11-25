@@ -254,6 +254,18 @@ export function extractDrybackVwcSamples(
   return out;
 }
 
+/**
+ * True when the rows hold at least one soil moisture reading. Dryback only
+ * needs calibration records for a tent that reports soil moisture, so a tent
+ * without a soil sensor never has to look them up.
+ */
+export function hasDrybackSoilMoistureReadings(
+  rows: readonly DrybackSensorReadingLike[] | null | undefined,
+): boolean {
+  if (!Array.isArray(rows)) return false;
+  return rows.some((row) => Boolean(row) && isSoilMoistureMetric(row.metric ?? null));
+}
+
 function normalizeSamples(samples: readonly DrybackVwcSampleInput[]): NormalizedSample[] {
   const out: NormalizedSample[] = [];
   for (const s of samples) {

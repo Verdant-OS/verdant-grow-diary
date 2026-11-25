@@ -33,9 +33,9 @@ import { useAuth } from "@/store/auth";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import {
   QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
-  QuickLogNoteRepeatPersistence,
   QuickLogNoteRepeatSaveRules,
 } from "@/lib/quickLogNoteSaveRules";
+import { useOptionalDiaryEntries } from "@/hooks/useOptionalDiaryEntries";
 import { QUICK_LOG_MANUAL_READINGS_NOTE } from "@/constants/quickLogGeneratedNoteCopy";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import {
@@ -168,6 +168,10 @@ export default function PlantQuickLog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { save } = useQuickLogV2Save();
+  // Saved diary rows, read while the sheet is open, for the repeat-note block.
+  const diaryEntries = useOptionalDiaryEntries();
+  const recentDiaryRef = useRef(diaryEntries.data);
+  recentDiaryRef.current = diaryEntries.data;
   // One idempotency key per LOGICAL submission (D-B2). Held in a ref, not
   // state: it is never rendered, and a stale render must never hand the
   // server a key that does not match the payload being sent.
@@ -510,32 +514,33 @@ export default function PlantQuickLog({
       return;
     }
 
-    const savedAt = new Date().toISOString();
+    const saveSignature = buildQuickLogSaveSignature({
+      ownerId: user?.id ?? null,
+      plantId,
+      growId,
+      tentId: tentId ?? null,
+      note: timelineNote,
+      sensors: sensorsForPayload,
+      photo: buildQuickLogPhotoIdentity(photoFile),
+    });
+    // Only a plain note can repeat: a photo or typed readings make a new
+    // entry even with the same caption. A retry of this exact unconfirmed
+    // save keeps its key, so the server returns the original entry instead.
     if (
+      !hasPhoto &&
+      !hasManualReadings &&
       QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
         note: timelineNote,
         plantId,
         eventType: "note",
-        recentEntries: QuickLogNoteRepeatPersistence.read(
-          QuickLogNoteRepeatPersistence.browser(),
-          user?.id,
-          new Date(savedAt),
-        ),
-        now: new Date(savedAt),
+        recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(recentDiaryRef.current),
+        now: new Date(),
+        sameSaveRetry: saveKeyRef.current?.signature === saveSignature,
       })
     ) {
       setError(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
       return;
     }
-    const rememberConfirmedPlantNote = () => {
-      QuickLogNoteRepeatPersistence.remember(QuickLogNoteRepeatPersistence.browser(), {
-        accountId: user?.id,
-        plantId,
-        note: timelineNote,
-        savedAt,
-        now: new Date(savedAt),
-      });
-    };
 
     // #2159: the inline EC error names the field; never save a negative EC.
     if (ecError) return;
@@ -551,15 +556,7 @@ export default function PlantQuickLog({
     const canContinue = () => saveContextRevisionRef.current === submissionRevision;
     const resolvedSaveKey = resolveQuickLogSaveKey({
       current: saveKeyRef.current,
-      signature: buildQuickLogSaveSignature({
-        ownerId: user?.id ?? null,
-        plantId,
-        growId,
-        tentId: tentId ?? null,
-        note: timelineNote,
-        sensors: sensorsForPayload,
-        photo: buildQuickLogPhotoIdentity(photoFile),
-      }),
+      signature: saveSignature,
       mint: newQuickLogSaveKey,
     });
     saveKeyRef.current = resolvedSaveKey.state;
@@ -661,7 +658,6 @@ export default function PlantQuickLog({
           },
           canContinue,
         );
-        rememberConfirmedPlantNote();
         return;
       }
 
@@ -728,7 +724,6 @@ export default function PlantQuickLog({
         return;
       }
       saveConfirmed = true;
-      rememberConfirmedPlantNote();
 
       const photoAttachmentFailed = !!uploadedPath && !result.growEventId;
       if (uploadedPath && result.growEventId) {
@@ -950,6 +945,7 @@ export default function PlantQuickLog({
         data-testid="plant-quick-log-sheet"
         aria-describedby="plant-quick-log-subtitle"
       >
+        {diaryEntries.source}
         <SheetHeader className="text-left">
           <SheetTitle className="font-display text-base">Quick Log</SheetTitle>
           <p id="plant-quick-log-subtitle" className="text-sm text-muted-foreground">

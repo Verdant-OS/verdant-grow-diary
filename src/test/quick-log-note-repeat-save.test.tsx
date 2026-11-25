@@ -4,7 +4,7 @@
  */
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
@@ -14,6 +14,7 @@ const harness = vi.hoisted(() => ({
   plants: [] as Array<Record<string, unknown>>,
   tents: [] as Array<Record<string, unknown>>,
   diary: [] as Array<Record<string, unknown>>,
+  diaryReads: 0,
   rpc: vi.fn(),
 }));
 
@@ -21,7 +22,10 @@ function diaryQuery() {
   const chain = {
     select: () => chain,
     is: () => chain,
-    order: () => Promise.resolve({ data: harness.diary, error: null }),
+    order: () => {
+      harness.diaryReads += 1;
+      return Promise.resolve({ data: harness.diary, error: null });
+    },
     update: () => ({ eq: () => Promise.resolve({ error: null }) }),
   };
   return chain;
@@ -126,6 +130,7 @@ beforeEach(() => {
   window.sessionStorage.clear();
   vi.clearAllMocks();
   harness.diary = [];
+  harness.diaryReads = 0;
   harness.plants = [
     { id: "p1", name: "Plant One", grow_id: "g1", tent_id: "t1", stage: "veg" },
     { id: "p2", name: "Plant Two", grow_id: "g1", tent_id: "t1", stage: "veg" },
@@ -150,6 +155,61 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   cleanup();
+});
+
+/** A note saved elsewhere (another phone, or before a reload), 2 minutes ago. */
+function savedElsewhere(plantId = "p1") {
+  const at = new Date(Date.now() - 2 * 60_000).toISOString();
+  harness.diary = [
+    {
+      plant_id: plantId,
+      note: "Leaf tips curling",
+      entry_at: at,
+      created_at: at,
+      details: { quick_log_activity: "note", linked_grow_event_id: "e-elsewhere" },
+    },
+  ];
+}
+
+async function waitForDiaryRead() {
+  await waitFor(() => expect(harness.diaryReads).toBeGreaterThan(0));
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+describe("a note saved on another device or before a reload", () => {
+  it("blocks the same text in the plant Quick Log with a fresh cache", async () => {
+    savedElsewhere();
+    render(
+      <QueryClientProvider client={client()}>
+        <QuickLog
+          open
+          onOpenChange={() => {}}
+          prefill={{ plantId: "p1", growId: "g1", tentId: "t1" }}
+        />
+      </QueryClientProvider>,
+    );
+    await waitForDiaryRead();
+    await savePanelNote("Leaf tips curling");
+    expect(await screen.findByText(QUICK_LOG_NOTE_ALREADY_SAVED_COPY)).toBeInTheDocument();
+    expect(harness.rpc).not.toHaveBeenCalled();
+  });
+
+  it("blocks the same text in the header Quick Log with a fresh cache", async () => {
+    savedElsewhere();
+    render(
+      <QueryClientProvider client={client()}>
+        <QuickLogV2Sheet open onOpenChange={() => {}} defaultTargetKey="plant:p1" />
+      </QueryClientProvider>,
+    );
+    await waitForDiaryRead();
+    await saveV2("Leaf tips curling");
+    expect(await screen.findByTestId("qlv2-error")).toHaveTextContent(
+      QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
+    );
+    expect(harness.rpc).not.toHaveBeenCalled();
+  });
 });
 
 describe("plant Quick Log blocks a reopened duplicate note", () => {

@@ -138,7 +138,6 @@ import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTy
 import type { CanonicalQuickLogStage } from "@/lib/grow";
 import {
   QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
-  QuickLogNoteRepeatPersistence,
   QuickLogNoteRepeatSaveRules,
   buildQuickLogSavedNoteExcerpt,
 } from "@/lib/quickLogNoteSaveRules";
@@ -1187,27 +1186,6 @@ export default function QuickLogAllActivitiesSection({
       setErrorForActivity(selected.id);
       return;
     }
-    if (
-      selected.id === "note" &&
-      QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
-        note,
-        plantId: currentTarget.plantId,
-        eventType: "note",
-        recentEntries: [
-          ...QuickLogNoteRepeatPersistence.read(
-            QuickLogNoteRepeatPersistence.browser(),
-            user?.id,
-            new Date(),
-          ),
-          ...QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(recentDiaryRef.current),
-        ],
-        now: new Date(),
-      })
-    ) {
-      setErrorReason(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
-      setErrorForActivity(selected.id);
-      return;
-    }
     const noteLengthError = validateQuickLogActivityNote(selected.id, note);
     if (noteLengthError) {
       setErrorReason(noteLengthError);
@@ -1296,6 +1274,35 @@ export default function QuickLogAllActivitiesSection({
       tentId: tentId ?? null,
       plantId: plantId ?? null,
     });
+    if (selected.id === "note") {
+      // A retry of this exact unconfirmed save keeps its key, so it is never
+      // blocked as a repeat: the server returns the original entry instead.
+      const attemptSignature = buildQuickLogSaveSignature({
+        ownerId: user?.id ?? null,
+        activityId: selected.id,
+        growId: capturedTarget.growId,
+        tentId: capturedTarget.tentId,
+        plantId: capturedTarget.plantId,
+        note: note.trim().length > 0 ? note.trim() : null,
+        extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : null,
+      });
+      if (
+        QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
+          note,
+          plantId: capturedTarget.plantId,
+          eventType: "note",
+          recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(
+            recentDiaryRef.current,
+          ),
+          now: new Date(),
+          sameSaveRetry: activitySaveKeyRef.current?.signature === attemptSignature,
+        })
+      ) {
+        setErrorReason(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
+        setErrorForActivity(selected.id);
+        return;
+      }
+    }
     const acquired = onSaveStart ? onSaveStart(capturedTarget) : !localSaveInFlightRef.current;
     if (!acquired) return;
     localSaveInFlightRef.current = true;
@@ -1536,16 +1543,6 @@ export default function QuickLogAllActivitiesSection({
             ]);
           }
         }
-      }
-      if (selected.id === "note" && activityInput.note && capturedTarget.plantId) {
-        const savedAt = new Date().toISOString();
-        QuickLogNoteRepeatPersistence.remember(QuickLogNoteRepeatPersistence.browser(), {
-          accountId: user?.id,
-          plantId: capturedTarget.plantId,
-          note: activityInput.note,
-          savedAt,
-          now: new Date(savedAt),
-        });
       }
       try {
         onSaveSuccess?.({

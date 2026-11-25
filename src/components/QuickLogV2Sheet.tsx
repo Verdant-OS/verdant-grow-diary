@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useContext, type ChangeEvent } from "react";
+import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
 import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
@@ -109,10 +109,10 @@ import {
   QUICK_LOG_RETRY_READING_TIME_REFUSAL,
   QuickLogReadingTime,
 } from "@/lib/quickLogReadingTime";
-import { QueryClientContext, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptionalDiaryEntries } from "@/hooks/useOptionalDiaryEntries";
 import {
   QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
-  QuickLogNoteRepeatPersistence,
   QuickLogNoteRepeatSaveRules,
 } from "@/lib/quickLogNoteSaveRules";
 import { useInRouterContext, useNavigate } from "@/lib/react-router-compat";
@@ -519,7 +519,11 @@ function QuickLogV2SheetForOwner({
     [tentsQ.data],
   );
   const queryClient = useQueryClient();
-  const diaryClient = useContext(QueryClientContext);
+  // Saved diary rows, read while the sheet is open, so a note saved on
+  // another device or before a reload still blocks its repeat.
+  const diaryEntries = useOptionalDiaryEntries();
+  const recentDiaryRef = useRef(diaryEntries.data);
+  recentDiaryRef.current = diaryEntries.data;
   const sessionNotesRef = useRef<
     Array<{ plantId: string; note: string; eventType: string; savedAt: string }>
   >([]);
@@ -2248,23 +2252,23 @@ function QuickLogV2SheetForOwner({
       return;
     }
 
+    // Only a plain note can repeat: typed readings or a photo make a new entry.
+    const plainNoteForm =
+      !photoFile &&
+      [form.temperatureC, form.humidityPct, form.vpdKpa].every(
+        (value) => String(value ?? "").trim().length === 0,
+      );
     const repeatNote =
       !pendingManualSubmission &&
       form.action === "note" &&
+      plainNoteForm &&
       QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
         note: form.note,
         plantId: resolved.plantId,
         eventType: "note",
         recentEntries: [
           ...sessionNotesRef.current,
-          ...QuickLogNoteRepeatPersistence.read(
-            QuickLogNoteRepeatPersistence.browser(),
-            user?.id,
-            new Date(),
-          ),
-          ...QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(
-            diaryClient?.getQueryData(["diary_entries"]),
-          ),
+          ...QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(recentDiaryRef.current),
         ],
         now: new Date(),
       });
@@ -3015,13 +3019,6 @@ function QuickLogV2SheetForOwner({
         },
         ...sessionNotesRef.current,
       ];
-      QuickLogNoteRepeatPersistence.remember(QuickLogNoteRepeatPersistence.browser(), {
-        accountId: user?.id,
-        plantId: resolved.plantId,
-        note: submissionNote,
-        savedAt,
-        now: new Date(savedAt),
-      });
     }
 
     setExactRetryPending(false);
@@ -3527,6 +3524,7 @@ function QuickLogV2SheetForOwner({
         onCloseAutoFocus={restoreOpenerFocus}
         onOpenAutoFocus={handleSheetOpenAutoFocus}
       >
+        {diaryEntries.source}
         <SheetHeader>
           <SheetTitle>Quick Log</SheetTitle>
           <p id="qlv2-sheet-description" className="text-sm text-muted-foreground">

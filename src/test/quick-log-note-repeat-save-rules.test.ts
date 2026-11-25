@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   QUICK_LOG_NOTE_REPEAT_WINDOW_MINUTES,
   QuickLogNoteRepeatSaveRules,
+  isPlainNoteSavePayload,
   type RecentSavedNoteEntry,
 } from "@/lib/quickLogNoteSaveRules";
 
@@ -103,5 +104,90 @@ describe("QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows", () => {
       QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows([{ note: "plain", plant_id: "p1" }])[0]
         .eventType,
     ).toBe("note");
+  });
+});
+
+describe("saved diary rows that are more than a plain note", () => {
+  const savedNow = "2026-11-25T11:58:00.000Z";
+  function repeatAgainst(row: Record<string, unknown>) {
+    return repeat({
+      recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows([
+        { plant_id: "p1", note: "Leaf tips curling", created_at: savedNow, ...row },
+      ]),
+    });
+  }
+
+  it("blocks a plain saved note, with or without the note marker or a tent snapshot", () => {
+    expect(repeatAgainst({ details: {} })).toBe(true);
+    expect(repeatAgainst({ details: { quick_log_activity: "note" } })).toBe(true);
+    expect(repeatAgainst({ details: { linked_grow_event_id: "e1" } })).toBe(true);
+    // The tent snapshot a note attaches on its own is not the grower's content.
+    expect(repeatAgainst({ details: { sensor: { temp_c: 24 } } })).toBe(true);
+  });
+
+  it("never blocks against a photo, typed readings, an issue, or another activity", () => {
+    expect(repeatAgainst({ photo_url: "u1/g1/1.jpg", details: {} })).toBe(false);
+    expect(repeatAgainst({ details: { photo_url: "u1/g1/1.jpg" } })).toBe(false);
+    expect(repeatAgainst({ details: { manual_sensor_snapshot: { temp_f: 78 } } })).toBe(false);
+    expect(repeatAgainst({ details: { manual_provenance: { source: "manual" } } })).toBe(false);
+    expect(repeatAgainst({ details: { environment_check: { temp_c: 24 } } })).toBe(false);
+    expect(repeatAgainst({ details: { subtype: "issue" } })).toBe(false);
+    expect(repeatAgainst({ details: { quick_log_activity: "watering" } })).toBe(false);
+    expect(repeatAgainst({ details: { event_type: "environment" } })).toBe(false);
+  });
+
+  it("counts the window from when the row was saved, not its backdated entry time", () => {
+    expect(repeatAgainst({ entry_at: "2026-11-23T08:00:00.000Z", details: {} })).toBe(true);
+    expect(
+      repeat({
+        recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows([
+          {
+            plant_id: "p1",
+            note: "Leaf tips curling",
+            created_at: "2026-11-25T11:40:00.000Z",
+            entry_at: "2026-11-25T11:59:00.000Z",
+            details: {},
+          },
+        ]),
+      }),
+    ).toBe(false);
+  });
+
+  it("treats a saved row from a clock up to 10 minutes ahead as recent", () => {
+    expect(repeatAgainst({ created_at: "2026-11-25T12:09:00.000Z", details: {} })).toBe(true);
+    expect(repeatAgainst({ created_at: "2026-11-25T12:11:00.000Z", details: {} })).toBe(false);
+  });
+});
+
+describe("isPlainNoteSavePayload", () => {
+  const plain = {
+    p_action: "note",
+    p_note: "Leaf tips curling",
+    p_volume_ml: null,
+    p_temperature_c: null,
+    p_humidity_pct: null,
+    p_vpd_kpa: null,
+    p_details: { quick_log_activity: "note" },
+  };
+
+  it("accepts a note-only payload, with or without details or a tent snapshot", () => {
+    expect(isPlainNoteSavePayload(plain)).toBe(true);
+    expect(isPlainNoteSavePayload({ ...plain, p_details: null })).toBe(true);
+    expect(isPlainNoteSavePayload({ ...plain, p_details: { sensor: { temp_c: 24 } } })).toBe(true);
+  });
+
+  it("rejects readings, water, photos, structured details and bad input", () => {
+    expect(isPlainNoteSavePayload({ ...plain, p_temperature_c: 24 })).toBe(false);
+    expect(isPlainNoteSavePayload({ ...plain, p_humidity_pct: 0 })).toBe(false);
+    expect(isPlainNoteSavePayload({ ...plain, p_action: "water", p_volume_ml: 500 })).toBe(false);
+    expect(isPlainNoteSavePayload({ ...plain, p_details: { photo_url: "u1/g1/1.jpg" } })).toBe(
+      false,
+    );
+    expect(
+      isPlainNoteSavePayload({ ...plain, p_details: { environment_check: { temp_c: 24 } } }),
+    ).toBe(false);
+    expect(isPlainNoteSavePayload({ ...plain, p_details: [] })).toBe(false);
+    expect(isPlainNoteSavePayload(null)).toBe(false);
+    expect(isPlainNoteSavePayload("note")).toBe(false);
   });
 });

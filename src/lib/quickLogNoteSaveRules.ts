@@ -128,9 +128,83 @@ function isNoteLikeEventType(eventType: unknown): boolean {
   return typeof eventType === "string" && NOTE_LIKE_EVENT_TYPES.has(eventType);
 }
 
+function hasText(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+/**
+ * Details keys that make a saved diary row more than a plain note: a photo,
+ * typed readings, a structured check, an issue, or another activity. A row
+ * that carries any of them is never a repeat candidate, so a new photo or
+ * reading with the same caption still saves. The tent snapshot a note attaches
+ * on its own (`details.sensor`) is not the grower's content, so it does not
+ * count.
+ */
+const STRUCTURED_DETAIL_KEYS: readonly string[] = [
+  "photo_url",
+  "photo_path",
+  "photo_urls",
+  "photos",
+  "manual_sensor_snapshot",
+  "manual_provenance",
+  "environment_check",
+  "early_stage",
+  "harvest",
+  "watering",
+  "feeding",
+  "volume_ml",
+  "kind",
+];
+
+/** The event type a diary row was saved as, or "note" when it names none. */
+function diaryRowEventType(
+  record: Record<string, unknown>,
+  details: Record<string, unknown> | null,
+): string {
+  if (details && hasText(details.subtype)) {
+    return `observation:${String(details.subtype).trim().toLowerCase()}`;
+  }
+  if (details) {
+    for (const key of STRUCTURED_DETAIL_KEYS) {
+      const value = details[key];
+      if (value !== undefined && value !== null && value !== "") return key;
+    }
+  }
+  if (hasText(record.photo_url)) return "photo";
+  const activity = details?.quick_log_activity;
+  if (typeof activity === "string" && activity.trim().toLowerCase() !== "note") {
+    return activity.trim().toLowerCase();
+  }
+  return (
+    (typeof details?.event_type === "string" && details.event_type) ||
+    (typeof record.event_type === "string" && record.event_type) ||
+    (typeof record.entry_type === "string" && record.entry_type) ||
+    "note"
+  );
+}
+
+/**
+ * True when a `quicklog_save_manual` payload saves only note text: no reading,
+ * photo, volume or structured details. Anything else is never blocked as a
+ * repeated note.
+ */
+export function isPlainNoteSavePayload(payload: unknown): boolean {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+  const record = payload as Record<string, unknown>;
+  for (const key of ["p_temperature_c", "p_humidity_pct", "p_vpd_kpa", "p_volume_ml"]) {
+    const value = record[key];
+    if (value !== undefined && value !== null && value !== "") return false;
+  }
+  if (typeof record.p_action === "string" && record.p_action !== "note") return false;
+  const details = record.p_details;
+  if (details === undefined || details === null) return true;
+  if (typeof details !== "object" || Array.isArray(details)) return false;
+  return isNoteLikeEventType(diaryRowEventType({}, details as Record<string, unknown>));
+}
+
 /**
  * Hard block for saving the same plain note on the same plant again inside
- * the window. Reads confirmed entries only. Case stays as
+ * the window. Reads confirmed, saved entries only. Case stays as
  * `normalizeQuickLogNoteText` left it. Structured entries are never a match.
  */
 export class QuickLogNoteRepeatSaveRules {
@@ -158,7 +232,11 @@ export class QuickLogNoteRepeatSaveRules {
     return false;
   }
 
-  /** Diary rows already loaded for Recent Activity. Unreadable rows are skipped. */
+  /**
+   * Saved diary rows (the `diary_entries` query Recent Activity uses).
+   * Unreadable and retracted rows are skipped. The save time is the row's
+   * `created_at`, so a backdated note still counts from when it was saved.
+   */
   static candidatesFromDiaryRows(rows: unknown): RecentSavedNoteEntry[] {
     if (!Array.isArray(rows)) return [];
     const candidates: RecentSavedNoteEntry[] = [];
@@ -170,16 +248,11 @@ export class QuickLogNoteRepeatSaveRules {
         record.details && typeof record.details === "object" && !Array.isArray(record.details)
           ? (record.details as Record<string, unknown>)
           : null;
-      const eventType =
-        (typeof details?.event_type === "string" && details.event_type) ||
-        (typeof record.event_type === "string" && record.event_type) ||
-        (typeof record.entry_type === "string" && record.entry_type) ||
-        "note";
       candidates.push({
         plantId: record.plant_id ?? record.plantId ?? null,
         note: record.note,
-        eventType,
-        savedAt: record.entry_at ?? record.entryAt ?? record.created_at ?? record.createdAt ?? null,
+        eventType: diaryRowEventType(record, details),
+        savedAt: record.created_at ?? record.createdAt ?? record.entry_at ?? record.entryAt ?? null,
       });
     }
     return candidates;
@@ -197,102 +270,12 @@ export class QuickLogNoteRepeatSaveRules {
         plant_id: entry.plantId,
         note: entry.note,
         entry_at: entry.savedAt,
+        created_at: entry.savedAt,
         retracted_at: null,
         details: { event_type: entry.eventType },
       },
       ...rows,
     ];
-  }
-}
-
-export interface QuickLogNoteRepeatStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
-
-/**
- * Confirmed note saves that must still block after a reload. Client storage
- * only. A failed save is never written. Expired rows are dropped on every
- * read and write.
- */
-export class QuickLogNoteRepeatPersistence {
-  static browser(): QuickLogNoteRepeatStorage | null {
-    if (typeof window === "undefined") return null;
-    try {
-      return window.localStorage;
-    } catch {
-      return null;
-    }
-  }
-
-  static storageKey(accountId: string): string {
-    return `verdant.quickLogNoteRepeat.v1.${accountId}`;
-  }
-
-  static read(
-    storage: QuickLogNoteRepeatStorage | null | undefined,
-    accountId: unknown,
-    now: Date,
-  ): RecentSavedNoteEntry[] {
-    if (!storage || typeof accountId !== "string" || accountId.length === 0) return [];
-    if (!(now instanceof Date) || !Number.isFinite(now.getTime())) return [];
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(storage.getItem(this.storageKey(accountId)) ?? "[]");
-    } catch {
-      return [];
-    }
-    if (!Array.isArray(parsed)) return [];
-    const windowMs = QUICK_LOG_NOTE_REPEAT_WINDOW_MINUTES * 60_000;
-    const nowMs = now.getTime();
-    const kept: RecentSavedNoteEntry[] = [];
-    for (const row of parsed) {
-      if (!row || typeof row !== "object") continue;
-      const record = row as Record<string, unknown>;
-      const plantId = typeof record.plantId === "string" ? record.plantId : "";
-      const note = normalizeQuickLogNoteText(record.note);
-      const savedAt = typeof record.savedAt === "string" ? record.savedAt : "";
-      const savedMs = savedAtMillis(savedAt);
-      if (!plantId || !note || savedMs === null) continue;
-      if (Math.abs(nowMs - savedMs) > windowMs) continue;
-      kept.push({ plantId, note, eventType: "note", savedAt });
-    }
-    return kept;
-  }
-
-  static remember(
-    storage: QuickLogNoteRepeatStorage | null | undefined,
-    input: {
-      accountId: unknown;
-      plantId: unknown;
-      note: unknown;
-      savedAt: string;
-      now: Date;
-    },
-  ): void {
-    if (!storage || typeof input.accountId !== "string" || input.accountId.length === 0) return;
-    if (typeof input.plantId !== "string" || input.plantId.length === 0) return;
-    const note = normalizeQuickLogNoteText(input.note);
-    if (!note) return;
-    const savedMs = savedAtMillis(input.savedAt);
-    if (savedMs === null || !(input.now instanceof Date) || !Number.isFinite(input.now.getTime())) {
-      return;
-    }
-    const current = this.read(storage, input.accountId, input.now).filter(
-      (entry) =>
-        !(entry.plantId === input.plantId && normalizeQuickLogNoteText(entry.note) === note),
-    );
-    current.unshift({
-      plantId: input.plantId,
-      note,
-      eventType: "note",
-      savedAt: input.savedAt,
-    });
-    try {
-      storage.setItem(this.storageKey(input.accountId), JSON.stringify(current));
-    } catch {
-      // Storage can be unavailable. The in-memory check still covers this mount.
-    }
   }
 }
 

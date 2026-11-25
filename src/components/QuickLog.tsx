@@ -75,8 +75,8 @@ import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
   QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
-  QuickLogNoteRepeatPersistence,
   QuickLogNoteRepeatSaveRules,
+  isPlainNoteSavePayload,
   applyPanelSavedNoteToPreviewWarnings,
   buildQuickLogNoteSavedToast,
   buildQuickLogSavedNoteExcerpt,
@@ -1131,13 +1131,6 @@ export default function QuickLog({
             savedAt,
           }),
         );
-        QuickLogNoteRepeatPersistence.remember(QuickLogNoteRepeatPersistence.browser(), {
-          accountId: user?.id,
-          plantId: result.target.plantId,
-          note: result.noteText,
-          savedAt,
-          now: new Date(savedAt),
-        });
       }
       if (result.noteText) {
         setPanelSavedNote({ text: result.noteText, plantId: result.target.plantId ?? null });
@@ -1795,19 +1788,18 @@ export default function QuickLog({
         built.payload.p_idempotency_key = saveIdempotencyKeyRef.current;
       }
       const persistedNote = typeof built.payload.p_note === "string" ? built.payload.p_note : note;
+      // Only a plain note can repeat: readings, a photo, water or a check
+      // make a new entry even with the same text.
+      const plainNoteSave = isPlainNoteSavePayload(built.payload);
       if (
+        plainNoteSave &&
         QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
           note: persistedNote,
           plantId: savePlant.id,
           eventType: saveEventType,
-          recentEntries: [
-            ...QuickLogNoteRepeatPersistence.read(
-              QuickLogNoteRepeatPersistence.browser(),
-              user?.id,
-              new Date(),
-            ),
-            ...QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(recentDiaryRef.current),
-          ],
+          recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(
+            recentDiaryRef.current,
+          ),
           now: new Date(),
           sameSaveRetry: lastFailedSaveSigRef.current === attemptSig,
         })
@@ -1941,7 +1933,11 @@ export default function QuickLog({
         return;
       }
 
-      if ((saveEventType === "observation" || saveEventType === "note") && note.trim().length > 0) {
+      if (
+        plainNoteSave &&
+        (saveEventType === "observation" || saveEventType === "note") &&
+        note.trim().length > 0
+      ) {
         const savedAt = new Date().toISOString();
         queryClient.setQueryData(["diary_entries"], (current) =>
           QuickLogNoteRepeatSaveRules.rememberConfirmedNote(current, {
@@ -1951,13 +1947,6 @@ export default function QuickLog({
             savedAt,
           }),
         );
-        QuickLogNoteRepeatPersistence.remember(QuickLogNoteRepeatPersistence.browser(), {
-          accountId: user.id,
-          plantId: savePlant.id,
-          note: persistedNote,
-          savedAt,
-          now: new Date(savedAt),
-        });
       }
 
       const confirmedTarget = result.savedWaterTarget ?? saveTarget;
@@ -2394,9 +2383,7 @@ export default function QuickLog({
   }
 
   return (
-    <>
-      {diaryEntries.source}
-      <Dialog
+    <Dialog
       open={open}
       onOpenChange={(o) => {
         if (!o) {
@@ -2420,6 +2407,7 @@ export default function QuickLog({
       }}
     >
       <DialogContent className="glass max-w-md max-h-[90vh] overflow-y-auto">
+        {diaryEntries.source}
         <DialogHeader>
           <DialogTitle className="font-display flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
@@ -4309,6 +4297,5 @@ export default function QuickLog({
         </form>
       </DialogContent>
     </Dialog>
-    </>
   );
 }

@@ -5,8 +5,8 @@ why: A WH52 probe publishes moisture as soil_ec_humN. The router only accepted s
 branch: cursor/ecowitt-wh52-soil-ec-hum-6601
 base: verdant-grow-diary
 pr: set after open
-head_sha: set after push
-state: local implementation
+head_sha: 0dbbe0ac62d9043fb83381de0a4623694f23ab25
+state: committed locally, push next
 current_step: router accepts soil_ec_humN; soil_ec_tempN and soil_ecN stay unmapped
 next_action: push, open the PR with Refs #3090, watch required CI
 post_merge_check: a WH52 custom-upload fixture with soil_ec_hum1 and soil_channels [1] stores one soil_moisture_pct row. NOT_MEASURED until merge; local vitest is the pre-merge check.

@@ -372,7 +372,7 @@ export default function Onboarding() {
                   id={`start-screen-${opt.key}-desc`}
                   className="block text-xs text-muted-foreground"
                 >
-                  {opt.description}
+                  {opt.onboardingDescription ?? opt.description}
                 </span>
               </span>
             </label>

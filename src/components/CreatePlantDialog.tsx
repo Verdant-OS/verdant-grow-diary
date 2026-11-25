@@ -27,6 +27,7 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@/lib/react-router-compat";
 import CreateTentDialog, { type CreatedTent } from "@/components/CreateTentDialog";
+import { resolveCreatePlantCurrentTentId } from "@/lib/createPlantCurrentTentDefaultRules";
 import {
   plantStartDateInputMax,
   plantStartDateInputToIso,
@@ -243,6 +244,15 @@ export default function CreatePlantDialog({
     tentsLoaded,
   });
 
+  // Opened outside a tent: start on the setup's only tent, never a guess between several.
+  const currentTentId = resolveCreatePlantCurrentTentId({
+    suppliedTentId: defaultTentId,
+    targetGrowId,
+    selectableTents: tents,
+    tentsSettled: tentsLoaded,
+    tentsReadFailed: tentsError,
+  });
+
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -286,6 +296,8 @@ export default function CreatePlantDialog({
   const [form, setForm] = useState(() => emptyForm(initialTentId));
   /** Once grower explicitly picks a compatible tent after a conflict, allow write. */
   const [explicitCompatiblePick, setExplicitCompatiblePick] = useState(false);
+  /** The grower chose in the Tent field; the current-tent default must not override it. */
+  const [tentFieldTouched, setTentFieldTouched] = useState(false);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -296,11 +308,27 @@ export default function CreatePlantDialog({
 
   useEffect(() => {
     if (!open || explicitCompatiblePick) return;
-    const nextTentId = defaultTentId && suppliedTent.kind === "ready" ? defaultTentId : "none";
+    // Without a supplied tent, only ever apply the current-tent default. Never
+    // retract it to "No tent": a later refetch or read error must not turn a
+    // tent the grower can see into a silent tentless write.
+    if (!defaultTentId && (tentFieldTouched || !currentTentId)) return;
+    const nextTentId = defaultTentId
+      ? suppliedTent.kind === "ready"
+        ? defaultTentId
+        : "none"
+      : currentTentId;
+    if (!nextTentId) return;
     setForm((current) =>
       current.tent_id === nextTentId ? current : { ...current, tent_id: nextTentId },
     );
-  }, [defaultTentId, explicitCompatiblePick, open, suppliedTent.kind]);
+  }, [
+    currentTentId,
+    defaultTentId,
+    explicitCompatiblePick,
+    open,
+    suppliedTent.kind,
+    tentFieldTouched,
+  ]);
 
   useEffect(() => {
     if (!pendingNestedTentId || !targetGrowId) return;
@@ -471,6 +499,7 @@ export default function CreatePlantDialog({
     if (!next) {
       setSaveError(null);
       setExplicitCompatiblePick(false);
+      setTentFieldTouched(false);
       setForm(emptyForm(initialTentId));
       setNestedTents([]);
       setPendingNestedTentId(null);
@@ -481,6 +510,7 @@ export default function CreatePlantDialog({
 
   function onTentSelect(v: string) {
     armTentSelectSubmitGuard();
+    setTentFieldTouched(true);
     if (v === "none") {
       setForm((current) => ({ ...current, tent_id: "none" }));
       setExplicitCompatiblePick(false);
@@ -698,6 +728,7 @@ export default function CreatePlantDialog({
       if (!stillMounted || handoffSuppressed) return;
       setForm(emptyForm(initialTentId));
       setExplicitCompatiblePick(false);
+      setTentFieldTouched(false);
       setNestedTents([]);
       setPendingNestedTentId(null);
       setNestedTentCreatorMounted(false);

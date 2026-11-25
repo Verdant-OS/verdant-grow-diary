@@ -170,6 +170,7 @@ import {
   resolveTonightTentSelection,
 } from "@/lib/tonightTentHomeViewModel";
 import { tonightRowsFromQuickLogManualReadings } from "@/lib/tentManualEnvironmentSnapshotRules";
+import { selectDashboardTentSnapshotRows } from "@/lib/dashboardTentSnapshotRowsRules";
 import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
 
 /**
@@ -493,12 +494,23 @@ export default function Dashboard() {
       plants: plantsForStage,
     });
     const stability = computeEnvironmentStability(stabilityReadings, { stage: envStage });
+    // The tent card's latest reading uses the plant page's rule: the newest
+    // observation wins, including this tent's Quick Log manual readings, so
+    // the two pages name the same latest reading. Charts and stability keep
+    // the sensor rows above.
+    const snapRows = selectDashboardTentSnapshotRows({
+      sensorRows: readingsByTent[t.id] ?? [],
+      quickLogManuals: quickLogManualReadings,
+      tentId: t.id,
+      nowMs: nowTick,
+    });
     return {
       tent: t,
       envStage,
       last: chartRows[chartRows.length - 1],
       stability,
       tentRows,
+      snapRows,
     };
   });
 
@@ -998,7 +1010,7 @@ export default function Dashboard() {
                         className="mb-2"
                       />
                       <div className="space-y-2.5">
-                        {latestPerTent.map(({ tent, envStage, stability, tentRows }) => {
+                        {latestPerTent.map(({ tent, envStage, stability, tentRows, snapRows }) => {
                           const stabilityView = formatStabilityChipView(stability);
                           // Pending/failed reads must not masquerade as established
                           // absence or as data. Non-UUID ids (mock-fallback tents)
@@ -1008,7 +1020,7 @@ export default function Dashboard() {
                             ? (sensorStatusByTent[tent.id] ?? "loading")
                             : "success";
                           const snapView = buildTentSnapshotView(
-                            tentRows as BuildTentSnapshotInput[],
+                            snapRows as BuildTentSnapshotInput[],
                             envStage,
                             nowTick,
                             {

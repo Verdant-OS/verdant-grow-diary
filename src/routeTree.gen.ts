@@ -83,6 +83,8 @@ import { Route as GuidesGrowStageCareGuideRouteImport } from './routes/guides.gr
 import { Route as GuidesIsolateMaleCannabisPlantRouteImport } from './routes/guides.isolate-male-cannabis-plant'
 import { Route as GuidesSteadyClimateMultipleGrowTentsRouteImport } from './routes/guides.steady-climate-multiple-grow-tents'
 import { Route as GuidesStillAirBoxVsFlowHoodRouteImport } from './routes/guides.still-air-box-vs-flow-hood'
+import { Route as HelpIndexRouteImport } from './routes/help.index'
+import { Route as HelpSectionRouteImport } from './routes/help.$section'
 import { Route as InternalContextualPhenoComparisonDemoRouteImport } from './routes/internal.contextual-pheno-comparison-demo'
 import { Route as InternalDemoProofWalkthroughRouteImport } from './routes/internal.demo-proof-walkthrough'
 import { Route as InternalPhenoHuntDemoRouteImport } from './routes/internal.pheno-hunt-demo'
@@ -538,6 +540,16 @@ const GuidesStillAirBoxVsFlowHoodRoute =
     path: '/guides/still-air-box-vs-flow-hood',
     getParentRoute: () => rootRouteImport,
   } as any)
+const HelpIndexRoute = HelpIndexRouteImport.update({
+  id: '/help/',
+  path: '/help/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpSectionRoute = HelpSectionRouteImport.update({
+  id: '/help/$section',
+  path: '/help/$section',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InternalContextualPhenoComparisonDemoRoute =
   InternalContextualPhenoComparisonDemoRouteImport.update({
     id: '/internal/contextual-pheno-comparison-demo',
@@ -1053,6 +1065,7 @@ export interface FileRoutesByFullPath {
   '/guides/isolate-male-cannabis-plant': typeof GuidesIsolateMaleCannabisPlantRoute
   '/guides/steady-climate-multiple-grow-tents': typeof GuidesSteadyClimateMultipleGrowTentsRoute
   '/guides/still-air-box-vs-flow-hood': typeof GuidesStillAirBoxVsFlowHoodRoute
+  '/help/$section': typeof HelpSectionRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1064,6 +1077,7 @@ export interface FileRoutesByFullPath {
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars/': typeof CultivarsIndexRoute
   '/guides/': typeof GuidesIndexRoute
+  '/help/': typeof HelpIndexRoute
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
@@ -1206,6 +1220,7 @@ export interface FileRoutesByTo {
   '/guides/isolate-male-cannabis-plant': typeof GuidesIsolateMaleCannabisPlantRoute
   '/guides/steady-climate-multiple-grow-tents': typeof GuidesSteadyClimateMultipleGrowTentsRoute
   '/guides/still-air-box-vs-flow-hood': typeof GuidesStillAirBoxVsFlowHoodRoute
+  '/help/$section': typeof HelpSectionRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1217,6 +1232,7 @@ export interface FileRoutesByTo {
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars': typeof CultivarsIndexRoute
   '/guides': typeof GuidesIndexRoute
+  '/help': typeof HelpIndexRoute
   '/strains': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/diagnostics': typeof AppOperatorDiagnosticsRoute
@@ -1363,6 +1379,7 @@ export interface FileRoutesById {
   '/guides/isolate-male-cannabis-plant': typeof GuidesIsolateMaleCannabisPlantRoute
   '/guides/steady-climate-multiple-grow-tents': typeof GuidesSteadyClimateMultipleGrowTentsRoute
   '/guides/still-air-box-vs-flow-hood': typeof GuidesStillAirBoxVsFlowHoodRoute
+  '/help/$section': typeof HelpSectionRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
@@ -1374,6 +1391,7 @@ export interface FileRoutesById {
   '/tools/vpd-calculator': typeof ToolsVpdCalculatorRoute
   '/cultivars/': typeof CultivarsIndexRoute
   '/guides/': typeof GuidesIndexRoute
+  '/help/': typeof HelpIndexRoute
   '/strains/': typeof StrainsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_app/_operator/diagnostics': typeof AppOperatorDiagnosticsRoute
@@ -1519,6 +1537,7 @@ export interface FileRouteTypes {
     | '/guides/isolate-male-cannabis-plant'
     | '/guides/steady-climate-multiple-grow-tents'
     | '/guides/still-air-box-vs-flow-hood'
+    | '/help/$section'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1530,6 +1549,7 @@ export interface FileRouteTypes {
     | '/tools/vpd-calculator'
     | '/cultivars/'
     | '/guides/'
+    | '/help/'
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
@@ -1672,6 +1692,7 @@ export interface FileRouteTypes {
     | '/guides/isolate-male-cannabis-plant'
     | '/guides/steady-climate-multiple-grow-tents'
     | '/guides/still-air-box-vs-flow-hood'
+    | '/help/$section'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1683,6 +1704,7 @@ export interface FileRouteTypes {
     | '/tools/vpd-calculator'
     | '/cultivars'
     | '/guides'
+    | '/help'
     | '/strains'
     | '/.lovable/oauth/consent'
     | '/diagnostics'
@@ -1828,6 +1850,7 @@ export interface FileRouteTypes {
     | '/guides/isolate-male-cannabis-plant'
     | '/guides/steady-climate-multiple-grow-tents'
     | '/guides/still-air-box-vs-flow-hood'
+    | '/help/$section'
     | '/internal/contextual-pheno-comparison-demo'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
@@ -1839,6 +1862,7 @@ export interface FileRouteTypes {
     | '/tools/vpd-calculator'
     | '/cultivars/'
     | '/guides/'
+    | '/help/'
     | '/strains/'
     | '/.lovable/oauth/consent'
     | '/_app/_operator/diagnostics'
@@ -1959,6 +1983,7 @@ export interface RootRouteChildren {
   GuidesIsolateMaleCannabisPlantRoute: typeof GuidesIsolateMaleCannabisPlantRoute
   GuidesSteadyClimateMultipleGrowTentsRoute: typeof GuidesSteadyClimateMultipleGrowTentsRoute
   GuidesStillAirBoxVsFlowHoodRoute: typeof GuidesStillAirBoxVsFlowHoodRoute
+  HelpSectionRoute: typeof HelpSectionRoute
   InternalContextualPhenoComparisonDemoRoute: typeof InternalContextualPhenoComparisonDemoRoute
   InternalDemoProofWalkthroughRoute: typeof InternalDemoProofWalkthroughRoute
   InternalPhenoHuntDemoRoute: typeof InternalPhenoHuntDemoRoute
@@ -1970,6 +1995,7 @@ export interface RootRouteChildren {
   ToolsVpdCalculatorRoute: typeof ToolsVpdCalculatorRoute
   CultivarsIndexRoute: typeof CultivarsIndexRoute
   GuidesIndexRoute: typeof GuidesIndexRoute
+  HelpIndexRoute: typeof HelpIndexRoute
   StrainsIndexRoute: typeof StrainsIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   CustomerGuideOreozVsGelonadeComparisonRoute: typeof CustomerGuideOreozVsGelonadeComparisonRoute
@@ -2496,6 +2522,20 @@ declare module '@tanstack/react-router' {
       path: '/guides/still-air-box-vs-flow-hood'
       fullPath: '/guides/still-air-box-vs-flow-hood'
       preLoaderRoute: typeof GuidesStillAirBoxVsFlowHoodRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help/': {
+      id: '/help/'
+      path: '/help'
+      fullPath: '/help/'
+      preLoaderRoute: typeof HelpIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help/$section': {
+      id: '/help/$section'
+      path: '/help/$section'
+      fullPath: '/help/$section'
+      preLoaderRoute: typeof HelpSectionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/internal/contextual-pheno-comparison-demo': {
@@ -3341,6 +3381,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuidesSteadyClimateMultipleGrowTentsRoute:
     GuidesSteadyClimateMultipleGrowTentsRoute,
   GuidesStillAirBoxVsFlowHoodRoute: GuidesStillAirBoxVsFlowHoodRoute,
+  HelpSectionRoute: HelpSectionRoute,
   InternalContextualPhenoComparisonDemoRoute:
     InternalContextualPhenoComparisonDemoRoute,
   InternalDemoProofWalkthroughRoute: InternalDemoProofWalkthroughRoute,
@@ -3353,6 +3394,7 @@ const rootRouteChildren: RootRouteChildren = {
   ToolsVpdCalculatorRoute: ToolsVpdCalculatorRoute,
   CultivarsIndexRoute: CultivarsIndexRoute,
   GuidesIndexRoute: GuidesIndexRoute,
+  HelpIndexRoute: HelpIndexRoute,
   StrainsIndexRoute: StrainsIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   CustomerGuideOreozVsGelonadeComparisonRoute:

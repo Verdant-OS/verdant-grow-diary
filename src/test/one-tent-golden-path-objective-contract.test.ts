@@ -241,7 +241,7 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).toContain("quick-log-target-tent");
     expect(SPEC).toContain("quick-log-target-grow");
     expect(SPEC).toContain("plant-detail-quick-log-open");
-    expect(SPEC).toContain("plant-quick-log-save");
+    expect(SPEC).toContain("qlv2-save");
     const authStage = SPEC.slice(
       SPEC.indexOf('await stage("auth_restored"'),
       SPEC.indexOf('await stage("hierarchy_created_via_ui"'),
@@ -258,10 +258,10 @@ describe("authenticated One-Tent proof covers the production objective", () => {
 
   it("attaches a real browser photo and manual readings to the exact diary row", () => {
     expect(SPEC).toContain("photo_and_manual_evidence_persisted");
-    expect(SPEC).toContain("plant-quick-log-photo-library-input");
-    expect(SPEC).toContain("plant-quick-log-photo-preview");
-    expect(SPEC).toContain("plant-quick-log-temp");
-    expect(SPEC).toContain("plant-quick-log-humidity");
+    expect(SPEC).toContain("qlv2-photo-library-input");
+    expect(SPEC).toContain("qlv2-photo-preview");
+    expect(SPEC).toContain("#qlv2-temp");
+    expect(SPEC).toContain("#qlv2-rh");
     expect(SPEC).toContain("photo_url");
     expect(SPEC).toContain("timeline-photo-open");
     expect(SPEC).toContain("timeline-manual-snapshot");

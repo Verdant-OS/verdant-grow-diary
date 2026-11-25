@@ -89,6 +89,12 @@ function typeAndSave(note: string) {
   fireEvent.click(screen.getByTestId("plant-quick-log-save"));
 }
 
+/** The failed attempt has finished: its error shows and Save is live again. */
+async function waitForSaveToSettle() {
+  await screen.findByTestId("plant-quick-log-error");
+  await waitFor(() => expect(screen.getByTestId("plant-quick-log-save")).not.toBeDisabled());
+}
+
 beforeEach(() => {
   diary.rows = [];
   diary.reads = 0;
@@ -129,6 +135,7 @@ describe("PlantQuickLog note repeat block", () => {
     await renderSheet();
     typeAndSave("leaf tips yellowing");
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    await waitForSaveToSettle();
     typeAndSave("leaf tips yellowing");
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
   });
@@ -142,6 +149,7 @@ describe("PlantQuickLog note repeat block", () => {
     const { client } = await renderSheet();
     typeAndSave("leaf tips yellowing");
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    await waitForSaveToSettle();
     // The saved row reaches this sheet's diary read before the retry.
     const readsBefore = diary.reads;
     await act(async () => {

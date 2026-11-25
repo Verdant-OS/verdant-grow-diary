@@ -68,12 +68,14 @@ import {
   MANUAL_SENSOR_TRUTH_LINES,
   MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE,
 } from "@/constants/manualSensorTruthCopy";
+import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
   QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
+  QuickLogNoteRepeatSaveRules,
   applyPanelSavedNoteToPreviewWarnings,
   buildQuickLogNoteSavedToast,
   buildQuickLogSavedNoteExcerpt,
@@ -452,6 +454,9 @@ export default function QuickLog({
   const plants = useMemo(() => plantsQuery.data ?? [], [plantsQuery.data]);
   const activeTents = useMemo(() => tentsQuery.data ?? [], [tentsQuery.data]);
   const queryClient = useQueryClient();
+  const diaryEntries = useDiaryEntries();
+  const recentDiaryRef = useRef(diaryEntries.data);
+  recentDiaryRef.current = diaryEntries.data;
   const { save: saveViaRpc } = useQuickLogV2Save();
   const verifiedPublicStarterWatering = isVerifiedPublicStarterWateringHandoff(
     prefill,
@@ -1115,6 +1120,16 @@ export default function QuickLog({
           result.reviewedStarterHandoffKey !== reviewedStarterHandoffKey)
       )
         return;
+      if (result.noteText && result.target.plantId) {
+        queryClient.setQueryData(["diary_entries"], (current) =>
+          QuickLogNoteRepeatSaveRules.rememberConfirmedNote(current, {
+            plantId: result.target.plantId as string,
+            note: result.noteText as string,
+            eventType: "note",
+            savedAt: new Date().toISOString(),
+          }),
+        );
+      }
       if (result.noteText) {
         setPanelSavedNote({ text: result.noteText, plantId: result.target.plantId ?? null });
         if (!result.recovered && result.activityId === "note") {
@@ -1140,7 +1155,13 @@ export default function QuickLog({
         user?.id ?? null,
       );
     },
-    [consumeReviewedPublicStarterDraft, draftHandoffKey, reviewedStarterHandoffKey, user?.id],
+    [
+      consumeReviewedPublicStarterDraft,
+      draftHandoffKey,
+      queryClient,
+      reviewedStarterHandoffKey,
+      user?.id,
+    ],
   );
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
@@ -1587,6 +1608,14 @@ export default function QuickLog({
         note,
         panelSavedNote: panelSavedNoteForTarget,
         eventType: saveEventType,
+      }) ||
+      QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
+        note,
+        plantId: savePlant.id,
+        eventType: saveEventType,
+        recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(recentDiaryRef.current),
+        now: new Date(),
+        sameSaveRetry: lastFailedSaveSigRef.current !== null,
       })
     ) {
       toast.message(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
@@ -1888,6 +1917,17 @@ export default function QuickLog({
         // Safe diagnostic only — reason code is allow-listed, never tokens/payload.
         console.error("[QuickLog] RPC save error", { reason });
         return;
+      }
+
+      if ((saveEventType === "observation" || saveEventType === "note") && note.trim().length > 0) {
+        queryClient.setQueryData(["diary_entries"], (current) =>
+          QuickLogNoteRepeatSaveRules.rememberConfirmedNote(current, {
+            plantId: savePlant.id,
+            note,
+            eventType: saveEventType,
+            savedAt: new Date().toISOString(),
+          }),
+        );
       }
 
       const confirmedTarget = result.savedWaterTarget ?? saveTarget;

@@ -93,6 +93,118 @@ export function isDuplicateOfPanelSavedNote(input: DuplicatePanelNoteInput): boo
   return note.length > 0 && note === saved;
 }
 
+/** How long the same note on the same plant stays blocked. Matthew, 2026-11-25. */
+export const QUICK_LOG_NOTE_REPEAT_WINDOW_MINUTES = 10;
+
+export interface RecentSavedNoteEntry {
+  plantId: unknown;
+  note: unknown;
+  eventType: unknown;
+  savedAt: unknown;
+}
+
+export interface RepeatRecentSavedNoteInput {
+  note: unknown;
+  plantId: unknown;
+  eventType: unknown;
+  recentEntries: readonly RecentSavedNoteEntry[] | null | undefined;
+  now: Date;
+  windowMinutes?: number;
+  /** A failed or uncertain attempt of this same save must stay retryable. */
+  sameSaveRetry?: boolean;
+}
+
+function savedAtMillis(value: unknown): number | null {
+  if (value instanceof Date) {
+    const ms = value.getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function isNoteLikeEventType(eventType: unknown): boolean {
+  return typeof eventType === "string" && NOTE_LIKE_EVENT_TYPES.has(eventType);
+}
+
+/**
+ * Hard block for saving the same plain note on the same plant again inside
+ * the window. Reads confirmed entries only. Case stays as
+ * `normalizeQuickLogNoteText` left it. Structured entries are never a match.
+ */
+export class QuickLogNoteRepeatSaveRules {
+  static isRepeatOfRecentSavedNote(input: RepeatRecentSavedNoteInput): boolean {
+    if (input.sameSaveRetry === true) return false;
+    if (!isNoteLikeEventType(input.eventType)) return false;
+    if (typeof input.plantId !== "string" || input.plantId.length === 0) return false;
+    const note = normalizeQuickLogNoteText(input.note);
+    if (note.length === 0) return false;
+    if (!(input.now instanceof Date) || !Number.isFinite(input.now.getTime())) return false;
+    if (!Array.isArray(input.recentEntries)) return false;
+    const windowMinutes = input.windowMinutes ?? QUICK_LOG_NOTE_REPEAT_WINDOW_MINUTES;
+    if (!Number.isFinite(windowMinutes) || windowMinutes < 0) return false;
+    const windowMs = windowMinutes * 60_000;
+    const nowMs = input.now.getTime();
+    for (const entry of input.recentEntries) {
+      if (!entry || typeof entry !== "object") continue;
+      if (entry.plantId !== input.plantId) continue;
+      if (!isNoteLikeEventType(entry.eventType)) continue;
+      if (normalizeQuickLogNoteText(entry.note) !== note) continue;
+      const savedMs = savedAtMillis(entry.savedAt);
+      if (savedMs === null) continue;
+      if (Math.abs(nowMs - savedMs) <= windowMs) return true;
+    }
+    return false;
+  }
+
+  /** Diary rows already loaded for Recent Activity. Unreadable rows are skipped. */
+  static candidatesFromDiaryRows(rows: unknown): RecentSavedNoteEntry[] {
+    if (!Array.isArray(rows)) return [];
+    const candidates: RecentSavedNoteEntry[] = [];
+    for (const row of rows) {
+      if (!row || typeof row !== "object") continue;
+      const record = row as Record<string, unknown>;
+      if (record.retracted_at) continue;
+      const details =
+        record.details && typeof record.details === "object" && !Array.isArray(record.details)
+          ? (record.details as Record<string, unknown>)
+          : null;
+      const eventType =
+        (typeof details?.event_type === "string" && details.event_type) ||
+        (typeof record.event_type === "string" && record.event_type) ||
+        (typeof record.entry_type === "string" && record.entry_type) ||
+        "note";
+      candidates.push({
+        plantId: record.plant_id ?? record.plantId ?? null,
+        note: record.note,
+        eventType,
+        savedAt: record.entry_at ?? record.entryAt ?? record.created_at ?? record.createdAt ?? null,
+      });
+    }
+    return candidates;
+  }
+
+  /** Confirmed note prepended onto the diary cache. Does not invent a row for a failed save. */
+  static rememberConfirmedNote(
+    current: unknown,
+    entry: { plantId: string; note: string; eventType: string; savedAt: string },
+  ): unknown[] {
+    const rows = Array.isArray(current) ? current : [];
+    return [
+      {
+        id: `quick-log-note-${entry.savedAt}`,
+        plant_id: entry.plantId,
+        note: entry.note,
+        entry_at: entry.savedAt,
+        retracted_at: null,
+        details: { event_type: entry.eventType },
+      },
+      ...rows,
+    ];
+  }
+}
+
 /** Title of the toast shown when the All activity types Note panel saves. */
 export const QUICK_LOG_NOTE_SAVED_TOAST_TITLE = "Note saved";
 

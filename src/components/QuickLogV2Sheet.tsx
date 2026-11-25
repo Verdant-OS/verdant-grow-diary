@@ -110,6 +110,11 @@ import {
   QuickLogReadingTime,
 } from "@/lib/quickLogReadingTime";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useDiaryEntries } from "@/hooks/use-diary-entries";
+import {
+  QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
+  QuickLogNoteRepeatSaveRules,
+} from "@/lib/quickLogNoteSaveRules";
 import { useInRouterContext, useNavigate } from "@/lib/react-router-compat";
 import {
   buildQuickLogTimelineNavTarget,
@@ -514,6 +519,9 @@ function QuickLogV2SheetForOwner({
     [tentsQ.data],
   );
   const queryClient = useQueryClient();
+  const diaryEntries = useDiaryEntries();
+  const recentDiaryRef = useRef(diaryEntries.data);
+  recentDiaryRef.current = diaryEntries.data;
   const temperatureUnit = useTemperatureUnitPreference();
   const inRouter = useInRouterContext();
   // `useNavigate` throws when called outside a Router. The sheet is
@@ -2239,6 +2247,22 @@ function QuickLogV2SheetForOwner({
       return;
     }
 
+    const repeatNote =
+      !pendingManualSubmission &&
+      form.action === "note" &&
+      QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
+        note: form.note,
+        plantId: resolved.plantId,
+        eventType: "note",
+        recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(recentDiaryRef.current),
+        now: new Date(),
+      });
+    if (repeatNote) {
+      setLocalError(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
+      setSaveStatus("");
+      return;
+    }
+
     if (
       !pendingSubmission &&
       isQuickLogV2CriticalContentMissing({
@@ -2967,6 +2991,17 @@ function QuickLogV2SheetForOwner({
       );
       setSaveStatus("");
       return;
+    }
+
+    if (submissionAction === "note" && resolved.plantId && submissionNote.trim()) {
+      queryClient.setQueryData(["diary_entries"], (current) =>
+        QuickLogNoteRepeatSaveRules.rememberConfirmedNote(current, {
+          plantId: resolved.plantId as string,
+          note: submissionNote,
+          eventType: "note",
+          savedAt: new Date().toISOString(),
+        }),
+      );
     }
 
     setExactRetryPending(false);

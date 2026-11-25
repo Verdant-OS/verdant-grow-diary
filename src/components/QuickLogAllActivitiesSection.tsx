@@ -136,7 +136,12 @@ import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreferen
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTypes";
 import type { CanonicalQuickLogStage } from "@/lib/grow";
-import { buildQuickLogSavedNoteExcerpt } from "@/lib/quickLogNoteSaveRules";
+import {
+  QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
+  QuickLogNoteRepeatSaveRules,
+  buildQuickLogSavedNoteExcerpt,
+} from "@/lib/quickLogNoteSaveRules";
+import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import {
   buildSymptomTimelineHref,
   hasGuidedSymptomPlant,
@@ -319,6 +324,9 @@ export default function QuickLogAllActivitiesSection({
   onSaveSuccess,
   onPendingPhotoChange,
 }: QuickLogAllActivitiesSectionProps) {
+  const diaryEntries = useDiaryEntries();
+  const recentDiaryRef = useRef(diaryEntries.data);
+  recentDiaryRef.current = diaryEntries.data;
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
     [growId, plantId, tentId],
@@ -1175,6 +1183,20 @@ export default function QuickLogAllActivitiesSection({
     }
     if (requiresNote && note.trim().length === 0) {
       setErrorReason("Add a short note before saving.");
+      setErrorForActivity(selected.id);
+      return;
+    }
+    if (
+      selected.id === "note" &&
+      QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
+        note,
+        plantId: currentTarget.plantId,
+        eventType: "note",
+        recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(recentDiaryRef.current),
+        now: new Date(),
+      })
+    ) {
+      setErrorReason(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
       setErrorForActivity(selected.id);
       return;
     }

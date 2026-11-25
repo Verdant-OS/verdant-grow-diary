@@ -106,6 +106,7 @@ import {
 } from "@/lib/plantDetailLoadTimeoutRules";
 import {
   derivePlantDetailBlockedStateView,
+  resolvePlantDetailTopBack,
   type PlantDetailBlockedStateAction,
   type PlantDetailBlockedStateView,
 } from "@/lib/plantDetailBlockedStateViewModel";
@@ -514,6 +515,7 @@ export default function PlantDetail() {
   // Text and time come from the same newest diary row; the profile note is
   // shown separately under its Edit Plant name, "Notes".
   const lastActivitySummary = resolvePlantLastActivitySummary(lastActivityInput);
+  const topBack = resolvePlantDetailTopBack({ plant, tentName: tent?.name ?? null });
   const harvestWatchEligible = isHarvestWatchEligible({
     stage: plant.stage,
     isArchived: plant.isArchived,
@@ -521,9 +523,9 @@ export default function PlantDetail() {
   return (
     <div className="min-w-0 max-w-full">
       <QuickLogV2Fab defaultTargetKey={`plant:${plant.id}`} />
-      <Button asChild variant="ghost" size="sm" className="mb-3">
-        <Link to={plantsPath()}>
-          <ArrowLeft className="h-4 w-4" /> Plants
+      <Button asChild variant="ghost" size="sm" className="mb-3" data-testid={topBack.testId}>
+        <Link to={topBack.path}>
+          <ArrowLeft className="h-4 w-4" /> {topBack.label}
         </Link>
       </Button>
       <PageHeader

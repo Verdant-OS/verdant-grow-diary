@@ -137,6 +137,27 @@ export function resolveBackContext(input: DerivePlantDetailBlockedStateInput): {
 }
 
 /**
+ * Top back link on a ready Plant Detail page.
+ *
+ * A plant that sits in a tent goes back to that tent, named once its read has
+ * loaded, instead of the whole Plants list (Cheek's field-notebook walk: on a
+ * phone the "View Tent" link sits about a screen below the header). A plant
+ * with no tent keeps "Plants". Derived from the plant's own tent id only:
+ * never a caller-supplied context and never a remembered target.
+ */
+export function resolvePlantDetailTopBack(input: {
+  plant?: ArchivedPlantLike | null;
+  tentName?: string | null;
+}): PlantDetailBlockedStateAction {
+  const { primary } = resolveBackContext({ loadState: "ready", plant: input.plant ?? null });
+  if (primary.kind !== "tent") {
+    return { ...primary, testId: "plant-detail-top-back", label: "Plants" };
+  }
+  const name = typeof input.tentName === "string" ? input.tentName.trim() : "";
+  return { ...primary, testId: "plant-detail-top-back", label: name || "Tent" };
+}
+
+/**
  * Deterministic blocked-state view derivation.
  *
  * Returns `null` for non-blocked load states (`loading` and matching

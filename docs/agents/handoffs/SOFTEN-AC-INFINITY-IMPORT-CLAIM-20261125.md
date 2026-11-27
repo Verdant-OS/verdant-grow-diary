@@ -23,7 +23,7 @@ decisions:
 - Two existing tests pinned the old wording and were updated because the specified copy changed: steady-climate-multi-tent (regex) and guide-csv-import-explainer-rendering (link label). Their intent is unchanged.
 tried_and_rejected:
 - Removing AC Infinity mentions entirely: the guides target AC Infinity searchers, and an honest "not confirmed yet" is more useful than silence.
-files_touched: src/constants/verdantSeoContent.ts; src/constants/verdantSeoCopy.ts; src/lib/publicGrowGuideArticles.ts; src/lib/environmentCsvPreviewCopyRules.ts; src/pages/HardwareIntegrations.tsx; src/components/EnvironmentCsvImportLauncher.tsx; src/test/ac-infinity-import-claim-honesty.test.ts (new); src/test/steady-climate-multi-tent.test.ts; src/test/guide-csv-import-explainer-rendering.test.tsx
+files_touched: src/constants/verdantSeoContent.ts; src/constants/verdantSeoCopy.ts; src/lib/publicGrowGuideArticles.ts; src/lib/environmentCsvPreviewCopyRules.ts; src/pages/HardwareIntegrations.tsx; src/components/EnvironmentCsvImportLauncher.tsx; src/test/ac-infinity-import-claim-honesty.test.ts (new); src/test/steady-climate-multi-tent.test.ts; src/test/guide-csv-import-explainer-rendering.test.tsx; src/test/environment-csv-import-ui.test.tsx
 files_remaining:
 - none
 blockers:
@@ -31,7 +31,8 @@ blockers:
 open_questions:
 - When a real AC Infinity export arrives: if it imports cleanly, restore the promise and update ac-infinity-import-claim-honesty.test.ts in the same PR.
 gotchas:
+- CI on 6d390e38 (2026-11-25): shard 10/32 failed because environment-csv-import-ui.test.tsx pinned the old CSV_IMPORT_DESCRIPTION; fixed in the next commit. Secret scan on that run used the wrong base (the PR was first opened against main, then retargeted); the next push reruns it on the right base.
 - PR #3086 edits src/lib/publicGrowGuideArticles.ts in a different hunk (steady-climate FAQ); no semantic overlap.
 - The guard test reads source text of the listed copy files; a new copy source that mentions AC Infinity import should be added to COPY_SOURCES.
-last_updated: 2026-11-25 by Claude (Taproot thread, AC Infinity claim task)
+last_updated: 2026-11-27 by Claude (Taproot thread, AC Infinity claim task)
 ```

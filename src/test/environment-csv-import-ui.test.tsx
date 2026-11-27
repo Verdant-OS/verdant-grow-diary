@@ -34,6 +34,7 @@ describe("EnvironmentCsvImportModal UI", () => {
     expect(screen.getByTestId("csv-import-entry")).toBeTruthy();
     expect(screen.getByText(/Import historical data/i)).toBeTruthy();
     expect(screen.getByText(/Spider Farmer or other environment CSV/i)).toBeTruthy();
+    expect(screen.getByText(/not confirmed yet/i)).toBeTruthy();
     expect(screen.getByText(/Data is read-only and source-tagged/i)).toBeTruthy();
   });
 

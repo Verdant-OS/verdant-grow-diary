@@ -183,7 +183,7 @@ export const VERDANT_PRICING_FAQ_ADDITIONS: ReadonlyArray<FaqEntry> = [
   {
     question: "Does Verdant replace AC Infinity, Spider Farmer, or TrolMaster?",
     answer:
-      "No. Verdant is not a controller. It works alongside your hardware by reading your data through CSV imports (tested on Spider Farmer GGS exports), manual snapshots, or read-only integrations where available. Your gear keeps doing what it does.",
+      "No. Verdant is not a controller. It works alongside your hardware by reading your data through CSV imports (tested on Spider Farmer GGS exports), manual snapshots, or read-only integrations where available. AC Infinity app exports are not confirmed yet. Your gear keeps doing what it does.",
   },
   {
     question: "Does Verdant charge extra for AI Doctor?",

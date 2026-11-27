@@ -2930,7 +2930,7 @@ export const VERDANT_SEO_GUIDES: ReadonlyArray<SeoGuidePage> = [
       {
         question: "Is importing AC Infinity or Spider Farmer CSVs the same thing?",
         answer:
-          "No. Controller CSV import brings in the room's sensor readings, such as temperature, humidity, and VPD, and labels them as CSV history. It's included on Free, from Sensors, using Import historical data. It doesn't bring in your own diary entries.",
+          "No. Controller CSV import brings in the room's sensor readings, such as temperature, humidity, and VPD, and labels them as CSV history. It's included on Free, from Sensors, using Import historical data, and tested on real Spider Farmer GGS exports; AC Infinity app exports are not confirmed yet. It doesn't bring in your own diary entries.",
       },
       {
         question: "Do I need an account?",

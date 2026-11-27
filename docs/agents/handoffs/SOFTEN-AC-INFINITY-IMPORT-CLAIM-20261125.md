@@ -8,8 +8,8 @@ why: No real AC Infinity app export has ever been run through the importer (repo
 branch: claude/soften-ac-infinity-import-claim
 base: verdant-grow-diary @ 19dd62a9e65d4d102c75f41eeb85cc2d89488034
 checkout: git fetch origin claude/soften-ac-infinity-import-claim && git switch claude/soften-ac-infinity-import-claim
-pr: draft, see the PR for this branch
-head_sha: see the PR (live head; not pinned here)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3107 (draft)
+head_sha: last observed remote head fcc6ebb212f05b03e6746eb5e706bea8a0cce59d at 2026-11-27 22:15 UTC; the commit that adds this line moves the head, so read the live head from the PR and compare before any exact-head verdict.
 state: Copy-only change on a draft PR. Every grower-facing sentence that named AC Infinity and promised import now says AC Infinity app exports are not confirmed yet, and leads with Spider Farmer GGS (tested on real exports). New guard test added.
 current_step: Waiting on one independent exact-head review (Seat A).
 next_action: Seat A reviews the exact head for honesty and meaning of the new copy. Out of draft, merge and deploy only on Matthew's per-item yes, through the Merge Steward.
@@ -20,6 +20,7 @@ decisions:
 - Questions (h1 "Is there an app that imports AC Infinity or Spider Farmer CSV sensor logs?", FAQ questions) kept; their answers carry the honest wording.
 - import-grow-sensor-csv title changed from "Import AC Infinity & Spider Farmer CSV Logs Free" to "Import Spider Farmer & Controller CSV Logs Free"; slug unchanged.
 - In-app copy softened too: EnvironmentCsvImportLauncher intro and CSV_IMPORT_DESCRIPTION.
+- 2026-11-27 guard strengthened after Copilot review: it now also catches "bring in" phrasing, FAQ answers whose question names AC Infinity, and claims split by inline JSX tags. Two FAQ answers (controller-CSV-vs-diary, does-Verdant-replace) gained the qualifier.
 - Two existing tests pinned the old wording and were updated because the specified copy changed: steady-climate-multi-tent (regex) and guide-csv-import-explainer-rendering (link label). Their intent is unchanged.
 tried_and_rejected:
 - Removing AC Infinity mentions entirely: the guides target AC Infinity searchers, and an honest "not confirmed yet" is more useful than silence.

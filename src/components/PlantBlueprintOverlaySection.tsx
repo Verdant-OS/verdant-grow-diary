@@ -19,6 +19,7 @@
 
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useBlueprintServerAccess } from "@/hooks/useBlueprintServerAccess";
 import { Button } from "@/components/ui/button";
 import { useNowTick } from "@/hooks/useNowTick";
 import { ProBlueprintOverlay } from "@/components/ProBlueprintOverlay";
@@ -72,7 +73,14 @@ export function PlantBlueprintOverlaySection({
   const temperatureUnit = useTemperatureUnitPreference();
   const now = useNowTick();
   const { entitlement, loading: entLoading, lookupFailed } = useMyEntitlements();
-  const unlocked = !lookupFailed && canUseCapability(entitlement, "blueprint");
+  const clientUnlocked = !lookupFailed && canUseCapability(entitlement, "blueprint");
+  // The server decides: Blueprint readings load only after the server
+  // verifies a Craft or Founder plan for the signed-in caller.
+  const serverAccess = useBlueprintServerAccess(
+    clientUnlocked,
+    entitlement?.effectivePlanId ?? "none",
+  );
+  const unlocked = serverAccess.allowed;
   // Only fetch live/logged data once unlocked — the locked teaser is static
   // (derived from stage alone), so free growers trigger no sensor/feeding query.
   const snapState = useLatestSensorSnapshot(
@@ -99,7 +107,7 @@ export function PlantBlueprintOverlaySection({
   // Presentation-only gate; the client hint is never authoritative for data
   // access (RLS enforces that). Blueprint is premium analysis, so hiding it
   // behind Pro is a UX gate, not a data gate.
-  if (entLoading) return null;
+  if (entLoading || serverAccess.pending) return null;
 
   if (!unlocked) {
     // Conversion demo: preview the real per-stage SOP target bands (what Craft

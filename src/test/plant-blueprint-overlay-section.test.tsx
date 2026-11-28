@@ -17,6 +17,12 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: () => snapshotMock(),
 }));
+// Server verdict mirrors the client capability here; the server rule itself
+// is covered by blueprint-access-rules.test.ts.
+const serverAccessMock = vi.fn((enabled: boolean) => ({ allowed: enabled, pending: false }));
+vi.mock("@/hooks/useBlueprintServerAccess", () => ({
+  useBlueprintServerAccess: (enabled: boolean) => serverAccessMock(enabled),
+}));
 vi.mock("@/hooks/useRootZoneObservations", () => ({
   useRootZoneObservations: () => rootZoneMock(),
 }));
@@ -57,6 +63,7 @@ beforeEach(() => {
   snapshotMock.mockReturnValue({ status: "ok", snapshot: EMPTY_SNAPSHOT });
   rootZoneMock.mockReturnValue({ observations: [] });
   trackSpy.mockClear();
+  serverAccessMock.mockImplementation((enabled: boolean) => ({ allowed: enabled, pending: false }));
 });
 
 describe("PlantBlueprintOverlaySection", () => {
@@ -189,5 +196,16 @@ describe("paywall impression (surface: blueprint_locked)", () => {
     entitlementsMock.mockReturnValue(entitlement(true));
     renderSection();
     expect(trackSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("PlantBlueprintOverlaySection — server verdict", () => {
+  it("stays locked when the server denies, even if the client thinks Craft", () => {
+    entitlementsMock.mockReturnValue(entitlement(true));
+    serverAccessMock.mockImplementation(() => ({ allowed: false, pending: false }));
+    renderSection();
+    expect(screen.queryByTestId("pro-blueprint-overlay")).toBeNull();
+    expect(screen.getByTestId("pro-blueprint-locked")).toBeTruthy();
+    expect(snapshotMock).toHaveBeenCalled();
   });
 });

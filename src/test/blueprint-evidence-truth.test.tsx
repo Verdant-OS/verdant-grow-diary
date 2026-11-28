@@ -17,6 +17,11 @@ vi.mock("@/hooks/useMyEntitlements", () => ({
     loading: false,
   }),
 }));
+// The server gate is pinned in plant-blueprint-overlay-section.test.tsx; here it
+// mirrors the client entitlement so these tests stay about evidence truth.
+vi.mock("@/hooks/useBlueprintServerAccess", () => ({
+  useBlueprintServerAccess: (enabled: boolean) => ({ allowed: enabled, pending: false }),
+}));
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: (...args: unknown[]) => {
     h.read(...args);

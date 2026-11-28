@@ -305,6 +305,42 @@ describe("AiDoctorSessionDetail — 'Created from this session' chip", () => {
     expect(buttons.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("does not offer to add a suggestion that already has a linked item", async () => {
+    linkedRows = [
+      {
+        id: "aq-light",
+        status: "pending_approval",
+        source: "ai_doctor",
+        reason: `Raise light. [session:${SESSION_ID}]`,
+        suggested_change: "Raise light — Raise the light by 10 cm.",
+      },
+    ];
+    renderDetail();
+    const list = await findReviewActionsList();
+    await within(list).findByTestId(
+      "ai-doctor-session-detail-review-action-created-from-session-chip",
+    );
+    const items = within(list).getAllByTestId("ai-doctor-session-detail-review-action");
+    const linked = items.find((li) => li.textContent?.startsWith("Raise light"))!;
+    const unlinked = items.find((li) => li.textContent?.startsWith("Add oscillating fan"))!;
+
+    const linkedButton = within(linked).getByTestId(
+      "ai-doctor-session-detail-add-to-action-queue-button",
+    ) as HTMLButtonElement;
+    expect(linkedButton.disabled).toBe(true);
+    expect(linkedButton.textContent).toBe("Already in Action Queue");
+    // The chip owns the link to the existing item; the button adds no second one.
+    expect(
+      within(linked).queryByTestId("ai-doctor-session-detail-add-to-action-queue-link"),
+    ).toBeNull();
+
+    const unlinkedButton = within(unlinked).getByTestId(
+      "ai-doctor-session-detail-add-to-action-queue-button",
+    ) as HTMLButtonElement;
+    expect(unlinkedButton.disabled).toBe(false);
+    expect(unlinkedButton.textContent).toBe("Add to Action Queue");
+  });
+
   it("never leaks the raw [session:<id>] token or target_device", async () => {
     linkedRows = [
       {

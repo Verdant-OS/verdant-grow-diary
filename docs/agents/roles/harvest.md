@@ -1,6 +1,9 @@
 # Role — Harvest: Historical Backup Merge Profile
 
-**Sentinel-Version: 2026-11-17.1**
+**Sentinel-Version: 2026-11-20.3**
+
+Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
+Start page (do not restate): docs/agents/START_HERE.md
 
 **Historical profile — no current backup merge assignment.** The Merge Executive
 assignment recorded on 2026-10-10 at 3:25 PM CT made Harvest the conditional backup
@@ -68,7 +71,7 @@ historical profile.
 ---
 
 The only action permitted before this gate is read-only acquisition of
-`AGENTS.md`, the "Start here" section of `docs/agents/CURRENT_STATE.md`, the open handoff log
+`AGENTS.md`, `docs/agents/START_HERE.md`, `docs/agents/SENTINEL_BLOCK.md`, the "Start here" section of `docs/agents/CURRENT_STATE.md`, the open handoff log
 (`docs/agents/HANDOFF_LOG.md` and open entries in `docs/agents/handoffs/`), and the assigned role file so the
 acknowledgment can be truthful. No application-code inspection, network mutation, or
 recommendation is permitted before the acknowledgment.

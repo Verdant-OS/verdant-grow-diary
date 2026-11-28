@@ -252,10 +252,16 @@ export function parseEnvironmentCSVText(
   const { detected, unsupported, soilUnsupported, soil } = detectColumns(headers);
   empty.unsupportedColumns = unsupported;
   const soilOnlyMessage = soilUnsupported.length > 0 ? CSV_SOIL_ONLY_MESSAGE : null;
+  const standaloneDateTime =
+    detected.timestamp === null &&
+    detected.date === null &&
+    detected.time !== null &&
+    CsvStandaloneTimeColumn.holdsDateTime(rows, headers, detected.time);
   const hasTimeCol =
     detected.timestamp !== null ||
     (detected.date !== null && detected.time !== null) ||
-    detected.date !== null;
+    detected.date !== null ||
+    standaloneDateTime;
   const hasMetricCol =
     detected.temperature !== null ||
     detected.humidity !== null ||
@@ -638,9 +644,9 @@ function classifySoilHeaders(soilHeaders: readonly string[]): {
       if (unit === "F" && tempF == null) tempF = h;
       else if (unit === "C" && tempC == null) tempC = h;
       else unsupported.push(h);
-    } else if (soil.moisture == null && /humidity|moisture|vwc|water/.test(k)) {
+    } else if (soil.moisture == null && /humidity|moisture|vwc|water|^humi/.test(k)) {
       soil.moisture = h;
-    } else if (soil.ec == null && /(^|[^a-z])ec([^a-z]|$)|conductiv/.test(k)) {
+    } else if (soil.ec == null && /(^|[^a-z])ec(soil)?([^a-z]|$)|conductiv/.test(k)) {
       soil.ec = h;
     } else {
       unsupported.push(h);
@@ -714,7 +720,7 @@ function detectColumns(headers: string[]): {
       temperatureCandidates.push(h);
       continue;
     }
-    if (out.humidity == null && /(humidity|^rh\b|^rh[^a-z])/.test(k)) {
+    if (out.humidity == null && /(humidity|^rh\b|^rh[^a-z]|^humi$)/.test(k)) {
       out.humidity = h;
       continue;
     }
@@ -804,7 +810,37 @@ function readTimestampText(rec: Record<string, string>, detected: DetectedColumn
     const d = (rec[detected.date] ?? "").trim();
     return d || null;
   }
+  if (detected.time) {
+    const t = (rec[detected.time] ?? "").trim();
+    return CsvStandaloneTimeColumn.looksLikeDateTime(t) ? t : null;
+  }
   return null;
+}
+
+/**
+ * A `Time` column is a clock time when a `Date` column is also present.
+ * GGS app exports have no Date or Timestamp column: `Time` holds the full
+ * wall-clock datetime. A clock-only cell stays unrecognized.
+ */
+export class CsvStandaloneTimeColumn {
+  static looksLikeDateTime(value: string): boolean {
+    return /^\d{4}-\d{1,2}-\d{1,2}[T ]\d{1,2}:\d{2}/.test(value.trim());
+  }
+
+  static holdsDateTime(
+    rows: readonly string[][],
+    headers: readonly string[],
+    timeHeader: string,
+  ): boolean {
+    const idx = headers.indexOf(timeHeader);
+    if (idx < 0) return false;
+    for (const row of rows) {
+      const cell = (row[idx] ?? "").trim();
+      if (cell === "") continue;
+      return CsvStandaloneTimeColumn.looksLikeDateTime(cell);
+    }
+    return false;
+  }
 }
 
 function parseNumber(input: string): number | null {

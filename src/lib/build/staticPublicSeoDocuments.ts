@@ -67,6 +67,7 @@ import {
   type PublicGrowGuideArticle,
 } from "../publicGrowGuideArticles";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "./siteSoftwareApplicationJsonLd";
+import { HelpCenterContent } from "../helpCenterContent";
 import type { StaticSocialRouteMetadata } from "./staticSocialRouteHtml";
 import {
   isGuideCitationHref,
@@ -853,7 +854,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   publicDocument("/hardware-integrations", {
     title: "Sensor & Hardware Integrations | Verdant Grow Diary",
     description:
-      "Hardware-neutral Grow OS. Connect Ecowitt, ESP32, MQTT, webhook or Raspberry Pi sensors read-only, or import CSVs. Bring your own gear; you stay in control.",
+      "Hardware-neutral Grow OS. Import CSVs or log readings by hand. Read-only EcoWitt and other bridges are built, not yet confirmed live. You stay in control.",
     imageAlt: "Verdant sensor and hardware integrations",
   }),
   publicDocument("/how-ai-doctor-works", {
@@ -1051,6 +1052,63 @@ export const STATIC_PUBLIC_NOINDEX_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocum
     }),
   ]);
 
+function helpCenterDocuments(): readonly StaticPublicSeoDocument[] {
+  const homeUrl = `${VERDANT_SITE_ORIGIN}${HelpCenterContent.homePath()}`;
+  const home = publicDocument(HelpCenterContent.homePath(), {
+    title: HelpCenterContent.homeTitle(),
+    description: HelpCenterContent.homeDescription(),
+    imageAlt: "Verdant Help",
+    bodyFallbackHtml: HelpCenterContent.homeFallbackHtml(),
+    jsonLd: [
+      buildStaticWebPageJsonLd({
+        title: HelpCenterContent.homeTitle(),
+        description: HelpCenterContent.homeDescription(),
+        url: homeUrl,
+      }),
+      buildBreadcrumbListJsonLd({ items: [{ name: "Help", url: homeUrl }] }),
+    ],
+  });
+  const hubs = HelpCenterContent.sections().map((entry) => {
+    const url = `${VERDANT_SITE_ORIGIN}${entry.path}`;
+    return publicDocument(entry.path, {
+      title: entry.titleTag,
+      description: entry.covers,
+      imageAlt: entry.title,
+      bodyFallbackHtml: helpHubFallback(entry.title, entry.covers, entry.topics),
+      jsonLd: [
+        buildStaticWebPageJsonLd({
+          title: entry.titleTag,
+          description: entry.covers,
+          url,
+        }),
+        buildBreadcrumbListJsonLd({
+          items: [
+            { name: "Help", url: homeUrl },
+            { name: entry.title, url },
+          ],
+        }),
+      ],
+    });
+  });
+  return [home, ...hubs];
+}
+
+function helpHubFallback(
+  title: string,
+  covers: string,
+  topics: readonly { readonly label: string; readonly href: string }[],
+): string {
+  const links = topics
+    .map(
+      (topic) =>
+        `<li><a href="${escapeStaticHtml(topic.href)}">${escapeStaticHtml(topic.label)}</a></li>`,
+    )
+    .join("");
+  return `<h1>${escapeStaticHtml(title)}</h1><p>${escapeStaticHtml(HelpCenterContent.coversClause(covers))}</p>${
+    links ? `<ul>${links}</ul>` : ""
+  }`;
+}
+
 /** All public documents emitted alongside Vite's primary SPA entry. */
 export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = Object.freeze([
   ...CORE_ACQUISITION_DOCUMENTS,
@@ -1058,6 +1116,7 @@ export const STATIC_PUBLIC_SEO_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument>
   ...GUIDE_DOCUMENTS,
   CULTIVAR_HUB,
   ...INDEXABLE_CULTIVAR_DOCUMENTS,
+  ...helpCenterDocuments(),
 ]);
 
 /**

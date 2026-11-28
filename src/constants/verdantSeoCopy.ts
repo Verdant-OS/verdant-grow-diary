@@ -91,7 +91,7 @@ export const VERDANT_SEO_LANDING_SECTIONS: ReadonlyArray<SeoSection> = [
   {
     id: "seo-hardware-neutral",
     heading: "Use the grow gear you already own",
-    body: "Bring in readings without replacing your controller: AC Infinity and Spider Farmer exports import as labeled CSV history, while TrolMaster, EcoWitt, and other gear come in through manual snapshots or read-only integrations where available. Verdant is not another controller — it turns existing grow-room data logging into plant memory.",
+    body: "Bring in readings without replacing your controller: AC Infinity and Spider Farmer exports import as labeled CSV history, while TrolMaster, EcoWitt, and other gear come in through manual snapshots. Read-only EcoWitt readings are built but not confirmed live. Verdant is not another controller — it turns existing grow-room data logging into plant memory.",
     targetPhrases: [
       "AC Infinity data logging",
       "Spider Farmer data logging",
@@ -141,7 +141,7 @@ export const VERDANT_LANDING_FAQ: ReadonlyArray<FaqEntry> = [
   {
     question: "Can Verdant work with the grow equipment I already own?",
     answer:
-      "Yes. Verdant is hardware-neutral. AC Infinity and Spider Farmer exports import as CSV; TrolMaster, EcoWitt, SensorPush, and similar gear come in through manual snapshots or read-only integrations where available. Verdant does not replace your controller.",
+      "Yes. Verdant is hardware-neutral. AC Infinity and Spider Farmer exports import as CSV; TrolMaster, EcoWitt, SensorPush, and similar gear come in through manual snapshots. Read-only EcoWitt readings are built but not confirmed live. Verdant does not replace your controller.",
   },
   {
     question: "Does Verdant control my lights, fans, irrigation, or humidifier?",

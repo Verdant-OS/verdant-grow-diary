@@ -199,7 +199,31 @@ export interface UseGrowDetailData {
    * Never invents a default among many.
    */
   soleTentId: string | null;
+  /**
+   * The grow's tents (id and name) from the same tent lookup, for the tent
+   * list at the top of the grow page. Never "ok" from a failed or pending read.
+   */
+  tentList: GrowTentListState;
   refetch: () => void;
+}
+
+export type GrowTentListState =
+  | { status: "loading" }
+  | { status: "unavailable" }
+  | { status: "ok"; tents: Array<{ id: string; name: string }> };
+
+/** Tent rows with an id, named for display; a blank name reads "Unnamed tent". */
+export function toGrowTentListEntries(rows: unknown): Array<{ id: string; name: string }> {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => (row ?? {}) as { id?: unknown; name?: unknown })
+    .filter((row): row is { id: string; name?: unknown } => {
+      return typeof row.id === "string" && row.id.length > 0;
+    })
+    .map((row) => ({
+      id: row.id,
+      name: typeof row.name === "string" && row.name.trim() ? row.name : "Unnamed tent",
+    }));
 }
 
 export function useGrowDetailData(): UseGrowDetailData {
@@ -214,6 +238,7 @@ export function useGrowDetailData(): UseGrowDetailData {
   const [recent, setRecentState] = useState<RecentState>({ status: "loading" });
   const [outcomes, setOutcomes] = useState<GrowOutcomesState>(EMPTY_GROW_OUTCOMES_STATE);
   const [soleTentId, setSoleTentId] = useState<string | null>(null);
+  const [tentList, setTentList] = useState<GrowTentListState>({ status: "loading" });
   const [status, setStatus] = useState<GrowStatus>(UNAVAILABLE_STATUS);
   const loadGeneration = useRef(0);
   const growRowAbortController = useRef<AbortController | null>(null);
@@ -364,6 +389,25 @@ export function useGrowDetailData(): UseGrowDetailData {
       tErr = err;
       setSoleTentId(null);
     }
+
+    // The tent names for the list at the top of the grow page (Cheek,
+    // 2026-11-28), read on their own so the count lookup above is unchanged
+    // and a slow or failed name read never holds up the counts. Never "ok"
+    // from a failed read.
+    setTentList({ status: "loading" });
+    void (async () => {
+      try {
+        const named = await supabase.from("tents").select("id, name").eq("grow_id", growId!);
+        if (!isCurrentLoad()) return;
+        if (named.error) {
+          setTentList({ status: "unavailable" });
+          return;
+        }
+        setTentList({ status: "ok", tents: toGrowTentListEntries(named.data) });
+      } catch {
+        if (isCurrentLoad()) setTentList({ status: "unavailable" });
+      }
+    })();
 
     async function countGrowScopedPlants(): Promise<CountValue> {
       try {
@@ -708,6 +752,7 @@ export function useGrowDetailData(): UseGrowDetailData {
     outcomes,
     growId,
     soleTentId,
+    tentList,
     refetch: load,
   };
 }

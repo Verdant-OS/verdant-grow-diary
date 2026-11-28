@@ -77,7 +77,7 @@ describe("Spider Farmer CSV import section (React)", () => {
       screen.getByRole("heading", { level: 3, name: "How to import your Spider Farmer CSV" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "AC Infinity and Spider Farmer CSV import" }),
+      screen.getByRole("link", { name: "tracking a grow tent with AC Infinity or Spider Farmer" }),
     ).toHaveAttribute("href", "/guides/ac-infinity-data-logging");
     const ctas = screen.getAllByRole("link", { name: CTA_LABEL });
     expect(ctas.length).toBeGreaterThan(0);

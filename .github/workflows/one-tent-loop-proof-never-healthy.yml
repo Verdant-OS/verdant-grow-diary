@@ -38,6 +38,9 @@ concurrency:
   group: one-tent-loop-proof-never-healthy-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions:
+  contents: read
+
 jobs:
   one-tent-loop-proof-never-healthy:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false

@@ -6,8 +6,9 @@ import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 import {
   isCurrentReadForAlertWrite,
   plantsForAlertPersistence,
-  resolveSelectedTentPlantStages,
+  resolveSelectedTentStagePlants,
 } from "@/lib/alertPlantStageScopeRules";
+import { resolveSnapshotStageScope } from "@/lib/alertSnapshotStageScopeRules";
 import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
 import StabilityChipDrilldown from "@/components/StabilityChipDrilldown";
 import {
@@ -293,15 +294,6 @@ export default function Dashboard() {
   // a later stage). Unscoped renders pass null: `tents` is the full
   // account set there, so no tent stage may be inferred.
   const stageContextTents = tents.filter((t) => selectedTentIds.includes(t.id));
-  const alertContextStage = scopedGrow
-    ? resolveAlertContextStage({
-        growStage: scopedGrow.stage,
-        tentStages: stageContextTents.map((t) => t.stage),
-        // Plants in the same selection scope that belong to this grow by the
-        // canonical attribution (QA 2026-09-24, BUG-006; Codex on #1683).
-        plantStages: resolveSelectedTentPlantStages(plants, scopedGrow.id, tents, selectedTentIds),
-      }).stage
-    : null;
   // Only a current, successful plant read may decide a persisted stage.
   const plantsForPersistence = plantsForAlertPersistence(plantsQuery);
   // Both alert writes, automatic and the manual save button, need current,
@@ -339,6 +331,26 @@ export default function Dashboard() {
   // persistence semantics.
   const dashboardHealthSnapshot = dashboardSnapshotForHealthyCues(currentSensorSnapshot);
   const dashboardSensorQuality = evaluateDashboardSensorQuality(currentSensorSnapshot, nowTick);
+  // When the snapshot names one of the selected tents, only that tent and its
+  // plants vote (friction item 1), the same scope the Alerts page persists
+  // with, so one reading cannot raise opposite alerts on the two pages
+  // (Codex on #3021). A snapshot spanning tents keeps the selection scope.
+  const dashboardStageScope = resolveSnapshotStageScope({
+    snapshotTentId: dashboardHealthSnapshot?.tent_id ?? null,
+    tents: stageContextTents,
+    // Plants in the same selection scope that belong to this grow by the
+    // canonical attribution (QA 2026-09-24, BUG-006; Codex on #1683).
+    plants: scopedGrow
+      ? resolveSelectedTentStagePlants(plants, scopedGrow.id, tents, selectedTentIds)
+      : [],
+  });
+  const alertContextStage = scopedGrow
+    ? resolveAlertContextStage({
+        growStage: scopedGrow.stage,
+        tentStages: dashboardStageScope.tentStages,
+        plantStages: dashboardStageScope.plantStages,
+      }).stage
+    : null;
 
   // First-run activation is relationship-aware. Independent grow/tent/plant
   // counts cannot prove that a usable One-Tent chain exists.

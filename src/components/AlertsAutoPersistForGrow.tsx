@@ -23,12 +23,8 @@ import { useGrowTargets } from "@/hooks/useGrowTargets";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { compareSnapshotToTargets } from "@/lib/environmentTargetComparison";
-import { resolveAlertContextStage } from "@/lib/alertStageResolution";
-import {
-  type AlertStagePlant,
-  isCurrentReadForAlertWrite,
-  resolveGrowPlantStages,
-} from "@/lib/alertPlantStageScopeRules";
+import { type AlertStagePlant, isCurrentReadForAlertWrite } from "@/lib/alertPlantStageScopeRules";
+import { resolveSnapshotAlertStage } from "@/lib/alertSnapshotStageScopeRules";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 
 interface Props {
@@ -63,13 +59,18 @@ export default function AlertsAutoPersistForGrow({ growId, stage, plants }: Prop
   const snapshot = buildSensorSnapshotReadState(sensorState).confirmedSnapshot;
   const targetsState = useGrowTargets(safeGrowId, { retryOnUnavailable: true });
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
-  // stages, most advanced known stage wins on disagreement.
-  const plantStages = safeGrowId ? resolveGrowPlantStages(plants, safeGrowId, tents) : plants;
-  const resolvedStage = resolveAlertContextStage({
+  // stages, most advanced known stage wins on disagreement. The inputs are
+  // scoped to the snapshot's tent when it names one (friction item 1): only
+  // that tent and its plants vote, never plants elsewhere in the grow.
+  // The Alerts header resolves through the same helper, so the stage it
+  // names is the stage these alerts are saved with (Sour Diesel on #3021).
+  const resolvedStage = resolveSnapshotAlertStage({
+    growId: safeGrowId,
     growStage: stage,
-    tentStages: tents.map((t) => t.stage),
-    plantStages: plantStages ?? null,
-  }).stage;
+    tents,
+    plants,
+    snapshotTentId: snapshot ? (snapshot.tent_id ?? null) : null,
+  });
   const plantsSettled = plants !== null;
   const targetsPending = targetsState.status !== "ok";
 

@@ -1,10 +1,16 @@
 /**
- * Presenter for /help and a section hub. Copy comes from HelpCenterContent.
+ * Presenter for /help, a section hub and a topic page. Copy comes from HelpCenterContent.
  */
 import { Link } from "@/lib/react-router-compat";
 import BrandLogo from "@/components/BrandLogo";
 import { usePageSeo } from "@/hooks/usePageSeo";
-import { HelpCenterContent, type HelpRun, type HelpSection } from "@/lib/helpCenterContent";
+import {
+  HelpCenterContent,
+  type HelpArticle,
+  type HelpArticleBlock,
+  type HelpRun,
+  type HelpSection,
+} from "@/lib/helpCenterContent";
 
 const tapLink = "inline-flex min-h-11 items-center text-primary underline-offset-4 hover:underline";
 
@@ -26,7 +32,34 @@ function LegalFooter() {
   );
 }
 
-function Crumbs({ section }: { readonly section: HelpSection | null }) {
+function Crumbs({
+  section,
+  article,
+}: {
+  readonly section: HelpSection | null;
+  readonly article: HelpArticle | null;
+}) {
+  if (article) {
+    return (
+      <nav aria-label="Breadcrumb" className="text-sm">
+        <ol className="flex flex-wrap items-center gap-1">
+          <li>
+            <Link to={HelpCenterContent.homePath()} className={tapLink}>
+              Help
+            </Link>
+            <span aria-hidden="true"> → </span>
+          </li>
+          <li>
+            <Link to={article.sectionPath} className={tapLink}>
+              {article.sectionTitle}
+            </Link>
+            <span aria-hidden="true"> → </span>
+          </li>
+          <li aria-current="page">{article.title}</li>
+        </ol>
+      </nav>
+    );
+  }
   return (
     <nav aria-label="Breadcrumb" className="text-sm">
       <ol className="flex flex-wrap items-center gap-1">
@@ -44,10 +77,24 @@ function Crumbs({ section }: { readonly section: HelpSection | null }) {
   );
 }
 
-export default function HelpCenterPage({ section }: { readonly section: HelpSection | null }) {
-  const title = section ? section.titleTag : HelpCenterContent.homeTitle();
-  const description = section ? section.covers : HelpCenterContent.homeDescription();
-  const path = section ? section.path : HelpCenterContent.homePath();
+export default function HelpCenterPage({
+  section,
+  article = null,
+}: {
+  readonly section: HelpSection | null;
+  readonly article?: HelpArticle | null;
+}) {
+  const title = article
+    ? article.titleTag
+    : section
+      ? section.titleTag
+      : HelpCenterContent.homeTitle();
+  const description = article
+    ? article.description
+    : section
+      ? section.covers
+      : HelpCenterContent.homeDescription();
+  const path = article ? article.path : section ? section.path : HelpCenterContent.homePath();
 
   usePageSeo({ title, description, path });
 
@@ -62,12 +109,12 @@ export default function HelpCenterPage({ section }: { readonly section: HelpSect
           >
             <BrandLogo size="md" showText />
           </Link>
-          <Crumbs section={section} />
+          <Crumbs section={section} article={article} />
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-8">
-        {section ? <Hub section={section} /> : <Home />}
+        {article ? <Article article={article} /> : section ? <Hub section={section} /> : <Home />}
       </main>
       <LegalFooter />
     </div>
@@ -156,5 +203,37 @@ function Hub({ section }: { readonly section: HelpSection }) {
         </ul>
       ) : null}
     </>
+  );
+}
+
+function ArticleBlockView({ block }: { readonly block: HelpArticleBlock }) {
+  if (block.tag === "ol") {
+    return (
+      <ol className="mt-4 list-decimal space-y-2 pl-6 text-base leading-7">
+        {block.items.map((runs, index) => (
+          <li key={index}>
+            {runs.map((run, runIndex) => (
+              <HelpRunView key={runIndex} run={run} />
+            ))}
+          </li>
+        ))}
+      </ol>
+    );
+  }
+  const runs = block.runs.map((run, index) => <HelpRunView key={index} run={run} />);
+  if (block.tag === "h1") {
+    return <h1 className="font-display text-3xl font-semibold leading-tight">{runs}</h1>;
+  }
+  if (block.tag === "h2") return <h2 className="mt-8 text-xl font-semibold">{runs}</h2>;
+  return <p className="mt-4 text-base leading-7">{runs}</p>;
+}
+
+function Article({ article }: { readonly article: HelpArticle }) {
+  return (
+    <article>
+      {article.blocks.map((block, index) => (
+        <ArticleBlockView key={index} block={block} />
+      ))}
+    </article>
   );
 }

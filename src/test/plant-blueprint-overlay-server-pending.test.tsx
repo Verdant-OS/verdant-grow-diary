@@ -50,13 +50,12 @@ function entitlement(blueprint: boolean, extra: Record<string, unknown> = {}) {
   };
 }
 
-function renderSection() {
-  return render(
-    <MemoryRouter>
-      <PlantBlueprintOverlaySection growId="g1" tentId="t1" plantId="p1" stage="veg" />
-    </MemoryRouter>,
-  );
-}
+const section = () => (
+  <MemoryRouter>
+    <PlantBlueprintOverlaySection growId="g1" tentId="t1" plantId="p1" stage="veg" />
+  </MemoryRouter>
+);
+const renderSection = () => render(section());
 
 beforeEach(() => {
   snapshotMock.mockReset().mockReturnValue({ status: "ok", snapshot: EMPTY_SNAPSHOT });
@@ -70,10 +69,7 @@ describe("PlantBlueprintOverlaySection — server verdict pending", () => {
     entitlementsMock.mockReturnValue(entitlement(true));
     serverAccessMock.mockReturnValue({ allowed: false, pending: true });
     const { container } = renderSection();
-    expect(screen.queryByTestId("pro-blueprint-paywall")).toBeNull();
-    expect(screen.queryByTestId("pro-blueprint-locked")).toBeNull();
-    expect(screen.queryByTestId("pro-blueprint-overlay")).toBeNull();
-    expect(container.textContent).toBe("");
+    expect(container.innerHTML).toBe("");
   });
 
   it("loads no readings while the server check runs", () => {
@@ -89,11 +85,7 @@ describe("PlantBlueprintOverlaySection — server verdict pending", () => {
     serverAccessMock.mockReturnValue({ allowed: false, pending: true });
     const { rerender } = renderSection();
     serverAccessMock.mockReturnValue({ allowed: true, pending: false });
-    rerender(
-      <MemoryRouter>
-        <PlantBlueprintOverlaySection growId="g1" tentId="t1" plantId="p1" stage="veg" />
-      </MemoryRouter>,
-    );
+    rerender(section());
     expect(screen.getByTestId("pro-blueprint-overlay")).toBeTruthy();
     expect(screen.queryByTestId("pro-blueprint-paywall")).toBeNull();
     expect(snapshotMock).toHaveBeenLastCalledWith("g1", ["t1"]);

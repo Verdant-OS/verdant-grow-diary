@@ -4,7 +4,7 @@
  * the query cache. use-blueprint-server-access.test.tsx covers the rest.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useBlueprintServerAccess } from "@/hooks/useBlueprintServerAccess";
@@ -27,10 +27,7 @@ beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   io.fetch.mockReset();
 });
-afterEach(() => {
-  cleanup();
-  client.clear();
-});
+afterEach(() => client.clear());
 
 describe("useBlueprintServerAccess — enabled goes false", () => {
   it("locks at once after an earlier allow, without asking the server again", async () => {

@@ -2,7 +2,10 @@
 //
 // Monetization: Pro-tier (paid entitlement) feature. This function does NOT
 // spend AI credits — the grow-scoped ai_credit ledger is for grow-specific AI
-// (doctor/coach). Access is gated on a server-resolved PAID entitlement.
+// (doctor/coach). Access is gated on a server-resolved PAID entitlement, and
+// each paid user gets CULTIVAR_QA_DAILY_LIMIT model calls per UTC day, counted
+// by the service-role-only RPC ai_cultivar_qa_consume before the model call
+// (security review finding E1). The count fails closed.
 //
 // Safety / doctrine:
 //  - Only a published cultivar slug and bounded question are trusted. Any
@@ -11,10 +14,14 @@
 //    The system prompt forbids inventing flowering times, chemistry, potency,
 //    chemotype, effects, medical claims, or guaranteed outcomes, and requires a
 //    refusal when the canonical context lacks the information.
-//  - No DB writes; no alerts/action_queue; no plant linkage.
+//  - No DB writes except the daily usage counter; no alerts/action_queue; no
+//    plant linkage.
 //  - Response is always { ok: true, answer } or { ok: false, reason }.
 //
-// Deploy prerequisites (founder): deploy this function and set LOVABLE_API_KEY.
+// Deploy prerequisites (founder): apply migration
+// 20261128070000_ai_cultivar_qa_daily_usage.sql first, then deploy this function
+// and set LOVABLE_API_KEY. Without the migration every question answers
+// usage_unavailable.
 import { corsHeaders as supabaseCorsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { resolveRequiredServerBillingEnvironment } from "../_shared/unionEntitlementLookup.ts";
@@ -29,6 +36,10 @@ import {
   parseCultivarQaRequest,
   readBoundedJsonBody,
 } from "../_shared/cultivarQaGrounding.ts";
+import {
+  CULTIVAR_QA_DAILY_LIMIT,
+  decideCultivarQaDailyCap,
+} from "../_shared/cultivarQaDailyCap.ts";
 import {
   captureAiGeneration,
   requestGrantsAnalyticsCapture,
@@ -92,6 +103,25 @@ Deno.serve(async (req) => {
     const parsedRequest = parseCultivarQaRequest(requestBody.value);
     if (!parsedRequest.ok) {
       return json({ ok: false, reason: parsedRequest.reason }, 200);
+    }
+
+    // ---- Per-user daily cap, counted before the model call (fails closed) ----
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!serviceRoleKey) return json({ ok: false, reason: "not_configured" }, 500);
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey, {
+      auth: { persistSession: false },
+    });
+    const dailyCap = decideCultivarQaDailyCap(
+      await admin.rpc("ai_cultivar_qa_consume", {
+        p_user_id: u.user.id,
+        p_daily_limit: CULTIVAR_QA_DAILY_LIMIT,
+      }),
+    );
+    if (!dailyCap.ok) {
+      if (dailyCap.reason === "usage_unavailable") {
+        console.log("ai-cultivar-qa status=usage_unavailable");
+      }
+      return json({ ok: false, reason: dailyCap.reason }, dailyCap.status);
     }
 
     const aiInput = [

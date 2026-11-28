@@ -58,6 +58,12 @@
     "edge_metrics_webhook_attempts": "ops"
   },
   "functions": {
+    "ai-cultivar-qa": {
+      "domain": "ai",
+      "tables": [],
+      "rpcs": ["ai_cultivar_qa_consume"],
+      "justification": "Counts each paid Cultivar Q&A call against a per-user daily cap before the model call (security review E1, 2026-11-19). The RPC is service-role-only and touches only its own counter table."
+    },
     "ai-coach": {
       "domain": "ai",
       "tables": ["diary_entries", "grows", "plants", "sensor_readings", "tents"],

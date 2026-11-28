@@ -26,6 +26,8 @@ function reasonCopy(reason: string | null): string {
       return "That question is too long — try a shorter one.";
     case "upgrade_required":
       return "This is a Pro feature. Upgrade to ask about this cultivar.";
+    case "daily_limit_reached":
+      return "You've reached today's limit for cultivar questions. It resets at midnight UTC.";
     case "upstream_credit_exhausted":
     case "upstream_unavailable":
     case "upstream_error":

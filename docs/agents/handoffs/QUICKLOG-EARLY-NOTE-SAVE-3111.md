@@ -23,9 +23,9 @@ blockers: none. 10 tests in quick-log-starter-water-uncertain-recovery.test.tsx 
 open_questions: none
 gotchas: open PR #3105 also edits QuickLog.tsx (runSubmit area). git merge-tree against #3105 is clean in both orders. The header Quick Log (QuickLogV2Sheet.tsx) has no "What changed?" field and is out of scope. The PR changes the edge _shared/lib mirror and is GATED: the mirror plus the locked manifest supabase/functions/_shared/lib/.sync-manifest.json. No schema, RLS, auth, billing or production change. No migration.
 links: https://github.com/Verdant-OS/verdant-grow-diary/issues/3111
-artifacts: PR checks on the draft PR
+artifacts: PR checks on the PR
 reviewer_seat: eligible independent reviewer, not this session
-reviewer_sha: Seat A and Seat C reviewed ed208c5dba85290198bc7a3bd45b15d2a1765e7f with PASS-with-P2. This push addresses those findings.
+reviewer_sha: Seat A PASS-with-P2 0/3/3 and Seat C FAIL 1/3/3 (code-only PASS-with-P2) at ed208c5dba85290198bc7a3bd45b15d2a1765e7f.
 session_state: Pineapple fix round on the PostHog branch; PostHog bot stays off it. No routines or paused workflows.
 claimed_by: Pineapple, 2026-11-28, on Cheek's assignment for this fix round
 owner: Pineapple for this fix round

@@ -4,6 +4,9 @@
  * No I/O, no React. Deterministic mapping from raw sensor_readings rows
  * (already scoped to a single tent by the caller) into a labeled,
  * display-ready view model. Missing values stay null — never invented.
+ * A current reading with temperature and RH but no stored VPD shows the VPD
+ * calculated from that pair, labeled as calculated, as the Dashboard tent
+ * panel does. A stale reading never gets a calculated VPD.
  *
  * Read-only. Not used for alerts, actions, AI Doctor, or device control.
  */
@@ -15,6 +18,8 @@ import {
   type SensorSnapshot,
 } from "@/lib/sensorSnapshot";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
+import { calculateVPD } from "@/lib/sensors/calculateVPD";
+import { TENTS_LIST_VPD_ORIGIN_COPY } from "@/lib/tentsListVpdRules";
 import {
   convertCelsiusForDisplay,
   getTemperatureUnitSymbol,
@@ -27,6 +32,8 @@ export interface PlantTentEnvironmentMetric {
   label: string;
   display: string;
   hasValue: boolean;
+  /** VPD only: set when the value is calculated from temperature and RH. */
+  originLabel?: typeof TENTS_LIST_VPD_ORIGIN_COPY.calculated;
 }
 
 export interface PlantTentEnvironmentView {
@@ -134,6 +141,14 @@ export function buildPlantTentEnvironmentView(
   if (!snap) return EMPTY_VIEW;
   const stale = isStale(snap.ts, now, undefined, snap.source);
   const tempSymbol = getTemperatureUnitSymbol(tempUnit);
+  const calculatedVpd = snap.vpd === null && !stale ? calculateVPD(snap.temp, snap.rh) : null;
+  const vpdMetric =
+    calculatedVpd === null
+      ? metric("vpd", "VPD", snap.vpd, " kPa", 2)
+      : {
+          ...metric("vpd", "VPD", calculatedVpd, " kPa", 2),
+          originLabel: TENTS_LIST_VPD_ORIGIN_COPY.calculated,
+        };
   return {
     hasReadings: true,
     capturedAt: snap.ts,
@@ -149,7 +164,7 @@ export function buildPlantTentEnvironmentView(
       // unit (default Fahrenheit) — conversion happens exactly once, here.
       metric("temp", "Temperature", convertCelsiusForDisplay(snap.temp, tempUnit), tempSymbol),
       metric("rh", "Humidity", snap.rh, "%"),
-      metric("vpd", "VPD", snap.vpd, " kPa", 2),
+      vpdMetric,
       metric("soil", "Soil moisture", snap.soil, "%"),
       metric("soil_ec", "Soil EC", snap.soil_ec, " mS/cm", 2),
       metric(

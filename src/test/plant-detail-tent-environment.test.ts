@@ -17,6 +17,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
 import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
+import { calculateVPD } from "@/lib/sensors/calculateVPD";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -59,7 +60,7 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
     expect(buildPlantTentEnvironmentView([]).hasReadings).toBe(false);
   });
 
-  it("maps available metrics and leaves missing ones as Unknown", () => {
+  it("maps available metrics and calculates a missing VPD from a current temperature and RH", () => {
     const ts = new Date().toISOString();
     // source must literally be "live" to earn the Live sensor label — the
     // old fixture's "sensor" string relied on the (fixed) default-to-live
@@ -80,8 +81,65 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
     // 24.5*9/5+32 = 76.1°F
     expect(temp.display).toContain("76.1");
     expect(temp.display).toContain("°F");
-    expect(vpd.hasValue).toBe(false);
-    expect(vpd.display).toBe("Unknown");
+    // VER-514: the Dashboard tent panel shows the VPD calculated from this
+    // pair, so the plant page shows the same value and names its origin.
+    expect(vpd.hasValue).toBe(true);
+    expect(vpd.display).toBe(`${calculateVPD(24.5, 55)?.toFixed(2)} kPa`);
+    expect(vpd.originLabel).toBe("Calculated from temperature and RH");
+    expect(view.metrics.find((m) => m.key === "co2")?.display).toBe("Unknown");
+  });
+
+  it("calculates VPD for a Quick Log manual temperature and RH, as the Dashboard panel does", () => {
+    const nowMs = Date.parse("2026-11-24T12:00:00.000Z");
+    const ts = new Date(nowMs - 2 * 60_000).toISOString();
+    const view = buildPlantTentEnvironmentView(
+      [
+        { ts, metric: "temperature_c", value: 25, source: "manual" },
+        { ts, metric: "humidity_pct", value: 60, source: "manual" },
+      ],
+      nowMs,
+      "fahrenheit",
+    );
+    const vpd = view.metrics.find((m) => m.key === "vpd")!;
+    expect(vpd.display).toBe(`${calculateVPD(25, 60)?.toFixed(2)} kPa`);
+    expect(vpd.originLabel).toBe("Calculated from temperature and RH");
+  });
+
+  it("keeps a stored VPD unlabeled, and never calculates one for a stale or partial reading", () => {
+    const nowMs = Date.parse("2026-11-24T12:00:00.000Z");
+    const ts = new Date(nowMs - 2 * 60_000).toISOString();
+    const stored = buildPlantTentEnvironmentView(
+      [
+        { ts, metric: "temperature_c", value: 25, source: "manual" },
+        { ts, metric: "humidity_pct", value: 60, source: "manual" },
+        { ts, metric: "vpd_kpa", value: 1.1, source: "manual" },
+      ],
+      nowMs,
+    ).metrics.find((m) => m.key === "vpd")!;
+    expect(stored.display).toBe("1.10 kPa");
+    expect(stored.originLabel).toBeUndefined();
+
+    const old = new Date(nowMs - 3 * 24 * 60 * 60_000).toISOString();
+    const staleView = buildPlantTentEnvironmentView(
+      [
+        { ts: old, metric: "temperature_c", value: 25, source: "manual" },
+        { ts: old, metric: "humidity_pct", value: 60, source: "manual" },
+      ],
+      nowMs,
+    );
+    expect(staleView.stale).toBe(true);
+    expect(staleView.metrics.find((m) => m.key === "vpd")?.display).toBe("Unknown");
+
+    const tempOnly = buildPlantTentEnvironmentView(
+      [{ ts, metric: "temperature_c", value: 25, source: "manual" }],
+      nowMs,
+    );
+    expect(tempOnly.metrics.find((m) => m.key === "vpd")?.hasValue).toBe(false);
+  });
+
+  it("names a calculated VPD's origin under its value on the panel", () => {
+    const src = read("src/components/PlantTentEnvironmentPanel.tsx");
+    expect(src).toContain("m.originLabel");
   });
 
   it("displays in °C, unconverted, when the grower's preference is celsius (live-reactive, not fixed-Fahrenheit)", () => {

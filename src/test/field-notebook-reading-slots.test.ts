@@ -18,6 +18,12 @@ import {
   buildFieldNotebookReadingsByTent,
   fieldNotebookReadingSlotsFromSnapshot,
 } from "@/lib/fieldNotebookReadingSlotsRules";
+import { selectDashboardTentSnapshotRows } from "@/lib/dashboardTentSnapshotRowsRules";
+import { LatestSnapshotQuickLogMerge } from "@/lib/latestSnapshotQuickLogMerge";
+import { sensorReadingFromQuickLogEnvironmentRow } from "@/lib/sensorsQuickLogManualSeriesRules";
+import { snapshotFromManualSensorSnapshot, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { calculateVPD } from "@/lib/sensors/calculateVPD";
+import { tentsListCanonicalVpd } from "@/lib/tentsListVpdRules";
 
 const NOW_MS = Date.parse("2026-11-24T12:00:00.000Z");
 const MINUTE_MS = 60_000;
@@ -177,6 +183,83 @@ describe("fieldNotebookReadingSlotsFromSnapshot", () => {
     expect(
       fieldNotebookReadingSlotsFromSnapshot(view({ lastUpdatedIso: "not a time" }), NOW_MS),
     ).toEqual([]);
+  });
+
+  describe("a Quick Log temperature and RH (VER-513)", () => {
+    const TENT = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f";
+    const at = new Date(NOW_MS - 2 * MINUTE_MS).toISOString();
+
+    // The Dashboard path: the panel's rows include the Quick Log manual pair,
+    // and its canonical VPD comes from the diary-inclusive snapshot, which
+    // names the diary entry as the capture.
+    function panelView(diaryAt: string) {
+      const manual = sensorReadingFromQuickLogEnvironmentRow(
+        {
+          event_type: "environment",
+          source: "manual",
+          tent_id: TENT,
+          occurred_at: at,
+          environment: { temperature_c: 25, humidity_pct: 60, vpd_kpa: null },
+        } as Parameters<typeof sensorReadingFromQuickLogEnvironmentRow>[0],
+        new Date(NOW_MS),
+      );
+      const manuals = manual ? [manual] : [];
+      const diary = snapshotFromManualSensorSnapshot(
+        diaryAt,
+        { source: "manual", temp_f: 77, humidity_percent: 60 },
+        { diaryEntryId: "diary-1" },
+      );
+      const snapshot = LatestSnapshotQuickLogMerge.merge(
+        { ...(diary as SensorSnapshot), tent_id: TENT },
+        manuals,
+        [TENT],
+        NOW_MS,
+      );
+      const snapRows = selectDashboardTentSnapshotRows({
+        sensorRows: [],
+        quickLogManuals: manuals,
+        tentId: TENT,
+        nowMs: NOW_MS,
+      });
+      return buildTentSnapshotView(snapRows as BuildTentSnapshotInput[], "veg", NOW_MS, {
+        canonicalVpd: tentsListCanonicalVpd([], TENT, NOW_MS, { status: "ok", snapshot }),
+      });
+    }
+
+    it("shows the VPD the panel calculates from the same reading", () => {
+      for (const diaryAt of [at, new Date(NOW_MS - 3 * 60 * MINUTE_MS).toISOString()]) {
+        const v = panelView(diaryAt);
+        const panelVpd = v.metrics.find((m) => m.key === "vpd");
+        expect(panelVpd?.display).toBe(`${calculateVPD(25, 60)?.toFixed(2)}`);
+        const slots = fieldNotebookReadingSlotsFromSnapshot(v, NOW_MS);
+        expect(slots.map((s) => s.label)).toEqual(["TEMP", "RH", "VPD"]);
+        expect(slots[2]).toMatchObject({
+          value: `${panelVpd?.display} kPa`,
+          source: "Manual",
+          ageLabel: "2m ago",
+        });
+      }
+    });
+
+    it("still leaves off a same-instant VPD that is not ok", () => {
+      const slots = fieldNotebookReadingSlotsFromSnapshot(
+        view({
+          metrics: [
+            metric({ key: "temp", display: "75.2", unit: "°F" }),
+            metric({
+              key: "vpd",
+              display: "0.90",
+              unit: " kPa",
+              status: "degraded",
+              statusLabel: "Needs verification · 2m ago",
+              cohortInstant: true,
+            }),
+          ],
+        }),
+        NOW_MS,
+      );
+      expect(slots.map((s) => s.label)).toEqual(["TEMP"]);
+    });
   });
 
   it("labels a stale cohort from the real snapshot view model", () => {

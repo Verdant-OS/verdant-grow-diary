@@ -173,6 +173,14 @@ export default function PlantTentEnvironmentPanel({
                     {m.label}
                   </div>
                   <div className={m.hasValue ? "" : "text-muted-foreground"}>{m.display}</div>
+                  {m.originLabel ? (
+                    <div
+                      className="text-[11px] text-muted-foreground"
+                      data-testid={`plant-tent-environment-metric-${m.key}-origin`}
+                    >
+                      {m.originLabel}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

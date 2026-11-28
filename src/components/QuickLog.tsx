@@ -3385,6 +3385,7 @@ export default function QuickLog({
                           onChange={(e) => {
                             if (restoreLockedDraftValue(e.currentTarget, earlyNotes)) return;
                             setEarlyNotes(e.target.value);
+                            setSaveError(null);
                           }}
                           placeholder="Optional — short observation"
                           autoComplete="off"

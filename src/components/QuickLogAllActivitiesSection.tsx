@@ -136,7 +136,12 @@ import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreferen
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTypes";
 import type { CanonicalQuickLogStage } from "@/lib/grow";
-import { buildQuickLogSavedNoteExcerpt } from "@/lib/quickLogNoteSaveRules";
+import {
+  QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
+  QuickLogNoteRepeatSaveRules,
+  buildQuickLogSavedNoteExcerpt,
+} from "@/lib/quickLogNoteSaveRules";
+import { useOptionalDiaryEntries } from "@/hooks/useOptionalDiaryEntries";
 import {
   buildSymptomTimelineHref,
   hasGuidedSymptomPlant,
@@ -319,6 +324,8 @@ export default function QuickLogAllActivitiesSection({
   onSaveSuccess,
   onPendingPhotoChange,
 }: QuickLogAllActivitiesSectionProps) {
+  const diaryEntries = useOptionalDiaryEntries();
+  const recentDiaryRef = diaryEntries.rowsRef;
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
     [growId, plantId, tentId],
@@ -1266,6 +1273,35 @@ export default function QuickLogAllActivitiesSection({
       tentId: tentId ?? null,
       plantId: plantId ?? null,
     });
+    if (selected.id === "note") {
+      // A retry of this exact unconfirmed save keeps its key, so it is never
+      // blocked as a repeat: the server returns the original entry instead.
+      const attemptSignature = buildQuickLogSaveSignature({
+        ownerId: user?.id ?? null,
+        activityId: selected.id,
+        growId: capturedTarget.growId,
+        tentId: capturedTarget.tentId,
+        plantId: capturedTarget.plantId,
+        note: note.trim().length > 0 ? note.trim() : null,
+        extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : null,
+      });
+      if (
+        QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
+          note,
+          plantId: capturedTarget.plantId,
+          eventType: "note",
+          recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(
+            recentDiaryRef.current,
+          ),
+          now: new Date(),
+          sameSaveRetry: activitySaveKeyRef.current?.signature === attemptSignature,
+        })
+      ) {
+        setErrorReason(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
+        setErrorForActivity(selected.id);
+        return;
+      }
+    }
     const acquired = onSaveStart ? onSaveStart(capturedTarget) : !localSaveInFlightRef.current;
     if (!acquired) return;
     localSaveInFlightRef.current = true;
@@ -1592,6 +1628,7 @@ export default function QuickLogAllActivitiesSection({
       data-testid={testIdPrefix}
       className="rounded-2xl border border-border/60 bg-background/40 p-3 sm:p-4 space-y-3"
     >
+      {diaryEntries.source}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-semibold">{heading}</h3>
         <p

@@ -93,6 +93,192 @@ export function isDuplicateOfPanelSavedNote(input: DuplicatePanelNoteInput): boo
   return note.length > 0 && note === saved;
 }
 
+/** How long the same note on the same plant stays blocked. Matthew, 2026-11-25. */
+export const QUICK_LOG_NOTE_REPEAT_WINDOW_MINUTES = 10;
+
+export interface RecentSavedNoteEntry {
+  plantId: unknown;
+  note: unknown;
+  eventType: unknown;
+  savedAt: unknown;
+}
+
+export interface RepeatRecentSavedNoteInput {
+  note: unknown;
+  plantId: unknown;
+  eventType: unknown;
+  recentEntries: readonly RecentSavedNoteEntry[] | null | undefined;
+  now: Date;
+  windowMinutes?: number;
+  /** A failed or uncertain attempt of this same save must stay retryable. */
+  sameSaveRetry?: boolean;
+}
+
+function savedAtMillis(value: unknown): number | null {
+  if (value instanceof Date) {
+    const ms = value.getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+  if (typeof value !== "string" || value.trim().length === 0) return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function isNoteLikeEventType(eventType: unknown): boolean {
+  return typeof eventType === "string" && NOTE_LIKE_EVENT_TYPES.has(eventType);
+}
+
+function hasText(value: unknown): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+/**
+ * Details keys that make a saved diary row more than a plain note: a photo,
+ * typed readings, a structured check, an issue, or another activity. A row
+ * that carries any of them is never a repeat candidate, so a new photo or
+ * reading with the same caption still saves. The tent snapshot a note attaches
+ * on its own (`details.sensor`) is not the grower's content, so it does not
+ * count.
+ */
+const STRUCTURED_DETAIL_KEYS: readonly string[] = [
+  "photo_url",
+  "photo_path",
+  "photo_urls",
+  "photos",
+  "manual_sensor_snapshot",
+  "manual_provenance",
+  "environment_check",
+  "early_stage",
+  "harvest",
+  "watering",
+  "feeding",
+  "volume_ml",
+  "kind",
+];
+
+/** The event type a diary row was saved as, or "note" when it names none. */
+function diaryRowEventType(
+  record: Record<string, unknown>,
+  details: Record<string, unknown> | null,
+): string {
+  if (details && hasText(details.subtype)) {
+    return `observation:${String(details.subtype).trim().toLowerCase()}`;
+  }
+  if (details) {
+    for (const key of STRUCTURED_DETAIL_KEYS) {
+      const value = details[key];
+      if (value !== undefined && value !== null && value !== "") return key;
+    }
+  }
+  if (hasText(record.photo_url)) return "photo";
+  const activity = details?.quick_log_activity;
+  if (typeof activity === "string" && activity.trim().toLowerCase() !== "note") {
+    return activity.trim().toLowerCase();
+  }
+  return (
+    (typeof details?.event_type === "string" && details.event_type) ||
+    (typeof record.event_type === "string" && record.event_type) ||
+    (typeof record.entry_type === "string" && record.entry_type) ||
+    "note"
+  );
+}
+
+/**
+ * True when a `quicklog_save_manual` payload saves only note text: no reading,
+ * photo, volume or structured details. Anything else is never blocked as a
+ * repeated note.
+ */
+export function isPlainNoteSavePayload(payload: unknown): boolean {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+  const record = payload as Record<string, unknown>;
+  for (const key of ["p_temperature_c", "p_humidity_pct", "p_vpd_kpa", "p_volume_ml"]) {
+    const value = record[key];
+    if (value !== undefined && value !== null && value !== "") return false;
+  }
+  if (typeof record.p_action === "string" && record.p_action !== "note") return false;
+  const details = record.p_details;
+  if (details === undefined || details === null) return true;
+  if (typeof details !== "object" || Array.isArray(details)) return false;
+  return isNoteLikeEventType(diaryRowEventType({}, details as Record<string, unknown>));
+}
+
+/**
+ * Hard block for saving the same plain note on the same plant again inside
+ * the window. Reads confirmed, saved entries only. Case stays as
+ * `normalizeQuickLogNoteText` left it. Structured entries are never a match.
+ */
+export class QuickLogNoteRepeatSaveRules {
+  static isRepeatOfRecentSavedNote(input: RepeatRecentSavedNoteInput): boolean {
+    if (input.sameSaveRetry === true) return false;
+    if (!isNoteLikeEventType(input.eventType)) return false;
+    if (typeof input.plantId !== "string" || input.plantId.length === 0) return false;
+    const note = normalizeQuickLogNoteText(input.note);
+    if (note.length === 0) return false;
+    if (!(input.now instanceof Date) || !Number.isFinite(input.now.getTime())) return false;
+    if (!Array.isArray(input.recentEntries)) return false;
+    const windowMinutes = input.windowMinutes ?? QUICK_LOG_NOTE_REPEAT_WINDOW_MINUTES;
+    if (!Number.isFinite(windowMinutes) || windowMinutes < 0) return false;
+    const windowMs = windowMinutes * 60_000;
+    const nowMs = input.now.getTime();
+    for (const entry of input.recentEntries) {
+      if (!entry || typeof entry !== "object") continue;
+      if (entry.plantId !== input.plantId) continue;
+      if (!isNoteLikeEventType(entry.eventType)) continue;
+      if (normalizeQuickLogNoteText(entry.note) !== note) continue;
+      const savedMs = savedAtMillis(entry.savedAt);
+      if (savedMs === null) continue;
+      if (Math.abs(nowMs - savedMs) <= windowMs) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Saved diary rows (the `diary_entries` query Recent Activity uses).
+   * Unreadable and retracted rows are skipped. The save time is the row's
+   * `created_at`, so a backdated note still counts from when it was saved.
+   */
+  static candidatesFromDiaryRows(rows: unknown): RecentSavedNoteEntry[] {
+    if (!Array.isArray(rows)) return [];
+    const candidates: RecentSavedNoteEntry[] = [];
+    for (const row of rows) {
+      if (!row || typeof row !== "object") continue;
+      const record = row as Record<string, unknown>;
+      if (record.retracted_at) continue;
+      const details =
+        record.details && typeof record.details === "object" && !Array.isArray(record.details)
+          ? (record.details as Record<string, unknown>)
+          : null;
+      candidates.push({
+        plantId: record.plant_id ?? record.plantId ?? null,
+        note: record.note,
+        eventType: diaryRowEventType(record, details),
+        savedAt: record.created_at ?? record.createdAt ?? record.entry_at ?? record.entryAt ?? null,
+      });
+    }
+    return candidates;
+  }
+
+  /** Confirmed note prepended onto the diary cache. Does not invent a row for a failed save. */
+  static rememberConfirmedNote(
+    current: unknown,
+    entry: { plantId: string; note: string; eventType: string; savedAt: string },
+  ): unknown[] {
+    const rows = Array.isArray(current) ? current : [];
+    return [
+      {
+        id: `quick-log-note-${entry.savedAt}`,
+        plant_id: entry.plantId,
+        note: entry.note,
+        entry_at: entry.savedAt,
+        created_at: entry.savedAt,
+        retracted_at: null,
+        details: { event_type: entry.eventType },
+      },
+      ...rows,
+    ];
+  }
+}
+
 /** Title of the toast shown when the All activity types Note panel saves. */
 export const QUICK_LOG_NOTE_SAVED_TOAST_TITLE = "Note saved";
 

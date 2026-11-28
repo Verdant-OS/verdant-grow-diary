@@ -50,33 +50,26 @@ vi.mock("@/components/SubscriptionPastDueBanner", () => ({
 }));
 vi.mock("@/components/GlobalSearchDialog", () => ({ default: () => null }));
 vi.mock("@/components/LegalFooterLinks", () => ({ default: () => null }));
-vi.mock("@/components/QuickLogV2Sheet", () => ({ default: () => null }));
-vi.mock("@/components/QuickLog", () => ({
-  default: ({
-    open,
-    onOpenChange,
-    onCreated,
-  }: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    onCreated?: () => void;
-  }) =>
+vi.mock("@/components/QuickLogV2Sheet", () => ({
+  default: ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) =>
     open ? (
-      <div data-testid="legacy-quick-log">
-        <button
-          type="button"
-          onClick={() => {
-            onCreated?.();
-            onOpenChange(false);
-          }}
-        >
-          Save and close
+      <div data-testid="quick-log-v2-sheet">
+        <label>
+          Note (optional)
+          <textarea aria-label="Note (optional)" />
+        </label>
+        <button type="button" onClick={() => onOpenChange(false)}>
+          Save
         </button>
         <button type="button" onClick={() => onOpenChange(false)}>
           Dismiss
         </button>
       </div>
     ) : null,
+}));
+vi.mock("@/components/QuickLog", () => ({
+  default: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="legacy-quick-log">legacy</div> : null,
 }));
 
 import AppShell from "@/components/AppShell";
@@ -170,32 +163,32 @@ describe("AppShell after the first onboarding Quick Log", () => {
     expect(window.sessionStorage.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
   });
 
-  it.each(["Save and close", "Dismiss"])(
-    "lands on the dashboard after %s",
-    async (closeLabel) => {
-      startRoomHandoffMemory.setItem(START_ROOM_DASHBOARD_HANDOFF_KEY, PLANT_ID);
-      renderAt(`/plants/${PLANT_ID}?open=quick-log`);
+  it.each(["Save", "Dismiss"])("lands on the dashboard after %s", async (closeLabel) => {
+    startRoomHandoffMemory.setItem(START_ROOM_DASHBOARD_HANDOFF_KEY, PLANT_ID);
+    renderAt(`/plants/${PLANT_ID}?open=quick-log`);
 
-      await screen.findByTestId("legacy-quick-log");
-      expect(startRoomHandoffMemory.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
-      expect(screen.getByTestId("current-path")).toHaveTextContent(`/plants/${PLANT_ID}`);
+    await screen.findByTestId("quick-log-v2-sheet");
+    expect(screen.getAllByLabelText("Note (optional)")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(1);
+    expect(screen.queryByText("Short note")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save log" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
+    expect(startRoomHandoffMemory.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
+    expect(screen.getByTestId("current-path")).toHaveTextContent(`/plants/${PLANT_ID}`);
 
-      fireEvent.click(screen.getByRole("button", { name: closeLabel }));
+    fireEvent.click(screen.getByRole("button", { name: closeLabel }));
 
-      await waitFor(() => expect(screen.getByTestId("current-path")).toHaveTextContent(/^\/$/));
-      expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
-    },
-  );
+    await waitFor(() => expect(screen.getByTestId("current-path")).toHaveTextContent(/^\/$/));
+    expect(screen.queryByTestId("quick-log-v2-sheet")).not.toBeInTheDocument();
+  });
 
   it("stays on Plant Detail without the hand-off marker", async () => {
     renderAt(`/plants/${PLANT_ID}?open=quick-log`);
 
-    await screen.findByTestId("legacy-quick-log");
-    fireEvent.click(screen.getByRole("button", { name: "Save and close" }));
+    await screen.findByTestId("quick-log-v2-sheet");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("quick-log-v2-sheet")).not.toBeInTheDocument());
     expect(screen.getByTestId("current-path")).toHaveTextContent(`/plants/${PLANT_ID}`);
   });
 
@@ -203,21 +196,19 @@ describe("AppShell after the first onboarding Quick Log", () => {
     startRoomHandoffMemory.setItem(START_ROOM_DASHBOARD_HANDOFF_KEY, OTHER_PLANT_ID);
     renderAt(`/plants/${PLANT_ID}?open=quick-log`);
 
-    await screen.findByTestId("legacy-quick-log");
+    await screen.findByTestId("quick-log-v2-sheet");
     expect(startRoomHandoffMemory.getItem(START_ROOM_DASHBOARD_HANDOFF_KEY)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("quick-log-v2-sheet")).not.toBeInTheDocument());
     expect(screen.getByTestId("current-path")).toHaveTextContent(`/plants/${PLANT_ID}`);
   });
 
   it("hands off only once: a later Quick Log on the dashboard stays put", async () => {
     startRoomHandoffMemory.setItem(START_ROOM_DASHBOARD_HANDOFF_KEY, PLANT_ID);
     renderAt(`/plants/${PLANT_ID}?open=quick-log`);
-    await screen.findByTestId("legacy-quick-log");
-    fireEvent.click(screen.getByRole("button", { name: "Save and close" }));
+    await screen.findByTestId("quick-log-v2-sheet");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(screen.getByTestId("current-path")).toHaveTextContent(/^\/$/));
 
     act(() => {
@@ -225,12 +216,12 @@ describe("AppShell after the first onboarding Quick Log", () => {
         new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, { detail: { plantId: PLANT_ID } }),
       );
     });
-    await screen.findByTestId("legacy-quick-log");
+    await screen.findByTestId("quick-log-v2-sheet");
+    expect(screen.getAllByLabelText("Note (optional)")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByTestId("quick-log-v2-sheet")).not.toBeInTheDocument());
     expect(screen.getByTestId("current-path")).toHaveTextContent(/^\/$/);
   });
 });

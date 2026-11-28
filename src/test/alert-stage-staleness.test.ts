@@ -41,7 +41,7 @@ describe("assessAlertStageStaleness", () => {
     const r = assessAlertStageStaleness({ reason: SEEDLING_VPD, currentStage: "Flowering" });
     expect(r.stale).toBe(true);
     expect(r.note).toBe(
-      "Checked against Seedling targets. This plant is now Flower, so this alert may no longer apply.",
+      "Checked against Seedling targets. This tent's alerts now use Flower targets, so this alert may no longer apply.",
     );
   });
 

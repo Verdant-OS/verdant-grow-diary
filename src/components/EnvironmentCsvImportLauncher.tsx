@@ -352,7 +352,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         <h3 className="font-display text-sm font-semibold">{label}</h3>
       </header>
       <p className="text-xs text-muted-foreground">
-        Bring in an AC Infinity CSV or other environment export.
+        Bring in a Spider Farmer CSV or other environment export.
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
         Data is read-only and source-tagged as CSV.

@@ -17,6 +17,7 @@ import type { SensorQualityResult } from "@/lib/sensorQuality";
 import type { MetricKey, TargetComparisonResult } from "@/lib/environmentTargetComparison";
 import { METRIC_LABELS } from "@/lib/environmentTargetComparison";
 import { buildDefaultThresholdAlerts } from "@/lib/defaultEnvironmentThresholds";
+import { CALCULATED_VPD_ALERT_NOTE, hasCalculatedVpd } from "@/lib/alertSnapshotDerivedVpdRules";
 
 export type AlertSeverity = "info" | "watch" | "warning" | "critical";
 
@@ -213,22 +214,26 @@ export function buildEnvironmentAlerts(inputs: AlertInputs): EnvironmentAlert[] 
     } else if (targets.status === "out_of_range") {
       for (const m of targets.metrics) {
         if (m.state === "low" || m.state === "high") {
+          const reason = buildTargetBreachReason(
+            {
+              metric: m.metric,
+              label: m.label,
+              value: m.value,
+              min: m.min,
+              max: m.max,
+              state: m.state,
+            },
+            inputs.includeConfiguredRangeInTargetBreachReason === true,
+          );
           alerts.push({
             id: `target:${m.metric}:${m.state}`,
             severity: "warning",
             metric: m.metric,
             title: m.state === "low" ? `${m.label} below target` : `${m.label} above target`,
-            reason: buildTargetBreachReason(
-              {
-                metric: m.metric,
-                label: m.label,
-                value: m.value,
-                min: m.min,
-                max: m.max,
-                state: m.state,
-              },
-              inputs.includeConfiguredRangeInTargetBreachReason === true,
-            ),
+            reason:
+              m.metric === "vpd" && hasCalculatedVpd(snapshot)
+                ? `${reason} ${CALCULATED_VPD_ALERT_NOTE}`
+                : reason,
             source: "target_comparison",
             createdAt,
           });

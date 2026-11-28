@@ -89,6 +89,7 @@ import {
   compareSnapshotToTargets,
   STATUS_HEADLINE as TARGET_STATUS_HEADLINE,
 } from "@/lib/environmentTargetComparison";
+import { withCaptureDerivedVpd } from "@/lib/alertSnapshotDerivedVpdRules";
 import {
   classifyVpdAgainstStage,
   normalizeVpdStage,
@@ -330,6 +331,9 @@ export default function Dashboard() {
   // label, but they cannot drive green quality, target, stage, alert, or
   // persistence semantics.
   const dashboardHealthSnapshot = dashboardSnapshotForHealthyCues(currentSensorSnapshot);
+  // Alerts grade a temperature and RH capture with no stored VPD on its
+  // calculated VPD, as the tent page does (#3124).
+  const dashboardAlertSnapshot = withCaptureDerivedVpd(dashboardHealthSnapshot);
   const dashboardSensorQuality = evaluateDashboardSensorQuality(currentSensorSnapshot, nowTick);
   // When the snapshot names one of the selected tents, only that tent and its
   // plants vote (friction item 1), the same scope the Alerts page persists
@@ -461,10 +465,10 @@ export default function Dashboard() {
     // Sourced from the SAME snapshot being alerted on, so attribution can
     // never describe different evidence. Null while the view spans tents.
     tentId: dashboardHealthSnapshot?.tent_id ?? null,
-    snapshot: dashboardHealthSnapshot,
+    snapshot: dashboardAlertSnapshot,
     quality: dashboardSensorQuality,
     targets: compareSnapshotToTargets(
-      dashboardHealthSnapshot,
+      dashboardAlertSnapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
     targetsPending,
@@ -1821,7 +1825,7 @@ export default function Dashboard() {
           </section>
           <section className="glass rounded-2xl p-4 mt-4" aria-label="Environment Alerts">
             {(() => {
-              const snap = dashboardHealthSnapshot;
+              const snap = dashboardAlertSnapshot;
               const quality = dashboardSensorQuality;
               const targetsCmp = compareSnapshotToTargets(
                 snap,

@@ -20,6 +20,7 @@
  *     0.6–1.6 kPa default range still applies for backward compatibility.
  */
 import { isStale, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import { CALCULATED_VPD_ALERT_NOTE, hasCalculatedVpd } from "@/lib/alertSnapshotDerivedVpdRules";
 import type { EnvironmentAlert } from "@/lib/environmentAlerts";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
@@ -151,6 +152,7 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
           : `VPD is below the ${stageLabel} target range.`,
       );
       parts.push(`Observed ${fmt(value, " kPa")} (${stageLabel} range ${rangeText}).`);
+      if (hasCalculatedVpd(snapshot)) parts.push(CALCULATED_VPD_ALERT_NOTE);
       if (snapshot.ts) parts.push(`Reading at ${snapshot.ts}.`);
       if (args.deviceLabel) parts.push(`Source: ${args.deviceLabel}.`);
       parts.push(STAGE_VPD_THRESHOLD_NOTE);
@@ -233,6 +235,7 @@ export function buildDefaultThresholdAlerts(args: BuildArgs): EnvironmentAlert[]
     parts.push(
       `Observed ${fmt(value, range.unit)} (default range ${fmt(range.min, range.unit)}–${fmt(range.max, range.unit)}).`,
     );
+    if (metric === "vpd" && hasCalculatedVpd(snapshot)) parts.push(CALCULATED_VPD_ALERT_NOTE);
     if (snapshot.ts) parts.push(`Reading at ${snapshot.ts}.`);
     if (args.deviceLabel) parts.push(`Source: ${args.deviceLabel}.`);
     parts.push(DEFAULT_THRESHOLD_NOTE);

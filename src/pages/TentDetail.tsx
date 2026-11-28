@@ -96,6 +96,14 @@ import {
   environmentMetricChipStatus,
 } from "@/lib/environmentStageTargetRules";
 import { cn } from "@/lib/utils";
+import GlanceNameList from "@/components/GlanceNameList";
+import TentSensorStrip from "@/components/TentSensorStrip";
+import TentDetailQuickLogButton from "@/components/TentDetailQuickLogButton";
+import { buildGlanceNameListView } from "@/lib/glanceNameListRules";
+import {
+  resolveTentSensorStripFreshness,
+  resolveTentSensorStripVpd,
+} from "@/lib/tentSensorStripRules";
 import FirstPlantMemoryCta from "@/components/FirstPlantMemoryCta";
 import { buildPlantQuickLogPrefill } from "@/lib/plantQuickLogPrefillRules";
 import TentPlantRosterPanel from "@/components/TentPlantRosterPanel";
@@ -357,6 +365,39 @@ export default function TentDetail() {
   const visiblePlants = filterVisiblePlants(visibilityPlants, { showArchived });
   const activeCount = getActivePlantCount(visibilityPlants);
   const rosterActivity = useTentPlantRosterActivity(allPlants);
+  // The compact plant list at the top of the page starts collapsed for each tent.
+  const [plantsGlanceExpanded, setPlantsGlanceExpanded] = useState(false);
+  useEffect(() => {
+    setPlantsGlanceExpanded(false);
+  }, [id]);
+  const plantsGlance = buildGlanceNameListView({
+    items: filterVisiblePlants(visibilityPlants, { showArchived: false }).map((p) => ({
+      id: p.id,
+      label: p.name,
+      href: plantDetailPath(p.id, { tentId: tent?.id ?? id ?? null }),
+    })),
+    complete: plantListRead.complete,
+    loading: activePlantsQuery.isPending && !activePlantsIsError,
+    expanded: plantsGlanceExpanded,
+  });
+  const sensorStripFreshness = resolveTentSensorStripFreshness({
+    displayed: displayedClimate,
+    sensorHeader,
+    chipStale: climateChipStale,
+  });
+  // The strip's VPD is the page's own resolved VPD (same-capture rules), with
+  // its own provenance: a fallback carries its label, otherwise the header's.
+  const sensorStripVpd = resolveTentSensorStripVpd({
+    observation: {
+      value: headerVpd,
+      capturedAt: headerVpdObservation.capturedAt,
+      stale: headerVpdObservation.stale,
+      calculated: headerVpdObservation.calculated,
+    },
+    sourceLabel: vpdFromFallback
+      ? fallbackVpdSourceLabel
+      : (sensorHeader.sourceLabel ?? headerVpdObservation.sourceLabel ?? null),
+  });
 
   // Reconcile persisted/URL selected tab against currently visible plants.
   // If the restored plant id no longer exists, or is archived while archived
@@ -517,7 +558,13 @@ export default function TentDetail() {
         title={tent.name}
         description={formatTentHeaderDescription(tent.brand, tent.size)}
         icon={<Box className="h-5 w-5" />}
-        actions={<StageBadge stage={tent.stage} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <StageBadge stage={tent.stage} />
+            {/* Tent-level Quick Log: this tent selected, no plant (Cheek, 2026-11-28). */}
+            <TentDetailQuickLogButton key={tent.id} tentId={tent.id} />
+          </div>
+        }
       />
       <DetailGrowContextLine growId={tent.growId} testId="tent-detail-grow-context" />
 
@@ -528,10 +575,90 @@ export default function TentDetail() {
         testId="tent-detail-data-source-disclosure"
       />
 
-      {/* Plants come first, right under the tent header, so a grower sees
-          which plants are in this tent without scrolling past the readings.
-          The environment metrics follow below. */}
-      <div className="mb-6" data-testid="tent-detail-plants-first">
+      {/* Plants first, right under the tent name: compact, tappable plant
+          names, then a compact sensor strip with the latest readings and
+          their freshness (Cheek, 2026-11-28). Detailed metrics follow below. */}
+      <GlanceNameList
+        view={plantsGlance}
+        title="Plants"
+        noun={{ singular: "plant", plural: "plants" }}
+        emptyText="No plants in this tent yet."
+        loadingText="Loading plants…"
+        unknownText={plantListRead.message ?? "Plant list not loaded yet."}
+        onToggle={() => setPlantsGlanceExpanded((open) => !open)}
+        testId="tent-detail-plants-glance"
+      />
+      <TentSensorStrip
+        climateFreshness={sensorStripFreshness}
+        temperature={
+          snap?.temp !== null && snap?.temp !== undefined
+            ? {
+                value: (convertCelsiusForDisplay(snap.temp) ?? 0).toFixed(1),
+                unit: getTemperatureUnitSymbol(),
+              }
+            : null
+        }
+        humidity={snap?.rh !== null && snap?.rh !== undefined ? String(snap.rh) : null}
+        vpd={sensorStripVpd}
+        vpdDisplay={
+          sensorStripVpd.value === null
+            ? null
+            : formatSensorValue("vpd_kpa", sensorStripVpd.value).replace(/\s*kPa$/, "")
+        }
+      />
+
+      {/* One-Tent Loop continuity card. Enable "Open plant" only when
+          a single safe plant target exists on this tent. With zero or
+          multiple plants, keep the calm safe disabled state — we do
+          not invent a default selection here. */}
+      {(() => {
+        return (
+          <OneTentLoopNextStepCard
+            current="tent"
+            ids={{
+              growId: tent.growId ?? null,
+              tentId: tent.id,
+              plantId: safePlantId,
+              // null while the active-plant read is not current, so the card
+              // falls back to its generic disabled state.
+              tentPlantCount: verifiedActivePlantCount,
+            }}
+            testId="tent-detail-one-tent-loop-next-step-card"
+            className="mb-3"
+          />
+        );
+      })()}
+
+      <TentPendingOutcomeNotice growId={tent.growId ?? null} tentId={tent.id} />
+
+      <div className="mb-3 flex items-center gap-2 flex-wrap">
+        <TentCardActionsMenu
+          tent={{
+            id: tent.id,
+            name: tent.name,
+            brand: tent.brand,
+            size: tent.size,
+            stage: tent.stage,
+            light: tent.light,
+          }}
+          assignedPlantCount={assignedPlantCount}
+          archivedAssignedPlantCount={archivedAssignedPlantCount}
+          onRetryAssignments={() => void allPlantsQuery.refetch()}
+          variant="row"
+          hideView
+        />
+        {tent.growId ? <StartPhenoHuntButton growId={tent.growId} tentId={tent.id} /> : null}
+        {tent.growId ? (
+          <Button size="sm" variant="outline" asChild data-testid="tent-detail-manage-targets">
+            <Link to={`/grows/${encodeURIComponent(tent.growId)}`}>Manage Targets</Link>
+          </Button>
+        ) : null}
+      </div>
+
+      {/* The full plant roster, tabs, activity and cards. The compact list
+          at the top links to each plant; this keeps every detail and the
+          add-plant actions above the detailed metrics. */}
+      <div className="mb-6" data-testid="tent-detail-plants-section">
         {plantListRead.message && (
           <div
             role={plantListRead.canRetry ? "alert" : "status"}
@@ -817,53 +944,6 @@ export default function TentDetail() {
         </div>
       </div>
 
-      {/* One-Tent Loop continuity card. Enable "Open plant" only when
-          a single safe plant target exists on this tent. With zero or
-          multiple plants, keep the calm safe disabled state — we do
-          not invent a default selection here. */}
-      {(() => {
-        return (
-          <OneTentLoopNextStepCard
-            current="tent"
-            ids={{
-              growId: tent.growId ?? null,
-              tentId: tent.id,
-              plantId: safePlantId,
-              // null while the active-plant read is not current, so the card
-              // falls back to its generic disabled state.
-              tentPlantCount: verifiedActivePlantCount,
-            }}
-            testId="tent-detail-one-tent-loop-next-step-card"
-            className="mb-3"
-          />
-        );
-      })()}
-
-      <TentPendingOutcomeNotice growId={tent.growId ?? null} tentId={tent.id} />
-
-      <div className="mb-3 flex items-center gap-2 flex-wrap">
-        <TentCardActionsMenu
-          tent={{
-            id: tent.id,
-            name: tent.name,
-            brand: tent.brand,
-            size: tent.size,
-            stage: tent.stage,
-            light: tent.light,
-          }}
-          assignedPlantCount={assignedPlantCount}
-          archivedAssignedPlantCount={archivedAssignedPlantCount}
-          onRetryAssignments={() => void allPlantsQuery.refetch()}
-          variant="row"
-          hideView
-        />
-        {tent.growId ? <StartPhenoHuntButton growId={tent.growId} tentId={tent.id} /> : null}
-        {tent.growId ? (
-          <Button size="sm" variant="outline" asChild data-testid="tent-detail-manage-targets">
-            <Link to={`/grows/${encodeURIComponent(tent.growId)}`}>Manage Targets</Link>
-          </Button>
-        ) : null}
-      </div>
 
       <div className="flex flex-wrap gap-2 mb-5" data-testid="tent-detail-metric-chips">
         {temperatureChip({ stale: climateChipStale.temp })}

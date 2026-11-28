@@ -199,8 +199,18 @@ export interface UseGrowDetailData {
    * Never invents a default among many.
    */
   soleTentId: string | null;
+  /**
+   * The grow's tents (id and name) from the same tent lookup, for the tent
+   * list at the top of the grow page. Never "ok" from a failed or pending read.
+   */
+  tentList: GrowTentListState;
   refetch: () => void;
 }
+
+export type GrowTentListState =
+  | { status: "loading" }
+  | { status: "unavailable" }
+  | { status: "ok"; tents: Array<{ id: string; name: string }> };
 
 export function useGrowDetailData(): UseGrowDetailData {
   const { growId } = useParams<{ growId: string }>();
@@ -214,6 +224,7 @@ export function useGrowDetailData(): UseGrowDetailData {
   const [recent, setRecentState] = useState<RecentState>({ status: "loading" });
   const [outcomes, setOutcomes] = useState<GrowOutcomesState>(EMPTY_GROW_OUTCOMES_STATE);
   const [soleTentId, setSoleTentId] = useState<string | null>(null);
+  const [tentList, setTentList] = useState<GrowTentListState>({ status: "loading" });
   const [status, setStatus] = useState<GrowStatus>(UNAVAILABLE_STATUS);
   const loadGeneration = useRef(0);
   const growRowAbortController = useRef<AbortController | null>(null);
@@ -349,20 +360,37 @@ export function useGrowDetailData(): UseGrowDetailData {
     // and leaves soleTentId null — never a silent undercount or invented default.
     let tErr: unknown = null;
     let tentIds: string[] = [];
+    setTentList({ status: "loading" });
     try {
-      const tentLookup = await supabase.from("tents").select("id").eq("grow_id", growId!);
+      const tentLookup = await supabase.from("tents").select("id, name").eq("grow_id", growId!);
       if (!isCurrentLoad()) return;
       tErr = tentLookup.error;
-      tentIds = tErr
+      const tentRows = tErr
         ? []
         : (tentLookup.data ?? [])
-            .map((r) => (r as { id?: string | null }).id ?? "")
-            .filter((id): id is string => typeof id === "string" && id.length > 0);
+            .map((r) => r as { id?: string | null; name?: string | null })
+            .filter(
+              (r): r is { id: string; name?: string | null } =>
+                typeof r.id === "string" && r.id.length > 0,
+            );
+      tentIds = tentRows.map((r) => r.id);
       setSoleTentId(tErr ? null : pickSoleLoadedId(tentIds));
+      setTentList(
+        tErr
+          ? { status: "unavailable" }
+          : {
+              status: "ok",
+              tents: tentRows.map((r) => ({
+                id: r.id,
+                name: typeof r.name === "string" && r.name.trim() ? r.name : "Unnamed tent",
+              })),
+            },
+      );
     } catch (err) {
       if (!isCurrentLoad()) return;
       tErr = err;
       setSoleTentId(null);
+      setTentList({ status: "unavailable" });
     }
 
     async function countGrowScopedPlants(): Promise<CountValue> {
@@ -708,6 +736,7 @@ export function useGrowDetailData(): UseGrowDetailData {
     outcomes,
     growId,
     soleTentId,
+    tentList,
     refetch: load,
   };
 }

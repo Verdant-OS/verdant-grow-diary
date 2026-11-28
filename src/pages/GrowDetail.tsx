@@ -44,6 +44,7 @@ import GrowArchiveControlButton from "@/components/GrowArchiveControlButton";
 import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSection";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
 import GrowPendingOutcomeNotice from "@/components/GrowPendingOutcomeNotice";
+import GrowTentsGlance from "@/components/GrowTentsGlance";
 
 /**
  * Grow detail hub. Presentational — all data loading + derivation live in
@@ -63,6 +64,7 @@ export default function GrowDetail() {
     outcomes,
     refetch,
     soleTentId,
+    tentList,
   } = useGrowDetailData();
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
 
@@ -216,6 +218,10 @@ export default function GrowDetail() {
           />
         </div>
       </header>
+
+      {/* Tents first, right under the grow name, ahead of the status and
+          hub panels (Cheek, 2026-11-28). */}
+      <GrowTentsGlance tentList={tentList} />
 
       {/* One-Tent Loop continuity card. Pass the grow's tent only when
           exactly one tent is already loaded. Several tents stay disabled

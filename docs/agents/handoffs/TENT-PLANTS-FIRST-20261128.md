@@ -2,30 +2,34 @@
 
 ```text
 TASK TENT-PLANTS-FIRST-20261128  priority: other  status: OPEN
-goal: On Grow → Tent (/tents/:id), the Plants section sits directly under the tent header, ahead of the environment metrics, so the first plant name shows without scrolling at 375px and on desktop.
-why: Cheek, 2026-11-28 17:00 UTC: "Top priority: put Plants first on Grow → Tent. Matthew's biggest friction is scrolling past environmental metrics to see which plants are in the tent."
+goal: Grow detail lists the grow's tents right under the grow name. Grow → Tent (/tents/:id) shows compact, tappable plant names right under the tent name (first names, a total and "See all plants" that expands on the page; more names on desktop), a compact sensor strip right below them, and the detailed metrics farther down. A compact Quick Log beside the tent name opens the existing Quick Log with the tent selected and no plant. First tent and plant names visible without scrolling at 375px and on desktop.
+why: Cheek, 2026-11-28 17:00, 17:09, 17:12 and 17:14 UTC (coordinator relays): plants first on Grow → Tent; tents first on Grow detail; sensor strip with air temperature and RH, or VPD alone, with freshness and "VPD unavailable."; tent-level Quick Log beside the tent name.
 branch: claude/project-thread-jk56y8
 base: verdant-grow-diary (ee105823343e87f365bbf0815f6511d45a3ad858 at start, 2026-11-28 17:05 UTC)
 checkout: git fetch origin claude/project-thread-jk56y8 verdant-grow-diary && git switch claude/project-thread-jk56y8
-pr: the draft PR opened from this branch
+pr: #3131 (draft)
 head_sha: see the PR; refreshed on each push
-state: commit 1 adds the order test only (RED proof on CI); commit 2 moves the plants block. Local tests, typecheck, lint and build NOT_MEASURED: bun install --frozen-lockfile BLOCKED (lockfile tarballs on europe-west4-npm.pkg.dev return 403 through the session proxy). Required CI provides them.
-current_step: draft PR open, waiting on CI
-next_action: when CI is green at the head, relay the Seat A (Sour Diesel) review block to Cheek; do not ready, enqueue or merge.
-post_merge_check: signed-in walk on verdantgrowdiary.com with an approved test account: open a fixture tent at 375x812 and at desktop width; the first plant name shows without scrolling, and the Environment card is still below. Reopens with the same owner on FAIL.
-active_writer: Claude thread session (coordinator relay of Cheek's 2026-11-28 17:00 UTC message)
+state: commits 1-2 moved the existing plant group up (RED 46168549510, GREEN 46168569104). Commit 3 adds the tests for the agreed layout (RED proof on CI); commit 4 implements it. Local tests, typecheck, lint and build NOT_MEASURED: bun install --frozen-lockfile BLOCKED (lockfile tarballs on europe-west4-npm.pkg.dev return 403 through the session proxy). Required CI and the dispatched 16-shard full suite provide them.
+current_step: draft PR updated, waiting on the dispatched full suite at the new head
+next_action: when the full suite is green at the head, relay the Seat A (Sour Diesel) review block to Cheek; do not ready, enqueue or merge. Signed-in viewport checks wait for a deploy the approved fixture can reach (fixture: matt+qa1128 account, owned and torn down by the notebook walkthrough thread; ask the coordinator).
+post_merge_check: signed-in walk on verdantgrowdiary.com with the approved test account: at 375x812 and desktop, a long-named fixture tent shows the tent name, Quick Log and the first plant names without scrolling, then the sensor strip; a busy tent shows "See all N plants" and expands on the page; the grow page shows tent names under the grow name. A tent note from the header Quick Log lands on the tent Timeline with no plant; a plant note from Plant detail lands on that plant. Reopens with the same owner on FAIL.
+active_writer: Claude thread session (coordinator relays of Cheek's 2026-11-28 messages)
 decisions:
-- Moved the whole existing plant group (read-status notice, plant tabs, Plant Roster, activity panels, "Plants in this tent" card) as one unit, internal order unchanged, into a wrapper right after the header block (back link, PageHeader, grow context line, data-source disclosure). Reason: smallest move that keeps every plant surface and behavior; the tab row puts the first plant name right under the header.
-- The data-source disclosure stays with the header: it labels where the page's data comes from.
-- FirstPlantMemoryCta stays where it was (bottom); it is a memory prompt, not the plant list, and keeping it out of the top block keeps the first plant name high.
-- The grid card gained no margin; the wrapper carries mb-6 because the card used to end the page.
-- No copy, schema, RLS, edge, auth or billing change.
-rejected: splitting the roster from the grid (more judgment, more risk) — note the repeated lists as friction instead.
-files_touched: src/pages/TentDetail.tsx; src/test/tent-detail-plants-first-order.test.tsx (new); this file.
+- New pure rules: src/lib/glanceNameListRules.ts (first 6 names on a phone, 12 from sm up, See all / Show fewer, "empty" only after a complete read) and src/lib/tentSensorStripRules.ts (strip freshness from the chips' own inputs; strip VPD from the page's resolved VPD).
+- New presenters: GlanceNameList, GrowTentsGlance, TentSensorStrip, TentSensorStripFreshnessLine, TentDetailQuickLogButton.
+- Sensor strip layout choice is a container query on the strip's width in rem (two values from 15rem): enlarged text also falls back to VPD alone. At 375px with default text the strip is about 20rem wide, so the two-value layout shows; the VPD layout shows on very narrow screens or large text.
+- Strip VPD reuses headerVpdObservation from resolveTentDetailVpd (already same-capture with captureClimate). No VPD math added. PR #3122 (notebook card and plant page VPD) touches none of these files: no dependency.
+- Header Quick Log is a new button (mirrors PlantDetailQuickLogButton) that opens QuickLogV2Sheet with tent:<id>, never a plant, even on a one-plant tent; the sheet mounts on first tap. Desktop FAB unchanged. Save handlers, the repeat-note block (#3105) and "What changed?" rules (#3113, #3120) untouched.
+- Save destination before Save: QuickLogV2Sheet already shows the chosen target beside Save (qlv2-save-target), on both the tent and plant flows; not changed. Long names truncate there (friction note).
+- Plant detail keeps its existing Quick Log (PlantDetailQuickLogButton, plant:<id>); no change.
+- Full plant group stays below the next-step card and actions as the detailed roster; detailed metric chips stay in their original place above the manual-history notice.
+- Grow tent list comes from the existing tent lookup in useGrowDetailData (select id, name); unavailable on error, never "none" from a failed read.
+rejected: MetricChip inside the strip (duplicates test ids and labels the existing suites query); a viewport breakpoint for the strip layout (ignores text size).
+files_touched: src/pages/TentDetail.tsx; src/pages/GrowDetail.tsx; src/hooks/useGrowDetailData.ts; src/components/{GlanceNameList,GrowTentsGlance,TentSensorStrip,TentSensorStripFreshnessLine,TentDetailQuickLogButton}.tsx; src/lib/{glanceNameListRules,tentSensorStripRules}.ts; src/test/{tent-detail-plants-first-order,glance-name-list-rules,tent-sensor-strip-rules,tent-sensor-strip,tent-detail-quick-log-button,grow-detail-tents-glance}.test.*; this file.
 files_remaining: none for this slice.
-open_questions: with many plants the page lists them three times (tabs/roster, activity panels, grid) before the metrics; candidate follow-up slice, not in this PR.
-gotchas: the plant-name span was re-wrapped to stay under 100 columns after the extra indent; no test pins that line.
-reviewer: Seat A (Sour Diesel) requested via Cheek's relay; no verdict yet.
+open_questions: none blocking. Timed save-and-reopen and tent vs plant Timeline landing are BLOCKED until the fixture walk.
+gotchas: tests that mount TentDetail mock QuickLogV2Fab but not QuickLogV2Sheet, which is why the header button mounts the sheet lazily.
+reviewer: Seat A (Sour Diesel) via Cheek's relay; no verdict yet.
 session_state: none paused; no routines.
-last_updated: 2026-11-28 17:30 UTC, by Claude thread session
+last_updated: 2026-11-28 17:40 UTC, by Claude thread session
 ```

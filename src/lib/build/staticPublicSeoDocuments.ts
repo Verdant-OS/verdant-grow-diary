@@ -1090,7 +1090,30 @@ function helpCenterDocuments(): readonly StaticPublicSeoDocument[] {
       ],
     });
   });
-  return [home, ...hubs];
+  const articles = HelpCenterContent.articles().map((article) => {
+    const url = `${VERDANT_SITE_ORIGIN}${article.path}`;
+    return publicDocument(article.path, {
+      title: article.titleTag,
+      description: article.description,
+      imageAlt: article.title,
+      bodyFallbackHtml: HelpCenterContent.articleFallbackHtml(article),
+      jsonLd: [
+        buildStaticWebPageJsonLd({
+          title: article.titleTag,
+          description: article.description,
+          url,
+        }),
+        buildBreadcrumbListJsonLd({
+          items: [
+            { name: "Help", url: homeUrl },
+            { name: article.sectionTitle, url: `${VERDANT_SITE_ORIGIN}${article.sectionPath}` },
+            { name: article.title, url },
+          ],
+        }),
+      ],
+    });
+  });
+  return [home, ...hubs, ...articles];
 }
 
 function helpHubFallback(

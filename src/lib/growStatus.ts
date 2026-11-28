@@ -4,6 +4,7 @@
  * No I/O, no Supabase calls, no React. Read-only derivations only.
  * Not an AI diagnosis — purely a deterministic summary of existing data.
  */
+import { NO_RECENT_LOG_STALE_AFTER_HOURS } from "@/constants/sensorTiming";
 
 export type CountValue = number | "unavailable";
 
@@ -66,14 +67,34 @@ export interface DeriveStatusInput {
   highestRisk: RiskRank;
   lastDiaryAt: string | null;
   now?: number;
+  /**
+   * Open (unresolved, undismissed) alerts for the grow, the same count the
+   * Grow page shows on its Alerts card. Omitted keeps the legacy behaviour.
+   */
+  alertsOpen?: CountValue;
+  /** Open alerts at critical severity. */
+  alertsCritical?: CountValue;
+}
+
+/**
+ * Freshness window for "recent diary activity". Shared with the
+ * "No recent check-in." prompt (noRecentLogRecoveryRules) so the two never
+ * disagree on the same screen.
+ */
+export const GROW_STATUS_DIARY_FRESH_HOURS = NO_RECENT_LOG_STALE_AFTER_HOURS;
+
+function countOf(value: CountValue | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
 /**
  * Pure status derivation. NOT an AI diagnosis.
  *  - high/critical pending risk → needs_review
  *  - any pending → watch
- *  - no pending + no/stale (>7d) diary → watch
- *  - no pending + recent diary → good
+ *  - open critical alert → needs_review
+ *  - any open alert → watch
+ *  - no pending + no/stale diary (older than GROW_STATUS_DIARY_FRESH_HOURS) → watch
+ *  - "good" only with no pending actions, no open alerts and recent diary
  *  - counts + risk both unavailable → unavailable
  */
 export function deriveStatus({
@@ -81,6 +102,8 @@ export function deriveStatus({
   highestRisk,
   lastDiaryAt,
   now = Date.now(),
+  alertsOpen,
+  alertsCritical,
 }: DeriveStatusInput): { level: StatusLevel; reason: string } {
   const countsUnavailable = pending === "unavailable";
   const ageDays = lastDiaryAt ? (now - new Date(lastDiaryAt).getTime()) / 86400000 : null;
@@ -93,13 +116,21 @@ export function deriveStatus({
   } else if (highestRisk === "critical" || highestRisk === "high") {
     level = "needs_review";
     reason = `Pending action at ${highestRisk} risk needs review`;
+  } else if (countOf(alertsCritical) > 0) {
+    const n = countOf(alertsCritical);
+    level = "needs_review";
+    reason = `${n} open critical alert${n === 1 ? "" : "s"}`;
   } else if (typeof pending === "number" && pending > 0) {
     level = "watch";
     reason = `${pending} pending action${pending === 1 ? "" : "s"} awaiting approval`;
+  } else if (countOf(alertsOpen) > 0) {
+    const n = countOf(alertsOpen);
+    level = "watch";
+    reason = `${n} open alert${n === 1 ? "" : "s"}`;
   } else if (ageDays === null) {
     level = "watch";
     reason = "No diary entries yet";
-  } else if (ageDays > 7) {
+  } else if (ageDays * 24 > GROW_STATUS_DIARY_FRESH_HOURS) {
     level = "watch";
     reason = `Last diary entry ${Math.floor(ageDays)} days ago`;
   } else {

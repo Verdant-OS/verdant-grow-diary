@@ -68,12 +68,15 @@ import {
   MANUAL_SENSOR_TRUTH_LINES,
   MANUAL_SENSOR_TRUTH_MISSING_READINGS_LINE,
 } from "@/constants/manualSensorTruthCopy";
+import { useOptionalDiaryEntries } from "@/hooks/useOptionalDiaryEntries";
 import { usePlants } from "@/hooks/use-plants";
 import { useTents } from "@/hooks/use-tents";
 import { shouldRequireFirstTentSetup } from "@/lib/firstTentSetupRules";
 import { evaluateQuickLogPreview } from "@/lib/quickLogPreviewRules";
 import {
   QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
+  QuickLogNoteRepeatSaveRules,
+  isPlainNoteSavePayload,
   applyPanelSavedNoteToPreviewWarnings,
   buildQuickLogNoteSavedToast,
   buildQuickLogSavedNoteExcerpt,
@@ -203,6 +206,7 @@ import {
   EARLY_STAGE_NOTE_PLACEHOLDER,
   buildEarlyStageDetails,
   buildEarlyStageNoteSuffix,
+  hasQuickLogNoteText,
   evaluateEarlyStageVisibility,
   type EarlyStageMilestone,
   type EarlyStageVigor,
@@ -452,6 +456,8 @@ export default function QuickLog({
   const plants = useMemo(() => plantsQuery.data ?? [], [plantsQuery.data]);
   const activeTents = useMemo(() => tentsQuery.data ?? [], [tentsQuery.data]);
   const queryClient = useQueryClient();
+  const diaryEntries = useOptionalDiaryEntries();
+  const recentDiaryRef = diaryEntries.rowsRef;
   const { save: saveViaRpc } = useQuickLogV2Save();
   const verifiedPublicStarterWatering = isVerifiedPublicStarterWateringHandoff(
     prefill,
@@ -1115,6 +1121,17 @@ export default function QuickLog({
           result.reviewedStarterHandoffKey !== reviewedStarterHandoffKey)
       )
         return;
+      if (result.noteText && result.target.plantId) {
+        const savedAt = new Date().toISOString();
+        queryClient.setQueryData(["diary_entries"], (current) =>
+          QuickLogNoteRepeatSaveRules.rememberConfirmedNote(current, {
+            plantId: result.target.plantId as string,
+            note: result.noteText as string,
+            eventType: "note",
+            savedAt,
+          }),
+        );
+      }
       if (result.noteText) {
         setPanelSavedNote({ text: result.noteText, plantId: result.target.plantId ?? null });
         if (!result.recovered && result.activityId === "note") {
@@ -1140,7 +1157,13 @@ export default function QuickLog({
         user?.id ?? null,
       );
     },
-    [consumeReviewedPublicStarterDraft, draftHandoffKey, reviewedStarterHandoffKey, user?.id],
+    [
+      consumeReviewedPublicStarterDraft,
+      draftHandoffKey,
+      queryClient,
+      reviewedStarterHandoffKey,
+      user?.id,
+    ],
   );
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
@@ -1592,7 +1615,7 @@ export default function QuickLog({
       toast.message(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
       return;
     }
-    if (!note.trim() && saveEventType !== "watering") {
+    if (!hasQuickLogNoteText({ note, earlyNotes }) && saveEventType !== "watering") {
       const message = "Add a quick note";
       setSaveError(message);
       toast.error(message);
@@ -1764,6 +1787,26 @@ export default function QuickLog({
         saveIdempotencyKeyRef.current = newQuickLogSaveKey();
         built.payload.p_idempotency_key = saveIdempotencyKeyRef.current;
       }
+      const persistedNote = typeof built.payload.p_note === "string" ? built.payload.p_note : note;
+      // Only a plain note can repeat: readings, a photo, water or a check
+      // make a new entry even with the same text.
+      const plainNoteSave = isPlainNoteSavePayload(built.payload);
+      if (
+        plainNoteSave &&
+        QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
+          note: persistedNote,
+          plantId: savePlant.id,
+          eventType: saveEventType,
+          recentEntries: QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(
+            recentDiaryRef.current,
+          ),
+          now: new Date(),
+          sameSaveRetry: lastFailedSaveSigRef.current === attemptSig,
+        })
+      ) {
+        toast.message(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
+        return;
+      }
 
       let waterRecord: PendingStarterWater | null = null;
       if (saveEventType === "watering") {
@@ -1888,6 +1931,22 @@ export default function QuickLog({
         // Safe diagnostic only — reason code is allow-listed, never tokens/payload.
         console.error("[QuickLog] RPC save error", { reason });
         return;
+      }
+
+      if (
+        plainNoteSave &&
+        (saveEventType === "observation" || saveEventType === "note") &&
+        note.trim().length > 0
+      ) {
+        const savedAt = new Date().toISOString();
+        queryClient.setQueryData(["diary_entries"], (current) =>
+          QuickLogNoteRepeatSaveRules.rememberConfirmedNote(current, {
+            plantId: savePlant.id,
+            note: persistedNote,
+            eventType: saveEventType,
+            savedAt,
+          }),
+        );
       }
 
       const confirmedTarget = result.savedWaterTarget ?? saveTarget;
@@ -2348,6 +2407,7 @@ export default function QuickLog({
       }}
     >
       <DialogContent className="glass max-w-md max-h-[90vh] overflow-y-auto">
+        {diaryEntries.source}
         <DialogHeader>
           <DialogTitle className="font-display flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
@@ -3384,6 +3444,7 @@ export default function QuickLog({
                           onChange={(e) => {
                             if (restoreLockedDraftValue(e.currentTarget, earlyNotes)) return;
                             setEarlyNotes(e.target.value);
+                            setSaveError(null);
                           }}
                           placeholder="Optional — short observation"
                           autoComplete="off"
@@ -3945,7 +4006,7 @@ export default function QuickLog({
 
             {(() => {
               const preview = evaluateQuickLogPreview({
-                note,
+                note: note.trim() ? note : earlyNotes,
                 eventType,
                 stage,
                 remindAt,

@@ -332,3 +332,41 @@ describe("Plant Detail assigned-tent read states", () => {
     expect(fixture.fetchTent.mock.calls).toEqual([[assignedTent.id], ["tent-2"]]);
   });
 });
+
+// Field-notebook walk: the top back link went to the whole Plants list, and the
+// way back to the plant's own tent ("View Tent") sat about a phone screen lower.
+describe("Plant Detail top back link", () => {
+  function topBack() {
+    return screen.getByTestId("plant-detail-top-back");
+  }
+  it("goes back to the plant's own tent, named once its read loads", async () => {
+    const read = deferredTent();
+    fixture.fetchTent.mockReturnValue(read.promise);
+    renderPage();
+    expect(topBack()).toHaveAttribute("href", "/tents/" + assignedTent.id);
+    expect(topBack()).toHaveTextContent(/^Tent$/);
+    await act(async () => read.resolve(assignedTent));
+    await waitFor(() => expect(topBack()).toHaveTextContent(assignedTent.name));
+    expect(topBack()).toHaveAttribute("href", "/tents/" + assignedTent.id);
+    expect(screen.queryByRole("link", { name: /^plants$/i })).toBeNull();
+  });
+  it("keeps Plants for a plant with no tent", () => {
+    fixture.tentId = undefined;
+    renderPage();
+    expect(topBack()).toHaveAttribute("href", "/plants");
+    expect(topBack()).toHaveTextContent(/^Plants$/);
+  });
+  it("never names a different tent row", async () => {
+    fixture.fetchTent.mockResolvedValue({
+      ...assignedTent,
+      id: "other-tent",
+      name: "Wrong canopy",
+    });
+    renderPage();
+    await waitFor(() =>
+      expect(section().getByRole("status")).toHaveTextContent("Assigned tent details unavailable"),
+    );
+    expect(topBack()).toHaveTextContent(/^Tent$/);
+    expect(topBack()).toHaveAttribute("href", "/tents/" + assignedTent.id);
+  });
+});

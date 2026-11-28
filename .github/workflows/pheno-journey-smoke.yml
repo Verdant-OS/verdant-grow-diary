@@ -26,6 +26,9 @@ on:
           - free
           - paid
 
+permissions:
+  contents: read
+
 jobs:
   pheno-journey:
     name: pheno-journey (${{ inputs.phase }})

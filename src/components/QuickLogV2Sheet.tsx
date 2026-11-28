@@ -110,12 +110,18 @@ import {
   QuickLogReadingTime,
 } from "@/lib/quickLogReadingTime";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOptionalDiaryEntries } from "@/hooks/useOptionalDiaryEntries";
+import {
+  QUICK_LOG_NOTE_ALREADY_SAVED_COPY,
+  QuickLogNoteRepeatSaveRules,
+} from "@/lib/quickLogNoteSaveRules";
 import { useInRouterContext, useNavigate } from "@/lib/react-router-compat";
 import {
   buildQuickLogTimelineNavTarget,
   QUICK_LOG_TIMELINE_CTA_LABEL,
 } from "@/lib/quickLogTimelineNavigationTarget";
 import { resolveQuickLogConfirmedScope } from "@/lib/quickLogConfirmedScopeRules";
+import { buildQuickLogNoteSavedToast } from "@/lib/quickLogNoteSaveRules";
 import { navigateToTimelineAnchor } from "@/lib/timelineAnchorNavigation";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -514,6 +520,13 @@ function QuickLogV2SheetForOwner({
     [tentsQ.data],
   );
   const queryClient = useQueryClient();
+  // Saved diary rows, read while the sheet is open, so a note saved on
+  // another device or before a reload still blocks its repeat.
+  const diaryEntries = useOptionalDiaryEntries();
+  const recentDiaryRef = diaryEntries.rowsRef;
+  const sessionNotesRef = useRef<
+    Array<{ plantId: string; note: string; eventType: string; savedAt: string }>
+  >([]);
   const temperatureUnit = useTemperatureUnitPreference();
   const inRouter = useInRouterContext();
   // `useNavigate` throws when called outside a Router. The sheet is
@@ -544,6 +557,7 @@ function QuickLogV2SheetForOwner({
       plantId?: string | null;
       growEventId?: string | null;
     },
+    description: string | null = null,
   ) {
     const nav = buildQuickLogTimelineNavTarget({
       growId: scope.growId,
@@ -554,7 +568,8 @@ function QuickLogV2SheetForOwner({
       growEventId: scope.growEventId ?? null,
     });
     if (!nav) {
-      toast.success(message);
+      if (description) toast.success(message, { description });
+      else toast.success(message);
       onOpenChange(false);
       return;
     }
@@ -575,6 +590,7 @@ function QuickLogV2SheetForOwner({
           )
         : "the selected target";
     toast.success(`${message} · ${targetLabel}`, {
+      ...(description ? { description } : {}),
       action: {
         label: QUICK_LOG_TIMELINE_CTA_LABEL,
         onClick: () => navigateToTimeline(nav.href, nav.hash, nav.path),
@@ -2239,6 +2255,32 @@ function QuickLogV2SheetForOwner({
       return;
     }
 
+    // Only a plain note can repeat: typed readings or a photo make a new entry.
+    const plainNoteForm =
+      !photoFile &&
+      [form.temperatureC, form.humidityPct, form.vpdKpa].every(
+        (value) => String(value ?? "").trim().length === 0,
+      );
+    const repeatNote =
+      !pendingManualSubmission &&
+      form.action === "note" &&
+      plainNoteForm &&
+      QuickLogNoteRepeatSaveRules.isRepeatOfRecentSavedNote({
+        note: form.note,
+        plantId: resolved.plantId,
+        eventType: "note",
+        recentEntries: [
+          ...sessionNotesRef.current,
+          ...QuickLogNoteRepeatSaveRules.candidatesFromDiaryRows(recentDiaryRef.current),
+        ],
+        now: new Date(),
+      });
+    if (repeatNote) {
+      setLocalError(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
+      setSaveStatus("");
+      return;
+    }
+
     if (
       !pendingSubmission &&
       isQuickLogV2CriticalContentMissing({
@@ -2969,6 +3011,19 @@ function QuickLogV2SheetForOwner({
       return;
     }
 
+    if (submissionAction === "note" && resolved.plantId && submissionNote.trim()) {
+      const savedAt = new Date().toISOString();
+      sessionNotesRef.current = [
+        {
+          plantId: resolved.plantId,
+          note: submissionNote,
+          eventType: "note",
+          savedAt,
+        },
+        ...sessionNotesRef.current,
+      ];
+    }
+
     setExactRetryPending(false);
     setHistoryCheckRequired(false);
     setPersistedNote(res.persistedNote);
@@ -3150,14 +3205,19 @@ function QuickLogV2SheetForOwner({
         "Watering saved. This tab did not attach the photo. Check Timeline before adding it separately.",
       );
     }
-    showTimelineConfirmation(successMessage, {
-      growId: confirmedScope.growId,
-      targetType: confirmedScope.targetType,
-      targetId: confirmedScope.targetId,
-      tentId: confirmedScope.tentId,
-      plantId: confirmedScope.plantId,
-      growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
-    });
+    showTimelineConfirmation(
+      successMessage,
+      {
+        growId: confirmedScope.growId,
+        targetType: confirmedScope.targetType,
+        targetId: confirmedScope.targetId,
+        tentId: confirmedScope.tentId,
+        plantId: confirmedScope.plantId,
+        growEventId: (res as { growEventId?: string | null }).growEventId ?? null,
+      },
+      // Only a confirmed note save carries persistedNote; Water keeps its fixed message.
+      buildQuickLogNoteSavedToast(res.persistedNote).description,
+    );
     applyQuickLogV2Refresh(queryClient, {
       targetType: resolved.targetType as "plant" | "tent",
       targetId: resolved.targetId as string,
@@ -3472,6 +3532,7 @@ function QuickLogV2SheetForOwner({
         onCloseAutoFocus={restoreOpenerFocus}
         onOpenAutoFocus={handleSheetOpenAutoFocus}
       >
+        {diaryEntries.source}
         <SheetHeader>
           <SheetTitle>Quick Log</SheetTitle>
           <p id="qlv2-sheet-description" className="text-sm text-muted-foreground">

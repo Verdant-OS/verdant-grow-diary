@@ -10,7 +10,7 @@ const EXACT_LABELS: Record<string, string> = {
   "/grows": "Grows",
   "/alerts": "Alerts",
   "/actions": "Actions",
-  "/daily-check": "Daily Check",
+  "/daily-check": "Quick Log",
   "/doctor": "AI Doctor",
   "/settings": "Settings",
   "/reports": "Reports",

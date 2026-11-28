@@ -175,3 +175,21 @@ export function buildEarlyStageNoteSuffix(input: EarlyStageDetailsInput): string
   if (envelope.notes) parts.push(`Early note: ${envelope.notes}`);
   return parts.join(" · ");
 }
+
+export interface QuickLogNoteTextInput {
+  /** Short note text. */
+  note?: string | null;
+  /** Early-stage "What changed?" text. */
+  earlyNotes?: string | null;
+}
+
+/**
+ * True when the grower typed text in Short note or in "What changed?".
+ * Save log accepts either field, because both reach the saved diary note
+ * (the second one through `buildEarlyStageNoteSuffix`).
+ */
+export function hasQuickLogNoteText(input: QuickLogNoteTextInput): boolean {
+  return [input.note, input.earlyNotes].some(
+    (value) => typeof value === "string" && value.trim().length > 0,
+  );
+}

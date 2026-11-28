@@ -63,7 +63,7 @@ export const NO_ANALYTICS_PAGE_CACHE_CONTROL = "no-transform";
 export const SEO_SNAPSHOT_HEADER = "x-verdant-seo-snapshot";
 export const SEO_SNAPSHOT_HEADER_VALUE = "1";
 
-const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
+export const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
   "/strains": "/cultivars",
   "/welcome": "/",
   "/features": "/",
@@ -77,6 +77,7 @@ const EXACT_PERMANENT_REDIRECTS: Readonly<Record<string, string>> = {
   // Exact help aliases only. /docs/mcp-api stays a document, and /docs/* is not a prefix.
   "/docs": "/help",
   "/support": "/help",
+  "/faq": "/help/faq",
   "/help/developers/mcp-tools": "/docs/mcp-api",
 };
 

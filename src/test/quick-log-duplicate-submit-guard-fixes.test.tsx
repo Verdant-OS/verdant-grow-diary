@@ -133,6 +133,12 @@ describe("QuickLogV2Sheet (P1, P2-3)", () => {
       expect((screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled).toBe(false),
     );
     fireEvent.click(screen.getByTestId("qlv2-save"));
+    await waitFor(() => expect(saveCalls().length).toBe(1));
+    fireEvent.change(noteBox(), { target: { value: "A different note" } });
+    await waitFor(() =>
+      expect((screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId("qlv2-save"));
     await waitFor(() => expect(saveCalls().length).toBe(2));
   });
 });

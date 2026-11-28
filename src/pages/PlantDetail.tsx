@@ -22,6 +22,7 @@ import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingC
 import PlantDailyGrowCheckConsistencyCard from "@/components/PlantDailyGrowCheckConsistencyCard";
 import PlantRecentMoveCard from "@/components/PlantRecentMoveCard";
 import PlantAssignedTentAlertsPanel from "@/components/PlantAssignedTentAlertsPanel";
+import { usePlantTentAlertStage } from "@/hooks/usePlantTentAlertStage";
 import DeepLinkAnchorRestorer from "@/components/DeepLinkAnchorRestorer";
 import PlantAssignedTentActionsPanel from "@/components/PlantAssignedTentActionsPanel";
 import PlantStatusStrip from "@/components/PlantStatusStrip";
@@ -106,6 +107,7 @@ import {
 } from "@/lib/plantDetailLoadTimeoutRules";
 import {
   derivePlantDetailBlockedStateView,
+  resolvePlantDetailTopBack,
   type PlantDetailBlockedStateAction,
   type PlantDetailBlockedStateView,
 } from "@/lib/plantDetailBlockedStateViewModel";
@@ -276,6 +278,9 @@ export default function PlantDetail() {
   // The plant row owns the assignment; a missing/failed details read must
   // neither clear that assignment nor substitute a row for another tent.
   const tent = tentQuery.data?.id === plant?.tentId ? tentQuery.data : null;
+  // The stage this plant's tent's alerts are judged by now, for the Tent
+  // Alerts staleness note (Reviewer C on #3021, round 3). Null until known.
+  const tentAlertStage = usePlantTentAlertStage(plant?.growId ?? null, plant?.tentId ?? null);
   const tentReadMessage = tentQuery.isError
     ? tent
       ? "Could not refresh assigned tent details. Showing cached details."
@@ -514,6 +519,7 @@ export default function PlantDetail() {
   // Text and time come from the same newest diary row; the profile note is
   // shown separately under its Edit Plant name, "Notes".
   const lastActivitySummary = resolvePlantLastActivitySummary(lastActivityInput);
+  const topBack = resolvePlantDetailTopBack({ plant, tentName: tent?.name ?? null });
   const harvestWatchEligible = isHarvestWatchEligible({
     stage: plant.stage,
     isArchived: plant.isArchived,
@@ -521,9 +527,9 @@ export default function PlantDetail() {
   return (
     <div className="min-w-0 max-w-full">
       <QuickLogV2Fab defaultTargetKey={`plant:${plant.id}`} />
-      <Button asChild variant="ghost" size="sm" className="mb-3">
-        <Link to={plantsPath()}>
-          <ArrowLeft className="h-4 w-4" /> Plants
+      <Button asChild variant="ghost" size="sm" className="mb-3" data-testid={topBack.testId}>
+        <Link to={topBack.path}>
+          <ArrowLeft className="h-4 w-4" /> {topBack.label}
         </Link>
       </Button>
       <PageHeader
@@ -991,6 +997,7 @@ export default function PlantDetail() {
             tentName={tent?.name ?? null}
             growId={plant.growId ?? null}
             plantId={plant.id}
+            tentAlertStage={tentAlertStage}
             doctorCreditGate={doctorCreditGate}
           />
         </div>

@@ -1,7 +1,9 @@
 /**
- * Public help-center registry for /help and the section hubs.
- * Later streams add topic pages here. A hub lists only pages that exist.
+ * Public help-center registry for /help, the section hubs and topic pages.
+ * A hub lists only pages that exist. Topic pages share the /help/:section
+ * route with the hubs; their copy lives in src/constants/helpCenterArticleCopy.ts.
  */
+import { HELP_CENTER_ARTICLES } from "@/constants/helpCenterArticleCopy";
 
 export interface HelpTopicLink {
   readonly label: string;
@@ -16,6 +18,34 @@ export interface HelpBlock {
   readonly tag: "h1" | "h2" | "p";
   readonly runs: readonly HelpRun[];
 }
+
+export interface HelpStepsBlock {
+  readonly tag: "ol";
+  readonly items: readonly (readonly HelpRun[])[];
+}
+
+export type HelpArticleBlock = HelpBlock | HelpStepsBlock;
+
+/** Topic-page copy as written in the constants file. */
+export interface HelpArticleCopy {
+  readonly slug: string;
+  /** The hub that lists this page. */
+  readonly sectionSlug: string;
+  readonly title: string;
+  readonly description: string;
+  readonly blocks: readonly HelpArticleBlock[];
+}
+
+export interface HelpArticle extends HelpArticleCopy {
+  readonly path: string;
+  readonly titleTag: string;
+  readonly sectionTitle: string;
+  readonly sectionPath: string;
+}
+
+export type HelpPage =
+  | { readonly kind: "section"; readonly section: HelpSection }
+  | { readonly kind: "article"; readonly article: HelpArticle };
 
 export interface HelpSection {
   readonly slug: string;
@@ -155,9 +185,30 @@ function section(
     covers,
     homeOneLiner,
     titleTag: `${title} | Help | Verdant Grow Diary`,
-    topics,
+    topics: [
+      ...HELP_CENTER_ARTICLES.filter((article) => article.sectionSlug === slug).map((article) => ({
+        label: article.title,
+        href: `${HOME_PATH}/${article.slug}`,
+      })),
+      ...topics,
+    ],
   };
 }
+
+const ARTICLES: readonly HelpArticle[] = HELP_CENTER_ARTICLES.map((copy) => {
+  const hub = SECTIONS.find((entry) => entry.slug === copy.sectionSlug);
+  if (!hub) throw new Error(`help article ${copy.slug} names unknown hub ${copy.sectionSlug}`);
+  if (SECTIONS.some((entry) => entry.slug === copy.slug)) {
+    throw new Error(`help article slug ${copy.slug} collides with a hub`);
+  }
+  return {
+    ...copy,
+    path: `${HOME_PATH}/${copy.slug}`,
+    titleTag: `${copy.title} | Help | Verdant Grow Diary`,
+    sectionTitle: hub.title,
+    sectionPath: hub.path,
+  };
+});
 
 export class HelpCenterContent {
   static homePath(): string {
@@ -190,8 +241,12 @@ export class HelpCenterContent {
     return SECTIONS;
   }
 
+  static articles(): readonly HelpArticle[] {
+    return ARTICLES;
+  }
+
   static paths(): readonly string[] {
-    return [HOME_PATH, ...SECTIONS.map((entry) => entry.path)];
+    return [HOME_PATH, ...SECTIONS.map((entry) => entry.path), ...ARTICLES.map((a) => a.path)];
   }
 
   static coversClause(covers: string): string {
@@ -201,6 +256,33 @@ export class HelpCenterContent {
   static sectionBySlug(slug: string | undefined): HelpSection | null {
     if (!slug) return null;
     return SECTIONS.find((entry) => entry.slug === slug) ?? null;
+  }
+
+  static articleBySlug(slug: string | undefined): HelpArticle | null {
+    if (!slug) return null;
+    return ARTICLES.find((entry) => entry.slug === slug) ?? null;
+  }
+
+  /** A hub or a topic page for one /help/:section slug. */
+  static pageBySlug(slug: string | undefined): HelpPage | null {
+    const hub = HelpCenterContent.sectionBySlug(slug);
+    if (hub) return { kind: "section", section: hub };
+    const article = HelpCenterContent.articleBySlug(slug);
+    return article ? { kind: "article", article } : null;
+  }
+
+  static articleFallbackHtml(article: HelpArticle): string {
+    return article.blocks.map(renderHelpArticleBlock).join("");
+  }
+
+  /** Visible copy plus titles and meta of the topic pages only. */
+  static articleCopyCorpus(): string {
+    const parts: string[] = [];
+    for (const article of ARTICLES) {
+      parts.push(article.title, article.titleTag, article.description, article.path);
+      for (const block of article.blocks) parts.push(blockText(block));
+    }
+    return parts.join("\n");
   }
 
   /** Visible copy plus titles and meta. Used by the public-copy guard. */
@@ -213,6 +295,7 @@ export class HelpCenterContent {
       parts.push(entry.title, entry.covers, entry.homeOneLiner, entry.titleTag, entry.path);
       for (const topic of entry.topics) parts.push(topic.label, topic.href);
     }
+    parts.push(HelpCenterContent.articleCopyCorpus());
     return parts.join("\n");
   }
 
@@ -247,4 +330,15 @@ function renderHelpRun(run: HelpRun): string {
 
 function renderHelpBlock(block: HelpBlock): string {
   return `<${block.tag}>${block.runs.map(renderHelpRun).join("")}</${block.tag}>`;
+}
+
+function renderHelpArticleBlock(block: HelpArticleBlock): string {
+  if (block.tag !== "ol") return renderHelpBlock(block);
+  const items = block.items.map((runs) => `<li>${runs.map(renderHelpRun).join("")}</li>`);
+  return `<ol>${items.join("")}</ol>`;
+}
+
+function blockText(block: HelpArticleBlock): string {
+  if (block.tag !== "ol") return block.runs.map((run) => run.text).join("");
+  return block.items.map((runs) => runs.map((run) => run.text).join("")).join("\n");
 }

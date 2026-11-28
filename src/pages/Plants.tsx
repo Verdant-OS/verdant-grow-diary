@@ -291,7 +291,9 @@ export default function Plants() {
   const filtered = filterPlantsBySearch(visibleAfterTent, search, tents);
 
   // Filter summary — counts only active plants under the current grow scope.
-  const summary = summarizePlantsPageFilters(growScopedPlants, {
+  // Uses plantsForList, the same list the grid, chips and archived toggle use,
+  // so a plant in an archived grow is counted as archived everywhere.
+  const summary = summarizePlantsPageFilters(plantsForList, {
     selectedGrowId: showUnassignedOnly ? UNASSIGNED_GROW_FILTER_ID : urlGrowId,
     selectedGrowName: showUnassignedOnly ? UNASSIGNED_GROW_OPTION_NAME : scopedGrowName,
     search,

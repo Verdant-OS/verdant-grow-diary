@@ -34,6 +34,7 @@ import {
   type AlertDoctorCreditGateView,
 } from "@/lib/alertDoctorCreditGateRules";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
+import { assessAlertStageStaleness } from "@/lib/alertStageStalenessRules";
 
 interface Props {
   tentId: string | null | undefined;
@@ -46,6 +47,15 @@ interface Props {
    * than pointing the grower at an unrelated plant.
    */
   plantId?: string | null;
+  /**
+   * The stage this tent's alerts are judged by now (usePlantTentAlertStage),
+   * not the plant's own stage: in a mixed tent a Flower plant's tent alerts
+   * can rightly use Veg targets. When an open alert quotes a different stage's
+   * range (it was judged before the tent moved on), the row says so. Label
+   * only: the alert stays open and is never changed here. Omitted or null
+   * shows no note.
+   */
+  tentAlertStage?: string | null;
   /**
    * Out-of-credits interception for the doctor CTA, computed by the CALLER
    * from presentation-only entitlement + usage reads (the panel itself
@@ -89,12 +99,18 @@ function AlertRowItem({
   plantId,
   tentId,
   creditGate,
+  tentAlertStage,
 }: {
   row: PlantAssignedTentAlertRow;
   plantId?: string | null;
   tentId?: string | null;
   creditGate?: AlertDoctorCreditGateView | null;
+  tentAlertStage?: string | null;
 }) {
+  const stageStaleness = assessAlertStageStaleness({
+    reason: row.reason,
+    currentStage: tentAlertStage ?? null,
+  });
   // Deep-links into the plant's existing cautious-review section via the
   // shared helper (same href five other surfaces already use). Navigation
   // only — reaching the anchor never starts a review or spends a credit.
@@ -239,6 +255,14 @@ function AlertRowItem({
           className="mt-1 text-xs text-muted-foreground leading-snug"
         />
       ) : null}
+      {stageStaleness.note ? (
+        <p
+          className="mt-1 text-xs text-[hsl(var(--warning))] leading-snug"
+          data-testid="plant-assigned-tent-alert-stage-stale"
+        >
+          {stageStaleness.note}
+        </p>
+      ) : null}
       {row.lastSeenAt ? (
         <p
           className="mt-1 text-[11px] text-muted-foreground"
@@ -256,6 +280,7 @@ export default function PlantAssignedTentAlertsPanel({
   tentName,
   growId,
   plantId,
+  tentAlertStage,
   doctorCreditGate,
 }: Props) {
   const enabled = !!tentId;
@@ -342,6 +367,7 @@ export default function PlantAssignedTentAlertsPanel({
                   plantId={plantId ?? null}
                   tentId={tentId ?? null}
                   creditGate={doctorCreditGate ?? null}
+                  tentAlertStage={tentAlertStage ?? null}
                 />
               ))}
             </ul>

@@ -44,15 +44,27 @@ describe("help center host redirects", () => {
     });
   });
 
-  it("does not redirect unknown docs paths or /faq", () => {
+  it("does not redirect unknown docs paths", () => {
     expect(decision("/docs/foo").kind).toBe("continue");
     expect(decision("/docs/mcp-api/x").kind).toBe("continue");
-    expect(decision("/faq").kind).toBe("continue");
+  });
+
+  it("sends /faq to the FAQ page with 308", () => {
+    expect(decision("/faq")).toMatchObject({
+      kind: "redirect",
+      status: 308,
+      location: "/help/faq",
+    });
+    expect(decision("/faq/")).toMatchObject({
+      kind: "redirect",
+      status: 308,
+      location: "/help/faq",
+    });
   });
 });
 
 describe("help sitemap", () => {
-  it("lists the help home, the nine hubs, and the MCP API reference", () => {
+  it("lists the help home, the nine hubs, the topic pages, and the MCP API reference", () => {
     for (const path of HelpCenterContent.paths()) {
       expect(SITEMAP).toContain(`<loc>https://verdantgrowdiary.com${path}</loc>`);
     }

@@ -67,7 +67,9 @@ describe("Action Queue detail view", () => {
 
   it("renders an audit-history section and shows previous → new status", () => {
     expect(DETAIL).toMatch(/aria-label="Audit history"/);
-    expect(DETAIL).toMatch(/previous_status \?\? "—"\}\s*→\s*\{e\.new_status \?\? "—"/);
+    // Friction item 10: the transition reads as words ("Waiting for approval
+    // → Cancelled"); a missing status still shows "—" (status-transition-labels).
+    expect(DETAIL).toContain("formatStatusTransition(e.previous_status, e.new_status)");
   });
 
   it("renders a not-found / RLS-blocked safe state", () => {

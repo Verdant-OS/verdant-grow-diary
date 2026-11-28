@@ -121,9 +121,15 @@ import {
   ACTION_QUEUE_AI_DOCTOR_DERIVED_EVIDENCE_NOT_LINKED_COPY,
 } from "@/lib/originatingTimelineEventRules";
 import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
+import { useAlertTargetNames } from "@/hooks/useAlertTargetNames";
+import {
+  ACTION_DETAIL_PLANT_LABEL_FALLBACK,
+  ACTION_DETAIL_TENT_LABEL_FALLBACK,
+} from "@/constants/actionDetailTargetCopy";
 import { useActionEvidenceVerification } from "@/hooks/useActionEvidenceVerification";
 import { useGrows } from "@/store/grows";
 import { localizeReadingAtTimestamps } from "@/lib/alertReasonDisplayRules";
+import { formatStatusTransition } from "@/lib/statusTransitionLabelRules";
 
 /**
  * Narrow cast for `action_queue_transition` (typing may lag generated Database
@@ -230,6 +236,8 @@ export default function ActionDetail() {
   const { actionId } = useParams<{ actionId: string }>();
   const { user } = useAuth();
   const { grows } = useGrows();
+  // Read-only, RLS-scoped tent/plant names; the maps hold no id-shaped names.
+  const targetNames = useAlertTargetNames();
   const [row, setRow] = useState<ActionRow | null>(null);
   // #1001: evidence refs are client-carried; verify sensor refs against the
   // grower's stored readings (RLS) before rendering any source as trusted.
@@ -795,10 +803,26 @@ export default function ActionDetail() {
             data-testid="action-detail-grow-label"
           />
           {row.tent_id && (
-            <IdField label="Tent" id={row.tent_id} to={tentDetailPath(row.tent_id)} />
+            <IdField
+              label="Tent"
+              id={row.tent_id}
+              to={tentDetailPath(row.tent_id)}
+              displayLabel={
+                targetNames.tentNameById.get(row.tent_id) ?? ACTION_DETAIL_TENT_LABEL_FALLBACK
+              }
+              data-testid="action-detail-tent-label"
+            />
           )}
           {row.plant_id && (
-            <IdField label="Plant" id={row.plant_id} to={plantDetailPath(row.plant_id)} />
+            <IdField
+              label="Plant"
+              id={row.plant_id}
+              to={plantDetailPath(row.plant_id)}
+              displayLabel={
+                targetNames.plantNameById.get(row.plant_id) ?? ACTION_DETAIL_PLANT_LABEL_FALLBACK
+              }
+              data-testid="action-detail-plant-label"
+            />
           )}
           <Field label="Created" value={new Date(row.created_at).toLocaleString()} />
           <Field label="Updated" value={new Date(row.updated_at).toLocaleString()} />
@@ -1195,7 +1219,7 @@ export default function ActionDetail() {
                     {e.event_type}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {e.previous_status ?? "—"} → {e.new_status ?? "—"}
+                    {formatStatusTransition(e.previous_status, e.new_status)}
                   </span>
                   <span className="ml-auto text-xs text-muted-foreground">
                     {new Date(e.created_at).toLocaleString()}

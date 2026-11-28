@@ -143,7 +143,7 @@ test.describe("Auth loading/disabled smoke (mocked)", () => {
   }) => {
     const gate = holdAndCount(page, /recover/i, {}, 200);
     await page.goto("/auth");
-    await page.getByRole("tab", { name: /forgot password/i }).click();
+    await page.getByRole("button", { name: /forgot password\?/i }).click();
     await page.getByLabel(/email/i).fill(SAFE_EMAIL);
 
     const button = page.getByRole("button", { name: /send reset link/i });
@@ -298,7 +298,7 @@ test.describe("Mobile auth loading/disabled smoke (mocked)", () => {
   }) => {
     const gate = holdAndCount(page, /recover/i, {}, 200);
     await page.goto("/auth");
-    await page.getByRole("tab", { name: /forgot password/i }).tap();
+    await page.getByRole("button", { name: /forgot password\?/i }).tap();
     await page.getByLabel(/email/i).fill(SAFE_EMAIL);
     await page.getByRole("button", { name: /send reset link/i }).tap();
     const loading = page.getByRole("button", { name: /sending reset link…/i });

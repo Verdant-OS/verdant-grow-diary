@@ -849,6 +849,7 @@ export default function DailyCheck() {
       <DailyGrowCheckOnboardingCard
         focusedPlantId={selectedPlant?.id ?? plantResolution.plant?.id ?? null}
         hideWhenReady
+        currentPath="/daily-check"
         className="mb-4"
       />
 

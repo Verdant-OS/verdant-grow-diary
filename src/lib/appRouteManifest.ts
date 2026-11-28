@@ -266,7 +266,7 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
   {
     path: "/help/:section",
     access: "public",
-    description: "Public help section hub. Unknown slugs are not found.",
+    description: "Public help section hub or topic page. Unknown slugs are not found.",
   },
   {
     path: "/how-ai-doctor-works",

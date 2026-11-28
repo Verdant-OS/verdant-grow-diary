@@ -73,10 +73,16 @@ interface MinimalPlant {
   isArchived?: boolean | null;
   archivedAt?: string | null;
   mergedIntoPlantId?: string | null;
+  /**
+   * True when the plant's grow is archived (set by withGrowArchiveVisibility).
+   * The /plants grid and archived toggle hide such plants, so the summary
+   * counts them as archived too: one list, one count.
+   */
+  growArchived?: boolean | null;
 }
 
 function isInactive(p: MinimalPlant): boolean {
-  return !!(p.isArchived || p.archivedAt || p.mergedIntoPlantId);
+  return !!(p.isArchived || p.archivedAt || p.mergedIntoPlantId || p.growArchived);
 }
 
 /**

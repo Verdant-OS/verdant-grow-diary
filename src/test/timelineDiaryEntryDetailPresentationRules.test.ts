@@ -4,6 +4,7 @@ import {
   isFullySuppressedTimelineDetail,
   presentTimelineDiaryEntryDetails,
 } from "@/lib/timelineDiaryEntryDetailPresentationRules";
+import { QUICK_LOG_NOTE_MARKER_KEY, withQuickLogNoteMarker } from "@/lib/quickLogNoteMarkerRules";
 
 describe("presentTimelineDiaryEntryDetails", () => {
   it("returns empty presentation for null/undefined/non-object details", () => {
@@ -89,6 +90,14 @@ describe("presentTimelineDiaryEntryDetails", () => {
       "fahrenheit",
     );
     expect(result.extra).toEqual([]);
+  });
+
+  it("keeps the Quick Log Note marker out of raw chips", () => {
+    const result = presentTimelineDiaryEntryDetails(
+      withQuickLogNoteMarker({ event_type: "observation", note: "Leaves look fine" }),
+      "fahrenheit",
+    );
+    expect(result.extra.some(([k]) => k === QUICK_LOG_NOTE_MARKER_KEY)).toBe(false);
   });
 
   it("drops any null-valued key from the raw fallback outright", () => {

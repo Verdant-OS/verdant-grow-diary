@@ -54,7 +54,9 @@ describe("Auth page essentials", () => {
     renderAuth();
     expect(screen.getByRole("tab", { name: /sign in/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /create account/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /forgot password/i })).toBeInTheDocument();
+    // Friction item 12 (2026-11-19): "Forgot password" is one link, not a third tab.
+    expect(screen.queryByRole("tab", { name: /forgot password/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /forgot password\?/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /back to home/i })).toHaveAttribute("href", "/");
   });
 
@@ -87,7 +89,7 @@ describe("Auth page essentials", () => {
 describe("Forgot password flow", () => {
   it("validates blank email", async () => {
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/enter the email/i);
     expect(resetForEmailMock).not.toHaveBeenCalled();
@@ -95,7 +97,7 @@ describe("Forgot password flow", () => {
 
   it("validates invalid email", async () => {
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "nope" } });
     fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/valid email/i);
@@ -105,7 +107,7 @@ describe("Forgot password flow", () => {
   it("calls resetPasswordForEmail with /reset-password redirect and shows generic success", async () => {
     resetForEmailMock.mockClear();
     renderAuth();
-    activateTab(/forgot password/i);
+    fireEvent.click(screen.getByRole("button", { name: /forgot password\?/i }));
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "grower@verdant.app" },
     });

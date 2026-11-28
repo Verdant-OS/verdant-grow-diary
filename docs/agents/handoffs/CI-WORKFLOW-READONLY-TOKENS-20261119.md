@@ -1,15 +1,15 @@
 # CI-WORKFLOW-READONLY-TOKENS-20261119
 
 ```text
-TASK CI-WORKFLOW-READONLY-TOKENS-20261119  priority: P2  status: OPEN
+TASK CI-WORKFLOW-READONLY-TOKENS-20261119  priority: P2  status: CLOSED
 goal: Every workflow that set no token permissions now sets `permissions: contents: read` at the top level, so a compromised step or dependency in those jobs cannot write to the repo, PRs or issues even if the repository default token is read-write.
 why: Finding B2 of the read-only security review (2026-11-19). Matthew said "execute" on the findings in the review thread, 2026-11-19 08:55 UTC.
 branch: claude/project-thread-nh4iin
 base: verdant-grow-diary at fc8e0e142a5a82200833826f96dce06b457228a4 (merged in 2026-11-25; first base was 679e8f51b17a2ee52e3eed204bff5401be082b63)
 pr: #3026 https://github.com/Verdant-OS/verdant-grow-diary/pull/3026
 head_sha: 9b86fd47b75188b8072763a50fcebca932194cf7 is the last commit with code or test changes. Commits after it touch only this handoff. The PR page shows the live head, and reviews and checks bind to that exact SHA.
-state: ready for review. 2026-11-25 04:49 UTC the merge queue dequeued it: the newer base scopes ci.yml#test itself and adds job-level contents: read to the gamification smoke job, so this PR's test failed in the queue. Base merged in and the test follows it (9b86fd47). The new head needs 35/35 checks, a fresh independent exact-head review and Matthew's yes again; the earlier approvals at 6c974ec are historical.
-next_action: (1) 35/35 required checks at the PR head; (2) independent exact-head review by a session that did not write this; (3) Matthew's per-item yes at that SHA.
+state: CLOSED 2026-11-28. Merged through the merge queue at 2026-11-28 06:16 UTC by cheekhimself as a47ca7ed20d72023b5cb45d6d2a5eb86b7908604 (squash of head 5e723dfdddbeb1c759a76133def5e1fe7e31c73c). Reviews at that head: VReviewer APPROVED (Matthew's own account, not independent); no Reviewer A, C or D review was posted.
+next_action: post-merge only. Watch the next runs of the 24 pull_request/schedule workflows for a 403 "Resource not accessible by integration"; datadog-synthetics.yml and gamification-staging-smoke.yml stay NOT_MEASURED (push to main only); e2e-fixture-garden-rotation.yml, pheno-journey-smoke.yml and vitest-batched-full-suite.yml stay NOT_MEASURED until a dispatch (Matthew's call). A failure reopens this task with the same owner.
 post_merge_check: a step that needed write would fail with 403 "Resource not accessible by integration". 24 of the 29 run on pull_request or schedule, so this PR's own CI run plus their next scheduled run covers them. datadog-synthetics.yml and gamification-staging-smoke.yml run on push to main only, so merging into verdant-grow-diary does not run them: record them NOT_MEASURED until a separately authorized run. e2e-fixture-garden-rotation.yml, pheno-journey-smoke.yml and vitest-batched-full-suite.yml are workflow_dispatch only: dispatch each once from verdant-grow-diary after merge (Matthew's call, since a dispatch starts work) or record them NOT_MEASURED until their next manual run. The committed fence is src/test/workflow-token-permissions.test.ts.
 decisions: (1) Only the 29 workflows with no `permissions:` key anywhere were changed; workflows that already declare permissions were left alone. (2) Each changed workflow was scanned for steps that need a write token (git push, gh pr/issue/api, github-script, upload-sarif, create-pull-request, release, pages, id-token); none found. Actions used: checkout, cache, setup-node, setup-bun, setup-deno, supabase/setup-cli, upload-artifact, DataDog synthetics; none needs a write token. (3) Same shape as the existing convention pinned by src/test/security-regression-workflow-trigger.test.ts:46.
 behavior_change: CI only. No app, schema, RLS, edge, auth or lockfile change.
@@ -23,5 +23,5 @@ reviewer_sha: none at 9b86fd47 (VReviewer approvals at 6c974ec are Matthew's own
 session_state: no routines, no paused workflows. Pending human decisions: merge yes; B1 secret move and rotation; whether to build D1 and E1.
 claimed_by: Claude thread session for the security review task, 2026-11-19 09:00 UTC
 owner: Claude thread session for the security review task
-last_updated: 2026-11-25 05:00 UTC
+last_updated: 2026-11-28 06:25 UTC
 ```

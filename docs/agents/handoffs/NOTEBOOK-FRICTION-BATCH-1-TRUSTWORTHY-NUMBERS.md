@@ -1,17 +1,18 @@
 # NOTEBOOK-FRICTION-BATCH-1-TRUSTWORTHY-NUMBERS
 
 ```text
-TASK NOTEBOOK-FRICTION-BATCH-1-TRUSTWORTHY-NUMBERS  priority: P2  status: OPEN
+TASK NOTEBOOK-FRICTION-BATCH-1-TRUSTWORTHY-NUMBERS  priority: P2  status: CLOSED
 goal: Stage, count and state on the plant, grow and /plants pages each come from one source, so a Flower plant is not judged or labelled by seedling numbers (friction items 1 and 2 of the 2026-11-19 field-notebook walk).
 why: Walk on the live build 0d9e9c0 found a Flower plant with open alerts quoting seedling ranges, a "Good" grow beside open alerts and "No recent check-in", and /plants saying 3 plants over 2 cards. Wrong targets can push a wrong cultivation decision.
 branch: claude/project-thread-jeosyv
 base: verdant-grow-diary at 0d9e9c081973ea3e4ff86f5cd8822d5cfab3f1be
 checkout: git fetch origin claude/project-thread-jeosyv verdant-grow-diary && git switch claude/project-thread-jeosyv
-pr: #3021 (open, ready for review)
-head_sha: read the PR's current full head; a commit cannot name itself.
+pr: #3021 (merged)
+head_sha: 50f306560dc41910e74570405bbd9bdbb24e8a1c, merged as 7ea9cd8a2fae54c083acd488d3017c4529f40a57.
 state: Implemented. Pure rules plus thin wiring. Seven new test files. Locally (scratch vitest 4.1.12): 67 pure tests pass; with a scratch jsdom setup, 11 mounted/pure alert suites (117 tests) pass, including the scorer-locked alerts-stage-resolution-wiring test unchanged in this round. Nine page-level alert suites, full tsc, lint and build NOT_MEASURED locally (deps missing; bun install --frozen-lockfile BLOCKED by registry 403); required CI provides them.
+state: CLOSED. Merged through the merge queue as 7ea9cd8a2fae54c083acd488d3017c4529f40a57 (#3021) on 2026-11-28T09:06:50Z from head 50f306560dc41910e74570405bbd9bdbb24e8a1c, after Reviewer A and Reviewer C passes at that head. Closed 2026-11-28 by the Claude thread session that wrote it.
 current_step: Round 3 fix. Reviewer C FAILED 86d4f946ae0837dcd4c095c0c2b54a81deeebfea (1/3/3) and Reviewer A was PASS-with-P2 earlier. Fixed C's reproduced bug: in a Veg tent that also holds a Flower plant, the Flower plant's Tent Alerts panel said a fresh Veg-range alert "may no longer apply". The note now compares with the stage the tent's alerts are judged by (resolveTentAlertStageForView via usePlantTentAlertStage), not the plant's own stage. Red-first commit eff5e8af57e0588bddf73782d313fe917d8f3fc9 holds the tests; the fix commit follows it.
-next_action: Read every required CI check (config/required-status-checks.json) plus CodeQL at the new head; fix any failure from this code. Then independent re-reviews by Reviewer A and Reviewer C at that exact head (Reviewer D is retired). Then Cheek's own typed yes naming #3021 and the full head SHA, and the scorer-lock unlock at that SHA. No merge, auto-merge, queue or deploy before that.
+next_action: none; closed. The post_merge_check below still applies, and stays NOT_MEASURED until the live version endpoint reports 7ea9cd8a2fae54c083acd488d3017c4529f40a57.
 post_merge_check: After an approved release, read-only on production as the disposable fixture account: plant BREAK-4pm-2 shows the stale-stage note under seedling-range alerts; the Grow page status is not "Good" while open alerts exist; the /plants summary count equals the visible cards.
 active_writer: Claude thread session (Cheek asked on 2026-11-19 03:08 UTC: "write build specs for batches 1 and 2 then build").
 scorer_lock: src/test/alerts-stage-resolution-wiring.test.tsx is scorer-locked. Changed once, at ae838aa: the pin toContain("tentStages: stageContextTents.map((t) => t.stage)") was replaced by four toContain pins for the snapshot-scoped Dashboard wiring (snapshotTentId, tents: stageContextTents, tentStages and plantStages from dashboardStageScope). Not touched since, including round 3. Cheek brings the unlock at the fixed SHA.
@@ -30,5 +31,5 @@ reviewer_sha: none valid; new head not yet reviewed.
 session_state: No subagents, routines or production actions. Earlier review request comment (Reviewer E, ae838aa) and @codex re-check are superseded by the new head.
 claimed_by: Claude thread session, 2026-11-19 03:20 UTC
 owner: Claude thread session
-last_updated: 2026-11-28 07:40 UTC, by Claude thread session
+last_updated: 2026-11-28 09:15 UTC, by Claude thread session
 ```

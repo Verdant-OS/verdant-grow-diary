@@ -1,5 +1,11 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2";
+import {
+  decideRlsSelftestAccess,
+  RLS_SELFTEST_ENABLED_ENV,
+  RLS_SELFTEST_SECRET_ENV,
+  RLS_SELFTEST_SECRET_HEADER,
+} from "../_shared/rlsSelftestGate.ts";
 
 interface LikelyFix {
   resource: "table" | "storage";
@@ -33,9 +39,12 @@ Deno.serve(async (req) => {
   const overallStart = performance.now();
 
   try {
-    const expected = Deno.env.get("RLS_TEST_SECRET");
-    const provided = req.headers.get("x-rls-test-secret");
-    if (!expected || provided !== expected) return json({ error: "forbidden" }, 403);
+    const gate = decideRlsSelftestAccess({
+      enabledFlag: Deno.env.get(RLS_SELFTEST_ENABLED_ENV),
+      expectedSecret: Deno.env.get(RLS_SELFTEST_SECRET_ENV),
+      providedSecret: req.headers.get(RLS_SELFTEST_SECRET_HEADER),
+    });
+    if (!gate.allowed) return json({ error: gate.error }, gate.status);
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const anon = Deno.env.get("SUPABASE_ANON_KEY")!;

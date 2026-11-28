@@ -85,6 +85,7 @@ import {
 import { ACTION_OUTCOME_EVENT_TYPE } from "@/lib/actionOutcomeRules";
 
 import { supabase } from "@/integrations/supabase/client";
+import { formatStatusTransition } from "@/lib/statusTransitionLabelRules";
 
 type LoadStatus = "idle" | "loading" | "ok" | "not_found" | "error";
 
@@ -955,10 +956,7 @@ export default function AlertDetail() {
                   <li key={e.id} className="text-xs text-muted-foreground">
                     <span className="font-medium">{e.event_type}</span>
                     {e.previous_status && e.new_status ? (
-                      <span>
-                        {" "}
-                        — {e.previous_status} → {e.new_status}
-                      </span>
+                      <span> — {formatStatusTransition(e.previous_status, e.new_status)}</span>
                     ) : null}{" "}
                     <span className="opacity-70">
                       {formatDistanceToNow(new Date(e.created_at), {

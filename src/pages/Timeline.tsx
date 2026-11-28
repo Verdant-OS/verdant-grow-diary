@@ -323,6 +323,7 @@ import {
   type TimelineCoreReadState,
   type TimelineSupplementalReadSource,
 } from "@/lib/timelinePageReadStateRules";
+import { formatStatusTransition } from "@/lib/statusTransitionLabelRules";
 
 // URL query params mirroring the Pro date-range filter, matching the
 // ?start/?end convention of the environment summary report.
@@ -4212,7 +4213,7 @@ function ActionQueueEventsSection({ events }: { events: ActionQueueEvent[] }) {
                 {e.event_type}
               </span>
               <span className="text-muted-foreground">
-                {e.previous_status ?? "—"} → {e.new_status ?? "—"}
+                {formatStatusTransition(e.previous_status, e.new_status)}
               </span>
               <span
                 className="ml-auto text-muted-foreground"
@@ -4299,7 +4300,7 @@ function AlertEventsSection({ events }: { events: AlertEventRow[] }) {
                 </span>
               )}
               <span className="text-muted-foreground">
-                {e.previous_status ?? "—"} → {e.new_status ?? "—"}
+                {formatStatusTransition(e.previous_status, e.new_status)}
               </span>
               <span
                 className="ml-auto text-muted-foreground"

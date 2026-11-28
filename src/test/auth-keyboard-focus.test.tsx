@@ -110,10 +110,12 @@ describe("/auth — keyboard tab order", () => {
   it("Home/End on a tab jumps to first/last tab", async () => {
     renderAuth();
     const tabs = screen.getAllByRole("tab");
-    tabs[1].focus();
-    fireEvent.keyDown(tabs[1], { key: "End" });
-    await waitFor(() => expect(document.activeElement).toBe(tabs[2]));
-    fireEvent.keyDown(tabs[2], { key: "Home" });
+    // Two tabs since friction item 12 (Forgot password is a link, not a tab).
+    expect(tabs).toHaveLength(2);
+    tabs[0].focus();
+    fireEvent.keyDown(tabs[0], { key: "End" });
+    await waitFor(() => expect(document.activeElement).toBe(tabs[1]));
+    fireEvent.keyDown(tabs[1], { key: "Home" });
     await waitFor(() => expect(document.activeElement).toBe(tabs[0]));
   });
 

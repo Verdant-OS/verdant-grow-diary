@@ -8,15 +8,16 @@ import {
 
 describe("authModeTabRules", () => {
   it("keeps auth tab labels in a typed source of truth", () => {
+    // Friction item 12 (2026-11-19): "Forgot password" opens from its link only.
     expect(AUTH_MODE_TABS.map((tab) => [tab.value, tab.label])).toEqual([
       ["signin", "Sign in"],
       ["signup", "Create account"],
-      ["forgot", "Forgot password"],
     ]);
+    expect(getAuthModeLabel("forgot")).toBe("Forgot password");
   });
 
   it("uses a responsive tab list with gap and padding to prevent crowding", () => {
-    expect(AUTH_TAB_LIST_CLASSNAME).toContain("grid-cols-3");
+    expect(AUTH_TAB_LIST_CLASSNAME).toContain("grid-cols-2");
     expect(AUTH_TAB_LIST_CLASSNAME).toContain("gap-1");
     expect(AUTH_TAB_LIST_CLASSNAME).toContain("p-1");
     expect(AUTH_TAB_LIST_CLASSNAME).toContain("h-auto");

@@ -72,6 +72,7 @@ import {
 import { showAlertsOneTentLoopNextStep } from "@/lib/oneTentLoopNavigationRules";
 import { actionsPath, alertDetailPath, alertsPath } from "@/lib/routes";
 import { formatDistanceToNow } from "date-fns";
+import { formatStatusTransition } from "@/lib/statusTransitionLabelRules";
 
 type StatusFilter = AlertStatusRow | "all";
 type SeverityFilter = AlertSeverityRow | "all";
@@ -635,10 +636,7 @@ function AlertHistory({ alertId }: { alertId: string }) {
           <li key={e.id} className="text-[11px] text-muted-foreground">
             <span className="font-medium">{e.event_type}</span>
             {e.previous_status && e.new_status ? (
-              <span>
-                {" "}
-                — {e.previous_status} → {e.new_status}
-              </span>
+              <span> — {formatStatusTransition(e.previous_status, e.new_status)}</span>
             ) : null}{" "}
             <span className="opacity-70">
               {formatDistanceToNow(new Date(e.created_at), { addSuffix: true })}

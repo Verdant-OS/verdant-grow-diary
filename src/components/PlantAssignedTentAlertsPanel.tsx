@@ -48,11 +48,14 @@ interface Props {
    */
   plantId?: string | null;
   /**
-   * The plant's current stage. When an open alert quotes a different stage's
-   * range (it was judged before the plant moved on), the row says so. Label
-   * only: the alert stays open and is never changed here.
+   * The stage this tent's alerts are judged by now (usePlantTentAlertStage),
+   * not the plant's own stage: in a mixed tent a Flower plant's tent alerts
+   * can rightly use Veg targets. When an open alert quotes a different stage's
+   * range (it was judged before the tent moved on), the row says so. Label
+   * only: the alert stays open and is never changed here. Omitted or null
+   * shows no note.
    */
-  plantStage?: string | null;
+  tentAlertStage?: string | null;
   /**
    * Out-of-credits interception for the doctor CTA, computed by the CALLER
    * from presentation-only entitlement + usage reads (the panel itself
@@ -96,17 +99,17 @@ function AlertRowItem({
   plantId,
   tentId,
   creditGate,
-  plantStage,
+  tentAlertStage,
 }: {
   row: PlantAssignedTentAlertRow;
   plantId?: string | null;
   tentId?: string | null;
   creditGate?: AlertDoctorCreditGateView | null;
-  plantStage?: string | null;
+  tentAlertStage?: string | null;
 }) {
   const stageStaleness = assessAlertStageStaleness({
     reason: row.reason,
-    currentStage: plantStage ?? null,
+    currentStage: tentAlertStage ?? null,
   });
   // Deep-links into the plant's existing cautious-review section via the
   // shared helper (same href five other surfaces already use). Navigation
@@ -277,7 +280,7 @@ export default function PlantAssignedTentAlertsPanel({
   tentName,
   growId,
   plantId,
-  plantStage,
+  tentAlertStage,
   doctorCreditGate,
 }: Props) {
   const enabled = !!tentId;
@@ -364,7 +367,7 @@ export default function PlantAssignedTentAlertsPanel({
                   plantId={plantId ?? null}
                   tentId={tentId ?? null}
                   creditGate={doctorCreditGate ?? null}
-                  plantStage={plantStage ?? null}
+                  tentAlertStage={tentAlertStage ?? null}
                 />
               ))}
             </ul>

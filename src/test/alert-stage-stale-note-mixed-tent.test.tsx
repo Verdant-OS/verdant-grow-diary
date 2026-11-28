@@ -17,9 +17,10 @@ import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import { mapPlantRow } from "@/lib/growAdapters";
 import type { PlantRow } from "@/lib/db";
 
-const VEG_VPD = "VPD is above the veg target range. Observed 1.4 kPa (veg range 0.8–1.2 kPa).";
-const SEEDLING_VPD =
-  "VPD is above the seedling target range. Observed 1.3 kPa (seedling range 0.4–0.8 kPa).";
+// Target-range reason format (no band numbers: derived-vpd-status-ui keeps
+// VPD band tuples out of .tsx files).
+const VEG_VPD = "VPD is above the veg target range.";
+const SEEDLING_VPD = "VPD is above the seedling target range.";
 const STALE_NOTE_TO_FLOWER =
   "Checked against Seedling targets. This tent's alerts now use Flower targets, so this alert may no longer apply.";
 

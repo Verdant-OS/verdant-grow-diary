@@ -10,6 +10,12 @@
  * refreshed when today's reading derives the same alert again, so an alert
  * born under the old stage can stay open with the old stage's numbers.
  *
+ * "Now" is the stage the alert's tent is judged by today
+ * (resolveTentAlertStageForView), not one plant's own stage: in a Veg tent
+ * that also holds a Flower plant, Veg still governs that tent's alerts, so a
+ * fresh Veg-range alert is current for every plant in it (Reviewer C on
+ * #3021, round 3).
+ *
  * This module only LABELS such an alert. It never resolves, dismisses or
  * rewrites it: the grower decides. `alerts` has no stage column, so the stage
  * is read back from the reason format this app writes itself.
@@ -55,6 +61,7 @@ export interface AlertStageStaleness {
 
 export function assessAlertStageStaleness(input: {
   readonly reason: string | null | undefined;
+  /** The stage the alert's tent is judged by now; null when unknown. */
   readonly currentStage: string | null | undefined;
 }): AlertStageStaleness {
   const evaluatedStage = parseAlertEvaluatedStage(input.reason);
@@ -75,5 +82,5 @@ export function buildAlertStageStaleNote(
   evaluatedStage: Exclude<VpdStage, "unknown">,
   currentStage: Exclude<VpdStage, "unknown">,
 ): string {
-  return `Checked against ${STAGE_LABEL[evaluatedStage]} targets. This plant is now ${STAGE_LABEL[currentStage]}, so this alert may no longer apply.`;
+  return `Checked against ${STAGE_LABEL[evaluatedStage]} targets. This tent's alerts now use ${STAGE_LABEL[currentStage]} targets, so this alert may no longer apply.`;
 }

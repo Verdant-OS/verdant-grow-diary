@@ -129,3 +129,55 @@ export function resolveSnapshotAlertStage(input: SnapshotAlertStageInput): strin
     plantStages: scope.plantStages ?? null,
   }).stage;
 }
+
+export interface TentAlertStageForViewInput {
+  /** The grow the tent belongs to. */
+  readonly growId: string | null | undefined;
+  /**
+   * The grow row, once the grows read has it; null/undefined while it is
+   * unknown. Only its stage is read.
+   */
+  readonly growRow: { readonly stage?: string | null } | null | undefined;
+  /** The tent whose open alerts are on screen. */
+  readonly tentId: string | null | undefined;
+  /** This grow's tents; null/undefined while the read is pending or failed. */
+  readonly tents: ReadonlyArray<SnapshotStageScopeTent> | null | undefined;
+  /**
+   * The grow's active plants; null/undefined while the read is pending or
+   * failed.
+   */
+  readonly plants: ReadonlyArray<AlertStagePlant> | null | undefined;
+}
+
+/**
+ * The stage a tent's alerts are judged by now: the stage a confirmed reading
+ * from that tent would be judged against, through the same helper the Alerts
+ * page saves alerts with (resolveSnapshotAlertStage).
+ *
+ * Why (Reviewer C on #3021, round 3): a plant's own stage is not what its
+ * tent's alerts were judged by. In a Veg tent that also holds a Flower plant
+ * the plant vote abstains and Veg governs, so a Veg-range alert saved a
+ * minute ago is current; comparing it with the Flower plant's stage said it
+ * "may no longer apply". The staleness note compares with this stage instead.
+ *
+ * Never guess: null when the grow row, the tents or the plants are not read
+ * yet, or the tent is not one of this grow's tents (the saved alert would
+ * then have used grow-wide inputs, which this view cannot confirm).
+ */
+export function resolveTentAlertStageForView(input: TentAlertStageForViewInput): string | null {
+  const growId =
+    typeof input.growId === "string" && input.growId.trim() !== "" ? input.growId : null;
+  const tentId =
+    typeof input.tentId === "string" && input.tentId.trim() !== "" ? input.tentId : null;
+  if (growId === null || tentId === null) return null;
+  if (!input.growRow) return null;
+  if (!Array.isArray(input.tents) || !Array.isArray(input.plants)) return null;
+  if (!input.tents.some((t) => t.id === tentId)) return null;
+  return resolveSnapshotAlertStage({
+    growId,
+    growStage: input.growRow.stage ?? null,
+    tents: input.tents,
+    plants: input.plants,
+    snapshotTentId: tentId,
+  });
+}

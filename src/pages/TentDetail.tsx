@@ -528,6 +528,295 @@ export default function TentDetail() {
         testId="tent-detail-data-source-disclosure"
       />
 
+      {/* Plants come first, right under the tent header, so a grower sees
+          which plants are in this tent without scrolling past the readings.
+          The environment metrics follow below. */}
+      <div className="mb-6" data-testid="tent-detail-plants-first">
+        {plantListRead.message && (
+          <div
+            role={plantListRead.canRetry ? "alert" : "status"}
+            className="glass rounded-2xl p-4 mb-4"
+            data-testid="tent-plant-list-read-status"
+          >
+            <p>{plantListRead.message}</p>
+            {plantListRead.availableNotice && (
+              <p className="text-sm text-muted-foreground">{plantListRead.availableNotice}</p>
+            )}
+            {plantListRead.canRetry && (
+              <Button
+                variant="outline"
+                className="mt-2"
+                onClick={() => {
+                  void activePlantsQuery.refetch();
+                  void allPlantsQuery.refetch();
+                }}
+              >
+                Retry plant list
+              </Button>
+            )}
+          </div>
+        )}
+        {(() => {
+          if (!plantListRead.showRows) return null;
+          const tabsVm = buildTentPlantTabsViewModel({
+            plants: visibilityPlants.map((p) => ({
+              id: p.id,
+              name: p.name,
+              isArchived: p.isArchived === true || p.growArchived === true,
+            })),
+            includeArchived: rosterIncludeArchived,
+            selectedPlantId: selectedPlantTabId,
+          });
+          const rosterPlantSource =
+            tabsVm.selectedPlantId == null
+              ? visibilityPlants
+              : visibilityPlants.filter((p) => p.id === tabsVm.selectedPlantId);
+          const scopedRosterKnown =
+            plantListRead.complete ||
+            rosterPlantSource.some((plant) => rosterIncludeArchived || plant.isArchived !== true);
+          return (
+            <div className="space-y-3">
+              <TentPlantTabs viewModel={tabsVm} onSelect={setSelectedPlantTabId} />
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="tent-plant-tabs-current-scope"
+              >
+                {tabsVm.selectedPlantCopy ?? tabsVm.allPlantsCopy}
+              </p>
+              <p
+                className="text-[11px] text-muted-foreground"
+                data-testid="tent-plant-tabs-shared-env-reminder"
+              >
+                {tabsVm.sharedEnvironmentReminderCopy}
+              </p>
+              <TentPlantRosterPanel
+                onToggleIncludeArchived={handleToggleRosterIncludeArchived}
+                quickActionContext={{
+                  tentId: id ?? null,
+                  tentName: tent.name ?? null,
+                  growId: tent.growId ?? null,
+                }}
+                viewModel={{
+                  ...buildTentPlantRosterViewModel({
+                    tentId: id ?? null,
+                    relationshipKnown: scopedRosterKnown,
+                    includeArchived: rosterIncludeArchived,
+                    plants: rosterPlantSource.map((p) => {
+                      const a = rosterActivity.byPlantId[p.id];
+                      return {
+                        id: p.id,
+                        name: p.name,
+                        strain: p.strain,
+                        stage: p.stage,
+                        tentId: p.tentId,
+                        isArchived: p.isArchived === true || p.growArchived === true,
+                        latestLogAt: a?.latestLogAt ?? null,
+                        hasRecentPhoto: a?.hasRecentPhoto ?? false,
+                        harvestWatchPublicState: a?.harvestWatchPublicState ?? null,
+                      };
+                    }),
+                    tentSensorContextLabel: sensorHeader.sourceLabel ?? null,
+                  }),
+                  ...(plantListRead.countNotice
+                    ? { headerCountsCopy: plantListRead.countNotice }
+                    : {}),
+                }}
+              />
+              {scopedRosterKnown && (
+                <TentPlantActivityPanels
+                  isLoading={rosterActivity.isLoading}
+                  viewModel={buildTentPlantActivityPanelsViewModel({
+                    plants: visibilityPlants.map((p) => ({
+                      id: p.id,
+                      name: p.name,
+                      strain: p.strain,
+                      stage: p.stage,
+                      isArchived: p.isArchived === true || p.growArchived === true,
+                    })),
+                    activityByPlantId: rosterActivity.byPlantId,
+                    includeArchived: rosterIncludeArchived,
+                    selectedPlantId: tabsVm.selectedPlantId,
+                    tentId: id ?? null,
+                    tentName: tent.name ?? null,
+                    growId: tent.growId ?? null,
+                  })}
+                  viewer={{ currentUserId: user?.id ?? null }}
+                  tentId={id ?? null}
+                  growId={tent.growId ?? null}
+                />
+              )}
+            </div>
+          );
+        })()}
+
+        <div className="glass rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <h2 className="font-display font-semibold">
+              Plants in this tent
+              {plantListRead.complete && (
+                <>
+                  {" "}
+                  ({activeCount}
+                  {hasArchived && allPlants.length > activeCount
+                    ? ` active · ${allPlants.length - activeCount} archived`
+                    : ""}
+                  )
+                </>
+              )}
+            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {hasArchived && (
+                <ArchivedPlantsToggle
+                  pressed={showArchived}
+                  onPressedChange={handleToggleRosterIncludeArchived}
+                  testId="tent-detail-show-archived-toggle"
+                />
+              )}
+              <AddExistingPlantDialog tentId={id ?? ""} growId={tent.growId ?? null} />
+              <CreatePlantDialog
+                defaultTentId={id}
+                defaultGrowId={tent.growId ?? undefined}
+                trigger={
+                  <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
+                    <Plus className="h-4 w-4" /> Add Plant to This Tent
+                  </Button>
+                }
+              />
+            </div>
+          </div>
+          {visiblePlants.length === 0 ? (
+            plantListRead.complete ? (
+              <div
+                className="flex flex-col items-start gap-3 py-4"
+                data-testid="tent-detail-plants-empty"
+              >
+                <p className="text-sm text-muted-foreground">
+                  {activeCount === 0 && hasArchived
+                    ? "No active plants in this tent."
+                    : "No plants in this tent yet."}
+                </p>
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="tent-detail-plants-empty-one-tent-loop-copy"
+                >
+                  Add or open a plant to continue the One-Tent Loop.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <AddExistingPlantDialog
+                    tentId={id ?? ""}
+                    growId={tent.growId ?? null}
+                    trigger={
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1"
+                        data-testid="tent-detail-empty-add-existing-plant"
+                      >
+                        Add Existing Plant
+                      </Button>
+                    }
+                  />
+                  <CreatePlantDialog
+                    defaultTentId={id}
+                    defaultGrowId={tent.growId ?? undefined}
+                    trigger={
+                      <Button
+                        size="sm"
+                        className="gradient-leaf text-primary-foreground gap-1"
+                        data-testid="tent-detail-empty-add-plant"
+                      >
+                        <Plus className="h-4 w-4" /> Add Plant to This Tent
+                      </Button>
+                    }
+                  />
+                </div>
+              </div>
+            ) : null
+          ) : (
+            <div
+              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"
+              data-testid="tent-detail-plants-grid"
+            >
+              {visiblePlants.map((p) => {
+                const archivedLabel = getArchivedPlantLabel(p);
+                const isInactive = archivedLabel.kind !== "active";
+                return (
+                  <div
+                    key={p.id}
+                    className={cn(
+                      "rounded-xl border border-border/40 overflow-hidden hover:border-primary/50 transition relative",
+                      isInactive && "opacity-70",
+                    )}
+                    data-testid="tent-detail-plant-card"
+                    data-archived={isInactive ? "true" : "false"}
+                    data-archived-kind={archivedLabel.kind}
+                  >
+                    <Link to={plantDetailPath(p.id, { tentId: tent.id })} className="block">
+                      <PlantPhoto
+                        src={p.photo}
+                        alt={p.name}
+                        className="aspect-video"
+                        caption="No plant photo yet"
+                      />
+                      <div className="p-3">
+                        <div className="flex items-center justify-between gap-2 pr-8">
+                          <span
+                            className="font-medium text-sm"
+                            data-testid="tent-detail-plant-name"
+                          >
+                            {p.name}
+                          </span>
+                          <StageBadge stage={p.stage} />
+                        </div>
+                        <p
+                          className="text-xs text-muted-foreground mt-0.5"
+                          data-testid="tent-detail-plant-strain"
+                        >
+                          {p.strain}
+                        </p>
+                        {isInactive && (
+                          <Badge
+                            variant="outline"
+                            data-testid="tent-detail-plant-archived-badge"
+                            data-archived-kind={archivedLabel.kind}
+                            className="mt-1 text-[10px] gap-1 border-amber-500/40 text-amber-300"
+                          >
+                            {archivedLabel.kind === "merged" ? (
+                              <GitMerge className="h-3 w-3" />
+                            ) : (
+                              <Archive className="h-3 w-3" />
+                            )}
+                            {archivedLabel.kind === "merged" ? "Merged / Archived" : "Archived"}
+                          </Badge>
+                        )}
+                      </div>
+                    </Link>
+                    <div className="absolute top-2 right-2">
+                      <PlantCardActionsMenu
+                        plant={{
+                          id: p.id,
+                          name: p.name,
+                          strain: p.strain,
+                          stage: p.stage ?? "",
+                          health: p.health,
+                          startedAt: p.startedAt,
+                          tentId: p.tentId ?? tent.id,
+                          growId: p.growId ?? tent.growId ?? null,
+                          lastNote: p.lastNote,
+                          isArchived: p.isArchived ?? false,
+                          photo: p.photo ?? null,
+                          plantType: p.plantType ?? null,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* One-Tent Loop continuity card. Enable "Open plant" only when
           a single safe plant target exists on this tent. With zero or
           multiple plants, keep the calm safe disabled state — we do
@@ -827,287 +1116,6 @@ export default function TentDetail() {
             <FirstPlantMemoryCta prefill={prefill} testId="tent-detail-first-plant-memory-cta" />
           );
         })()}
-
-      {plantListRead.message && (
-        <div
-          role={plantListRead.canRetry ? "alert" : "status"}
-          className="glass rounded-2xl p-4 mb-4"
-          data-testid="tent-plant-list-read-status"
-        >
-          <p>{plantListRead.message}</p>
-          {plantListRead.availableNotice && (
-            <p className="text-sm text-muted-foreground">{plantListRead.availableNotice}</p>
-          )}
-          {plantListRead.canRetry && (
-            <Button
-              variant="outline"
-              className="mt-2"
-              onClick={() => {
-                void activePlantsQuery.refetch();
-                void allPlantsQuery.refetch();
-              }}
-            >
-              Retry plant list
-            </Button>
-          )}
-        </div>
-      )}
-      {(() => {
-        if (!plantListRead.showRows) return null;
-        const tabsVm = buildTentPlantTabsViewModel({
-          plants: visibilityPlants.map((p) => ({
-            id: p.id,
-            name: p.name,
-            isArchived: p.isArchived === true || p.growArchived === true,
-          })),
-          includeArchived: rosterIncludeArchived,
-          selectedPlantId: selectedPlantTabId,
-        });
-        const rosterPlantSource =
-          tabsVm.selectedPlantId == null
-            ? visibilityPlants
-            : visibilityPlants.filter((p) => p.id === tabsVm.selectedPlantId);
-        const scopedRosterKnown =
-          plantListRead.complete ||
-          rosterPlantSource.some((plant) => rosterIncludeArchived || plant.isArchived !== true);
-        return (
-          <div className="space-y-3">
-            <TentPlantTabs viewModel={tabsVm} onSelect={setSelectedPlantTabId} />
-            <p
-              className="text-xs text-muted-foreground"
-              data-testid="tent-plant-tabs-current-scope"
-            >
-              {tabsVm.selectedPlantCopy ?? tabsVm.allPlantsCopy}
-            </p>
-            <p
-              className="text-[11px] text-muted-foreground"
-              data-testid="tent-plant-tabs-shared-env-reminder"
-            >
-              {tabsVm.sharedEnvironmentReminderCopy}
-            </p>
-            <TentPlantRosterPanel
-              onToggleIncludeArchived={handleToggleRosterIncludeArchived}
-              quickActionContext={{
-                tentId: id ?? null,
-                tentName: tent.name ?? null,
-                growId: tent.growId ?? null,
-              }}
-              viewModel={{
-                ...buildTentPlantRosterViewModel({
-                  tentId: id ?? null,
-                  relationshipKnown: scopedRosterKnown,
-                  includeArchived: rosterIncludeArchived,
-                  plants: rosterPlantSource.map((p) => {
-                    const a = rosterActivity.byPlantId[p.id];
-                    return {
-                      id: p.id,
-                      name: p.name,
-                      strain: p.strain,
-                      stage: p.stage,
-                      tentId: p.tentId,
-                      isArchived: p.isArchived === true || p.growArchived === true,
-                      latestLogAt: a?.latestLogAt ?? null,
-                      hasRecentPhoto: a?.hasRecentPhoto ?? false,
-                      harvestWatchPublicState: a?.harvestWatchPublicState ?? null,
-                    };
-                  }),
-                  tentSensorContextLabel: sensorHeader.sourceLabel ?? null,
-                }),
-                ...(plantListRead.countNotice
-                  ? { headerCountsCopy: plantListRead.countNotice }
-                  : {}),
-              }}
-            />
-            {scopedRosterKnown && (
-              <TentPlantActivityPanels
-                isLoading={rosterActivity.isLoading}
-                viewModel={buildTentPlantActivityPanelsViewModel({
-                  plants: visibilityPlants.map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                    strain: p.strain,
-                    stage: p.stage,
-                    isArchived: p.isArchived === true || p.growArchived === true,
-                  })),
-                  activityByPlantId: rosterActivity.byPlantId,
-                  includeArchived: rosterIncludeArchived,
-                  selectedPlantId: tabsVm.selectedPlantId,
-                  tentId: id ?? null,
-                  tentName: tent.name ?? null,
-                  growId: tent.growId ?? null,
-                })}
-                viewer={{ currentUserId: user?.id ?? null }}
-                tentId={id ?? null}
-                growId={tent.growId ?? null}
-              />
-            )}
-          </div>
-        );
-      })()}
-
-      <div className="glass rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-          <h2 className="font-display font-semibold">
-            Plants in this tent
-            {plantListRead.complete && (
-              <>
-                {" "}
-                ({activeCount}
-                {hasArchived && allPlants.length > activeCount
-                  ? ` active · ${allPlants.length - activeCount} archived`
-                  : ""}
-                )
-              </>
-            )}
-          </h2>
-          <div className="flex flex-wrap items-center gap-2">
-            {hasArchived && (
-              <ArchivedPlantsToggle
-                pressed={showArchived}
-                onPressedChange={handleToggleRosterIncludeArchived}
-                testId="tent-detail-show-archived-toggle"
-              />
-            )}
-            <AddExistingPlantDialog tentId={id ?? ""} growId={tent.growId ?? null} />
-            <CreatePlantDialog
-              defaultTentId={id}
-              defaultGrowId={tent.growId ?? undefined}
-              trigger={
-                <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
-                  <Plus className="h-4 w-4" /> Add Plant to This Tent
-                </Button>
-              }
-            />
-          </div>
-        </div>
-        {visiblePlants.length === 0 ? (
-          plantListRead.complete ? (
-            <div
-              className="flex flex-col items-start gap-3 py-4"
-              data-testid="tent-detail-plants-empty"
-            >
-              <p className="text-sm text-muted-foreground">
-                {activeCount === 0 && hasArchived
-                  ? "No active plants in this tent."
-                  : "No plants in this tent yet."}
-              </p>
-              <p
-                className="text-xs text-muted-foreground"
-                data-testid="tent-detail-plants-empty-one-tent-loop-copy"
-              >
-                Add or open a plant to continue the One-Tent Loop.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <AddExistingPlantDialog
-                  tentId={id ?? ""}
-                  growId={tent.growId ?? null}
-                  trigger={
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1"
-                      data-testid="tent-detail-empty-add-existing-plant"
-                    >
-                      Add Existing Plant
-                    </Button>
-                  }
-                />
-                <CreatePlantDialog
-                  defaultTentId={id}
-                  defaultGrowId={tent.growId ?? undefined}
-                  trigger={
-                    <Button
-                      size="sm"
-                      className="gradient-leaf text-primary-foreground gap-1"
-                      data-testid="tent-detail-empty-add-plant"
-                    >
-                      <Plus className="h-4 w-4" /> Add Plant to This Tent
-                    </Button>
-                  }
-                />
-              </div>
-            </div>
-          ) : null
-        ) : (
-          <div
-            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"
-            data-testid="tent-detail-plants-grid"
-          >
-            {visiblePlants.map((p) => {
-              const archivedLabel = getArchivedPlantLabel(p);
-              const isInactive = archivedLabel.kind !== "active";
-              return (
-                <div
-                  key={p.id}
-                  className={cn(
-                    "rounded-xl border border-border/40 overflow-hidden hover:border-primary/50 transition relative",
-                    isInactive && "opacity-70",
-                  )}
-                  data-testid="tent-detail-plant-card"
-                  data-archived={isInactive ? "true" : "false"}
-                  data-archived-kind={archivedLabel.kind}
-                >
-                  <Link to={plantDetailPath(p.id, { tentId: tent.id })} className="block">
-                    <PlantPhoto
-                      src={p.photo}
-                      alt={p.name}
-                      className="aspect-video"
-                      caption="No plant photo yet"
-                    />
-                    <div className="p-3">
-                      <div className="flex items-center justify-between gap-2 pr-8">
-                        <span className="font-medium text-sm" data-testid="tent-detail-plant-name">
-                          {p.name}
-                        </span>
-                        <StageBadge stage={p.stage} />
-                      </div>
-                      <p
-                        className="text-xs text-muted-foreground mt-0.5"
-                        data-testid="tent-detail-plant-strain"
-                      >
-                        {p.strain}
-                      </p>
-                      {isInactive && (
-                        <Badge
-                          variant="outline"
-                          data-testid="tent-detail-plant-archived-badge"
-                          data-archived-kind={archivedLabel.kind}
-                          className="mt-1 text-[10px] gap-1 border-amber-500/40 text-amber-300"
-                        >
-                          {archivedLabel.kind === "merged" ? (
-                            <GitMerge className="h-3 w-3" />
-                          ) : (
-                            <Archive className="h-3 w-3" />
-                          )}
-                          {archivedLabel.kind === "merged" ? "Merged / Archived" : "Archived"}
-                        </Badge>
-                      )}
-                    </div>
-                  </Link>
-                  <div className="absolute top-2 right-2">
-                    <PlantCardActionsMenu
-                      plant={{
-                        id: p.id,
-                        name: p.name,
-                        strain: p.strain,
-                        stage: p.stage ?? "",
-                        health: p.health,
-                        startedAt: p.startedAt,
-                        tentId: p.tentId ?? tent.id,
-                        growId: p.growId ?? tent.growId ?? null,
-                        lastNote: p.lastNote,
-                        isArchived: p.isArchived ?? false,
-                        photo: p.photo ?? null,
-                        plantType: p.plantType ?? null,
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

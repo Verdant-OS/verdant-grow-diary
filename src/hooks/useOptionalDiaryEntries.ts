@@ -1,38 +1,34 @@
-import { createElement, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createElement, useContext, useEffect, useRef, type ReactNode } from "react";
 import { QueryClientContext } from "@tanstack/react-query";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 
-function sameDiaryRows(prev: unknown, next: unknown): boolean {
-  if (prev === next) return true;
-  if (!Array.isArray(prev) || !Array.isArray(next) || prev.length !== next.length) return false;
-  for (let i = 0; i < prev.length; i += 1) {
-    if (prev[i] !== next[i]) return false;
-  }
-  return true;
-}
+type RowsRef = { current: unknown };
 
-function DiaryEntrySource({ onData }: { onData: (data: unknown) => void }) {
+function DiaryEntrySource({ rowsRef }: { rowsRef: RowsRef }) {
   const query = useDiaryEntries();
   useEffect(() => {
-    onData(query.data);
-  }, [onData, query.data]);
+    rowsRef.current = query.data;
+  }, [rowsRef, query.data]);
   return null;
 }
 
 /**
- * Recent diary rows for the repeat-note check. The source is rendered only
- * when a QueryClient is already mounted, so Quick Log tests that have no
- * provider keep working. With a provider, this is the same `diary_entries`
- * query Recent Activity uses.
+ * Recent diary rows for the repeat-note check, read at save time through
+ * `rowsRef.current`. The rows go into a ref, not state: Quick Log never
+ * re-renders because the diary query returned, so a query (or a test mock)
+ * that hands back a fresh array on every call cannot start a render loop.
+ * The source is rendered only when a QueryClient is already mounted, so
+ * Quick Log tests that have no provider keep working. With a provider, this
+ * is the same `diary_entries` query Recent Activity uses.
  */
-export function useOptionalDiaryEntries(): { data: unknown; source: ReactNode } {
+export function useOptionalDiaryEntries(): {
+  rowsRef: { readonly current: unknown };
+  source: ReactNode;
+} {
   const client = useContext(QueryClientContext);
-  const [data, setData] = useState<unknown>(undefined);
-  const onData = useCallback((next: unknown) => {
-    setData((prev) => (sameDiaryRows(prev, next) ? prev : next));
-  }, []);
+  const rowsRef = useRef<unknown>(undefined);
   return {
-    data: client ? data : undefined,
-    source: client ? createElement(DiaryEntrySource, { onData }) : null,
+    rowsRef,
+    source: client ? createElement(DiaryEntrySource, { rowsRef }) : null,
   };
 }

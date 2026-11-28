@@ -170,8 +170,7 @@ export default function PlantQuickLog({
   const { save } = useQuickLogV2Save();
   // Saved diary rows, read while the sheet is open, for the repeat-note block.
   const diaryEntries = useOptionalDiaryEntries();
-  const recentDiaryRef = useRef(diaryEntries.data);
-  recentDiaryRef.current = diaryEntries.data;
+  const recentDiaryRef = diaryEntries.rowsRef;
   // One idempotency key per LOGICAL submission (D-B2). Held in a ref, not
   // state: it is never rendered, and a stale render must never hand the
   // server a key that does not match the payload being sent.

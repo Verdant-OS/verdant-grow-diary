@@ -456,8 +456,7 @@ export default function QuickLog({
   const activeTents = useMemo(() => tentsQuery.data ?? [], [tentsQuery.data]);
   const queryClient = useQueryClient();
   const diaryEntries = useOptionalDiaryEntries();
-  const recentDiaryRef = useRef(diaryEntries.data);
-  recentDiaryRef.current = diaryEntries.data;
+  const recentDiaryRef = diaryEntries.rowsRef;
   const { save: saveViaRpc } = useQuickLogV2Save();
   const verifiedPublicStarterWatering = isVerifiedPublicStarterWateringHandoff(
     prefill,

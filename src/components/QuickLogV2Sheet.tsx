@@ -522,8 +522,7 @@ function QuickLogV2SheetForOwner({
   // Saved diary rows, read while the sheet is open, so a note saved on
   // another device or before a reload still blocks its repeat.
   const diaryEntries = useOptionalDiaryEntries();
-  const recentDiaryRef = useRef(diaryEntries.data);
-  recentDiaryRef.current = diaryEntries.data;
+  const recentDiaryRef = diaryEntries.rowsRef;
   const sessionNotesRef = useRef<
     Array<{ plantId: string; note: string; eventType: string; savedAt: string }>
   >([]);

@@ -325,8 +325,7 @@ export default function QuickLogAllActivitiesSection({
   onPendingPhotoChange,
 }: QuickLogAllActivitiesSectionProps) {
   const diaryEntries = useOptionalDiaryEntries();
-  const recentDiaryRef = useRef(diaryEntries.data);
-  recentDiaryRef.current = diaryEntries.data;
+  const recentDiaryRef = diaryEntries.rowsRef;
   const currentTarget = useMemo(
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
     [growId, plantId, tentId],

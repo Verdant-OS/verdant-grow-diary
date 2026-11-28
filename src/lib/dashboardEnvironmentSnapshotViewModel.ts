@@ -73,6 +73,25 @@ export interface MetricView {
   cohortInstant?: true;
 }
 
+/**
+ * True only for the one proven equivalence between a canonical VPD and a
+ * cohort whose capture refs never match: a Quick Log reading. Its canonical
+ * VPD names the diary entry (`diary:<id>`) and its cohort rows are synthetic
+ * manual sensor rows of one capture (`sensor:<ms>:manual`). A canonical VPD
+ * that names a sensor row, or a cohort of another family or of several
+ * captures, is another capture and stays off the card (Codex P2 on #3110 at
+ * f403ea8d).
+ */
+function isQuickLogDiaryCapture(
+  canonicalRefs: readonly (string | null)[] | null | undefined,
+  cohortRefs: readonly (string | null)[],
+): boolean {
+  if (!captureRefsKnown(canonicalRefs) || !captureRefsKnown(cohortRefs)) return false;
+  if (!canonicalRefs.every((ref) => ref.startsWith("diary:"))) return false;
+  if (!cohortRefs.every((ref) => /^sensor:\d+:manual(?::dev:.+)?$/.test(ref))) return false;
+  return cohortRefs.every((ref) => captureRefsMatch(ref, cohortRefs[0]));
+}
+
 /** Where a shown VPD number came from. */
 export type VpdOrigin = "stored" | "calculated";
 
@@ -620,8 +639,7 @@ export function buildTentSnapshotView(
     const cohortInstant =
       sameInstant(canonical.capturedAt, snap.ts) &&
       canonical.source === provenance &&
-      captureRefsKnown(cohortRefs) &&
-      cohortRefs.every((ref) => captureRefsMatch(ref, cohortRefs[0]));
+      isQuickLogDiaryCapture(canonical.captureRefs, cohortRefs);
     metrics[2] = {
       ...ownCaptureVpdMetric({ ...canonical, kpa: canonical.kpa }, stage, now),
       ...(cohortInstant ? { cohortInstant: true as const } : {}),

@@ -241,6 +241,47 @@ describe("fieldNotebookReadingSlotsFromSnapshot", () => {
       }
     });
 
+    it("leaves off a same-instant VPD from another device's capture (Codex P2 on #3110)", () => {
+      const ms = NOW_MS - 2 * MINUTE_MS;
+      const iso = new Date(ms).toISOString();
+      const rows = [
+        {
+          ts: iso,
+          captured_at: iso,
+          metric: "temperature_c",
+          value: 25,
+          source: "live",
+          quality: "ok",
+          device_id: "device-a",
+        },
+        {
+          ts: iso,
+          captured_at: iso,
+          metric: "humidity_pct",
+          value: 60,
+          source: "live",
+          quality: "ok",
+          device_id: "device-a",
+        },
+      ] as BuildTentSnapshotInput[];
+      const v = buildTentSnapshotView(rows, "veg", NOW_MS, {
+        canonicalVpd: {
+          kpa: 1.4,
+          capturedAt: iso,
+          source: "live",
+          sourceLabel: "Live sensor",
+          ageText: "2m ago",
+          captureRefs: [`sensor:${ms}:live:dev:device-b`],
+        },
+      });
+      const vpd = v.metrics.find((m) => m.key === "vpd");
+      expect(vpd?.cohortInstant).toBeUndefined();
+      expect(fieldNotebookReadingSlotsFromSnapshot(v, NOW_MS).map((s) => s.label)).toEqual([
+        "TEMP",
+        "RH",
+      ]);
+    });
+
     it("still leaves off a same-instant VPD that is not ok", () => {
       const slots = fieldNotebookReadingSlotsFromSnapshot(
         view({

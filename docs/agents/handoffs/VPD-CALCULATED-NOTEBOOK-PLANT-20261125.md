@@ -9,7 +9,7 @@ fix: client only. buildTentSnapshotView marks an own-capture VPD `cohortInstant`
 branch: posthog-self-driving/fixvpd-show-calculated-vpd-on-notebook-978e2d (name fixed by the PostHog run)
 base: verdant-grow-diary at 19dd62a9e65d
 pr: draft, opened from this branch; the PR body carries the head SHA
-state: pushed draft
+state: open PR (not draft); review fixes pushed 2026-11-28
 next_action: dispatch ci.yml on the branch (draft PRs skip it), then request one independent exact-head review.
 post_merge_check: once live /version.json reports the merged SHA, read only, signed in as the disposable fixture account: after a Quick Log temperature and RH on Fixture Tent A, the notebook card VPD tile matches the tent panel VPD, and the plant page Current Environment VPD shows the same value with "Calculated from temperature and RH". NOT_MEASURED until then.
 decisions: (1) Do not change sameCapture in buildTentSnapshotView: its identity rules carry many review decisions, and the panel already shows the right value. (2) The card keeps only an ok same-instant VPD; a stale or degraded own-capture VPD stays off the card as before. (3) The plant top tile (PlantStatusStrip) stays a freshness and source tile; adding a value there is a product call (#3109).
@@ -21,10 +21,12 @@ files_touched: src/lib/dashboardEnvironmentSnapshotViewModel.ts; src/lib/fieldNo
 files_remaining: none planned
 not_in_scope: the Environment strip mixing a CSV VPD with a manual pair (#3108 last item); plant top tile value (#3109); LatestSnapshotQuickLogMerge keeping an older diary ref after a manual win; schema, RLS, auth, edge, migrations.
 blockers: none in code
+review_fixes (2026-11-28, new holder): both Codex P2s at f403ea8d fixed. (1) The card's same-instant VPD exception now holds only for the proven Quick Log case: every canonical ref is a diary ref and every cohort ref is one manual sensor capture (isQuickLogDiaryCapture). A canonical VPD that names another sensor capture stays off the card. (2) The plant panel calculates VPD only when the temperature and RH rows it picked at the latest instant share a capture ref (tempAndRhShareCapture); two devices or sources at one instant stay Unknown. Base merged in (no conflicts).
+review_fixes_evidence: local vitest BLOCKED (bun install --frozen-lockfile gets 403 on the pinned private registry). RED/GREEN measured instead by running the rule functions directly with bun on the same fixtures: with the fixes set aside, other-device VPD reached the card (TEMP,RH,VPD) and mixed-capture plant VPD showed 1.27 kPa; with them, TEMP,RH and Unknown. The Quick Log case still shows TEMP,RH,VPD and 1.27 kPa. Hosted CI is the gate.
 reviewer_seat: one eligible independent reviewer at the exact head (not this session)
 reviewer_sha: none yet
 session_state: PostHog self-driving cloud run; no routines, no paused workflows
-claimed_by: Claude (PostHog self-driving run), 2026-11-25 17:30 UTC
-owner: Claude (PostHog self-driving run)
-last_updated: 2026-11-25 17:30 UTC, by Claude (holder)
+claimed_by: Claude (thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsRxJF5jtG18unEDBg5dBGg2), 2026-11-28 11:33 UTC, on Matthew's 2026-11-28 instruction to take over the PostHog agent's PRs; earlier holder: Claude (PostHog self-driving run), 2026-11-25 17:30 UTC
+owner: Claude (thread session cmsg_01P7pGxx3V5wxVuLXvJUxaGsRxJF5jtG18unEDBg5dBGg2)
+last_updated: 2026-11-28 11:33 UTC, by Claude (holder)
 ```

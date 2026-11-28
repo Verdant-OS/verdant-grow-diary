@@ -137,6 +137,29 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
     expect(tempOnly.metrics.find((m) => m.key === "vpd")?.hasValue).toBe(false);
   });
 
+  it("never calculates VPD from a temperature and an RH of different captures (Codex P2 on #3110)", () => {
+    const nowMs = Date.parse("2026-11-24T12:00:00.000Z");
+    const ts = new Date(nowMs - 2 * 60_000).toISOString();
+    const vpd = buildPlantTentEnvironmentView(
+      [
+        { ts, metric: "temperature_c", value: 25, source: "live", device_id: "device-a" },
+        { ts, metric: "humidity_pct", value: 60, source: "csv", device_id: "device-b" },
+      ],
+      nowMs,
+    ).metrics.find((m) => m.key === "vpd")!;
+    expect(vpd.display).toBe("Unknown");
+    expect(vpd.originLabel).toBeUndefined();
+
+    const twoDevices = buildPlantTentEnvironmentView(
+      [
+        { ts, metric: "temperature_c", value: 25, source: "live", device_id: "device-a" },
+        { ts, metric: "humidity_pct", value: 60, source: "live", device_id: "device-b" },
+      ],
+      nowMs,
+    ).metrics.find((m) => m.key === "vpd")!;
+    expect(twoDevices.hasValue).toBe(false);
+  });
+
   it("names a calculated VPD's origin under its value on the panel", () => {
     const src = read("src/components/PlantTentEnvironmentPanel.tsx");
     expect(src).toContain("m.originLabel");

@@ -18,6 +18,8 @@ import {
   type SensorSnapshot,
 } from "@/lib/sensorSnapshot";
 import { formatSensorSourceLabel } from "@/lib/manualSensorSourceLabel";
+import { captureRefsMatch, rowCaptureRef } from "@/lib/sensorCaptureRefRules";
+import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 import { calculateVPD } from "@/lib/sensors/calculateVPD";
 import { TENTS_LIST_VPD_ORIGIN_COPY } from "@/lib/tentsListVpdRules";
 import {
@@ -131,6 +133,25 @@ function metric(
   };
 }
 
+/**
+ * True when the temperature and RH rows the snapshot picked at its latest
+ * instant (first match, as `snapshotFromReadings` selects them) are one
+ * capture. Two devices or sources reporting at one instant are not a pair, so
+ * no VPD is calculated from them (Codex P2 on #3110 at f403ea8d).
+ */
+function tempAndRhShareCapture(rows: readonly SensorReadingLike[], ts: string | null): boolean {
+  if (ts === null) return false;
+  const latestMs = Date.parse(ts);
+  const latest = rows.filter((row) => {
+    const at = resolveSensorObservationTime(row);
+    return at !== null && Date.parse(at) === latestMs;
+  });
+  const temp = latest.find((row) => row.metric === "temperature_c");
+  const rh = latest.find((row) => row.metric === "humidity_pct");
+  if (!temp || !rh) return false;
+  return captureRefsMatch(rowCaptureRef(temp), rowCaptureRef(rh));
+}
+
 export function buildPlantTentEnvironmentView(
   rows: SensorReadingLike[] | null | undefined,
   now: number = Date.now(),
@@ -141,7 +162,10 @@ export function buildPlantTentEnvironmentView(
   if (!snap) return EMPTY_VIEW;
   const stale = isStale(snap.ts, now, undefined, snap.source);
   const tempSymbol = getTemperatureUnitSymbol(tempUnit);
-  const calculatedVpd = snap.vpd === null && !stale ? calculateVPD(snap.temp, snap.rh) : null;
+  const calculatedVpd =
+    snap.vpd === null && !stale && tempAndRhShareCapture(rows, snap.ts)
+      ? calculateVPD(snap.temp, snap.rh)
+      : null;
   const vpdMetric =
     calculatedVpd === null
       ? metric("vpd", "VPD", snap.vpd, " kPa", 2)

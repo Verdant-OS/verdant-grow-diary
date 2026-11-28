@@ -139,7 +139,8 @@ function metric(
  * capture. Two devices or sources reporting at one instant are not a pair, so
  * no VPD is calculated from them (Codex P2 on #3110 at f403ea8d).
  */
-function tempAndRhShareCapture(rows: readonly SensorReadingLike[], ts: string): boolean {
+function tempAndRhShareCapture(rows: readonly SensorReadingLike[], ts: string | null): boolean {
+  if (ts === null) return false;
   const latestMs = Date.parse(ts);
   const latest = rows.filter((row) => {
     const at = resolveSensorObservationTime(row);

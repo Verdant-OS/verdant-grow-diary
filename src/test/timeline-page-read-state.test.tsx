@@ -2441,3 +2441,44 @@ describe("Timeline mounted filter reset (QOL-09)", () => {
     expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
   });
 });
+
+describe("Timeline mobile touch targets (VER-508)", () => {
+  beforeEach(() => {
+    harness.executeQuery.mockReset();
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries" && !isOlderPage(spec)) {
+        return { data: [diaryEntry("entry-new", "Newest retained entry")], error: null, count: 2 };
+      }
+      return defaultResult(spec);
+    });
+    Object.assign(harness.growsState, {
+      activeGrow: GROW_A,
+      activeGrowId: GROW_A.id,
+      grows: [GROW_A],
+      loading: false,
+      error: null,
+    });
+  });
+
+  it("gives filter chips, small buttons and Load older a 44px minimum below the sm breakpoint", async () => {
+    renderTimeline();
+
+    expect(await screen.findByText("Newest retained entry")).toBeInTheDocument();
+    const sensorChips = within(screen.getByTestId("timeline-sensor-source-filter")).getAllByRole(
+      "button",
+    );
+    expect(sensorChips.length).toBeGreaterThan(0);
+    const targets = [
+      ...sensorChips,
+      screen.getByRole("button", { name: /^Vegetative/i }),
+      screen.getByTestId("timeline-clear-filters"),
+      screen.getByTestId("timeline-next-missing-action"),
+      screen.getByTestId("timeline-load-older"),
+      screen.getByTestId("timeline-env-summary-shortcut"),
+    ];
+    for (const target of targets) {
+      expect(target).toHaveClass("min-h-11");
+      expect(target.className).not.toMatch(/(^|\s)min-h-(?!11(\s|$))/);
+    }
+  });
+});

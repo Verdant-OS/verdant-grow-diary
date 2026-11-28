@@ -212,6 +212,20 @@ export type GrowTentListState =
   | { status: "unavailable" }
   | { status: "ok"; tents: Array<{ id: string; name: string }> };
 
+/** Tent rows with an id, named for display; a blank name reads "Unnamed tent". */
+export function toGrowTentListEntries(rows: unknown): Array<{ id: string; name: string }> {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => (row ?? {}) as { id?: unknown; name?: unknown })
+    .filter((row): row is { id: string; name?: unknown } => {
+      return typeof row.id === "string" && row.id.length > 0;
+    })
+    .map((row) => ({
+      id: row.id,
+      name: typeof row.name === "string" && row.name.trim() ? row.name : "Unnamed tent",
+    }));
+}
+
 export function useGrowDetailData(): UseGrowDetailData {
   const { growId } = useParams<{ growId: string }>();
   const { user } = useAuth();
@@ -360,38 +374,40 @@ export function useGrowDetailData(): UseGrowDetailData {
     // and leaves soleTentId null — never a silent undercount or invented default.
     let tErr: unknown = null;
     let tentIds: string[] = [];
-    setTentList({ status: "loading" });
     try {
-      const tentLookup = await supabase.from("tents").select("id, name").eq("grow_id", growId!);
+      const tentLookup = await supabase.from("tents").select("id").eq("grow_id", growId!);
       if (!isCurrentLoad()) return;
       tErr = tentLookup.error;
-      const tentRows = tErr
+      tentIds = tErr
         ? []
         : (tentLookup.data ?? [])
-            .map((r) => r as { id?: string | null; name?: string | null })
-            .filter(
-              (r): r is { id: string; name?: string | null } =>
-                typeof r.id === "string" && r.id.length > 0,
-            );
-      tentIds = tentRows.map((r) => r.id);
+            .map((r) => (r as { id?: string | null }).id ?? "")
+            .filter((id): id is string => typeof id === "string" && id.length > 0);
       setSoleTentId(tErr ? null : pickSoleLoadedId(tentIds));
-      setTentList(
-        tErr
-          ? { status: "unavailable" }
-          : {
-              status: "ok",
-              tents: tentRows.map((r) => ({
-                id: r.id,
-                name: typeof r.name === "string" && r.name.trim() ? r.name : "Unnamed tent",
-              })),
-            },
-      );
     } catch (err) {
       if (!isCurrentLoad()) return;
       tErr = err;
       setSoleTentId(null);
-      setTentList({ status: "unavailable" });
     }
+
+    // The tent names for the list at the top of the grow page (Cheek,
+    // 2026-11-28), read on their own so the count lookup above is unchanged
+    // and a slow or failed name read never holds up the counts. Never "ok"
+    // from a failed read.
+    setTentList({ status: "loading" });
+    void (async () => {
+      try {
+        const named = await supabase.from("tents").select("id, name").eq("grow_id", growId!);
+        if (!isCurrentLoad()) return;
+        if (named.error) {
+          setTentList({ status: "unavailable" });
+          return;
+        }
+        setTentList({ status: "ok", tents: toGrowTentListEntries(named.data) });
+      } catch {
+        if (isCurrentLoad()) setTentList({ status: "unavailable" });
+      }
+    })();
 
     async function countGrowScopedPlants(): Promise<CountValue> {
       try {

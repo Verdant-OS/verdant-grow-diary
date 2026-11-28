@@ -17,7 +17,12 @@ import {
   type EcCompensationPreviewModel,
 } from "@/lib/ecCompensationPreviewViewModel";
 import type { EcUnit } from "@/constants/units";
-import type { DiaryCalendarEvent, DiaryCalendarEventKind } from "@/lib/diaryCalendarViewModel";
+import {
+  formatDiaryCalendarWateringAmount,
+  type DiaryCalendarEvent,
+  type DiaryCalendarEventKind,
+} from "@/lib/diaryCalendarViewModel";
+import type { WaterEntryUnit } from "@/lib/quickLogWaterVolumeUnitRules";
 import {
   celsiusToFahrenheit,
   type TemperatureUnitPreference,
@@ -226,21 +231,15 @@ function buildMeasurementsSection(
   kind: DiaryCalendarEventKind,
   d: Record<string, unknown> | null,
   tempUnit: TemperatureUnitPreference,
+  waterUnit: WaterEntryUnit,
 ): { fields: DiaryCalendarDrawerField[]; ecPreview: EcCompensationPreviewModel | null } {
   if (!d) return { fields: [], ecPreview: null };
   const fields: DiaryCalendarDrawerField[] = [];
   let ecPreview: EcCompensationPreviewModel | null = null;
 
   if (kind === "watering") {
-    const ml = pickFirstFiniteNumber(d, [
-      "watering_amount_ml",
-      "wateringAmountMl",
-      "volume_ml",
-      "amount_ml",
-    ]);
-    const l = pickFirstFiniteNumber(d, ["watering_amount_l", "wateringAmountL", "amount_l"]);
-    if (ml != null) fields.push({ label: "Amount", value: `${ml} ml` });
-    else if (l != null) fields.push({ label: "Amount", value: `${l} L` });
+    const amount = formatDiaryCalendarWateringAmount(d, waterUnit);
+    if (amount) fields.push({ label: "Amount", value: amount });
     const ph = pickFirstFiniteNumber(d, ["ph", "ph_value", "runoff_ph"]);
     if (ph != null) fields.push({ label: "pH", value: ph.toFixed(2) });
   }
@@ -336,10 +335,11 @@ export function buildDiaryCalendarEventDrawerViewModel(
   event: DiaryCalendarEvent,
   rawDetails: unknown,
   tempUnit: TemperatureUnitPreference = "celsius",
+  waterUnit: WaterEntryUnit = "ml",
 ): DiaryCalendarEventDrawerViewModel {
   const d = pickRecord(rawDetails);
   const summaryFields = buildSummarySection(event.kind, d);
-  const measurements = buildMeasurementsSection(event.kind, d, tempUnit);
+  const measurements = buildMeasurementsSection(event.kind, d, tempUnit, waterUnit);
   const plantMemoryFields = buildPlantMemorySection(event, d);
   const attachments = buildAttachments(d);
 

@@ -50,6 +50,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { useWaterVolumeEntryUnit } from "@/hooks/useWaterVolumeEntryUnit";
 
 export const ENVIRONMENT_CHECK_SHOW_DETAILS_LABEL = "Show details";
 export const ENVIRONMENT_CHECK_HIDE_DETAILS_LABEL = "Hide details";
@@ -136,9 +137,14 @@ export default function DiaryCalendarSection({
   const internalNowRef = useRef(new Date());
   const calendarNow = now ?? internalNowRef.current;
   const temperatureUnit = useTemperatureUnitPreference();
+  const waterUnit = useWaterVolumeEntryUnit();
   const allGroups = useMemo(
-    () => buildDiaryCalendarViewModel(rawEntries ?? [], temperatureUnit, { plantNamesById }),
-    [rawEntries, temperatureUnit, plantNamesById],
+    () =>
+      buildDiaryCalendarViewModel(rawEntries ?? [], temperatureUnit, {
+        plantNamesById,
+        waterUnit,
+      }),
+    [rawEntries, temperatureUnit, plantNamesById, waterUnit],
   );
   const historyFacts = useMemo<CultivationCalendarHistoryFact[]>(() => {
     const facts: CultivationCalendarHistoryFact[] = [];
@@ -260,9 +266,10 @@ export default function DiaryCalendarSection({
             drawerEvent,
             rawDetailsById.get(drawerEvent.id) ?? null,
             temperatureUnit,
+            waterUnit,
           )
         : null,
-    [drawerEvent, rawDetailsById, temperatureUnit],
+    [drawerEvent, rawDetailsById, temperatureUnit, waterUnit],
   );
   const [openDay, setOpenDay] = useState<string | null>(visibleGroups[0]?.dateKey ?? null);
 

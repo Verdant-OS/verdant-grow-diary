@@ -7,8 +7,8 @@ why: runSubmit in src/components/QuickLog.tsx checked only the Short note value.
 branch: posthog-self-driving/fixquick-log-accept-what-changed-text-a538f1 (name fixed by the PostHog run harness)
 base: verdant-grow-diary (started at 19dd62a9e65d4d102c75f41eeb85cc2d89488034)
 checkout: git fetch origin posthog-self-driving/fixquick-log-accept-what-changed-text-a538f1 verdant-grow-diary && git switch posthog-self-driving/fixquick-log-accept-what-changed-text-a538f1 && git merge --ff-only "$VERIFIED_SHA" && test "$(git rev-parse HEAD)" = "$VERIFIED_SHA" && git merge origin/verdant-grow-diary
-pr: the draft PR from this branch (number recorded on the PR; this file is written before the first push)
-head_sha: the PR's live head (not pinned here)
+pr: https://github.com/Verdant-OS/verdant-grow-diary/pull/3113 (draft)
+head_sha: code commit 7cd32532f86a493babde7eae1c8ff464ca712da2 (observed on the remote 2026-11-27 21:25 CT); this handoff update sits on top of it. Use the PR's live head for review.
 state: pushed draft
 current_step: fix and test committed together; RED proven locally (2 of 7 new tests fail without the QuickLog.tsx wiring)
 next_action: confirm CI is green at the PR head, then request an eligible independent exact-head review
@@ -29,5 +29,5 @@ reviewer_sha: none yet
 session_state: PostHog self-driving run; no routines or paused workflows
 claimed_by: PostHog self-driving Claude session, 2026-11-27 21:18 CT
 owner: PostHog self-driving Claude session
-last_updated: 2026-11-27 21:18 CT, by Claude
+last_updated: 2026-11-27 21:30 CT, by Claude
 ```

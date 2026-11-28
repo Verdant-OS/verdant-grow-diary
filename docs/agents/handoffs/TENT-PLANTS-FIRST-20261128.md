@@ -9,7 +9,7 @@ base: verdant-grow-diary (ee105823343e87f365bbf0815f6511d45a3ad858 at start, 202
 checkout: git fetch origin claude/project-thread-jk56y8 verdant-grow-diary && git switch claude/project-thread-jk56y8
 pr: #3131 (draft)
 head_sha: see the PR; refreshed on each push
-state: commits 1-2 moved the existing plant group up (RED 46168549510, GREEN 46168569104). Commit 3 adds the tests for the agreed layout (RED proof on CI); commit 4 implements it. Local tests, typecheck, lint and build NOT_MEASURED: bun install --frozen-lockfile BLOCKED (lockfile tarballs on europe-west4-npm.pkg.dev return 403 through the session proxy). Required CI and the dispatched 16-shard full suite provide them.
+state: commits 1-2 moved the existing plant group up (RED 46168549510, GREEN 46168569104). Commit 3 (277d374d) adds the tests for the agreed layout: RED run 46169704095, shards 7 and 15 (the new tests) failed. Commit 4 (b85cdee7) implements it; its run 46169723500 failed shards 7 and 8 (shard 7: the grow count pin; shard 8 cause NOT_MEASURED, artifact download blocked). Commit 5 (c2a10e26) keeps the count lookup and reads names separately: dispatched ci.yml run 46170095664, 36/36 jobs success, including all 32 Full test suite shards and Lint, typecheck, test, build. Local tests, typecheck, lint and build NOT_MEASURED: bun install --frozen-lockfile BLOCKED (lockfile tarballs on europe-west4-npm.pkg.dev return 403 through the session proxy). Required CI and the dispatched 16-shard full suite provide them.
 current_step: draft PR updated, waiting on the dispatched full suite at the new head
 next_action: when the full suite is green at the head, relay the Seat A (Sour Diesel) review block to Cheek; do not ready, enqueue or merge. Signed-in viewport checks wait for a deploy the approved fixture can reach (fixture: matt+qa1128 account, owned and torn down by the notebook walkthrough thread; ask the coordinator).
 post_merge_check: signed-in walk on verdantgrowdiary.com with the approved test account: at 375x812 and desktop, a long-named fixture tent shows the tent name, Quick Log and the first plant names without scrolling, then the sensor strip; a busy tent shows "See all N plants" and expands on the page; the grow page shows tent names under the grow name. A tent note from the header Quick Log lands on the tent Timeline with no plant; a plant note from Plant detail lands on that plant. Reopens with the same owner on FAIL.
@@ -23,13 +23,13 @@ decisions:
 - Save destination before Save: QuickLogV2Sheet already shows the chosen target beside Save (qlv2-save-target), on both the tent and plant flows; not changed. Long names truncate there (friction note).
 - Plant detail keeps its existing Quick Log (PlantDetailQuickLogButton, plant:<id>); no change.
 - Full plant group stays below the next-step card and actions as the detailed roster; detailed metric chips stay in their original place above the manual-history notice.
-- Grow tent list comes from the existing tent lookup in useGrowDetailData (select id, name); unavailable on error, never "none" from a failed read.
+- Grow tent list comes from its own id-and-name read in useGrowDetailData (toGrowTentListEntries); the existing tent-id lookup for the plant count stays select("id"), as src/test/grow-detail-counts.test.ts pins (a locked check, not edited). Unavailable on error, never "none" from a failed read.
 rejected: MetricChip inside the strip (duplicates test ids and labels the existing suites query); a viewport breakpoint for the strip layout (ignores text size).
-files_touched: src/pages/TentDetail.tsx; src/pages/GrowDetail.tsx; src/hooks/useGrowDetailData.ts; src/components/{GlanceNameList,GrowTentsGlance,TentSensorStrip,TentSensorStripFreshnessLine,TentDetailQuickLogButton}.tsx; src/lib/{glanceNameListRules,tentSensorStripRules}.ts; src/test/{tent-detail-plants-first-order,glance-name-list-rules,tent-sensor-strip-rules,tent-sensor-strip,tent-detail-quick-log-button,grow-detail-tents-glance}.test.*; this file.
+files_touched: src/test/grow-tent-list-entries.test.ts; src/pages/TentDetail.tsx; src/pages/GrowDetail.tsx; src/hooks/useGrowDetailData.ts; src/components/{GlanceNameList,GrowTentsGlance,TentSensorStrip,TentSensorStripFreshnessLine,TentDetailQuickLogButton}.tsx; src/lib/{glanceNameListRules,tentSensorStripRules}.ts; src/test/{tent-detail-plants-first-order,glance-name-list-rules,tent-sensor-strip-rules,tent-sensor-strip,tent-detail-quick-log-button,grow-detail-tents-glance}.test.*; this file.
 files_remaining: none for this slice.
 open_questions: none blocking. Timed save-and-reopen and tent vs plant Timeline landing are BLOCKED until the fixture walk.
 gotchas: tests that mount TentDetail mock QuickLogV2Fab but not QuickLogV2Sheet, which is why the header button mounts the sheet lazily.
 reviewer: Seat A (Sour Diesel) via Cheek's relay; no verdict yet.
 session_state: none paused; no routines.
-last_updated: 2026-11-28 17:40 UTC, by Claude thread session
+last_updated: 2026-11-28 17:45 UTC, by Claude thread session
 ```

@@ -42,6 +42,7 @@ import {
 import { PHENO_EVIDENCE_RECEIPT_KIND } from "@/lib/phenoEvidenceCaptureRules";
 import { readDetailsLoggedAt } from "@/lib/quicklogManualDiagnosticsRules";
 import { formatStoredWaterVolume, type WaterEntryUnit } from "@/lib/quickLogWaterVolumeUnitRules";
+import { QUICK_LOG_NOTE_MARKER_KEY } from "@/lib/quickLogNoteMarkerRules";
 
 /**
  * Top-level detail keys that must never render as a raw "key: value" chip,
@@ -79,6 +80,8 @@ export const HIDDEN_DIARY_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "attached_to_action",
   // Operator attestation blob. Never a grower-facing chip.
   "manual_provenance",
+  // Note/Issue identity marker. The entry heading already says "Note".
+  QUICK_LOG_NOTE_MARKER_KEY,
 ]);
 
 /**

@@ -143,12 +143,14 @@ import {
   QUICK_LOG_WATER_RECOVERY_UNREADABLE_HELPER,
 } from "@/constants/quickLogWaterRecoveryCopy";
 import {
+  appendLegacyDetailsToNote,
   buildLegacyQuickLogUnifiedPayload,
   isSupportedLegacyEventType,
   isVerifiedPublicStarterWateringHandoff,
   ORDINARY_LEGACY_WATERING_BLOCKED_COPY,
   UNSUPPORTED_EVENT_TYPE_COPY,
 } from "@/lib/legacyQuickLogUnifiedSave";
+import { buildQuickLogEarlyStageNoteText } from "@/lib/quickLogEarlyNoteTextRules";
 import {
   assessWateringVolumeInput,
   QUICK_LOG_WATER_VOLUME_TOO_LARGE_MESSAGE,
@@ -205,7 +207,6 @@ import {
   EARLY_STAGE_PHOTO_HINT,
   EARLY_STAGE_NOTE_PLACEHOLDER,
   buildEarlyStageDetails,
-  buildEarlyStageNoteSuffix,
   hasQuickLogNoteText,
   evaluateEarlyStageVisibility,
   type EarlyStageMilestone,
@@ -1693,11 +1694,12 @@ export default function QuickLog({
       const earlyStageRecord: Record<string, unknown> | null = earlyStageEnvelope
         ? { ...earlyStageEnvelope }
         : null;
-      const earlyStageSuffix = buildEarlyStageNoteSuffix({
+      const earlyStageSuffix = buildQuickLogEarlyStageNoteText({
         milestone: earlyMilestone,
         vigor: earlyVigor,
         notes: earlyNotes,
         stage: saveStage,
+        otherNoteText: appendLegacyDetailsToNote(noteWithHardware, details),
       });
       // Block out-of-band air-sensor values before building the envelope so an
       // implausible reading surfaces the same per-metric copy Quick Log v2

@@ -21,11 +21,15 @@ import {
   downloadSignedStorageObject,
   isAllowedSignedPhotoUrl,
 } from "../_shared/geminiInlineImage.ts";
+import {
+  captureAiGeneration,
+  requestGrantsAnalyticsCapture,
+} from "../_shared/posthogAiObservability.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-retry-count",
+    "authorization, x-client-info, apikey, content-type, x-retry-count, x-verdant-analytics-consent",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 };
 
@@ -693,6 +697,28 @@ Rules for diagnosis (structured view, approval-first):
     const text = (body.question ? `QUESTION: ${body.question}\n\n` : "") + context;
     userContent.push({ type: "text", text });
 
+    const aiInput = [
+      { role: "system", content: system },
+      { role: "user", content: userContent },
+    ];
+    const providerStartedAt = performance.now();
+    const captureGeneration = (details: {
+      response?: unknown;
+      httpStatus?: number;
+      error?: string;
+    }) =>
+      captureAiGeneration({
+        distinctId: userId,
+        traceId: idempotencyKey,
+        spanName: FEATURE,
+        model: COACH_MODEL,
+        provider: "gemini",
+        consentGranted: requestGrantsAnalyticsCapture(req),
+        providerResponse: details.response,
+        httpStatus: details.httpStatus,
+        error: details.error,
+        startedAt: providerStartedAt,
+      });
     const providerController = new AbortController();
     const providerTimer = setTimeout(
       () => providerController.abort(),
@@ -706,39 +732,48 @@ Rules for diagnosis (structured view, approval-first):
         signal: providerController.signal,
         body: {
           response_format: { type: "json_object" },
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: userContent },
-          ],
+          messages: aiInput,
         },
       });
       const r = await fetch(GATEWAY_URL, providerRequest);
       if (r.status === 429) {
+        captureGeneration({ httpStatus: r.status, error: "upstream_credit_exhausted" });
         console.log("ai-coach status=upstream_credit_exhausted http=200");
         return failureAfterRefund(spendId, "upstream_429", "upstream_credit_exhausted");
       }
       if (r.status === 402) {
+        captureGeneration({ httpStatus: r.status, error: "upstream_credit_exhausted" });
         console.log("ai-coach status=upstream_credit_exhausted http=200");
         return failureAfterRefund(spendId, "upstream_402", "upstream_credit_exhausted");
       }
       if (!r.ok) {
+        captureGeneration({ httpStatus: r.status, error: "upstream_http_error" });
         return failureAfterRefund(spendId, `upstream_${r.status}`, "http");
       }
       const readProviderBody = r.json.bind(r);
       r.json = () => readJsonUntilAbort(r, providerController.signal, readProviderBody);
+      const noteParse = (aborted: boolean) =>
+        captureGeneration({
+          httpStatus: r.status,
+          error: aborted ? "timeout" : "invalid_json_response",
+        });
       try {
         data = await r.json();
       } catch {
+        noteParse(providerController.signal.aborted);
         if (providerController.signal.aborted) {
           return failureAfterRefund(spendId, "upstream_network", "timeout");
         }
         return failureAfterRefund(spendId, "upstream_parse", "parse");
       }
     } catch {
+      captureGeneration({ error: "network_or_timeout" });
       return failureAfterRefund(spendId, "upstream_network", "timeout");
     } finally {
       clearTimeout(providerTimer);
     }
+
+    captureGeneration({ response: data, httpStatus: 200 });
 
     const raw = readCoachMessageContent(data);
     if (!raw) return failureAfterRefund(spendId, "upstream_empty", "empty");

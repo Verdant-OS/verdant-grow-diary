@@ -9,6 +9,7 @@ import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 
 import { getGrowWalkContextForOwnedTarget } from "../../growWalkContextReadModels";
+import { asStructuredJson } from "./_json";
 import { supabaseForUser, unauthenticated } from "./_supabase";
 
 export default defineTool({
@@ -64,7 +65,7 @@ export default defineTool({
               : `Grow Walk context ready for ${archived}"${scope}" with ${partial} explicit partial evidence lane(s).`,
         },
       ],
-      structuredContent: { context },
+      structuredContent: asStructuredJson({ context }),
     };
   },
 });

@@ -22,7 +22,7 @@
  * Line endings are preserved as written; the parity gate normalizes CRLF
  * before comparing, so a CRLF checkout stays green.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const CANONICAL = "AGENTS.md";
 
@@ -101,6 +101,26 @@ if (normalize(embedded) !== normalize(agents)) {
     gemini.slice(end.index);
   if (!checkOnly) writeFileSync("GEMINI.md", rebuilt);
   changed.push("GEMINI.md: embedded SENTINEL-CORE re-synced from AGENTS.md");
+}
+
+const BLOCK_PATH = "docs/agents/SENTINEL_BLOCK.md";
+if (existsSync(BLOCK_PATH)) {
+  const agentsVersion = /Sentinel-Version:\s*([0-9]{4}-[0-9]{2}-[0-9]{2}\.[0-9]+)/.exec(agents)?.[1];
+  const blockText = readFileSync(BLOCK_PATH, "utf8");
+  const blockVersion = /Sentinel-Version:\s*([0-9]{4}-[0-9]{2}-[0-9]{2}\.[0-9]+)/.exec(blockText)?.[1];
+  if (agentsVersion && blockVersion !== agentsVersion) {
+    const next = blockText.replace(VERSION_RE, `$1${agentsVersion}`);
+    const stamped = new RegExp(`Sentinel-Version:\\s*${agentsVersion.replace(".", "\\.")}`).test(next);
+    if (next === blockText || !stamped) {
+      console.error(
+        `${BLOCK_PATH}: Sentinel-Version stamp is missing or not replaceable, so it was not ` +
+          `set to ${agentsVersion}.`,
+      );
+      process.exit(1);
+    }
+    if (!checkOnly) writeFileSync(BLOCK_PATH, next);
+    changed.push(`${BLOCK_PATH}: Sentinel-Version → ${agentsVersion}`);
+  }
 }
 
 if (changed.length === 0) {

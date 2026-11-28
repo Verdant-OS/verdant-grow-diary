@@ -6,6 +6,7 @@ import {
   CLOUDFLARE_WORKERS_RUNTIME,
   GLOBAL_SECURITY_HEADERS,
   LOVABLE_OAUTH_ORIGIN,
+  NO_ANALYTICS_PAGE_CACHE_CONTROL,
   SEO_SNAPSHOT_ENV,
   SEO_SNAPSHOT_HEADER,
   SEO_SNAPSHOT_HEADER_VALUE,
@@ -270,6 +271,68 @@ describe("response headers", () => {
     expect(headerValue(headers, "Permissions-Policy")).toBe(
       "geolocation=(), camera=(), microphone=(), payment=()",
     );
+  });
+
+  it("asks Cloudflare not to transform the two no-analytics beta pages", () => {
+    // Cloudflare Web Analytics' automatic setup injects its beacon into HTML it
+    // may transform; no-transform keeps it off the pages that promise "No analytics." (#2714).
+    expect(NO_ANALYTICS_PAGE_CACHE_CONTROL).toBe("no-transform");
+    for (const path of [
+      "/creator-beta",
+      "/breeder-beta",
+      "/Creator-Beta/",
+      "//breeder-beta",
+      "/creator%2Dbeta",
+    ]) {
+      const headers = new Headers(hostHeadersForPathname(path));
+      expect(headerValue(headers, "Cache-Control"), path).toBe("no-transform");
+      expect(headerValue(headers, "X-Content-Type-Options"), path).toBe("nosniff");
+      expect(headerValue(headers, CONTENT_SECURITY_POLICY_REPORT_ONLY_HEADER), path).toBe(
+        buildContentSecurityPolicyReportOnly(),
+      );
+    }
+    for (const path of ["/", "/pricing", "/creator-beta-faq", "/beta/creator-beta"]) {
+      const headers = new Headers(hostHeadersForPathname(path));
+      expect(headerValue(headers, "Cache-Control"), path).toBeNull();
+    }
+  });
+
+  it("adds no-transform to a beta page response without dropping its own cache directives", () => {
+    const bare = withHostHeaders(
+      new Request("https://verdantgrowdiary.com/creator-beta"),
+      new Response("<html></html>", { status: 200, headers: { "content-type": "text/html" } }),
+    );
+    expect(bare.headers.get("cache-control")).toBe("no-transform");
+    expect(bare.headers.get("content-type")).toBe("text/html");
+
+    const cached = withHostHeaders(
+      new Request("https://verdantgrowdiary.com/breeder-beta"),
+      new Response("<html></html>", {
+        status: 200,
+        headers: { "cache-control": "public, max-age=60" },
+      }),
+    );
+    expect(cached.headers.get("cache-control")).toBe("public, max-age=60, no-transform");
+
+    const already = new Response("<html></html>", {
+      status: 200,
+      headers: [
+        ...hostHeadersForPathname("/creator-beta").filter(([name]) => name !== "Cache-Control"),
+        ["Cache-Control", "private, No-Transform"],
+      ],
+    });
+    const kept = withHostHeaders(new Request("https://verdantgrowdiary.com/creator-beta"), already);
+    expect(kept).toBe(already);
+    expect(kept.headers.get("cache-control")).toBe("private, No-Transform");
+
+    const other = withHostHeaders(
+      new Request("https://verdantgrowdiary.com/pricing"),
+      new Response("<html></html>", {
+        status: 200,
+        headers: { "cache-control": "public, max-age=60" },
+      }),
+    );
+    expect(other.headers.get("cache-control")).toBe("public, max-age=60");
   });
 
   it("writes the same headers onto a continued response and a redirect response", () => {

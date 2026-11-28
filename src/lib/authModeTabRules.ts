@@ -35,3 +35,16 @@ export function getAuthTabTriggerClassName(mode: AuthMode): string {
 export function getAuthModeLabel(mode: AuthMode): string {
   return AUTH_MODES.find((tab) => tab.value === mode)?.label ?? "Sign in";
 }
+
+// Walkthrough FA-20261119-M1 item 6: the browser tab title follows the form
+// that is showing, so the sign-up form is never titled "Sign in". The sign-in
+// title stays unchanged because the production preflight pins it.
+const AUTH_PAGE_TITLES: Record<AuthMode, string> = {
+  signin: "Sign in to Verdant Grow Diary",
+  signup: "Create your Verdant Grow Diary account",
+  forgot: "Reset your Verdant Grow Diary password",
+};
+
+export function getAuthPageTitle(mode: AuthMode): string {
+  return AUTH_PAGE_TITLES[mode] ?? AUTH_PAGE_TITLES.signin;
+}

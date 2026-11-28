@@ -131,10 +131,11 @@ describe("Quick Log Water: liters by default", () => {
     expect(payload(latest).runoff_ml).toBe(250);
   });
 
-  it("8: an ml preset switches this form to ml but does not change the phone's default", () => {
+  it("8: a shortcut keeps the form in liters and does not change the phone's default", () => {
     const first = render(<Harness />);
     fireEvent.click(screen.getByTestId("qlv2-volume-preset-1000"));
-    expect(screen.getByLabelText("Volume (ml)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Volume (L)")).toBeInTheDocument();
+    expect(volumeInput().value).toBe("1");
     expect(payload(latest).volume_ml).toBe(1000);
     expect(storedUnit()).toBeNull();
     first.unmount();

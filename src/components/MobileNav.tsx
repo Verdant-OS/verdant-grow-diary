@@ -40,6 +40,9 @@ import {
   type LabsNavigationDestinationId,
 } from "@/lib/growerNavigationRules";
 import { resolveNavigationGrowId } from "@/lib/navigationGrowIdRules";
+import { resolveMobileTentHref } from "@/lib/mobileTentNavRules";
+import { useTents } from "@/hooks/use-tents";
+import { useGrows } from "@/store/grows";
 
 type PrimaryItem = MoreItem & NavigationActiveRule;
 
@@ -58,6 +61,8 @@ export interface MoreItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  /** Match the route exactly, so "/" does not light up on every page. */
+  end?: boolean;
 }
 
 export interface MoreGroup {
@@ -94,6 +99,9 @@ export const moreGroups: MoreGroup[] = [
   {
     heading: "Cultivation",
     items: [
+      // The Tent tab opens the grower's tent once they have one, so this is
+      // the phone's way back to the Dashboard (the desktop sidebar's label).
+      { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
       { to: "/grows", label: "My Grows", icon: Sprout },
       { to: "/tents", label: "Tents", icon: Box },
       { to: "/plants", label: "Plants", icon: Leaf },
@@ -136,6 +144,10 @@ export default function MobileNav() {
   const [open, setOpen] = useState(false);
   const { pathname, search } = useLocation();
   const navigationGrowId = resolveNavigationGrowId({ pathname, search });
+  const { data: tents } = useTents();
+  const { activeGrowId } = useGrows();
+  // Tent opens the grower's tent; Home is the fallback when none is clear.
+  const tentHref = resolveMobileTentHref({ pathname, tents, activeGrowId });
   const labsNavItems: MoreItem[] = resolveLabsNavigationDestinations(navigationGrowId).map(
     (item) => ({
       ...item,
@@ -149,11 +161,14 @@ export default function MobileNav() {
     >
       <div className="grid grid-cols-4 h-16">
         {primary.map((n) => {
-          const active = isNavigationItemActive(pathname, n);
+          const isTent = n.label === "Tent";
+          const href = isTent ? tentHref : resolveMobilePrimaryHref(n.to, navigationGrowId);
+          const active =
+            isNavigationItemActive(pathname, n) || (isTent && href !== "/" && pathname === href);
           return (
             <Link
               key={n.to}
-              to={resolveMobilePrimaryHref(n.to, navigationGrowId)}
+              to={href}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "relative flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] transition-colors",
@@ -202,6 +217,7 @@ export default function MobileNav() {
                       <NavLink
                         key={m.to}
                         to={m.to}
+                        end={m.end}
                         onClick={() => setOpen(false)}
                         className={({ isActive }) =>
                           cn(

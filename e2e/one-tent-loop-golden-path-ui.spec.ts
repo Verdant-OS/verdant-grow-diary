@@ -509,30 +509,33 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
         await createdPlantCard.click();
         await expect(page).toHaveURL(new RegExp(`/plants/${fixturePlantId}$`));
         await expect(page.getByRole("heading", { name: PLANT_NAME, exact: true })).toBeVisible();
+        // FA-20261119-M1 item 5: the plant page's Quick Log opens the header
+        // (top-bar) form, aimed at this plant.
         await page.getByTestId("plant-detail-quick-log-open").click();
-        const plantQuickLog = page.getByTestId("plant-quick-log-sheet");
+        const plantQuickLog = page
+          .getByRole("dialog")
+          .filter({ has: page.getByTestId("qlv2-save") });
         await expect(plantQuickLog).toBeVisible();
-        await plantQuickLog.getByTestId("plant-quick-log-note").fill(QUICK_LOG_NOTE);
-        await plantQuickLog.getByTestId("plant-quick-log-photo-library-input").setInputFiles({
+        await plantQuickLog.getByTestId("qlv2-note").fill(QUICK_LOG_NOTE);
+        await plantQuickLog.getByTestId("qlv2-photo-library-input").setInputFiles({
           name: "one-tent-leaf.png",
           mimeType: "image/png",
           buffer: ONE_PIXEL_PNG,
         });
-        await expect(plantQuickLog.getByTestId("plant-quick-log-photo-preview")).toBeVisible();
+        await expect(plantQuickLog.getByTestId("qlv2-photo-preview")).toBeVisible();
+        await plantQuickLog.getByText("Manual sensor snapshot (optional)").click();
         const tempLabel =
-          (await plantQuickLog.locator('label[for="plant-quick-log-temp"]').textContent()) ?? "";
-        await plantQuickLog
-          .getByTestId("plant-quick-log-temp")
-          .fill(tempLabel.includes("°C") ? "27.8" : "82");
-        await plantQuickLog.getByTestId("plant-quick-log-humidity").fill("48");
-        await expect(plantQuickLog.getByTestId("plant-quick-log-save")).toBeEnabled();
+          (await plantQuickLog.locator('label[for="qlv2-temp"]').textContent()) ?? "";
+        await plantQuickLog.locator("#qlv2-temp").fill(tempLabel.includes("°C") ? "27.8" : "82");
+        await plantQuickLog.locator("#qlv2-rh").fill("48");
+        await expect(plantQuickLog.getByTestId("qlv2-save")).toBeEnabled();
         const [quickLogResponse] = await Promise.all([
           page.waitForResponse(
             (response) =>
               /\/rest\/v1\/rpc\/quicklog_save_manual(?:\?|$)/.test(response.url()) &&
               response.request().method() === "POST",
           ),
-          plantQuickLog.getByTestId("plant-quick-log-save").click(),
+          plantQuickLog.getByTestId("qlv2-save").click(),
         ]);
         expect(quickLogResponse.ok()).toBe(true);
         await expect(plantQuickLog).toBeHidden();
@@ -549,14 +552,15 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
         expect(diaryRows).toHaveLength(1);
         const diaryRow = diaryRows?.[0];
         expect(diaryRow?.photo_url).toBeTruthy();
+        // The header form sends temperature and humidity to the save RPC, which
+        // stores them on the linked manual environment row; the diary companion
+        // carries only the manual provenance. The readings themselves are
+        // proven below by the Tent card (82°F, 48%) and the Timeline manual
+        // snapshot (82°F), which both read that exact environment row.
         const diaryDetails = (diaryRow?.details ?? {}) as Record<string, unknown>;
-        const manualSnapshot = (diaryDetails.manual_sensor_snapshot ?? {}) as Record<
-          string,
-          unknown
-        >;
-        expect(manualSnapshot.source).toBe("manual");
-        expect(manualSnapshot.temp_f).toBe(82);
-        expect(manualSnapshot.humidity_percent).toBe(48);
+        const manualProvenance = (diaryDetails.manual_provenance ?? {}) as Record<string, unknown>;
+        expect(manualProvenance.source).toBe("manual");
+        expect(manualProvenance.transport).toBe("manual");
       });
 
       await stage("quick_log_persisted", async () => {

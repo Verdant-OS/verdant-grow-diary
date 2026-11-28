@@ -24,8 +24,7 @@ const STATUS_COPY: Record<
   granted: {
     label: "Analytics on",
     variant: "default",
-    detail:
-      "You accepted analytics. Verdant loads Google Analytics and Ahrefs Web Analytics to record page usage.",
+    detail: "You accepted usage analytics on this browser.",
   },
   denied: {
     label: "Analytics off",
@@ -41,7 +40,7 @@ const STATUS_COPY: Record<
 };
 
 export default function AnalyticsConsentSettings() {
-  const { decision, hydrated, accept, decline } = useAnalyticsConsent();
+  const { decision, paidSince, hydrated, accept, decline } = useAnalyticsConsent();
 
   // Apply the current decision to the live document so a revoke takes effect
   // without a reload.
@@ -56,8 +55,10 @@ export default function AnalyticsConsentSettings() {
     <div className="container mx-auto max-w-2xl px-4 py-8" data-testid="analytics-consent-settings">
       <h1 className="text-2xl font-semibold tracking-tight">Analytics consent</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Verdant only measures page usage if you say yes. Your grows, diary entries, photos, and
-        sensor readings are never sent to analytics.
+        With your permission, Verdant uses Google Analytics, Ahrefs and PostHog to understand how
+        growers use the app. PostHog records your first paid upgrade using your account ID and
+        activation time. Your email, payment details, diary entries, photos and sensor readings stay
+        out of that event.
       </p>
 
       <Card className="mt-6">
@@ -80,11 +81,15 @@ export default function AnalyticsConsentSettings() {
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               className="min-h-11 flex-1"
-              disabled={!hydrated || decision === "granted"}
+              disabled={!hydrated || paidSince != null}
               data-testid="analytics-consent-settings-grant"
               onClick={accept}
             >
-              {decision === "granted" ? "Analytics allowed" : "Allow analytics"}
+              {paidSince != null
+                ? "Analytics allowed"
+                : decision === "granted"
+                  ? "Allow first-upgrade measurement"
+                  : "Allow analytics"}
             </Button>
             <Button
               variant="outline"
@@ -118,6 +123,10 @@ export default function AnalyticsConsentSettings() {
             <li>
               Ahrefs Web Analytics property in use:{" "}
               <code className="break-all font-mono text-xs">{AHREFS_WEB_ANALYTICS_KEY}</code>
+            </li>
+            <li>
+              PostHog records when you first activate a paid plan, using your account ID. Diary
+              entries, payment details, and email stay out of that event.
             </li>
           </ul>
         </CardContent>

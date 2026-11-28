@@ -30,6 +30,7 @@ import {
 } from "@/lib/analyticsConsentRuntime";
 import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import FunnelEventDbSink from "@/components/FunnelEventDbSink";
+import { useFirstPaidAnalytics } from "@/hooks/useFirstPaidAnalytics";
 import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { initErrorReporter, reportErrorWhenReady } from "@/lib/errorReporter";
@@ -186,7 +187,7 @@ function useClearQueryCacheBeforeAuthIdentityChange() {
 }
 
 function AnalyticsShell() {
-  const { decision } = useAnalyticsConsent();
+  const { decision, paidSince } = useAnalyticsConsent();
   const location = useRouterState({
     select: (state) => ({
       pathname: state.location.pathname,
@@ -202,6 +203,7 @@ function AnalyticsShell() {
     if (decision !== "granted" && reload) window.location.reload();
   }, [decision, location]);
 
+  useFirstPaidAnalytics(location.pathname, paidSince);
   useGoogleAnalyticsPageViews();
   return <AnalyticsConsentBanner />;
 }

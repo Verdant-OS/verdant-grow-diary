@@ -49,6 +49,7 @@ import { STAGES } from "@/lib/grow";
 import { timelineStagePresentationLabel } from "@/lib/timelineStagePresentationRules";
 import { QUICK_LOG_FAB_TIMELINE_FILTER_CLEARANCE_CLASS } from "@/lib/quickLogFabClearanceRules";
 import { TimelineGrowDayLabel } from "@/components/TimelineGrowDayLabel";
+import { useTimelineHeaderStageFacts } from "@/hooks/useTimelineHeaderStageFacts";
 import { normalizeQuickLogStage } from "@/lib/quickLogStageDefaultRules";
 import { formatTimelineEntryTimestamp } from "@/lib/timelineEntryTimestampFormat";
 import { format, formatDistanceToNow } from "date-fns";
@@ -223,6 +224,7 @@ import {
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { useTimelineNameDirectory } from "@/hooks/useTimelineNameDirectory";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { useWaterVolumeEntryUnit } from "@/hooks/useWaterVolumeEntryUnit";
 import { canUseFeature } from "@/lib/featureEntitlements";
 import {
   buildTimelinePhotoLightboxList,
@@ -580,6 +582,7 @@ async function loadLinkedRootSensorSiblings(input: {
 
 export default function Timeline() {
   const temperatureUnit = useTemperatureUnitPreference();
+  const waterUnit = useWaterVolumeEntryUnit();
   const authUser = useAuth().user;
   // Keep the read callback keyed to a stable primitive. Auth providers and
   // test adapters may return an equivalent user object with a new identity on
@@ -1819,6 +1822,15 @@ export default function Timeline() {
     user,
     directoryGrowId,
   );
+  // The header reads the scoped plant's (or tent's) own stage so a Flower
+  // plant in a grow still marked Veg is not labelled Veg.
+  const headerStageTentId = tentFilter || (plantFilter ? plantTentIdsById?.get(plantFilter) : "");
+  const headerStageFacts = useTimelineHeaderStageFacts(
+    user,
+    directoryGrowId,
+    plantFilter || null,
+    headerStageTentId || null,
+  );
   const recentLaneTargetNames = useMemo(
     () => ({ plantNamesById, tentNamesById, plantTentIdsById }),
     [plantNamesById, tentNamesById, plantTentIdsById],
@@ -2540,7 +2552,14 @@ export default function Timeline() {
           title={activeGrow.name}
           description="Trace observations, evidence, and decisions across this grow."
           icon={<Sprout className="size-5" aria-hidden="true" />}
-          meta={<TimelineGrowDayLabel startedAt={activeGrow.started_at} stage={activeGrow.stage} />}
+          meta={
+            <TimelineGrowDayLabel
+              startedAt={activeGrow.started_at}
+              stage={activeGrow.stage}
+              plant={headerStageFacts.plant}
+              tent={headerStageFacts.tent}
+            />
+          }
           actions={
             growSwitcher ? (
               <TimelineGrowSwitcher switcher={growSwitcher} onChange={switchTimelineGrow} />
@@ -3430,7 +3449,11 @@ export default function Timeline() {
                           const { detailLines, extra } = presentTimelineDiaryEntryDetails(
                             e.details,
                             temperatureUnit,
-                            { suppress: isLearningLoopEvent || isReadinessCheckEvent },
+                            {
+                              suppress: isLearningLoopEvent || isReadinessCheckEvent,
+                              waterUnit,
+                              entryType: effectiveCareType,
+                            },
                           );
                           const loopActionId =
                             isLearningLoopEvent && typeof e.details?.action_queue_id === "string"

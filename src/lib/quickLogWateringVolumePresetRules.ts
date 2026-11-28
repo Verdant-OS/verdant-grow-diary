@@ -6,7 +6,13 @@
  * Presets only fill the grower-entered volume field; the grower can still
  * type any valid ml value. Selecting the already-active preset clears it
  * (same chip-toggle contract as root-zone observation chips).
+ *
+ * The chips follow the Water entry unit (owner decision 2026-11-19): ml shows
+ * "500 ml", L shows the same amounts as "0.5 L", and gal shows none because
+ * gallon amounts do not come out round. Every chip saves the same canonical ml.
  */
+
+import { mlToWaterEntryDisplay, type WaterEntryUnit } from "./quickLogWaterVolumeUnitRules";
 
 export const QUICK_LOG_WATERING_VOLUME_PRESETS_ML = [
   500, 1000, 1500, 1800, 2000, 2500,
@@ -17,9 +23,9 @@ export type QuickLogWateringVolumePresetMl =
 
 export interface QuickLogWateringVolumePresetOption {
   readonly ml: QuickLogWateringVolumePresetMl;
-  /** Chip label, e.g. "500 ml". */
+  /** Chip label, e.g. "500 ml" or "0.5 L". */
   readonly label: string;
-  /** Value written into the volume field. */
+  /** Canonical ml written into the volume field, e.g. "500". */
   readonly value: string;
 }
 
@@ -33,6 +39,29 @@ export const QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS: readonly QuickLogWatering
       }),
     ),
   );
+
+const QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS_L: readonly QuickLogWateringVolumePresetOption[] =
+  Object.freeze(
+    QUICK_LOG_WATERING_VOLUME_PRESETS_ML.map((ml) =>
+      Object.freeze({
+        ml,
+        label: `${mlToWaterEntryDisplay(ml, "L")} L`,
+        value: String(ml),
+      }),
+    ),
+  );
+
+/**
+ * The shortcut chips for the unit the Water form is in. ml: today's chips.
+ * L: the same amounts labelled in liters. gal: none. `value` stays canonical ml.
+ */
+export function wateringVolumePresetOptionsForUnit(
+  unit: WaterEntryUnit,
+): readonly QuickLogWateringVolumePresetOption[] {
+  if (unit === "ml") return QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS;
+  if (unit === "L") return QUICK_LOG_WATERING_VOLUME_PRESET_OPTIONS_L;
+  return [];
+}
 
 export const QUICK_LOG_WATERING_VOLUME_PRESET_HELP =
   "Optional shortcuts. You can still type any volume.";

@@ -308,10 +308,10 @@ export interface ArticleJsonLd {
   readonly description: string;
   readonly url: string;
   readonly image?: string;
-  readonly datePublished: string;
+  readonly datePublished?: string;
   readonly dateModified?: string;
   readonly author: {
-    readonly "@type": "Organization";
+    readonly "@type": "Organization" | "Person";
     readonly name: string;
     readonly url?: string;
   };
@@ -336,16 +336,19 @@ export function buildArticleJsonLd({
   datePublished,
   dateModified,
   authorName = "Verdant Grow Diary",
+  authorType = "Organization",
   publisherName = "Verdant Grow Diary",
   siteUrl,
 }: {
   headline: string;
   description: string;
   url: string;
-  datePublished: string;
+  datePublished?: string;
   dateModified?: string;
   image?: string;
   authorName?: string;
+  /** Organization is the default and the only type used by existing pages. */
+  authorType?: "Organization" | "Person";
   publisherName?: string;
   siteUrl?: string;
 }): ArticleJsonLd {
@@ -354,11 +357,17 @@ export function buildArticleJsonLd({
   if (!/^https?:\/\//i.test(url)) {
     throw new Error(`buildArticleJsonLd: url must be absolute (got "${url}")`);
   }
-  if (!/^\d{4}-\d{2}-\d{2}/.test(datePublished)) {
+  if (authorType === "Organization" && !/^\d{4}-\d{2}-\d{2}/.test(datePublished ?? "")) {
+    throw new Error(`buildArticleJsonLd: datePublished must be ISO-8601 (got "${datePublished}")`);
+  }
+  if (authorType === "Person" && datePublished && !/^\d{4}-\d{2}-\d{2}/.test(datePublished)) {
     throw new Error(`buildArticleJsonLd: datePublished must be ISO-8601 (got "${datePublished}")`);
   }
   if (dateModified && !/^\d{4}-\d{2}-\d{2}/.test(dateModified)) {
     throw new Error(`buildArticleJsonLd: dateModified must be ISO-8601 (got "${dateModified}")`);
+  }
+  if (authorType === "Person" && !dateModified) {
+    throw new Error("buildArticleJsonLd: dateModified required for a person author");
   }
   return {
     "@context": "https://schema.org",
@@ -367,9 +376,12 @@ export function buildArticleJsonLd({
     description,
     url,
     ...(image ? { image } : {}),
-    datePublished,
+    ...(datePublished ? { datePublished } : {}),
     ...(dateModified ? { dateModified } : {}),
-    author: { "@type": "Organization", name: authorName, ...(siteUrl ? { url: siteUrl } : {}) },
+    author:
+      authorType === "Person"
+        ? { "@type": "Person", name: authorName }
+        : { "@type": "Organization", name: authorName, ...(siteUrl ? { url: siteUrl } : {}) },
     publisher: {
       "@type": "Organization",
       name: publisherName,

@@ -3,10 +3,10 @@
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
 // src/lib/mcp/index.ts
-import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@3.5.0";
 
 // src/lib/mcp/tools/list-grows.ts
-import { defineTool } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { defineTool } from "npm:@lovable.dev/mcp-js@3.5.0";
 import { z } from "npm:zod@^4.6.6";
 
 // src/lib/mcp/tools/_supabase.ts
@@ -66,7 +66,7 @@ ${JSON.stringify(rows, null, 2)}`
 });
 
 // src/lib/mcp/tools/list-recent-diary-entries.ts
-import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@3.5.0";
 import { z as z2 } from "npm:zod@^4.6.6";
 
 // src/lib/liveSourceTruthGateRules.ts
@@ -790,6 +790,11 @@ async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {})
   }
 }
 
+// src/lib/mcp/tools/_json.ts
+function asStructuredJson(value) {
+  return value;
+}
+
 // src/lib/mcp/tools/list-recent-diary-entries.ts
 var list_recent_diary_entries_default = defineTool2({
   name: "list_recent_diary_entries",
@@ -824,13 +829,13 @@ var list_recent_diary_entries_default = defineTool2({
 ${JSON.stringify(rows, null, 2)}`
         }
       ],
-      structuredContent: { entries: rows }
+      structuredContent: asStructuredJson({ entries: rows })
     };
   }
 });
 
 // src/lib/mcp/tools/get-latest-sensor-snapshot.ts
-import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@3.5.0";
 import { z as z3 } from "npm:zod@^4.6.6";
 var get_latest_sensor_snapshot_default = defineTool3({
   name: "get_latest_sensor_snapshot",
@@ -873,13 +878,13 @@ var get_latest_sensor_snapshot_default = defineTool3({
 ${summary}`
         }
       ],
-      structuredContent: { snapshot: result.data.snapshot }
+      structuredContent: asStructuredJson({ snapshot: result.data.snapshot })
     };
   }
 });
 
 // src/lib/mcp/tools/list-grow-walk-targets.ts
-import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@3.5.0";
 import { z as z4 } from "npm:zod@^4.6.6";
 
 // src/lib/growAttributionRules.ts
@@ -1647,13 +1652,13 @@ var list_grow_walk_targets_default = defineTool4({
           text: targets.length === 0 ? `No Grow Walk targets found in "${grow.name}".` : `Found ${targets.length} Grow Walk target(s) in "${grow.name}", ordered for physical inspection${summaryIsPartial ? " with explicit bounded-summary limits" : ""}.`
         }
       ],
-      structuredContent: { grow, targets, generatedAt, receipt }
+      structuredContent: asStructuredJson({ grow, targets, generatedAt, receipt })
     };
   }
 });
 
 // src/lib/mcp/tools/get-grow-walk-context.ts
-import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@3.5.0";
 import { z as z5 } from "npm:zod@^4.6.6";
 
 // src/lib/actionQueueProvenanceRules.ts
@@ -2312,18 +2317,25 @@ var get_grow_walk_context_default = defineTool5({
           text: partial === 0 ? `Grow Walk context ready for ${archived}"${scope}".` : `Grow Walk context ready for ${archived}"${scope}" with ${partial} explicit partial evidence lane(s).`
         }
       ],
-      structuredContent: { context }
+      structuredContent: asStructuredJson({ context })
     };
   }
 });
 
 // src/lib/mcp/index.ts
 var projectRef = "knkwiiywfkbqznbxwqfh";
+var MCP_ALLOWED_ORIGINS = [
+  "https://verdantgrowdiary.com",
+  "https://www.verdantgrowdiary.com",
+  "https://id-preview--66255e7b-892c-4be5-8686-ab1cfc3666db.lovable.app",
+  "https://66255e7b-892c-4be5-8686-ab1cfc3666db.lovableproject.com"
+];
 var mcp_default = defineMcp({
   name: "verdant-grow-os-mcp",
   title: "Verdant Grow OS",
   version: "0.1.0",
   instructions: "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Use `list_grow_walk_targets` to rank owned tents and plants for physical inspection, then `get_grow_walk_context` to retrieve bounded, source-labeled evidence for one exact owned target. Grow Walk priority is scouting guidance, not diagnosis. Photo rows are metadata only unless an image is separately supplied and inspected. Sensor readings always include their `source` and `quality` labels verbatim. Trust is deny-by-default: a reading is current live telemetry ONLY when its quality is `ok` AND its source is `live` (fresh validated connected telemetry). Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. This server never writes, never starts AI Doctor, never spends AI credits, never approves Action Queue items, and never controls devices.",
+  allowedOrigins: MCP_ALLOWED_ORIGINS,
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"
@@ -2338,5 +2350,5 @@ var mcp_default = defineMcp({
 });
 
 // lovable-mcp-supabase-entry.ts
-import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@0.24.0/stacks/supabase";
+import { createSupabaseHandler } from "npm:@lovable.dev/mcp-js@3.5.0/stacks/supabase";
 Deno.serve(createSupabaseHandler(mcp_default, { functionName: "mcp" }));

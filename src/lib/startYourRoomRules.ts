@@ -160,6 +160,26 @@ export function startRoomFormWithDefaults(form: StartYourRoomForm): StartYourRoo
   };
 }
 
+/**
+ * One visible line naming the grow and tent this submit will create, so a
+ * grower who never opens the optional names group still knows what Verdant
+ * made. A typed name replaces its default; an item that already exists is
+ * left out. Returns null when both already exist.
+ */
+export function startRoomPendingNamesLine(
+  form: StartYourRoomForm,
+  ids: StartYourRoomIds,
+): string | null {
+  const growName = trimName(form.growName) || START_YOUR_ROOM_DEFAULT_GROW_NAME;
+  const tentName = trimName(form.tentName) || START_YOUR_ROOM_DEFAULT_TENT_NAME;
+  const needsGrow = !ids.growId;
+  const needsTent = !ids.tentId;
+  if (needsGrow && needsTent) return `Creates grow “${growName}” and tent “${tentName}”.`;
+  if (needsGrow) return `Creates grow “${growName}”.`;
+  if (needsTent) return `Creates tent “${tentName}”.`;
+  return null;
+}
+
 /** The first room item that still has to be created; "done" when all exist. */
 export function firstMissingStep(ids: StartYourRoomIds): StartYourRoomStep {
   if (!ids.growId) return "grow";

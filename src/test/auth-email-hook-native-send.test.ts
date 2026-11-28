@@ -204,7 +204,7 @@ describe("auth-email-hook native Send Email hook", () => {
       expect(hook.sends).toHaveLength(1);
       expect(hook.sends[0].message).toMatchObject({
         to: "grower@example.invalid",
-        from: "verdantgrowdiary-com <noreply@verdantgrowdiary.com>",
+        from: "Verdant Grow Diary <noreply@verdantgrowdiary.com>",
         sender_domain: "notify.verdantgrowdiary.com",
         label: action,
         idempotency_key: `msg_${action}`,

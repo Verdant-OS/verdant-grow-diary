@@ -12,7 +12,7 @@
  * so a grower sees the same email whichever path Supabase Auth calls.
  */
 
-export const AUTH_EMAIL_SITE_NAME = "verdantgrowdiary-com";
+export const AUTH_EMAIL_SITE_NAME = "Verdant Grow Diary";
 export const AUTH_EMAIL_SENDER_DOMAIN = "notify.verdantgrowdiary.com";
 export const AUTH_EMAIL_ROOT_DOMAIN = "verdantgrowdiary.com";
 export const AUTH_EMAIL_FROM = `${AUTH_EMAIL_SITE_NAME} <noreply@${AUTH_EMAIL_ROOT_DOMAIN}>`;

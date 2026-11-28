@@ -14,14 +14,17 @@ import type { NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
 import { resolveQuickLogEventIdentity } from "@/lib/quickLogEventIdentityRules";
 import { splitHardwareReadingsFromNote } from "@/lib/quickLogHardwareReadingsDisplayRules";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
+import type { WaterEntryUnit } from "@/lib/quickLogWaterVolumeUnitRules";
 
 /**
  * Display options for the history builders. `temperatureUnit` is the
  * grower's unit for a sensor temperature in `summarySuffix`; omitted, the
  * identity resolver uses the app default. Stored values stay Celsius.
+ * `waterUnit` is the unit for a watering volume; omitted, it stays ml.
  */
 export interface QuickLogHistoryBuildOptions {
   temperatureUnit?: TemperatureUnitPreference;
+  waterUnit?: WaterEntryUnit;
 }
 
 export type HistoryLane =

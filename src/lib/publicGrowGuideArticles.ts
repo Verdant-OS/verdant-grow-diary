@@ -388,7 +388,7 @@ export const STEADY_CLIMATE_GUIDE: PublicGrowGuideArticle = {
       id: "measure-each-tent",
       heading: "Measure each tent on its own",
       paragraphs: [
-        "Put a sensor in each tent at canopy height, away from direct light and fans. Before you compare tents, put the sensors side by side for a while to see how far apart they read. A gap you never checked can look like a climate difference that isn't there.",
+        "Put a sensor in each tent at canopy height, away from direct light and fans. Before you compare tents, put the sensors next to each other for a while to see how far apart they read. A gap you never checked can look like a climate difference that isn't there.",
         "Label each reading with its tent and its source: live, manual, or CSV import. A reading with no tent label can't tell you which tent to fix.",
       ],
       links: [{ label: "Sensor truth in the grow room", to: "/guides/sensor-truth-grow-room" }],
@@ -411,6 +411,42 @@ export const STEADY_CLIMATE_GUIDE: PublicGrowGuideArticle = {
       ],
       links: [{ label: "Identify and isolate a male cannabis plant", to: `/guides/${MALE_SLUG}` }],
     },
+    {
+      id: "track-each-tent",
+      heading: "Track each tent in one diary",
+      paragraphs: [
+        "Climate readings only help if you know which plants were in the tent when they were taken. In a multi-tent room, plants move, and a reading with no plant history attached can't explain what happened to them.",
+      ],
+    },
+    {
+      id: "plant-to-tent-history",
+      heading: "Plant-to-tent history (Pro; Free includes 1 tent)",
+      paragraphs: [
+        "Log which tent each plant is in, with the date it went in. Every feed, photo and note then sits under the right tent. When a plant struggles, you can look back at the climate that tent had during that stretch, not the room's average.",
+      ],
+    },
+    {
+      id: "veg-to-flower-moves",
+      heading: "Veg-to-flower moves (Pro)",
+      paragraphs: [
+        "When you move a plant from a veg tent to a flower tent, record the move date and both tents. The plant's climate history changes on that day, because the flower tent usually runs warmer, drier air than veg. If a plant stalls a week after a move, the move date and the new tent's readings are the first things to check.",
+      ],
+    },
+    {
+      id: "compare-vpd-each-tent",
+      heading: "Compare VPD for each tent",
+      paragraphs: [
+        "Work out air VPD for each tent from its canopy-height temperature and humidity, using the VPD calculator. Record the same hours for each tent, lights-on and lights-off, and judge each tent against the range for the stage of its plants. Label the result air VPD unless you measured leaf temperature. Log each tent's VPD in its own diary entries, so each tent keeps its own record and you can filter the Timeline by tent.",
+      ],
+      links: [{ label: "VPD calculator", to: "/tools/vpd-calculator" }],
+    },
+    {
+      id: "bring-in-readings",
+      heading: "Bring in readings",
+      paragraphs: [
+        "Import CSV exports from AC Infinity or Spider Farmer on any plan, including Free. Pro adds read-only EcoWitt sensor readings and history across more than one tent. Each reading keeps its tent and source (CSV import or live EcoWitt, read-only), so tent comparisons use the same labels as the rest of your diary. Verdant doesn't control your equipment.",
+      ],
+    },
   ],
   faq: [
     {
@@ -431,7 +467,17 @@ export const STEADY_CLIMATE_GUIDE: PublicGrowGuideArticle = {
     {
       question: "How do I know if my sensors agree?",
       answer:
-        "Put them side by side in the same spot for a while and compare the readings. Note any steady gap before comparing tents, so a sensor difference isn't mistaken for a climate difference.",
+        "Put them next to each other in the same spot for a while and compare the readings. Note any steady gap before comparing tents, so a sensor difference isn't mistaken for a climate difference.",
+    },
+    {
+      question: "How do I keep a grow diary for more than one tent?",
+      answer:
+        "On Pro, give each plant a tent and a start date, and log every move between tents with its date. Keep each tent's readings under that tent's name. Then each plant's notes, photos and feeds line up with the climate it actually had.",
+    },
+    {
+      question: "How can I compare VPD between two grow tents?",
+      answer:
+        "Calculate air VPD for each tent from its canopy-height temperature and humidity, using the VPD calculator. Record the same hours for both, lights-on and lights-off, and judge each tent against the range for the stage of its plants. Label the result air VPD unless you measured leaf temperature. Check that your sensors agree first, so a sensor gap isn't read as a climate gap.",
     },
   ],
   sources: [],

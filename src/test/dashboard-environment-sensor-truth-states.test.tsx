@@ -151,7 +151,7 @@ describe("Environment Snapshot strip — pending/failed/empty truth states (Tent
       /const\s+tentRows\s*=\s*selectDashboardSensorEvidenceRows\([\s\S]*?readingsByTent\[t\.id\]/,
     );
     expect(DASHBOARD).toMatch(
-      /buildTentSnapshotView\(\s*tentRows\s+as\s+BuildTentSnapshotInput\[\][\s\S]*?nowTick/,
+      /buildTentSnapshotView\(\s*snapRows\s+as\s+BuildTentSnapshotInput\[\][\s\S]*?nowTick/,
     );
   });
 });

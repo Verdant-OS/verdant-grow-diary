@@ -20,13 +20,20 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 | Reviewer B      | Main  | Jack Herer                               | `cheekhimself` (shared) |
 | Reviewer C      | Main  | Durban Poison · Reviewer (Main)          | `cheekhimself` (shared) |
 | Reviewer D      | Main  | Maui Wowie · Reviewer (Main)             | `cheekhimself` (shared) |
-| Reviewer E      | Main  | VReviewer · Reviewer (Main)              | `VReviewer`             |
-| Reviewer F      | Main  | matt816cheek-bit · Reviewer (Main)       | `matt816cheek-bit`      |
 | QA              | Main  | Blue Dream · QA (Main)                   |                         |
 | New-User Smoke  | Main  | Toad Venom                               |                         |
 | Bug Sweep       | Main  | White Widow                              |                         |
 | Owner Adviser   | Main  | Bloom                                    |                         |
 | Flow Owner      | Both  | The Coordinator on each side, by default |                         |
+
+## Owner accounts
+
+These are Matthew's own GitHub accounts, not seats.
+
+- `cheekhimself`: Matthew's owner account (also the shared account used by the seats above).
+- `cheekhimselfonetent-boop`: Matthew's own second account. Its approval counts as owner sign-off only, never an independent review.
+- `matt816cheek-bit`: Matthew's own account (Matthew, 2026-11-24). It no longer holds a Reviewer seat. Its approval is Matthew's owner sign-off, never an independent seat review, under the same conditions as `VReviewer` below.
+- `VReviewer`: Matthew's own account. Its approval is Matthew's owner sign-off and the counting GitHub approve click, never an independent seat review. Matthew clicks it himself, only after an independent seat pass at the exact head plus his own-words yes naming the PR and SHA. No agent or app holds its login (Matthew, 2026-11-23 6:44 AM CT).
 
 ## Rules
 
@@ -41,7 +48,7 @@ Governance docs define seats and duties. `docs/agents/constitution/roster.md` is
 - PR #1971: the records below and in `docs/agents/OWNERSHIP.md` name OG Kush as its merge actor. That founder assignment is not moved to another seat by inference. Matthew names the new #1971 merge actor; the hold stays with the Coordinator.
 - `verdant-ultra-bot` is retired (Matthew, 2026-11-17). Ultra seats open and push pull requests as `cheekhimself` (shared). GitHub does not let an account approve its own pull request, so a `cheekhimself` (shared) seat cannot post the GitHub approval on them.
 - Ultra's open pull-request cap is 10.
-- Reviewer C, Reviewer D, Reviewer E, Reviewer F, and QA are active. Matthew set Reviewer E and Reviewer F on 2026-11-17: they are non-author Main Reviewer seats, never write product code, and never merge.
+- Reviewer C, Reviewer D, and QA are active. Reviewer E and Reviewer F are retired as seats (2026-11-24): their accounts, `VReviewer` and `matt816cheek-bit`, are Matthew's own and are listed under Owner accounts.
 
 **Projects Manager has no Verdant delivery seat** (Matthew, 2026-11-05): it does not build, relay yeses, keep handoff files or route work; Ultra Relay (Roots) keeps handoff continuity.
 
@@ -53,7 +60,7 @@ Matthew renames bots, so instruction files outside this roster name seats only, 
 | --- | --- |
 | Writer A, Writer B | Ultra Builder 1, Ultra Builder 2 |
 | Fixer | Ultra Fixer |
-| Reviewer A, B, C, D, E, F | Reviewer A, B, C, D, E, F (Main) |
+| Reviewer A, B, C, D | Reviewer A, B, C, D (Main) |
 | Grok Lead (Main) | Coordinator (Main) |
 | Grok Lead (Ultra) | Ultra Relay |
 | Merge Steward, Merge Readiness, Steward Backup, QA | The seats of the same name |

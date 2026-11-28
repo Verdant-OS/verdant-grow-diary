@@ -26,6 +26,7 @@ import {
 import { getEventType } from "@/lib/diary";
 import { TimelineQuickLogEnvironmentSnapshotReadback } from "@/lib/timelineQuickLogEnvironmentSnapshotReadback";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { useWaterVolumeEntryUnit } from "@/hooks/useWaterVolumeEntryUnit";
 import {
   convertCelsiusForDisplay,
   getTemperatureUnitSymbol,
@@ -420,13 +421,14 @@ function QuickLogHistorySection({
   onEntryChanged,
   targetNames,
 }: QuickLogHistorySectionProps) {
-  // Sensor temperatures in a row's summary follow the grower's unit.
+  // Sensor temperatures and watering volumes in a row's summary follow the grower's units.
   const temperatureUnit = useTemperatureUnitPreference();
+  const waterUnit = useWaterVolumeEntryUnit();
   const rows = useMemo(() => {
     const lifted = liftEntries(rawEntries);
     const normalized = normalizeDiaryEntries({ rawEntries: lifted });
-    return builder(normalized, { temperatureUnit }).slice(0, Math.max(0, limit));
-  }, [rawEntries, builder, limit, temperatureUnit]);
+    return builder(normalized, { temperatureUnit, waterUnit }).slice(0, Math.max(0, limit));
+  }, [rawEntries, builder, limit, temperatureUnit, waterUnit]);
 
   // Correction/retraction handles (issue #786): resolved from the raw
   // entries so only identifiable Quick Log rows get controls; legacy rows

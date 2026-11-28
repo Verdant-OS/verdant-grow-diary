@@ -413,6 +413,9 @@ export default function CsvSensorPreviewPanel({
                         <span className="font-mono text-xs">{f.header}</span>
                         <span className="font-medium">{copy?.title ?? f.message}</span>
                       </div>
+                      <p className="text-xs" data-testid={`csv-preview-flag-detail-${f.code}-${i}`}>
+                        {f.message}
+                      </p>
                       {copy && (
                         <>
                           <p

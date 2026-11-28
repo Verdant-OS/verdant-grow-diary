@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
 import { useNowTick } from "@/hooks/useNowTick";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import { useWaterVolumeEntryUnit } from "@/hooks/useWaterVolumeEntryUnit";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { timelineEntryDetailPhotoSrc } from "@/lib/timelineEntryDetailPermalinkRules";
 import {
@@ -28,7 +29,16 @@ function OpenEvidenceDetail({
 }: Pick<Props, "onClose" | "actions"> & { entry: TimelineEvidenceDetailInput }) {
   const nowMs = useNowTick();
   const temperatureUnit = useTemperatureUnitPreference();
-  const readingLines = presentTimelineDiaryEntryDetails(entry.details, temperatureUnit).detailLines;
+  const waterUnit = useWaterVolumeEntryUnit();
+  const readingLines = presentTimelineDiaryEntryDetails(entry.details, temperatureUnit, {
+    waterUnit,
+    entryType:
+      typeof entry.details?.event_type === "string"
+        ? entry.details.event_type
+        : typeof entry.details?.entry_type === "string"
+          ? entry.details.entry_type
+          : null,
+  }).detailLines;
   return (
     <TimelineEvidenceDetailDrawer
       open

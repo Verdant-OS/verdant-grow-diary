@@ -203,6 +203,7 @@ import {
   EARLY_STAGE_NOTE_PLACEHOLDER,
   buildEarlyStageDetails,
   buildEarlyStageNoteSuffix,
+  hasQuickLogNoteText,
   evaluateEarlyStageVisibility,
   type EarlyStageMilestone,
   type EarlyStageVigor,
@@ -1592,7 +1593,7 @@ export default function QuickLog({
       toast.message(QUICK_LOG_NOTE_ALREADY_SAVED_COPY);
       return;
     }
-    if (!note.trim() && saveEventType !== "watering") {
+    if (!hasQuickLogNoteText({ note, earlyNotes }) && saveEventType !== "watering") {
       const message = "Add a quick note";
       setSaveError(message);
       toast.error(message);
@@ -3384,6 +3385,7 @@ export default function QuickLog({
                           onChange={(e) => {
                             if (restoreLockedDraftValue(e.currentTarget, earlyNotes)) return;
                             setEarlyNotes(e.target.value);
+                            setSaveError(null);
                           }}
                           placeholder="Optional — short observation"
                           autoComplete="off"
@@ -3945,7 +3947,7 @@ export default function QuickLog({
 
             {(() => {
               const preview = evaluateQuickLogPreview({
-                note,
+                note: note.trim() ? note : earlyNotes,
                 eventType,
                 stage,
                 remindAt,

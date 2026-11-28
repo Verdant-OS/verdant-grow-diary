@@ -7,6 +7,7 @@ import {
 } from "@/hooks/useDiaryPhotoDisplayRows";
 import { normalizeDiaryEntries, normalizeDiaryEntry } from "@/lib/diaryEntryRules";
 import { buildPhotoHistory } from "@/lib/photoHistoryRules";
+import { liftDiaryEventType } from "@/lib/plantListPhotoFallbackRules";
 import {
   buildPlantPhotoStripItemsWithSource,
   PLANT_PHOTO_STRIP_DEFAULT_LIMIT,
@@ -49,15 +50,7 @@ export function usePlantDetailPhotoStripItems(
   );
   const items = useMemo(() => {
     if (!plantId || display.rows.length === 0) return [] as PlantDetailPhotoStripItem[];
-    const lifted = display.rows.map((raw) => {
-      const row = (raw ?? {}) as Record<string, unknown>;
-      if (row.entry_type || row.entryType || row.event_type || row.eventType) return row;
-      const details = (row.details ?? null) as Record<string, unknown> | null;
-      const liftedType = details && typeof details === "object" ? details.event_type : undefined;
-      return typeof liftedType === "string" && liftedType.length > 0
-        ? { ...row, entry_type: liftedType }
-        : row;
-    });
+    const lifted = display.rows.map(liftDiaryEventType);
     const normalized = normalizeDiaryEntries({ rawEntries: lifted });
     const photoRows = buildPhotoHistory(normalized);
     return buildPlantPhotoStripItemsWithSource({

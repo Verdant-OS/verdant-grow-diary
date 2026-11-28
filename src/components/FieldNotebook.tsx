@@ -1,5 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import NotebookRouteLink from "@/components/NotebookRouteLink";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useNotebookSessionOwner } from "@/hooks/useNotebookSessionOwner";
 import { useAuth } from "@/store/auth";
 import { timelinePath } from "@/lib/routes";
@@ -121,6 +124,9 @@ export default function FieldNotebook({
     return initial;
   });
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const idPrefix = useId();
+  const panelId = `${idPrefix}-panel`;
+  const tabId = (tentId: string) => `${idPrefix}-tab-${tentId}`;
 
   const selected = tents.find((t) => t.id === selectedId) ?? tents[0];
   const draft = selected ? (drafts[selected.id] ?? readForViewer(selected.id)) : null;
@@ -151,6 +157,30 @@ export default function FieldNotebook({
   }, [selected?.id]);
 
   if (!selected || !draft) return null;
+
+  function moveTab(event: KeyboardEvent<HTMLDivElement>) {
+    const index = tents.findIndex((t) => t.id === selected.id);
+    const last = tents.length - 1;
+    const target =
+      event.key === "ArrowRight"
+        ? index === last
+          ? 0
+          : index + 1
+        : event.key === "ArrowLeft"
+          ? index === 0
+            ? last
+            : index - 1
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? last
+              : null;
+    if (target === null) return;
+    event.preventDefault();
+    const tent = tents[target];
+    setSelectedId(tent.id);
+    tabRefs.current[tent.id]?.focus();
+  }
 
   function put(next: NotebookDraft, asOwner: string | null = notebookSessionOwner()) {
     writeNotebookDraft(next, asOwner);
@@ -318,6 +348,8 @@ export default function FieldNotebook({
         className="mt-2 flex gap-2 overflow-x-auto"
         data-testid="field-notebook-tabs"
         role="tablist"
+        aria-label="Tents"
+        onKeyDown={moveTab}
       >
         {tents.map((tent) => {
           const active = tent.id === selected.id;
@@ -329,8 +361,11 @@ export default function FieldNotebook({
               }}
               type="button"
               role="tab"
+              id={tabId(tent.id)}
               aria-selected={active}
-              className={`min-h-11 shrink-0 px-3 text-sm ${active ? "border-b-2 border-primary font-bold text-primary" : ""}`}
+              aria-controls={panelId}
+              tabIndex={active ? 0 : -1}
+              className={`min-h-11 shrink-0 rounded-sm px-3 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${active ? "border-b-2 border-primary font-bold text-primary" : ""}`}
               onClick={() => setSelectedId(tent.id)}
             >
               {tent.name}
@@ -338,7 +373,12 @@ export default function FieldNotebook({
           );
         })}
       </div>
-      <div className="mt-3 space-y-3">
+      <div
+        className="mt-3 space-y-3"
+        role="tabpanel"
+        id={panelId}
+        aria-labelledby={tabId(selected.id)}
+      >
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{selected.name}</p>
           <h3 className="text-xl font-semibold">
@@ -373,12 +413,12 @@ export default function FieldNotebook({
         </div>
         {draft.phase === "check_found" || draft.phase === "check_none" ? null : (
           <>
-            <label className="block text-sm font-medium" htmlFor="field-notebook-note">
+            <Label className="block" htmlFor="field-notebook-note">
               Observation
-            </label>
-            <textarea
+            </Label>
+            <Textarea
               id="field-notebook-note"
-              className="min-h-24 w-full rounded-md border bg-background p-2 text-base"
+              className="min-h-24 p-2 text-base"
               placeholder={FIELD_NOTEBOOK_EMPTY_NOTE_PLACEHOLDER}
               value={draft.note}
               readOnly={draft.phase === "saving"}
@@ -411,11 +451,15 @@ export default function FieldNotebook({
             />
           </>
         )}
-        {draft.idempotencyRetracted || view.statusLine ? (
-          <p className="text-sm" data-testid="field-notebook-status">
-            {draft.idempotencyRetracted ? formatRetractedLine() : view.statusLine}
-          </p>
-        ) : null}
+        <p
+          className="text-sm empty:sr-only"
+          data-testid="field-notebook-status"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {draft.idempotencyRetracted ? formatRetractedLine() : view.statusLine}
+        </p>
         {draft.phase === "check_found" && draft.verifiedEntry ? (
           <div data-testid="field-notebook-timeline-check">
             <p className="font-semibold">{foundLabel}</p>
@@ -438,15 +482,16 @@ export default function FieldNotebook({
             </NotebookRouteLink>
           ) : null}
           {view.showCheckTimeline ? (
-            <button
+            <Button
               type="button"
-              className="min-h-11 rounded-md border px-3 text-sm font-medium"
+              variant="outline"
+              className="h-auto min-h-11 whitespace-normal"
               onClick={() => {
                 void checkTimeline();
               }}
             >
               Check Timeline
-            </button>
+            </Button>
           ) : null}
           {draft.phase === "uncertain" && draft.attempt ? (
             <>
@@ -455,16 +500,17 @@ export default function FieldNotebook({
                   {formatSaveAgainSendsOriginal()}
                 </p>
               )}
-              <button
+              <Button
                 type="button"
-                className="min-h-11 rounded-md border px-3 text-sm font-medium"
+                variant="outline"
+                className="h-auto min-h-11 whitespace-normal"
                 hidden={draft.idempotencyRetracted === true}
                 onClick={() => {
                   void submit("save_again");
                 }}
               >
                 Save again (won't duplicate)
-              </button>
+              </Button>
             </>
           ) : null}
           {view.showCheckTimeline ? (
@@ -476,20 +522,21 @@ export default function FieldNotebook({
             </NotebookRouteLink>
           ) : null}
           {draft.phase === "check_found" ? (
-            <button
+            <Button
               type="button"
-              className="min-h-11 rounded-md border px-3 text-sm font-medium"
+              variant="outline"
+              className="h-auto min-h-11 whitespace-normal"
               onClick={() => {
                 put(backToNote(draft));
               }}
             >
               Back to note
-            </button>
+            </Button>
           ) : null}
           {draft.phase === "check_found" || draft.phase === "check_none" ? (
-            <button
+            <Button
               type="button"
-              className="min-h-11 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+              className="h-auto min-h-11 whitespace-normal"
               onClick={() => {
                 if (draft.phase === "check_found" && draft.verifiedEntry) {
                   put({ ...acknowledgeFound(draft), recoverySurface: "grow" });
@@ -499,11 +546,11 @@ export default function FieldNotebook({
               }}
             >
               {draft.phase === "check_found" ? "Yes, that's it" : "Back to note"}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
-              className="min-h-11 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
+              className="h-auto min-h-11 whitespace-normal"
               disabled={
                 draft.phase === "saving" ||
                 (draft.phase === "editing" && !maySubmit(draft)) ||
@@ -518,7 +565,7 @@ export default function FieldNotebook({
               }}
             >
               {view.primaryLabel}
-            </button>
+            </Button>
           )}
         </div>
         <p className="text-xs text-muted-foreground" data-testid="field-notebook-photo-note">

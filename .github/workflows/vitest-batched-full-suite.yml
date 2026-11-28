@@ -17,6 +17,9 @@ on:
         required: false
         default: "dot"
 
+permissions:
+  contents: read
+
 jobs:
   batched-suite:
     name: Batched Vitest (matrix)

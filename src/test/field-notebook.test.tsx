@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FieldNotebook, { type FieldNotebookSaveResponse } from "@/components/FieldNotebook";
 import type { FieldNotebookServerEntry } from "@/lib/fieldNotebookOutcomeRules";
@@ -89,8 +89,10 @@ describe("FieldNotebook", () => {
       target: { value: entry.note },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save to Flower Tent 2" }));
-    expect(await screen.findByTestId("field-notebook-status")).toHaveTextContent(
-      /Saved to Flower Tent 2/,
+    await waitFor(() =>
+      expect(screen.getByTestId("field-notebook-status")).toHaveTextContent(
+        /Saved to Flower Tent 2/,
+      ),
     );
     expect(screen.getAllByRole("link", { name: "View in Timeline" })).toHaveLength(1);
     expect(screen.getByTestId("field-notebook-status")).not.toHaveTextContent("View in Timeline");

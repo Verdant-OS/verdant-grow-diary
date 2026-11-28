@@ -14,6 +14,9 @@ on:
           - execute
           - execute-with-diary
 
+permissions:
+  contents: read
+
 jobs:
   rotate:
     name: Garden rotation (${{ inputs.mode }})

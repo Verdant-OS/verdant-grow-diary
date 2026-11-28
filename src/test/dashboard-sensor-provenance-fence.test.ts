@@ -275,11 +275,16 @@ describe("Dashboard sensor provenance fence", () => {
     expect(DASHBOARD).toMatch(/evaluateDashboardSensorQuality\s*\(\s*currentSensorSnapshot/);
     expect(DASHBOARD).toContain("dashboardSnapshotForHealthyCues(");
     expect(DASHBOARD).toContain("evaluateDashboardSensorQuality(");
+    // #3124: alerts read the fenced health snapshot through the calculated-VPD
+    // wrapper, never the raw snapshot.
     expect(DASHBOARD).toMatch(
-      /usePersistEnvironmentAlerts\(\{[\s\S]*?snapshot:\s*dashboardHealthSnapshot/,
+      /const\s+dashboardAlertSnapshot\s*=\s*withCaptureDerivedVpd\(\s*dashboardHealthSnapshot\s*\)/,
     );
     expect(DASHBOARD).toMatch(
-      /const\s+snap\s*=\s*dashboardHealthSnapshot;[\s\S]*?buildEnvironmentAlerts/,
+      /usePersistEnvironmentAlerts\(\{[\s\S]*?snapshot:\s*dashboardAlertSnapshot/,
+    );
+    expect(DASHBOARD).toMatch(
+      /const\s+snap\s*=\s*dashboardAlertSnapshot;[\s\S]*?buildEnvironmentAlerts/,
     );
     expect(DASHBOARD).not.toContain("evaluateSensorQuality(");
     expect(DASHBOARD).not.toContain("raw_payload");

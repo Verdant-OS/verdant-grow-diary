@@ -26,6 +26,7 @@ import { compareSnapshotToTargets } from "@/lib/environmentTargetComparison";
 import { type AlertStagePlant, isCurrentReadForAlertWrite } from "@/lib/alertPlantStageScopeRules";
 import { resolveSnapshotAlertStage } from "@/lib/alertSnapshotStageScopeRules";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
+import { withCaptureDerivedVpd } from "@/lib/alertSnapshotDerivedVpdRules";
 
 interface Props {
   growId: string | null | undefined;
@@ -56,7 +57,11 @@ export default function AlertsAutoPersistForGrow({ growId, stage, plants }: Prop
   const tentsCurrent = isCurrentReadForAlertWrite(tentsQuery);
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(safeGrowId, tentIds);
-  const snapshot = buildSensorSnapshotReadState(sensorState).confirmedSnapshot;
+  // A temperature and RH capture with no stored VPD is graded on its
+  // calculated VPD, as the tent page grades it (#3124).
+  const snapshot = withCaptureDerivedVpd(
+    buildSensorSnapshotReadState(sensorState).confirmedSnapshot,
+  );
   const targetsState = useGrowTargets(safeGrowId, { retryOnUnavailable: true });
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
   // stages, most advanced known stage wins on disagreement. The inputs are

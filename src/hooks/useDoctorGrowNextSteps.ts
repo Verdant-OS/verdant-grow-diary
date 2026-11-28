@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { grantedAnalyticsConsentHeaders } from "@/lib/analyticsConsent";
 import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
 import {
   classifyDoctorNextStepsResponse,
@@ -25,6 +26,7 @@ export function useDoctorGrowNextSteps() {
     setRunning(true);
     try {
       const { data, error } = await supabase.functions.invoke("ai-coach", {
+        headers: grantedAnalyticsConsentHeaders(),
         body: { mode: "next_steps", growId, idempotencyKey: key },
       });
       // A transport error leaves the server outcome unknown (it may have

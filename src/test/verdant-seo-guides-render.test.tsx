@@ -13,8 +13,19 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import GuidesIndex from "@/pages/GuidesIndex";
 import GuidePage from "@/pages/GuidePage";
-import { VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
+import { VERDANT_GUIDES_BREADCRUMB_ITEMS, VERDANT_SEO_GUIDES } from "@/constants/verdantSeoContent";
+import {
+  STATIC_PUBLIC_SEO_DOCUMENTS,
+  VERDANT_SITE_ORIGIN,
+} from "@/lib/build/staticPublicSeoDocuments";
 import { staticRouteHead } from "@/lib/build/staticRouteHead";
+import {
+  buildArticleJsonLd,
+  buildBreadcrumbListJsonLd,
+  buildFaqPageJsonLd,
+  buildHowToJsonLd,
+  buildWebPageJsonLd,
+} from "@/lib/seoStructuredData";
 
 const routeState = vi.hoisted(() => ({ slug: "", hash: "" }));
 
@@ -175,7 +186,7 @@ describe("/guides/:slug detail — public render", () => {
     renderAt("/guides/grow-diary-app");
     const page = screen.getByTestId("guide-page");
     expect(page.getAttribute("data-guide-slug")).toBe("grow-diary-app");
-    expect(screen.getByText(/Best grow diary app for serious growers/i)).toBeTruthy();
+    expect(screen.getByText(/Best grow diary app for cannabis: Verdant/i)).toBeTruthy();
   });
 
   it("emits unique canonical + OG url per guide", () => {
@@ -268,8 +279,79 @@ describe("/guides/:slug detail — public render", () => {
     expect(document.head.querySelectorAll("script[data-page-ldjson]")).toHaveLength(0);
   });
 
-  it("omits Article schema when a legacy guide has no verified publication date", () => {
-    expect(readStaticRouteJsonLd("/guides/grow-diary-app", "Article")).toBeNull();
+  it("names Matthew Cheek and the last-updated date on the two opted-in guides only", () => {
+    for (const slug of ["grow-diary-app", "grow-log-without-spreadsheets"] as const) {
+      cleanup();
+      renderAt(`/guides/${slug}`);
+      expect(screen.getByTestId("guide-byline")).toHaveTextContent("By Matthew Cheek");
+      expect(screen.getByTestId("guide-last-updated")).toHaveTextContent("Last updated 2026-11-18");
+      expect(screen.queryByTestId("guide-editorial-provenance")).toBeNull();
+
+      const article = readStaticRouteJsonLd(`/guides/${slug}`, "Article") as {
+        datePublished?: string;
+        dateModified?: string;
+        author?: { "@type"?: string; name?: string };
+      } | null;
+      expect(article?.author).toEqual({ "@type": "Person", name: "Matthew Cheek" });
+      expect(article?.dateModified).toBe("2026-11-18");
+      expect(article?.datePublished).toBe(slug === "grow-diary-app" ? "2026-07-03" : "2026-11-18");
+    }
+
+    cleanup();
+    renderAt("/guides/sensor-truth-grow-room");
+    expect(screen.queryByTestId("guide-byline")).toBeNull();
+    expect(screen.queryByTestId("guide-last-updated")).toBeNull();
+    expect(readStaticRouteJsonLd("/guides/sensor-truth-grow-room", "Article")).toBeNull();
+  });
+
+  it("keeps every other guide and non-guide document on the previous JSON-LD bytes", () => {
+    const optedIn = new Set(["grow-diary-app", "grow-log-without-spreadsheets"]);
+    for (const guide of VERDANT_SEO_GUIDES) {
+      if (optedIn.has(guide.slug)) continue;
+      const url = `${VERDANT_SITE_ORIGIN}/guides/${guide.slug}`;
+      const article = guide.publishedOn
+        ? buildArticleJsonLd({
+            headline: guide.h1,
+            description: guide.description,
+            url,
+            datePublished: guide.publishedOn,
+            dateModified: guide.modifiedOn,
+            image: `${VERDANT_SITE_ORIGIN}/brand/verdant-logo-512.png`,
+            authorName: "Verdant Grow Diary",
+            publisherName: "Verdant Grow Diary",
+            siteUrl: VERDANT_SITE_ORIGIN,
+          })
+        : null;
+      const howTo = guide.howTo
+        ? buildHowToJsonLd({ url, name: guide.howTo.name, steps: guide.howTo.steps })
+        : null;
+      const previous = [
+        buildWebPageJsonLd({
+          title: guide.title,
+          description: guide.description,
+          url,
+          siteUrl: VERDANT_SITE_ORIGIN,
+          dateModified: guide.publishedOn ? undefined : guide.modifiedOn,
+        }),
+        buildFaqPageJsonLd({ pageUrl: url, questions: guide.faq }),
+        buildBreadcrumbListJsonLd({
+          items: [...VERDANT_GUIDES_BREADCRUMB_ITEMS, { name: guide.h1, url }],
+        }),
+        ...(howTo ? [howTo] : []),
+        ...(article ? [article] : []),
+      ];
+      const actual = staticRouteHead(`/guides/${guide.slug}`).scripts.map((script) =>
+        JSON.parse(script.children),
+      );
+      expect(actual).toEqual(previous);
+    }
+
+    for (const doc of STATIC_PUBLIC_SEO_DOCUMENTS) {
+      if (optedIn.has(doc.path.replace(/^\/guides\//, ""))) continue;
+      const raw = JSON.stringify(doc.metadata.jsonLd ?? null);
+      expect(raw).not.toContain('"@type":"Person"');
+      expect(raw).not.toContain("Matthew Cheek");
+    }
   });
 
   it("moves keyboard focus to the deep-linked FAQ accordion item", async () => {

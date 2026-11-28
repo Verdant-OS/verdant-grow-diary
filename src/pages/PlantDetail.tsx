@@ -90,10 +90,10 @@ import { useAuth } from "@/store/auth";
 import { format } from "date-fns";
 
 import PlantQuickLog from "@/components/PlantQuickLog";
+import PlantDetailQuickLogButton from "@/components/PlantDetailQuickLogButton";
 import PlantManualSensorFreshnessCard from "@/components/PlantManualSensorFreshnessCard";
 import PlantSensorSourceBreakdownCard from "@/components/PlantSensorSourceBreakdownCard";
 import { useEffect, useMemo, useState } from "react";
-import { Zap } from "lucide-react";
 import type {
   PhotoDiagnosisLatestReview,
   PhotoDiagnosisPhotoInput,
@@ -819,15 +819,7 @@ export default function PlantDetail() {
               </div>
             ) : null}
             <div className="flex min-w-0 flex-wrap gap-2">
-              <Button
-                size="sm"
-                type="button"
-                onClick={() => setQuickLogOpen(true)}
-                data-testid="plant-detail-quick-log-open"
-                className="min-h-11 gap-1 whitespace-normal bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                <Zap className="h-3.5 w-3.5" /> Quick Log
-              </Button>
+              <PlantDetailQuickLogButton plantId={plant.id} testId="plant-detail-quick-log-open" />
               <Button asChild variant="outline" size="sm" className="min-h-11 whitespace-normal">
                 <Link to={logsPath()}>Open Logs</Link>
               </Button>

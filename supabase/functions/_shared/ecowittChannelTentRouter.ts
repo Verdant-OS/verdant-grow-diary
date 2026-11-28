@@ -83,6 +83,38 @@ const TEMP_F_RE = /^temp([1-8])f$/i;
 const HUMIDITY_RE = /^humidity([1-8])$/i;
 const SOIL_RE = /^soilmoisture([1-8])$/i;
 
+/**
+ * WH52 soil-EC probes publish moisture as `soil_ec_humN` (N = 1–8), not
+ * `soilmoistureN`. `soil_ec_tempN` and `soil_ecN` are not EcoWitt router
+ * metrics (`EcoWittRouterMetric` is only air temp, air humidity, and soil
+ * moisture), so this class does not read them.
+ *
+ * When both moisture keys exist for the same N, `soilmoistureN` is the only
+ * candidate. `soil_ec_humN` is skipped even if the WH51 value is later
+ * dropped, so one channel cannot emit two moisture readings.
+ */
+export class EcoWittWh52SoilProbe {
+  static readonly MOISTURE_KEY = /^soil_ec_hum([1-8])$/i;
+
+  static moistureChannel(key: string): number | null {
+    const match = EcoWittWh52SoilProbe.MOISTURE_KEY.exec(key);
+    return match ? Number(match[1]) : null;
+  }
+
+  static legacyMoistureKey(channel: number): string {
+    return `soilmoisture${channel}`;
+  }
+
+  /**
+   * True when any key equals `soilmoistureN`, ignoring case. Callers may
+   * pass the raw payload or the lowercased copy.
+   */
+  static legacyMoisturePresent(payload: Record<string, unknown>, channel: number): boolean {
+    const wanted = EcoWittWh52SoilProbe.legacyMoistureKey(channel);
+    return Object.keys(payload).some((key) => key.toLowerCase() === wanted);
+  }
+}
+
 // Plausible ranges. Mirrors the suspicion thresholds in
 // sensorBridgeIntakeRules so we drop garbage before fan-out (the intake
 // rules remain the source of truth at insert time).
@@ -92,8 +124,12 @@ const PCT_MIN = 0;
 const PCT_MAX = 100;
 
 function coerceFinite(v: unknown): number | null {
-  if (v === null || v === undefined || v === "") return null;
-  const n = typeof v === "number" ? v : Number(v);
+  if (typeof v === "boolean" || v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v !== "string") return null;
+  const trimmed = v.trim();
+  if (trimmed === "" || trimmed === "true" || trimmed === "false") return null;
+  const n = Number(trimmed);
   return Number.isFinite(n) ? n : null;
 }
 
@@ -158,12 +194,16 @@ export function routeEcoWittPayloadToTents(input: EcoWittRouterInput): EcoWittRo
 
   // Pair temp{n}f with humidity{n} into the same air-channel tent. Both go
   // to the tent that lists channel `n` in `air_channels`. soilmoisture{n}
-  // goes to the tent that lists `n` in `soil_channels`. The two lists can
-  // point to different tents — that's the whole point of Option C.
+  // and WH52 soil_ec_hum{n} go to the tent that lists `n` in `soil_channels`.
+  // The two lists can point to different tents — that's the whole point of Option C.
   for (const [rawKey, rawValue] of Object.entries(lower)) {
     const tempMatch = TEMP_F_RE.exec(rawKey);
     const humMatch = HUMIDITY_RE.exec(rawKey);
     const soilMatch = SOIL_RE.exec(rawKey);
+    const wh52Channel = EcoWittWh52SoilProbe.moistureChannel(rawKey);
+    if (wh52Channel !== null && EcoWittWh52SoilProbe.legacyMoisturePresent(lower, wh52Channel)) {
+      continue;
+    }
 
     let metric: EcoWittRouterMetric | null = null;
     let channel = 0;
@@ -181,6 +221,10 @@ export function routeEcoWittPayloadToTents(input: EcoWittRouterInput): EcoWittRo
     } else if (soilMatch) {
       metric = "soil_moisture_pct";
       channel = Number(soilMatch[1]);
+      value = coerceFinite(rawValue);
+    } else if (wh52Channel !== null) {
+      metric = "soil_moisture_pct";
+      channel = wh52Channel;
       value = coerceFinite(rawValue);
     } else {
       continue;

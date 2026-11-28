@@ -15,7 +15,7 @@ export default function CreatorBeta() {
   usePageSeo({
     title: "Verdant Creator & Breeder Beta | Verdant Grow Diary",
     description:
-      "Controlled beta for serious growers, breeders, and grower-educators. See how Verdant turns plant logs, photos, sensor snapshots, phenotype notes, and lab evidence into one clear plant history.",
+      "Controlled beta for serious growers, breeders and educators. Verdant turns logs, photos, sensor snapshots, pheno notes and lab evidence into one plant history.",
     path: "/creator-beta",
   });
 

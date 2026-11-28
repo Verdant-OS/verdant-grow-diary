@@ -66,6 +66,7 @@ import {
 import {
   AUTH_MODE_TABS,
   AUTH_TAB_LIST_CLASSNAME,
+  getAuthPageTitle,
   getAuthTabTriggerClassName,
   type AuthMode,
 } from "@/lib/authModeTabRules";
@@ -89,13 +90,6 @@ import {
 } from "@/constants/authSessionCopy";
 
 export default function Auth() {
-  usePageSeo({
-    title: "Sign in to Verdant Grow Diary",
-    description:
-      "Sign in or create your Verdant Grow Diary account to log grows, sensor snapshots, and cautious AI coaching.",
-    path: "/auth",
-    noindex: true,
-  });
   const { user, loading } = useAuth();
   const hydrated = useHydrated();
   const nav = useNavigate();
@@ -120,6 +114,14 @@ export default function Auth() {
   useEffect(() => {
     setMode(requestedMode);
   }, [requestedMode]);
+
+  usePageSeo({
+    title: getAuthPageTitle(mode),
+    description:
+      "Sign in or create your Verdant Grow Diary account to log grows, sensor snapshots, and cautious AI coaching.",
+    path: "/auth",
+    noindex: true,
+  });
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

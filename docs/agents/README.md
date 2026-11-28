@@ -1,37 +1,9 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-11-17.1**
+**Sentinel-Version: 2026-11-20.3**
 
-Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` §4.3.
-**Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.
-Exclude every author and repairer even after a task transfer. A shared GitHub identity
-alone does not establish independence: record session, role, contributor exclusions,
-full 40-character head SHA, complete scope, evidence and verdict.
-The Merge Steward's gate still requires **35/35 required checks** and an independent
-**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing
-OWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,
-protected or mixed scopes still need an eligible outside reviewer. Required CI and
-supplemental evidence, protected-file gates, holds, merge queue and founder-only
-production controls remain. Builder and Fixer seats use normal pushes only: no force-push, merge,
-Publish, SQL apply or production Supabase writes. Drafts remain draft.
-The Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.
-Check the existing request and receipt before pinging; keep one current review request
-per PR/full head with owner, permalink and requested/running/blocked/verdict/superseded
-state. Transfer an unavailable reviewer once to an eligible fallback; otherwise record
-BLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence
-are not PASS. Preserve a still-valid independent review without a duplicate request.
-
-Hosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep
-E2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the
-disposable test account owns the fixture grow and its selected tent/plant;
-tag every saved grow record `[smoke <timestamp>]`. Never write customer data or
-use the KEEP account. Stop a write if identity, ownership or tagging cannot
-be verified; report that exact safety gap rather than proposing another host.
-Local/CI fixtures validate code, not production. Repository integration follows
-the explicit merge gate in AGENTS.md; it is not production acceptance. No
-Publish, production APPLY, real charge, role/auth change, device control or
-Action Queue operation is authorized here. Existing owner locks remain.
-See docs/production-only-verification-runbook.md.
+Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md
+Start page (do not restate): docs/agents/START_HERE.md
 
 Multi-agent work on Verdant runs under one shared constitution plus a small
 platform-specific bootstrap per agent. A single file cannot reach every AI platform

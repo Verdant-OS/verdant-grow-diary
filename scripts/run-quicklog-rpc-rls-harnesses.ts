@@ -29,6 +29,15 @@ if (missing.length > 0 || !hasAnon) {
   process.exit(0);
 }
 
+// Local-only. save-event and save-manual create users and write rows with the
+// service-role key and have no host check of their own, so refuse a hosted
+// SUPABASE_URL here, before any harness starts (Codex review on #3025).
+const apiHost = new URL(process.env.SUPABASE_URL as string).hostname.toLowerCase();
+if (!["127.0.0.1", "localhost", "::1"].includes(apiHost)) {
+  console.log(`[quicklog-rpc] SKIP — local-only harness refused API host ${apiHost}`);
+  process.exit(0);
+}
+
 const HARNESSES = [
   "scripts/run-quicklog-save-event-rls-harness.ts",
   "scripts/run-quicklog-save-manual-rls-harness.ts",

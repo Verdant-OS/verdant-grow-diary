@@ -646,6 +646,170 @@ test("rejects a Sentinel date downgrade with a higher revision number", () => {
   assert.match(result.stderr, /Sentinel-Version downgrade/);
 });
 
+const SHARED_POINTERS = [
+  "Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md",
+  "Start page (do not restate): docs/agents/START_HERE.md",
+];
+
+const SENTINEL_BLOCK_PINS = [
+  "Independent acceptance routing: select an **actually available, eligible independent\nreviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` \u00a74.3.\n**Blue Dream and Critical Mass are retired from future routing**; preserve historical\nreceipts. **Codex** remains eligible on work Codex neither authored nor repaired.\nA **non-contributing Claude or Grok review session** may give independent acceptance,\nincluding for Codex-authored work; **Durban Poison** remains eligible when available.\nExclude every author and repairer even after a task transfer. A shared GitHub identity\nalone does not establish independence: record session, role, contributor exclusions,\nfull 40-character head SHA, complete scope, evidence and verdict.\nThe merge gate still requires **35/35 required checks** and an independent\n**PASS at the exact head SHA**, with no P1 or P2; seats are named only in the roster. **Graft** retains only its existing\nOWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,\nprotected or mixed scopes still need an eligible outside reviewer. Required CI and\nsupplemental evidence, protected-file gates, holds, merge queue and founder-only\nproduction controls remain. Codex uses normal pushes only: no force-push, merge,\nPublish, SQL apply or production Supabase writes. Drafts remain draft.\nCheck the existing request and receipt before pinging; keep one current review request\nper PR/full head with owner, permalink and requested/running/blocked/verdict/superseded\nstate. Transfer an unavailable reviewer once to an eligible fallback; otherwise record\nBLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence\nare not PASS. Preserve a still-valid independent review without a duplicate request.\n\nHosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep\nE2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the\ndisposable test account owns the fixture grow and its selected tent/plant;\ntag every saved grow record `[smoke <timestamp>]`. Never write customer data or\nuse the KEEP account. Stop a write if identity, ownership or tagging cannot\nbe verified; report that exact safety gap rather than proposing another host.\nLocal/CI fixtures validate code, not production. Repository integration follows\nthe explicit merge gate in AGENTS.md; it is not production acceptance. No\nPublish, production APPLY, real charge, role/auth change, device control or\nAction Queue operation is authorized here. Existing owner locks remain.\nSee docs/production-only-verification-runbook.md.",
+  "Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` \u00a74.3.\n**Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.\nExclude every author and repairer even after a task transfer. A shared GitHub identity\nalone does not establish independence: record session, role, contributor exclusions,\nfull 40-character head SHA, complete scope, evidence and verdict.\nThe Merge Steward's gate still requires **35/35 required checks** and an independent\n**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing\nOWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,\nprotected or mixed scopes still need an eligible outside reviewer. Required CI and\nsupplemental evidence, protected-file gates, holds, merge queue and founder-only\nproduction controls remain. Builder and Fixer seats use normal pushes only: no force-push, merge,\nPublish, SQL apply or production Supabase writes. Drafts remain draft.\nThe Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.\nCheck the existing request and receipt before pinging; keep one current review request\nper PR/full head with owner, permalink and requested/running/blocked/verdict/superseded\nstate. Transfer an unavailable reviewer once to an eligible fallback; otherwise record\nBLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence\nare not PASS. Preserve a still-valid independent review without a duplicate request.\n\nHosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep\nE2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the\ndisposable test account owns the fixture grow and its selected tent/plant;\ntag every saved grow record `[smoke <timestamp>]`. Never write customer data or\nuse the KEEP account. Stop a write if identity, ownership or tagging cannot\nbe verified; report that exact safety gap rather than proposing another host.\nLocal/CI fixtures validate code, not production. Repository integration follows\nthe explicit merge gate in AGENTS.md; it is not production acceptance. No\nPublish, production APPLY, real charge, role/auth change, device control or\nAction Queue operation is authorized here. Existing owner locks remain.\nSee docs/production-only-verification-runbook.md.",
+  "Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` \u00a74.3.\n**Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.\nExclude every author and repairer even after a task transfer. A shared GitHub identity\nalone does not establish independence: record session, role, contributor exclusions,\nfull 40-character head SHA, complete scope, evidence and verdict.\nThe Merge Steward's gate still requires **35/35 required checks** and an independent\n**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing\nOWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,\nprotected or mixed scopes still need an eligible outside reviewer. Required CI and\nsupplemental evidence, protected-file gates, holds, merge queue and founder-only\nproduction controls remain. Builder and Fixer seats use normal pushes only: no force-push, merge,\nPublish, SQL apply or production Supabase writes. Drafts remain draft.\nThe Merge Steward has no authority over the PR #1971 hold.\nCheck the existing request and receipt before pinging; keep one current review request\nper PR/full head with owner, permalink and requested/running/blocked/verdict/superseded\nstate. Transfer an unavailable reviewer once to an eligible fallback; otherwise record\nBLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence\nare not PASS. Preserve a still-valid independent review without a duplicate request.",
+];
+
+function writeSharedBlockFixture(root, version) {
+  const pointers = `${SHARED_POINTERS.join("\n")}\n`;
+  for (const path of GOVERNANCE_FILES) {
+    const absolute = join(root, path);
+    if (path === "AGENTS.md") {
+      writeFileSync(absolute, readFileSync(absolute, "utf8") + pointers, "utf8");
+    }
+  }
+  const agents = readFileSync(join(root, "AGENTS.md"), "utf8");
+  const geminiPath = join(root, "GEMINI.md");
+  writeFileSync(
+    geminiPath,
+    readFileSync(geminiPath, "utf8").replace(
+      /<!-- SENTINEL-CORE:BEGIN[^\n]*\n[\s\S]*?\n<!-- SENTINEL-CORE:END -->/,
+      `<!-- SENTINEL-CORE:BEGIN -->\n${agents.trimEnd()}\n<!-- SENTINEL-CORE:END -->`,
+    ),
+    "utf8",
+  );
+  for (const path of GOVERNANCE_FILES) {
+    if (path === "AGENTS.md") continue;
+    const absolute = join(root, path);
+    writeFileSync(absolute, readFileSync(absolute, "utf8") + pointers, "utf8");
+  }
+  writeFileSync(join(root, "docs", "agents", "START_HERE.md"), "# Start\n", "utf8");
+  writeFileSync(
+    join(root, "docs", "agents", "SENTINEL_BLOCK.md"),
+    `Sentinel-Version: ${version}\n${SENTINEL_BLOCK_PINS.join("\n")}\n`,
+    "utf8",
+  );
+}
+
+test("requires the shared sentinel block at 2026-11-20.1", () => {
+  const root = makeFixture({
+    version: "2026-11-20.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  const result = runChecker(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /SENTINEL_BLOCK\.md: missing/);
+});
+
+test("rejects a shared sentinel block that drops a moved sentence", () => {
+  const root = makeFixture({
+    version: "2026-11-20.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  writeSharedBlockFixture(root, "2026-11-20.1");
+  const blockPath = join(root, "docs", "agents", "SENTINEL_BLOCK.md");
+  writeFileSync(
+    blockPath,
+    readFileSync(blockPath, "utf8").replace("Drafts remain draft.", ""),
+    "utf8",
+  );
+  const result = runChecker(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /moved copy is missing from operative prose/);
+});
+
+test("accepts 2026-11-20.1 when every governance file points at the shared block", () => {
+  const root = makeFixture({
+    version: "2026-11-20.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  writeSharedBlockFixture(root, "2026-11-20.2");
+  for (const path of GOVERNANCE_FILES) {
+    replace(root, path, "2026-11-20.1", "2026-11-20.2");
+  }
+  const result = runChecker(root);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Sentinel-Version OK — 2026-11-20\.2 across 18/);
+});
+
+
+test("rejects moved copies that survive only inside a comment", () => {
+  const root = makeFixture({
+    version: "2026-11-20.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  writeSharedBlockFixture(root, "2026-11-20.2");
+  for (const path of GOVERNANCE_FILES) {
+    replace(root, path, "2026-11-20.1", "2026-11-20.2");
+  }
+  const blockPath = join(root, "docs", "agents", "SENTINEL_BLOCK.md");
+  const body = readFileSync(blockPath, "utf8").replace(/^Sentinel-Version:.*\n/, "");
+  writeFileSync(blockPath, `Sentinel-Version: 2026-11-20.2\n<!--\n${body}\n-->\n`, "utf8");
+  const result = runChecker(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /moved copy is missing from operative prose/);
+});
+
+test("rejects shared pointers that survive only inside a comment", () => {
+  const root = makeFixture({
+    version: "2026-11-20.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  writeSharedBlockFixture(root, "2026-11-20.2");
+  for (const path of GOVERNANCE_FILES) {
+    replace(root, path, "2026-11-20.1", "2026-11-20.2");
+    const absolute = join(root, path);
+    let text = readFileSync(absolute, "utf8");
+    for (const pointer of SHARED_POINTERS) {
+      text = text.replaceAll(pointer, `<!-- ${pointer} -->`);
+    }
+    writeFileSync(absolute, text, "utf8");
+  }
+  const result = runChecker(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /missing shared pointer in operative prose/);
+});
+
+test("rejects a shared-block edit that does not bump the version", () => {
+  const root = makeFixture({
+    version: "2026-11-20.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  writeSharedBlockFixture(root, "2026-11-20.1");
+  git(root, "add", ".");
+  git(root, "commit", "-m", "add shared block");
+  const blockPath = join(root, "docs", "agents", "SENTINEL_BLOCK.md");
+  writeFileSync(blockPath, readFileSync(blockPath, "utf8") + "\nextra rule\n", "utf8");
+  const result = runChecker(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /SENTINEL_BLOCK\.md: content changed/);
+});
+
+test("accepts a shared-block edit once the version is bumped", () => {
+  const root = makeFixture({
+    version: "2026-11-20.1",
+    startupGate: COVERAGE_STARTUP_GATE,
+    handoffLog: true,
+  });
+  writeSharedBlockFixture(root, "2026-11-20.1");
+  git(root, "add", ".");
+  git(root, "commit", "-m", "add shared block");
+  const blockPath = join(root, "docs", "agents", "SENTINEL_BLOCK.md");
+  writeFileSync(
+    blockPath,
+    readFileSync(blockPath, "utf8").replace("2026-11-20.1", "2026-11-20.2") + "\nextra rule\n",
+    "utf8",
+  );
+  for (const path of GOVERNANCE_FILES) {
+    replace(root, path, "2026-11-20.1", "2026-11-20.2");
+  }
+  const result = runChecker(root);
+  assert.equal(result.status, 0, result.stderr);
+});
+
 test("allows a same-date revision upgrade from 9 to 10", () => {
   const root = makeFixture({
     version: "2026-09-28.9",

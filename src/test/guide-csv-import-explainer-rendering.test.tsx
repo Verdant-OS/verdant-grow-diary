@@ -49,10 +49,12 @@ describe("AC Infinity CSV import guide (React)", () => {
     const guide = findGuideBySlug("ac-infinity-data-logging")!;
     renderGuide("ac-infinity-data-logging");
     expect(screen.getByRole("heading", { name: guide.introHeading! })).toBeInTheDocument();
-    expect(screen.getByText("Pick your file and import it.")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "See it in your tent history" }),
+      screen.getByText("Pick your file, check the preview, and import it."),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "See it in your tent history" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Free and Pro" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "plans" })).toHaveAttribute("href", "/pricing");
     expect(screen.getAllByText(/Related:/).length).toBeGreaterThan(0);
@@ -89,7 +91,7 @@ describe("CSV import guides (static no-JS fallback)", () => {
     const ac = staticFallback("ac-infinity-data-logging");
     const sf = staticFallback("spider-farmer-data-logging");
     expect(ac).toContain(`href="${amp(AC_CTA)}"`);
-    expect(ac).toContain("<li>Pick your file and import it.</li>");
+    expect(ac).toContain("<li>Pick your file, check the preview, and import it.</li>");
     expect(ac).toContain('<a href="/pricing">plans</a>');
     expect(sf).toContain(`href="${amp(SF_CTA)}"`);
     expect(sf).toContain('<a href="/guides/ac-infinity-data-logging">');

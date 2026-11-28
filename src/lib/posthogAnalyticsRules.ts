@@ -31,7 +31,13 @@ export type PostHogStartup =
   | { enabled: true; key: string; apiHost: string };
 
 export type PostHogProductEvent = {
-  name: "user_signed_up" | "grow_created" | "plant_created" | "log_created" | "sensor_csv_imported";
+  name:
+    | "user_signed_up"
+    | "grow_created"
+    | "tent_created"
+    | "plant_created"
+    | "log_created"
+    | "sensor_csv_imported";
   properties: Record<string, string | number>;
 };
 
@@ -59,7 +65,7 @@ export function isExcludedAnalyticsPath(pathname: string): boolean {
  * The router serves these pages in any letter case, with repeated or trailing
  * slashes, and with percent-escapes, so the match ignores all of them.
  */
-function isNoAnalyticsPublicPath(pathname: unknown): boolean {
+export function isNoAnalyticsPublicPath(pathname: unknown): boolean {
   if (typeof pathname !== "string" || pathname === "") return false;
   let decoded = pathname;
   try {
@@ -161,6 +167,8 @@ export function mapFunnelEventToPostHog(
       return [{ name: "user_signed_up", properties: {} }];
     case "grow_created":
       return [{ name: "grow_created", properties: {} }];
+    case "tent_created":
+      return [{ name: "tent_created", properties: {} }];
     case "plant_created":
       return [{ name: "plant_created", properties: {} }];
     case "quick_log_saved":
@@ -227,6 +235,7 @@ const PRODUCT_PROPERTY_KEYS: Record<string, readonly string[]> = {
   $web_vitals: ["$pathname", "$current_url", ...WEB_VITALS_VALUE_KEYS],
   user_signed_up: [],
   grow_created: [],
+  tent_created: [],
   plant_created: [],
   log_created: ["source"],
   sensor_csv_imported: ["row_count"],
@@ -270,6 +279,11 @@ export function buildPostHogInitOptions(apiHost: string): Partial<PostHogConfig>
     opt_out_persistence_by_default: true,
     disable_surveys: true,
     enable_recording_console_log: false,
+    logs: {
+      captureConsoleLogs: false,
+      serviceName: "verdant-grow-diary-web",
+      environment: "production",
+    },
     capture_performance: { web_vitals: true, web_vitals_attribution: false, network_timing: false },
     persistence: "localStorage+cookie",
     property_denylist: ["email", "$email", "name", "note", "notes", "diary"],
@@ -359,7 +373,7 @@ const SDK_USER_AGENT_PROPERTY_KEYS = [
   "$device_type",
 ] as const;
 
-const SDK_USER_AGENT_MAX_LENGTH = 512;
+export const SDK_USER_AGENT_MAX_LENGTH = 512;
 
 function copySdkTransportProperties(
   source: Record<string, unknown>,
@@ -385,7 +399,7 @@ function copySafeSdkProperties(
   }
 }
 
-function isSafeSdkTransportString(value: string, maxLength: number): boolean {
+export function isSafeSdkTransportString(value: string, maxLength: number): boolean {
   if (!value || value.length > maxLength) return false;
   if (value !== value.trim()) return false;
   if (value.includes("@") || value.includes("\n") || value.includes("\r")) return false;

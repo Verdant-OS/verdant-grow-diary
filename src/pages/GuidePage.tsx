@@ -177,7 +177,17 @@ export default function GuidePage() {
             <GuideHref href={guide.introCta.href} label={guide.introCta.label} />
           </p>
         ) : null}
-        {(guide.publishedOn || guide.modifiedOn) && (
+        {guide.author ? (
+          <p data-testid="guide-byline" className="mt-4 text-sm text-muted-foreground">
+            By {guide.author.name}
+          </p>
+        ) : null}
+        {guide.author && guide.modifiedOn ? (
+          <p data-testid="guide-last-updated" className="mt-1 text-xs text-muted-foreground">
+            Last updated <time dateTime={guide.modifiedOn}>{guide.modifiedOn}</time>
+          </p>
+        ) : null}
+        {!guide.author && (guide.publishedOn || guide.modifiedOn) && (
           <p
             data-testid="guide-editorial-provenance"
             className="mt-4 text-xs text-muted-foreground"

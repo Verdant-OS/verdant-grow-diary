@@ -130,6 +130,8 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   "/breeder-beta",
   "/creator-beta",
   "/glossary",
+  "/help",
+  "/help/:section",
   "/pheno-expression-showcase",
   "/upgrade",
   "/checkout/success",

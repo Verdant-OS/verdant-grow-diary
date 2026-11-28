@@ -66,13 +66,17 @@ import {
   readGeminiDirectApiKey,
   resolveGeminiDirectChat,
 } from "../_shared/geminiDirectChat.ts";
+import {
+  captureAiGeneration,
+  requestGrantsAnalyticsCapture,
+} from "../_shared/posthogAiObservability.ts";
 
 const SUPABASE_JS_SPECIFIER = "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-retry-count",
+    "authorization, x-client-info, apikey, content-type, x-retry-count, x-verdant-analytics-consent",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 };
 
@@ -597,6 +601,28 @@ export async function handleAiDoctorReviewRequest(
       recordedAt: new Date().toISOString(),
       userPromptText: promptMessages.user,
     }).measurement;
+    const aiInput = [
+      { role: "system", content: promptMessages.system },
+      { role: "user", content: promptMessages.user },
+    ];
+    const providerStartedAt = performance.now();
+    const captureGeneration = (details: {
+      response?: unknown;
+      httpStatus?: number;
+      error?: string;
+    }) =>
+      captureAiGeneration({
+        distinctId: userId,
+        traceId: idempotencyKey,
+        spanName: FEATURE,
+        model: WIRE_MODEL,
+        provider: "gemini",
+        consentGranted: requestGrantsAnalyticsCapture(req),
+        providerResponse: details.response,
+        httpStatus: details.httpStatus,
+        error: details.error,
+        startedAt: providerStartedAt,
+      });
     let upstream: Response;
     try {
       const providerRequest = buildGeminiDirectChatRequest({
@@ -604,10 +630,7 @@ export async function handleAiDoctorReviewRequest(
         geminiModelId: WIRE_MODEL,
         signal: ctrl.signal,
         body: {
-          messages: [
-            { role: "system", content: promptMessages.system },
-            { role: "user", content: promptMessages.user },
-          ],
+          messages: aiInput,
           tools: [TOOL_SCHEMA],
           tool_choice: {
             type: "function",
@@ -617,6 +640,7 @@ export async function handleAiDoctorReviewRequest(
       });
       upstream = await fetch(GATEWAY_URL, providerRequest);
     } catch {
+      captureGeneration({ error: "network_or_timeout" });
       console.log("ai-doctor-review status=timeout_or_network");
       return failureAfterRefund(spendId, "upstream_timeout", "timeout");
     } finally {
@@ -624,6 +648,7 @@ export async function handleAiDoctorReviewRequest(
     }
 
     if (upstream.status === 402) {
+      captureGeneration({ httpStatus: upstream.status, error: "upstream_credit_exhausted" });
       console.log("ai-doctor-review status=upstream_credit_exhausted");
       try {
         await upstream.text();
@@ -634,6 +659,7 @@ export async function handleAiDoctorReviewRequest(
     }
 
     if (upstream.status === 429) {
+      captureGeneration({ httpStatus: upstream.status, error: "upstream_credit_exhausted" });
       console.log("ai-doctor-review status=upstream_credit_exhausted");
       try {
         await upstream.text();
@@ -644,6 +670,7 @@ export async function handleAiDoctorReviewRequest(
     }
 
     if (!upstream.ok) {
+      captureGeneration({ httpStatus: upstream.status, error: "upstream_http_error" });
       console.log(`ai-doctor-review status=http_${upstream.status}`);
       try {
         await upstream.text();
@@ -657,9 +684,12 @@ export async function handleAiDoctorReviewRequest(
     try {
       payload = await upstream.json();
     } catch {
+      captureGeneration({ httpStatus: upstream.status, error: "invalid_json_response" });
       console.log("ai-doctor-review status=parse_error");
       return failureAfterRefund(spendId, "upstream_parse", "parse");
     }
+
+    captureGeneration({ httpStatus: upstream.status, response: payload });
 
     // Provider response boundary: attach provider-reported token usage to the
     // in-memory prompt measurement. Pure, immutable; never persisted, never

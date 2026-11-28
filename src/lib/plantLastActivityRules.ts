@@ -17,6 +17,7 @@ import {
   isQuickLogPlaceholderNote,
 } from "@/lib/plantFeedingDisplayRules";
 import { buildRecentQuickLogActivity } from "@/lib/quickLogHistoryRules";
+import { hasQuickLogNoteMarker } from "@/lib/quickLogNoteMarkerRules";
 
 /** A diary row: only the times are read directly; the rest goes to the normalizer. */
 type ActivityRow = { entry_at?: string | null; created_at?: string | null; [key: string]: unknown };
@@ -131,7 +132,14 @@ export function resolvePlantLastActivitySummary(
     firstLine.length > PLANT_LAST_ACTIVITY_TEXT_MAX
       ? `${firstLine.slice(0, PLANT_LAST_ACTIVITY_TEXT_MAX - 1).trimEnd()}…`
       : firstLine;
-  return { eventType: entry.eventType, text };
+  // A Quick Log Note persists as an observation carrying the note marker. The
+  // Timeline titles it "Note", so Last activity must not call it "Observation"
+  // (FA-20261119-M1 item 2). Unmarked observations keep their own type.
+  const eventType =
+    entry.eventType === "observation" && hasQuickLogNoteMarker(newest.row.details)
+      ? "note"
+      : entry.eventType;
+  return { eventType, text };
 }
 
 /** Types the diary type table lacks, with the names Quick Log gives them. */

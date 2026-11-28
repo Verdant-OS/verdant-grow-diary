@@ -8,9 +8,22 @@ const calibrationState = vi.hoisted(() => ({
   isError: false,
 }));
 
+// The calibration notice only applies to a tent that reports soil moisture
+// (#3029 gates the lookup on soil readings), so these cases supply one.
+const SOIL_ROWS = vi.hoisted(() => [
+  {
+    id: "soil-1",
+    metric: "soil_moisture_pct",
+    value: 45,
+    captured_at: "2026-11-19T10:00:00.000Z",
+    source: "manual",
+    quality: null,
+  },
+]);
+
 vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadings: () => ({
-    data: [],
+    data: SOIL_ROWS,
     isLoading: false,
     isError: false,
     refetch: vi.fn(),

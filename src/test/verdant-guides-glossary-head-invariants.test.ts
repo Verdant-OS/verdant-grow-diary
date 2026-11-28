@@ -180,7 +180,9 @@ describe("Guides + glossary SSR head matches global invariants", () => {
         .sort();
       const expected = ["BreadcrumbList", "FAQPage", "WebPage"];
       if (guide.howTo) expected.push("HowTo");
-      if (guide.publishedOn) expected.push("Article");
+      const personAuthored =
+        guide.slug === "grow-diary-app" || guide.slug === "grow-log-without-spreadsheets";
+      if (guide.publishedOn || personAuthored) expected.push("Article");
       expect(types).toEqual(expected.sort());
     },
   );

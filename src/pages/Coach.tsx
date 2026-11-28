@@ -35,6 +35,7 @@ import AiCreditLimitNotice from "@/components/AiCreditLimitNotice";
 import AiCreditRemainingBadge from "@/components/AiCreditRemainingBadge";
 import AiCreditServiceDegradedNotice from "@/components/AiCreditServiceDegradedNotice";
 import { adaptCreditedAiResponse } from "@/lib/aiCreditedResponseAdapter";
+import { grantedAnalyticsConsentHeaders } from "@/lib/analyticsConsent";
 import type { AiCreditDenial } from "@/lib/aiCreditLimitNoticeViewModel";
 import type { AiCreditRemainingInput } from "@/lib/aiCreditRemainingBadgeViewModel";
 import { buildLegacyAiSensorEvidence } from "@/lib/growSensorEvidenceRules";
@@ -320,6 +321,7 @@ export default function Coach() {
       }
       invocationStarted = true;
       const { data, error } = await supabase.functions.invoke("ai-coach", {
+        headers: grantedAnalyticsConsentHeaders(),
         body: {
           mode,
           growId: activeGrowId,

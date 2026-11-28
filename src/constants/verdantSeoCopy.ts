@@ -91,7 +91,7 @@ export const VERDANT_SEO_LANDING_SECTIONS: ReadonlyArray<SeoSection> = [
   {
     id: "seo-hardware-neutral",
     heading: "Use the grow gear you already own",
-    body: "Bring in readings without replacing your controller: AC Infinity and Spider Farmer exports import as labeled CSV history, while TrolMaster, EcoWitt, and other gear come in through manual snapshots or read-only integrations where available. Verdant is not another controller — it turns existing grow-room data logging into plant memory.",
+    body: "Bring in readings without replacing your controller: AC Infinity and Spider Farmer exports import as labeled CSV history, while TrolMaster, EcoWitt, and other gear come in through manual snapshots. Read-only EcoWitt readings are built but not confirmed live. Verdant is not another controller — it turns existing grow-room data logging into plant memory.",
     targetPhrases: [
       "AC Infinity data logging",
       "Spider Farmer data logging",
@@ -141,7 +141,7 @@ export const VERDANT_LANDING_FAQ: ReadonlyArray<FaqEntry> = [
   {
     question: "Can Verdant work with the grow equipment I already own?",
     answer:
-      "Yes. Verdant is hardware-neutral. AC Infinity and Spider Farmer exports import as CSV; TrolMaster, EcoWitt, SensorPush, and similar gear come in through manual snapshots or read-only integrations where available. Verdant does not replace your controller.",
+      "Yes. Verdant is hardware-neutral. AC Infinity and Spider Farmer exports import as CSV; TrolMaster, EcoWitt, SensorPush, and similar gear come in through manual snapshots. Read-only EcoWitt readings are built but not confirmed live. Verdant does not replace your controller.",
   },
   {
     question: "Does Verdant control my lights, fans, irrigation, or humidifier?",
@@ -188,7 +188,7 @@ export const VERDANT_PRICING_FAQ_ADDITIONS: ReadonlyArray<FaqEntry> = [
   {
     question: "Does Verdant charge extra for AI Doctor?",
     answer:
-      "No à-la-carte AI charges. Free includes 3 AI Doctor credits per grow. Pro Monthly and Pro Annual each include 100 AI Doctor credits per UTC calendar month. Craft includes 300. Credits are capped, never unlimited.",
+      "Free includes 3 AI Doctor credits per grow. Pro Monthly and Pro Annual each include 100 AI Doctor credits per UTC calendar month, and Craft includes 300. Credits are capped, never unlimited. Pro and Craft members can also buy one-time credit packs when they run out: 50 credits for $9 or 150 credits for $19. Packs never expire.",
   },
   {
     question: "Can I use Verdant without live sensors?",

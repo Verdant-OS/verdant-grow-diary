@@ -23,7 +23,16 @@
  *   - No recommendation, no health inference, no "safe to feed / train
  *     / defoliate", no harvest readiness, no diagnosis language.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { QueryClientContext } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +58,10 @@ import {
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
 import { fileClaimsPng, validateQuickLogPngClaim } from "@/lib/quickLogPhotoContentRules";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
+import {
+  applyQuickLogV2Refresh,
+  resolveQuickLogV2RefreshScope,
+} from "@/lib/quickLogV2RefreshRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
   buildQuickLogSaveSignature,
@@ -123,6 +136,7 @@ import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreferen
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTypes";
 import type { CanonicalQuickLogStage } from "@/lib/grow";
+import { buildQuickLogSavedNoteExcerpt } from "@/lib/quickLogNoteSaveRules";
 import {
   buildSymptomTimelineHref,
   hasGuidedSymptomPlant,
@@ -200,6 +214,8 @@ export interface QuickLogAllActivitiesSaveSuccess {
   /** Existing uncertain write confirmed later; compare its handoff before consuming a draft. */
   readonly recovered?: true;
   readonly reviewedStarterHandoffKey?: string | null;
+  /** Trimmed text of a saved Note activity; omitted for other activities and empty notes. */
+  readonly noteText?: string;
 }
 
 /** Map a QuickLogActivityId to the "What was saved" DailyCheck source. */
@@ -250,6 +266,8 @@ interface SavedRecord {
   target: QuickLogAllActivitiesSaveTarget;
   growEventId: string | null;
   symptomCheck: boolean;
+  /** Excerpt of the saved note text, shown in "What was saved". */
+  noteExcerpt: string | null;
 }
 
 function ActivityNoteLimit({
@@ -424,6 +442,16 @@ export default function QuickLogAllActivitiesSection({
   const [structuredWaterError, setStructuredWaterError] = useState<string | null>(null);
   const [structuredFeedError, setStructuredFeedError] = useState<string | null>(null);
   const { save, saving } = useQuickLogActivitySave();
+  // The plant-page React Query reads have no listener for verdant:entry-created
+  // (Timeline already refreshes itself). Without a provider there is no cache to refresh.
+  const queryClient = useContext(QueryClientContext);
+  const refreshConfirmedSave = useCallback(
+    (target: QuickLogAllActivitiesSaveTarget) => {
+      if (!queryClient) return;
+      applyQuickLogV2Refresh(queryClient, resolveQuickLogV2RefreshScope(target));
+    },
+    [queryClient],
+  );
   const localSaveInFlightRef = useRef(false);
   const activitySaveKeyRef = useRef<QuickLogSaveKeyState | null>(null);
   const [pendingActivity, setPendingActivity] = useState<PendingQuickLogActivity | null>(null);
@@ -837,6 +865,7 @@ export default function QuickLogAllActivitiesSection({
         tentId: record.input.tentId,
         plantId: record.input.plantId,
       });
+      refreshConfirmedSave(capturedTarget);
       const stillCurrent =
         liveOwnerIdRef.current === record.ownerId &&
         liveTargetKeyRef.current === buildQuickLogTargetKey(capturedTarget);
@@ -870,6 +899,7 @@ export default function QuickLogAllActivitiesSection({
                 target: capturedTarget,
                 growEventId,
                 symptomCheck: record.receipt.symptomCheck,
+                noteExcerpt: buildQuickLogSavedNoteExcerpt(record.input.note),
               },
             ]);
         }
@@ -899,12 +929,15 @@ export default function QuickLogAllActivitiesSection({
           growEventId,
           recovered: true,
           reviewedStarterHandoffKey: record.reviewedStarterHandoffKey ?? null,
+          ...(record.input.activityId === "note" && record.input.note && record.input.note.trim()
+            ? { noteText: record.input.note.trim() }
+            : {}),
         });
       } catch {
         // The confirmed write remains successful if parent cleanup fails.
       }
     },
-    [onSaveSuccess],
+    [onSaveSuccess, refreshConfirmedSave],
   );
 
   const handleRetryPendingActivity = useCallback(async () => {
@@ -1353,6 +1386,7 @@ export default function QuickLogAllActivitiesSection({
             source: "quick_log_v2",
             activityId: "photo",
           });
+          refreshConfirmedSave(capturedTarget);
           trackQuickLogSuccess("photo", { reused: false });
         } catch {
           // Any unexpected failure after upload remains unconfirmed. Retain
@@ -1431,6 +1465,7 @@ export default function QuickLogAllActivitiesSection({
           return;
         }
         savedGrowEventId = result.growEventId ?? null;
+        refreshConfirmedSave(capturedTarget);
         if (clearPendingQuickLogActivity(claim.record)) {
           if (stillCurrent) setPendingActivity(null);
         } else {
@@ -1466,6 +1501,7 @@ export default function QuickLogAllActivitiesSection({
                 target: capturedTarget,
                 growEventId: savedGrowEventId,
                 symptomCheck: guidedSymptomCheck && selected.id === "issue_observation",
+                noteExcerpt: buildQuickLogSavedNoteExcerpt(activityInput.note),
               },
             ]);
           }
@@ -1476,6 +1512,7 @@ export default function QuickLogAllActivitiesSection({
           activityId: selected.id,
           target: capturedTarget,
           growEventId: savedGrowEventId,
+          ...(selected.id === "note" && activityInput.note ? { noteText: activityInput.note } : {}),
         });
       } catch {
         // Persistence already succeeded. A caller-owned local cleanup
@@ -1534,6 +1571,7 @@ export default function QuickLogAllActivitiesSection({
     activityPersistenceBlockReason,
     activeEnvCheckTempUnit,
     onSaveSuccess,
+    refreshConfirmedSave,
     guidedSymptomCheck,
     guidedSymptomStage,
     guidedSymptomStageConfirmed,
@@ -2255,6 +2293,14 @@ export default function QuickLogAllActivitiesSection({
                 data-target-plant-id={s.target.plantId ?? undefined}
               >
                 <span>{s.item.label}</span>
+                {s.noteExcerpt && (
+                  <span
+                    className="mt-0.5 block whitespace-pre-wrap break-words text-muted-foreground"
+                    data-testid={`${testIdPrefix}-saved-note`}
+                  >
+                    “{s.noteExcerpt}”
+                  </span>
+                )}
                 {s.symptomCheck &&
                   (() => {
                     const href = buildSymptomTimelineHref(s.target.growId, s.growEventId);

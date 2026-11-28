@@ -209,6 +209,31 @@ function versionIn(text) {
   return match ? match[1] : null;
 }
 
+/**
+ * From 2026-11-20.1 the routing and smoke paragraphs live once in
+ * docs/agents/SENTINEL_BLOCK.md. Each governance file must point at that file
+ * and at the start page, and the block must still contain every moved copy.
+ * Older versions keep the previous layout. Deleting the block, or a sentence
+ * from it, fails this check. The GEMINI.md constitution mirror is unchanged.
+ */
+function requiresSharedBlock(version) {
+  if (!version) return false;
+  const [date, revision] = version.split(".");
+  return date > "2026-11-20" || (date === "2026-11-20" && BigInt(revision) >= 1n);
+}
+
+const SHARED_POINTERS = [
+  "Sentinel block (read, do not restate): docs/agents/SENTINEL_BLOCK.md",
+  "Start page (do not restate): docs/agents/START_HERE.md",
+];
+
+/** Full moved copies. Operative prose must still contain each one. */
+const SENTINEL_BLOCK_PINS = [
+  "Independent acceptance routing: select an **actually available, eligible independent\nreviewer session** for the complete scope under `docs/agents/OWNERSHIP.md` \u00a74.3.\n**Blue Dream and Critical Mass are retired from future routing**; preserve historical\nreceipts. **Codex** remains eligible on work Codex neither authored nor repaired.\nA **non-contributing Claude or Grok review session** may give independent acceptance,\nincluding for Codex-authored work; **Durban Poison** remains eligible when available.\nExclude every author and repairer even after a task transfer. A shared GitHub identity\nalone does not establish independence: record session, role, contributor exclusions,\nfull 40-character head SHA, complete scope, evidence and verdict.\nThe merge gate still requires **35/35 required checks** and an independent\n**PASS at the exact head SHA**, with no P1 or P2; seats are named only in the roster. **Graft** retains only its existing\nOWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,\nprotected or mixed scopes still need an eligible outside reviewer. Required CI and\nsupplemental evidence, protected-file gates, holds, merge queue and founder-only\nproduction controls remain. Codex uses normal pushes only: no force-push, merge,\nPublish, SQL apply or production Supabase writes. Drafts remain draft.\nCheck the existing request and receipt before pinging; keep one current review request\nper PR/full head with owner, permalink and requested/running/blocked/verdict/superseded\nstate. Transfer an unavailable reviewer once to an eligible fallback; otherwise record\nBLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence\nare not PASS. Preserve a still-valid independent review without a duplicate request.\n\nHosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep\nE2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the\ndisposable test account owns the fixture grow and its selected tent/plant;\ntag every saved grow record `[smoke <timestamp>]`. Never write customer data or\nuse the KEEP account. Stop a write if identity, ownership or tagging cannot\nbe verified; report that exact safety gap rather than proposing another host.\nLocal/CI fixtures validate code, not production. Repository integration follows\nthe explicit merge gate in AGENTS.md; it is not production acceptance. No\nPublish, production APPLY, real charge, role/auth change, device control or\nAction Queue operation is authorized here. Existing owner locks remain.\nSee docs/production-only-verification-runbook.md.",
+  "Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` \u00a74.3.\n**Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.\nExclude every author and repairer even after a task transfer. A shared GitHub identity\nalone does not establish independence: record session, role, contributor exclusions,\nfull 40-character head SHA, complete scope, evidence and verdict.\nThe Merge Steward's gate still requires **35/35 required checks** and an independent\n**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing\nOWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,\nprotected or mixed scopes still need an eligible outside reviewer. Required CI and\nsupplemental evidence, protected-file gates, holds, merge queue and founder-only\nproduction controls remain. Builder and Fixer seats use normal pushes only: no force-push, merge,\nPublish, SQL apply or production Supabase writes. Drafts remain draft.\nThe Merge Steward has no authority over the PR #1971 hold, which stays with the Coordinator.\nCheck the existing request and receipt before pinging; keep one current review request\nper PR/full head with owner, permalink and requested/running/blocked/verdict/superseded\nstate. Transfer an unavailable reviewer once to an eligible fallback; otherwise record\nBLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence\nare not PASS. Preserve a still-valid independent review without a duplicate request.\n\nHosted smoke/verification uses **https://verdantgrowdiary.com** only. Keep\nE2E_BASE_URL and E2E_GROW_1_PLANT_URL there. Before a smoke write, verify the\ndisposable test account owns the fixture grow and its selected tent/plant;\ntag every saved grow record `[smoke <timestamp>]`. Never write customer data or\nuse the KEEP account. Stop a write if identity, ownership or tagging cannot\nbe verified; report that exact safety gap rather than proposing another host.\nLocal/CI fixtures validate code, not production. Repository integration follows\nthe explicit merge gate in AGENTS.md; it is not production acceptance. No\nPublish, production APPLY, real charge, role/auth change, device control or\nAction Queue operation is authorized here. Existing owner locks remain.\nSee docs/production-only-verification-runbook.md.",
+  "Independent acceptance routing: the Coordinator selects an actually available Reviewer seat (A, B, C, or D) for the complete scope under `docs/agents/OWNERSHIP.md` \u00a74.3.\n**Critical Mass is retired from future routing**; preserve historical receipts. Reviewer C, Reviewer D, and QA are active. Holders are named only in the roster.\nExclude every author and repairer even after a task transfer. A shared GitHub identity\nalone does not establish independence: record session, role, contributor exclusions,\nfull 40-character head SHA, complete scope, evidence and verdict.\nThe Merge Steward's gate still requires **35/35 required checks** and an independent\n**PASS at the exact head SHA**, with no P1 or P2. **Graft** retains only its existing\nOWNERSHIP.md low-risk allowlist on work Graft neither authored nor repaired; governance,\nprotected or mixed scopes still need an eligible outside reviewer. Required CI and\nsupplemental evidence, protected-file gates, holds, merge queue and founder-only\nproduction controls remain. Builder and Fixer seats use normal pushes only: no force-push, merge,\nPublish, SQL apply or production Supabase writes. Drafts remain draft.\nThe Merge Steward has no authority over the PR #1971 hold.\nCheck the existing request and receipt before pinging; keep one current review request\nper PR/full head with owner, permalink and requested/running/blocked/verdict/superseded\nstate. Transfer an unavailable reviewer once to an eligible fallback; otherwise record\nBLOCKED. A new head invalidates the old verdict; pending, acknowledgments and silence\nare not PASS. Preserve a still-valid independent review without a duplicate request.",
+];
+
 /** The coverage field becomes mandatory in the 2026-09-28.3 constitution. */
 function requiresHandoffAck(version) {
   if (!version) return false;
@@ -308,6 +333,51 @@ for (const path of [CANONICAL, ...ROLE_FILES]) {
   const text = head.get(path)?.text.replace(/\r\n/g, "\n") ?? "";
   if (text && !text.includes(requiredStartupGate)) {
     problems.push(`${path}: exact mandatory SENTINEL_ACK startup gate is missing`);
+  }
+}
+
+if (requiresSharedBlock(canonicalVersion)) {
+  const blockPath = "docs/agents/SENTINEL_BLOCK.md";
+  if (!existsSync(blockPath)) {
+    problems.push(
+      `${blockPath}: missing. The routing and smoke rules live in this one file; ` +
+        "governance files only point at it.",
+    );
+  } else {
+    const blockText = readFileSync(blockPath, "utf8").replace(/\r\n/g, "\n");
+    const blockVersion = versionIn(blockText);
+    if (blockVersion !== canonicalVersion) {
+      problems.push(
+        `${blockPath}: Sentinel-Version ${blockVersion ?? "missing"} does not match ` +
+          `${CANONICAL} ${canonicalVersion}`,
+      );
+    }
+    const blockProse = normalizeWhitespace(operativeProse(blockText));
+    for (const pin of SENTINEL_BLOCK_PINS) {
+      if (!blockProse.includes(normalizeWhitespace(pin))) {
+        problems.push(
+          `${blockPath}: a moved copy is missing from operative prose ` +
+            `(${JSON.stringify(pin.slice(0, 80))}). A copy inside a comment, fence, or ` +
+            "blockquote does not count.",
+        );
+      }
+    }
+  }
+  if (!existsSync("docs/agents/START_HERE.md")) {
+    problems.push("docs/agents/START_HERE.md: missing start page");
+  }
+  for (const path of ALL) {
+    const text = head.get(path)?.text.replace(/\r\n/g, "\n") ?? "";
+    if (!text) continue;
+    const prose = normalizeWhitespace(operativeProse(text));
+    for (const pointer of SHARED_POINTERS) {
+      if (!prose.includes(normalizeWhitespace(pointer))) {
+        problems.push(
+          `${path}: missing shared pointer in operative prose ${JSON.stringify(pointer)}. ` +
+            "A copy inside a comment, fence, or blockquote does not count.",
+        );
+      }
+    }
   }
 }
 
@@ -481,6 +551,22 @@ if (!base) {
           `${entry.version}. Bump it — and every other governance file, which PARITY ` +
           `then requires, so the GEMINI.md mirror is updated in the same commit.`,
       );
+    }
+  }
+  if (requiresSharedBlock(canonicalVersion)) {
+    for (const path of ["docs/agents/SENTINEL_BLOCK.md", "docs/agents/START_HERE.md"]) {
+      if (!existsSync(path)) continue;
+      const headText = readFileSync(path, "utf8");
+      const baseText = contentAt(base.sha, path);
+      if (normalize(headText) === (baseText === null ? null : normalize(baseText))) continue;
+      changedFiles += 1;
+      if (baseCanonicalVersion === canonicalVersion) {
+        problems.push(
+          `${path}: content changed against ${base.ref} but ${CANONICAL} Sentinel-Version ` +
+            `is still ${canonicalVersion}. Bump every governance file and stamp ` +
+            "docs/agents/SENTINEL_BLOCK.md with the same version.",
+        );
+      }
     }
   }
   notes.push(

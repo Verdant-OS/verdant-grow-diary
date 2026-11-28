@@ -9,6 +9,9 @@ export const FIELD_NOTEBOOK_EMPTY_NOTE_PLACEHOLDER = "Add what you observed.";
 
 export const FIELD_NOTEBOOK_READING_MISSING = "—";
 
+/** Tile value when a reading is absent; matches the tent panel's word. */
+export const FIELD_NOTEBOOK_READING_ABSENT = "Missing";
+
 export interface ReadingSlot {
   label: "TEMP" | "RH" | "VPD" | "PPFD";
   /** Null when the reading is absent. Zero is a real value. */
@@ -20,7 +23,7 @@ export interface ReadingSlot {
 }
 
 export function formatReadingValue(value: string | null): string {
-  if (value === null || value.trim() === "") return FIELD_NOTEBOOK_READING_MISSING;
+  if (value === null || value.trim() === "") return FIELD_NOTEBOOK_READING_ABSENT;
   return value;
 }
 
